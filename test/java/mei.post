@@ -1,0 +1,16 @@
+POST /login HTTP/1.1
+Host: mei.fm
+Connection: keep-alive
+Content-Length: 46
+Origin: http://mei.fm
+X-Requested-With: XMLHttpRequest
+User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/535.11 (KHTML, like Gecko) Chrome/17.0.963.26 Safari/535.11
+Content-Type: application/x-www-form-urlencoded
+Accept: application/json, text/javascript, */*; q=0.01
+Referer: http://mei.fm/beta_shield
+Accept-Encoding: gzip,deflate,sdch
+Accept-Language: en-US,en;q=0.8
+Accept-Charset: UTF-8,*;q=0.5
+Cookie: delvisitor="dFzA69Q5og1xZ35YBjTVr3RB8FlLWJ0JngjP+nGy2vl72D0iV0Poadu6KQyB6az3ZPEsTj8Y6KhDRfX0A88v+Q\075\075"; __utma=191365302.1258807376.1330827372.1331303406.1331351563.6; __utmb=191365302.1.10.1331351563; __utmc=191365302; __utmz=191365302.1330827372.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none); _chartbeat2=i65n4fjg39bn7njy.1330827380652.1331351563719.00000000000001
+
+email=feng.shen%40onycloud.com&password=as1234
