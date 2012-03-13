@@ -4,7 +4,7 @@ import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.Set;
 
-public interface HttpMessage {
+public interface IHttpMessage {
 
     State decode(ByteBuffer buffer);
 

@@ -5,7 +5,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
-public class DefaultHttpRequest implements HttpRequest {
+public class DefaultHttpRequest implements IHttpRequest {
     static final byte CR = 13;
     static final byte LF = 10;
     static final String CONTENT_LENGTH = "content-length";
@@ -60,7 +60,7 @@ public class DefaultHttpRequest implements HttpRequest {
         }
     }
 
-    void splitAddHeader(String sb) {
+    void splitAndAddHeader(String sb) {
         final int length = sb.length();
         int nameStart;
         int nameEnd;
@@ -139,42 +139,47 @@ public class DefaultHttpRequest implements HttpRequest {
     }
 
     public boolean isKeepAlive() {
-        return false;
+        return version == HttpVersion.HTTP_1_1;
     }
 
     public State decode(ByteBuffer buffer) {
-        while (buffer.hasRemaining()
-                && (state != State.PROTOCOL_ERROR || state != State.ALL_READ)) {
-            switch (state) {
-            case READ_INITIAL:
-                readInitialLine(buffer);
-                state = State.READ_HEADER;
-                break;
-            case READ_HEADER:
-                String line = readLine(buffer);
-                while (!line.isEmpty()) {
-                    splitAddHeader(line);
-                    line = readLine(buffer);
-                }
-                String cl = headers.get(CONTENT_LENGTH);
-                if (cl != null) {
-                    try {
-                        contentLength = Integer.parseInt(cl);
-                        content = new byte[contentLength];
-                        contentRemain = contentLength;
-                        state = State.READ_FIXED_LENGTH_CONTENT;
-                    } catch (NumberFormatException e) {
+        try {
+            while (buffer.hasRemaining()
+                    && (state != State.PROTOCOL_ERROR || state != State.ALL_READ)) {
+                switch (state) {
+                case READ_INITIAL:
+                    readInitialLine(buffer);
+                    state = State.READ_HEADER;
+                    break;
+                case READ_HEADER:
+                    String line = readLine(buffer);
+                    while (!line.isEmpty()) {
+                        splitAndAddHeader(line);
+                        line = readLine(buffer);
                     }
-                } else {
-                    state = State.ALL_READ;
+                    String cl = headers.get(CONTENT_LENGTH);
+                    if (cl != null) {
+                        try {
+                            contentLength = Integer.parseInt(cl);
+                            content = new byte[contentLength];
+                            contentRemain = contentLength;
+                            state = State.READ_FIXED_LENGTH_CONTENT;
+                        } catch (NumberFormatException e) {
+                            state = State.PROTOCOL_ERROR;
+                        }
+                    } else {
+                        state = State.ALL_READ;
+                    }
+                    break;
+                case READ_FIXED_LENGTH_CONTENT:
+                    int remain = buffer.remaining();
+                    int read = Math.min(remain, contentRemain);
+                    buffer.get(content, contentLength - contentRemain, read);
+                    break;
                 }
-                break;
-            case READ_FIXED_LENGTH_CONTENT:
-                int remain = buffer.remaining();
-                int read = Math.min(remain, contentRemain);
-                buffer.get(content, contentLength - contentRemain, read);
-                break;
             }
+        } catch (Exception e) {
+            state = State.PROTOCOL_ERROR;
         }
         return state;
     }

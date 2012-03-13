@@ -1,6 +1,6 @@
 package me.shenfeng.http.codec;
 
-public interface HttpResponse extends HttpMessage {
+public interface IHttpResponse extends IHttpMessage {
 
     /**
      * Returns the status of this response.
