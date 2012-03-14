@@ -9,6 +9,16 @@ import me.shenfeng.http.codec.IHttpRequest;
 
 import org.junit.Test;
 
+class SingleThreadHandler implements IHandler {
+    public void handle(IHttpRequest request, IParamedRunnable callback) {
+        ByteBuffer buffer = ByteBuffer
+                .wrap("HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\n0123456789"
+                        .getBytes());
+
+        callback.run(buffer);
+    }
+}
+
 public class HttpServerTest {
 
     @Test
@@ -46,15 +56,5 @@ class MultiThreadHandler implements IHandler {
                 callback.run(buffer);
             }
         });
-    }
-}
-
-class SingleThreadHandler implements IHandler {
-    public void handle(IHttpRequest request, IParamedRunnable callback) {
-        ByteBuffer buffer = ByteBuffer
-                .wrap("HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\n0123456789"
-                        .getBytes());
-
-        callback.run(buffer);
     }
 }
