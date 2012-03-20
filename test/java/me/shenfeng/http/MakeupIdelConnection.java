@@ -21,32 +21,31 @@ import java.util.Set;
 public class MakeupIdelConnection {
 
     final static int STEPS = 10;
-    final static int connectionPerIP = 50000;
+    final static int connectionPerIP = 5000;
 
     public static void main(String[] args) throws IOException {
 
         final Selector selector = Selector.open();
 
-        InetSocketAddress locals[] = {
-                // new InetSocketAddress("127.0.0.1", 9090),
-                // new InetSocketAddress("192.168.1.114", 9090),
-                // new InetSocketAddress("192.168.1.21", 9090),
-                new InetSocketAddress("192.168.1.22", 9090),
-                new InetSocketAddress("192.168.1.23", 9090),
-                new InetSocketAddress("192.168.1.24", 9090),
-                new InetSocketAddress("192.168.1.25", 9090),
-                new InetSocketAddress("192.168.1.26", 9090),
-                new InetSocketAddress("192.168.1.27", 9090),
-                new InetSocketAddress("192.168.1.28", 9090),
-                new InetSocketAddress("192.168.1.29", 9090),
-                new InetSocketAddress("192.168.1.30", 9090),
-                new InetSocketAddress("192.168.1.31", 9090),
-                new InetSocketAddress("192.168.1.32", 9090),
-                new InetSocketAddress("192.168.1.33", 9090),
-                new InetSocketAddress("192.168.1.34", 9090),
-                new InetSocketAddress("192.168.1.35", 9090),
-                new InetSocketAddress("192.168.1.36", 9090),
-                new InetSocketAddress("192.168.1.37", 9090),
+        InetSocketAddress locals[] = { new InetSocketAddress("127.0.0.1", 9091),
+        // new InetSocketAddress("192.168.1.114", 9090),
+        // new InetSocketAddress("192.168.1.21", 9090),
+        // new InetSocketAddress("192.168.1.22", 9090),
+        // new InetSocketAddress("192.168.1.23", 9090),
+        // new InetSocketAddress("192.168.1.24", 9090),
+        // new InetSocketAddress("192.168.1.25", 9090),
+        // new InetSocketAddress("192.168.1.26", 9090),
+        // new InetSocketAddress("192.168.1.27", 9090),
+        // new InetSocketAddress("192.168.1.28", 9090),
+        // new InetSocketAddress("192.168.1.29", 9090),
+        // new InetSocketAddress("192.168.1.30", 9090),
+        // new InetSocketAddress("192.168.1.31", 9090),
+        // new InetSocketAddress("192.168.1.32", 9090),
+        // new InetSocketAddress("192.168.1.33", 9090),
+        // new InetSocketAddress("192.168.1.34", 9090),
+        // new InetSocketAddress("192.168.1.35", 9090),
+        // new InetSocketAddress("192.168.1.36", 9090),
+        // new InetSocketAddress("192.168.1.37", 9090),
 
         };
 
@@ -90,8 +89,7 @@ public class MakeupIdelConnection {
                         SocketChannel ch = (SocketChannel) key.channel();
                         if (ch.finishConnect()) {
                             ++connected;
-                            if (connected
-                                    % (connectionPerIP * locals.length / 10) == 0) {
+                            if (connected % (connectionPerIP * locals.length / 10) == 0) {
                                 System.out.println("connected: " + connected);
                             }
                             key.interestOps(SelectionKey.OP_READ);

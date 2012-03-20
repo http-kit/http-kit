@@ -1,7 +1,7 @@
-package me.shenfeng.http;
+package me.shenfeng.http.server;
 
 import me.shenfeng.http.codec.IHttpRequest;
 
-interface IHandler {
+public interface IHandler {
     void handle(IHttpRequest request, IParamedRunnable callback);
 }

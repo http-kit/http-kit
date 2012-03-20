@@ -1,21 +1,27 @@
 package me.shenfeng.http.codec;
 
-
 public class HttpResponseStatus {
 
     private final int code;
     private final String reasonPhrase;
+    private byte[] bytes;
 
     public HttpResponseStatus(int code, String reasonPhrase) {
         this.code = code;
         this.reasonPhrase = reasonPhrase;
+        bytes = ("HTTP/1.1 " + code + " " + reasonPhrase + "\r\n")
+                .getBytes(HttpUtils.ASCII);
+    }
+
+    public byte[] getResponseIntialLineBytes() {
+        return bytes;
     }
 
     /**
      * 100 Continue
      */
-    public static final HttpResponseStatus CONTINUE = new HttpResponseStatus(
-            100, "Continue");
+    public static final HttpResponseStatus CONTINUE = new HttpResponseStatus(100,
+            "Continue");
 
     /**
      * 101 Switching Protocols
@@ -26,26 +32,25 @@ public class HttpResponseStatus {
     /**
      * 102 Processing (WebDAV, RFC2518)
      */
-    public static final HttpResponseStatus PROCESSING = new HttpResponseStatus(
-            102, "Processing");
+    public static final HttpResponseStatus PROCESSING = new HttpResponseStatus(102,
+            "Processing");
 
     /**
      * 200 OK
      */
-    public static final HttpResponseStatus OK = new HttpResponseStatus(200,
-            "OK");
+    public static final HttpResponseStatus OK = new HttpResponseStatus(200, "OK");
 
     /**
      * 201 Created
      */
-    public static final HttpResponseStatus CREATED = new HttpResponseStatus(
-            201, "Created");
+    public static final HttpResponseStatus CREATED = new HttpResponseStatus(201,
+            "Created");
 
     /**
      * 202 Accepted
      */
-    public static final HttpResponseStatus ACCEPTED = new HttpResponseStatus(
-            202, "Accepted");
+    public static final HttpResponseStatus ACCEPTED = new HttpResponseStatus(202,
+            "Accepted");
 
     /**
      * 203 Non-Authoritative Information (since HTTP/1.1)
@@ -56,14 +61,14 @@ public class HttpResponseStatus {
     /**
      * 204 No Content
      */
-    public static final HttpResponseStatus NO_CONTENT = new HttpResponseStatus(
-            204, "No Content");
+    public static final HttpResponseStatus NO_CONTENT = new HttpResponseStatus(204,
+            "No Content");
 
     /**
      * 205 Reset Content
      */
-    public static final HttpResponseStatus RESET_CONTENT = new HttpResponseStatus(
-            205, "Reset Content");
+    public static final HttpResponseStatus RESET_CONTENT = new HttpResponseStatus(205,
+            "Reset Content");
 
     /**
      * 206 Partial Content
@@ -74,8 +79,8 @@ public class HttpResponseStatus {
     /**
      * 207 Multi-Status (WebDAV, RFC2518)
      */
-    public static final HttpResponseStatus MULTI_STATUS = new HttpResponseStatus(
-            207, "Multi-Status");
+    public static final HttpResponseStatus MULTI_STATUS = new HttpResponseStatus(207,
+            "Multi-Status");
 
     /**
      * 300 Multiple Choices
@@ -92,26 +97,25 @@ public class HttpResponseStatus {
     /**
      * 302 Found
      */
-    public static final HttpResponseStatus FOUND = new HttpResponseStatus(
-            302, "Found");
+    public static final HttpResponseStatus FOUND = new HttpResponseStatus(302, "Found");
 
     /**
      * 303 See Other (since HTTP/1.1)
      */
-    public static final HttpResponseStatus SEE_OTHER = new HttpResponseStatus(
-            303, "See Other");
+    public static final HttpResponseStatus SEE_OTHER = new HttpResponseStatus(303,
+            "See Other");
 
     /**
      * 304 Not Modified
      */
-    public static final HttpResponseStatus NOT_MODIFIED = new HttpResponseStatus(
-            304, "Not Modified");
+    public static final HttpResponseStatus NOT_MODIFIED = new HttpResponseStatus(304,
+            "Not Modified");
 
     /**
      * 305 Use Proxy (since HTTP/1.1)
      */
-    public static final HttpResponseStatus USE_PROXY = new HttpResponseStatus(
-            305, "Use Proxy");
+    public static final HttpResponseStatus USE_PROXY = new HttpResponseStatus(305,
+            "Use Proxy");
 
     /**
      * 307 Temporary Redirect (since HTTP/1.1)
@@ -122,14 +126,14 @@ public class HttpResponseStatus {
     /**
      * 400 Bad Request
      */
-    public static final HttpResponseStatus BAD_REQUEST = new HttpResponseStatus(
-            400, "Bad Request");
+    public static final HttpResponseStatus BAD_REQUEST = new HttpResponseStatus(400,
+            "Bad Request");
 
     /**
      * 401 Unauthorized
      */
-    public static final HttpResponseStatus UNAUTHORIZED = new HttpResponseStatus(
-            401, "Unauthorized");
+    public static final HttpResponseStatus UNAUTHORIZED = new HttpResponseStatus(401,
+            "Unauthorized");
 
     /**
      * 402 Payment Required
@@ -140,14 +144,14 @@ public class HttpResponseStatus {
     /**
      * 403 Forbidden
      */
-    public static final HttpResponseStatus FORBIDDEN = new HttpResponseStatus(
-            403, "Forbidden");
+    public static final HttpResponseStatus FORBIDDEN = new HttpResponseStatus(403,
+            "Forbidden");
 
     /**
      * 404 Not Found
      */
-    public static final HttpResponseStatus NOT_FOUND = new HttpResponseStatus(
-            404, "Not Found");
+    public static final HttpResponseStatus NOT_FOUND = new HttpResponseStatus(404,
+            "Not Found");
 
     /**
      * 405 Method Not Allowed
@@ -158,8 +162,8 @@ public class HttpResponseStatus {
     /**
      * 406 Not Acceptable
      */
-    public static final HttpResponseStatus NOT_ACCEPTABLE = new HttpResponseStatus(
-            406, "Not Acceptable");
+    public static final HttpResponseStatus NOT_ACCEPTABLE = new HttpResponseStatus(406,
+            "Not Acceptable");
 
     /**
      * 407 Proxy Authentication Required
@@ -176,14 +180,13 @@ public class HttpResponseStatus {
     /**
      * 409 Conflict
      */
-    public static final HttpResponseStatus CONFLICT = new HttpResponseStatus(
-            409, "Conflict");
+    public static final HttpResponseStatus CONFLICT = new HttpResponseStatus(409,
+            "Conflict");
 
     /**
      * 410 Gone
      */
-    public static final HttpResponseStatus GONE = new HttpResponseStatus(410,
-            "Gone");
+    public static final HttpResponseStatus GONE = new HttpResponseStatus(410, "Gone");
 
     /**
      * 411 Length Required
@@ -236,8 +239,8 @@ public class HttpResponseStatus {
     /**
      * 423 Locked (WebDAV, RFC4918)
      */
-    public static final HttpResponseStatus LOCKED = new HttpResponseStatus(
-            423, "Locked");
+    public static final HttpResponseStatus LOCKED = new HttpResponseStatus(423,
+            "Locked");
 
     /**
      * 424 Failed Dependency (WebDAV, RFC4918)
@@ -272,8 +275,8 @@ public class HttpResponseStatus {
     /**
      * 502 Bad Gateway
      */
-    public static final HttpResponseStatus BAD_GATEWAY = new HttpResponseStatus(
-            502, "Bad Gateway");
+    public static final HttpResponseStatus BAD_GATEWAY = new HttpResponseStatus(502,
+            "Bad Gateway");
 
     /**
      * 503 Service Unavailable
@@ -308,8 +311,8 @@ public class HttpResponseStatus {
     /**
      * 510 Not Extended (RFC2774)
      */
-    public static final HttpResponseStatus NOT_EXTENDED = new HttpResponseStatus(
-            510, "Not Extended");
+    public static final HttpResponseStatus NOT_EXTENDED = new HttpResponseStatus(510,
+            "Not Extended");
 
     public static HttpResponseStatus valueOf(int code) {
         switch (code) {

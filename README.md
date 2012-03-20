@@ -22,34 +22,35 @@ I write it for the http server and http client of
 ### simple interface
 ```java
 
-interface IHandler {
+public interface IHandler {
     void handle(IHttpRequest request, IParamedRunnable callback);
 }
 
-interface IParamedRunnable {
-    void run(ByteBuffer resp);
+public interface IParamedRunnable {
+    public void run(IHttpResponse resp);
 }
 
 ```
 ### provide a Ihandler, start the server
 
 ```java
-// single thread
 class SingleThreadHandler implements IHandler {
+    public static IHttpResponse resp(IHttpRequest req) {
+        IHttpResponse resp = new DefaultHttpResponse(HttpResponseStatus.OK,
+                HttpVersion.HTTP_1_1);
+        byte[] body = "hello word".getBytes();
+        resp.setContent(body);
+        resp.setHeader("Content-Length", body.length + "");
+        return resp;
+    }
     public void handle(IHttpRequest request, IParamedRunnable callback) {
-        ByteBuffer buffer = ByteBuffer
-                .wrap("HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\n0123456789"
-                        .getBytes());
-
-        callback.run(buffer);
+        callback.run(resp(request));
     }
 }
-
-public class HttpServerTest {
-    @Test
-    public void testSingleThreadServer() throws IOException {
-        // concurrency 1024, 2000000 request, time: 14294ms; 139918.85 req/s;
-        // receive: 93M data; 6.51 M/s
+public class SingleThreadHttpServerTest {
+    public static void main(String[] args) throws IOException {
+        // concurrency 1024, 2000000 request, time: 16545ms; 120882.44 req/s;
+        // receive: 93M data; 5.62 M/s
         HttpServer server = new HttpServer("0.0.0.0", 9091, new SingleThreadHandler());
         server.start();
     }
@@ -59,31 +60,24 @@ public class HttpServerTest {
 ```java
 class MultiThreadHandler implements IHandler {
     private ExecutorService exec;
-
     public MultiThreadHandler() {
         int core = 4; // Runtime.getRuntime().availableProcessors();
         exec = Executors.newFixedThreadPool(core);
     }
-
-    public void handle(IHttpRequest request, final IParamedRunnable callback) {
+    public void handle(final IHttpRequest request, final IParamedRunnable callback) {
         exec.submit(new Runnable() {
             public void run() {
-                ByteBuffer buffer = ByteBuffer
-                        .wrap("HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\n0123456789"
-                                .getBytes());
-
-                callback.run(buffer);
+                callback.run(SingleThreadHandler.resp(request));
             }
         });
     }
 }
-
-public class HttpServerTest {
-    @Test
-    public void testMultiThreadServer() throws IOException {
-        // concurrency 1024, 2000000 request, time: 16609ms; 120416.64 req/s;
-        // receive: 93M data; 5.60 M/s
+public class MultiThreadHttpServerTest {
+    public static void main(String[] args) throws IOException {
+        // concurrency 1024, 2000000 request, time: 17814ms; 112271.25 req/s;
+        // receive: 93M data; 5.22 M/s
         HttpServer server = new HttpServer("0.0.0.0", 9091, new MultiThreadHandler());
         server.start();
     }
+}
 ```

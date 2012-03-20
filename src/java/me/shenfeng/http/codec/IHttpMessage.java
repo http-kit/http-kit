@@ -1,24 +1,24 @@
 package me.shenfeng.http.codec;
 
-import java.nio.ByteBuffer;
 import java.util.Map;
-import java.util.Set;
 
 public interface IHttpMessage {
-
-    State decode(ByteBuffer buffer);
 
     String getHeader(String name);
 
     Map<String, String> getHeaders();
 
-    Set<String> getHeaderNames();
+    void setHeader(String name, String value);
 
     HttpVersion getProtocolVersion();
 
     byte[] getContent();
 
+    void setContent(byte[] content);
+
     long getContentLength();
+
+    HttpVersion getVersion();
 
     boolean isKeepAlive();
 }
