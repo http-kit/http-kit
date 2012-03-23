@@ -1,7 +1,7 @@
 package me.shenfeng.http.codec;
 
-import static me.shenfeng.http.codec.HttpUtils.CR;
-import static me.shenfeng.http.codec.HttpUtils.LF;
+import static me.shenfeng.http.HttpUtils.CR;
+import static me.shenfeng.http.HttpUtils.LF;
 
 import java.nio.ByteBuffer;
 

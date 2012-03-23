@@ -1,5 +1,7 @@
 package me.shenfeng.http.codec;
 
+import me.shenfeng.http.HttpUtils;
+
 public class DynamicBytes {
     private byte[] data;
     private int idx = 0;

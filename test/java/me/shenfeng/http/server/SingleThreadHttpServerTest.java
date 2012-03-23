@@ -8,8 +8,6 @@ import me.shenfeng.http.codec.HttpVersion;
 import me.shenfeng.http.codec.IHttpRequest;
 import me.shenfeng.http.codec.IHttpResponse;
 import me.shenfeng.http.server.HttpServer;
-import me.shenfeng.http.server.IHandler;
-import me.shenfeng.http.server.IParamedRunnable;
 
 class SingleThreadHandler implements IHandler {
     public static IHttpResponse resp(IHttpRequest req) {
@@ -21,8 +19,8 @@ class SingleThreadHandler implements IHandler {
         return resp;
     }
 
-    public void handle(IHttpRequest request, IParamedRunnable callback) {
-        callback.run(resp(request));
+    public void handle(IHttpRequest request, IParamedRunnable cb) {
+        cb.run(resp(request));
     }
 }
 

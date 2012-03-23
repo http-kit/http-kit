@@ -1,5 +1,7 @@
 package me.shenfeng.http.codec;
 
+import me.shenfeng.http.HttpUtils;
+
 public class HttpResponseStatus {
 
     private final int code;

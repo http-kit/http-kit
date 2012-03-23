@@ -9,11 +9,14 @@ I write it for the http server and http client of
 
 # Design goal
 
-* Intended to be used as a library
-* Simple, single interface: response = handle(request)
-* Fast, I like fast. Should handle 200k+ concurrent connection, and
-  40k+ req/s if `hello world` response.
-* Memory efficient.
+* Clean compact code
+* Asynchronous. Used as a library
+* Simple, two interface: response = handle(request)
+* Fast, I like fast. The server should handle 200k+ concurrent connection, and
+  50k+ req/s if response with `hello world`.
+* Memory efficient
+* Handle timeout correctly
+* Support Socks and HTTP proxy
 
 # Usage
 

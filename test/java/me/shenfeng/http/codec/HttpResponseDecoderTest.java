@@ -3,8 +3,6 @@ package me.shenfeng.http.codec;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import me.shenfeng.http.codec.HttpMessageDecoder.State;
-
 import org.junit.Before;
 import org.junit.Test;
 
@@ -24,12 +22,14 @@ public class HttpResponseDecoderTest {
     public void testChunked() throws LineTooLargeException, ProtocolException {
         decoder.decode(chunked);
         IHttpResponse resp = decoder.getMessage();
+        System.out.println(resp);
     }
 
     @Test
     public void testNormal() throws LineTooLargeException, ProtocolException {
-        State decode = decoder.decode(chunked);
+        decoder.decode(normal);
         IHttpResponse resp = decoder.getMessage();
+        System.out.println(resp);
     }
 
 }

@@ -6,8 +6,6 @@ import java.util.concurrent.Executors;
 
 import me.shenfeng.http.codec.IHttpRequest;
 import me.shenfeng.http.server.HttpServer;
-import me.shenfeng.http.server.IHandler;
-import me.shenfeng.http.server.IParamedRunnable;
 
 class MultiThreadHandler implements IHandler {
     private ExecutorService exec;
@@ -17,10 +15,10 @@ class MultiThreadHandler implements IHandler {
         exec = Executors.newFixedThreadPool(core);
     }
 
-    public void handle(final IHttpRequest request, final IParamedRunnable callback) {
+    public void handle(final IHttpRequest request, final IParamedRunnable cb) {
         exec.submit(new Runnable() {
             public void run() {
-                callback.run(SingleThreadHandler.resp(request));
+                cb.run(SingleThreadHandler.resp(request));
             }
         });
     }

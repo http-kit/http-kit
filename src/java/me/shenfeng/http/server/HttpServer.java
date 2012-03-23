@@ -11,10 +11,10 @@ import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+import me.shenfeng.http.HttpUtils;
 import me.shenfeng.http.codec.DefaultHttpResponse;
 import me.shenfeng.http.codec.HttpMessageDecoder.State;
 import me.shenfeng.http.codec.HttpReqeustDecoder;
-import me.shenfeng.http.codec.HttpUtils;
 import me.shenfeng.http.codec.IHttpResponse;
 import me.shenfeng.http.codec.LineTooLargeException;
 import me.shenfeng.http.codec.ProtocolException;
@@ -25,7 +25,9 @@ public class HttpServer {
         System.out.println(System.currentTimeMillis() / 100 + " " + str);
     }
 
-    private static void write(SelectionKey key, SelectAtta atta) throws IOException {
+    private static void doWrite(SelectionKey key, int time) throws IOException {
+        SelectAtta atta = (SelectAtta) key.attachment();
+        atta.touch(time);
         SocketChannel ch = (SocketChannel) key.channel();
         ByteBuffer header = atta.respHeader;
         ByteBuffer body = atta.respBody;
@@ -81,7 +83,8 @@ public class HttpServer {
         System.out.println("start server " + ip + "@" + port);
     }
 
-    private void read(final SelectionKey key, final SelectAtta atta) throws IOException {
+    private void doRead(final SelectionKey key) throws IOException {
+        final SelectAtta atta = (SelectAtta) key.attachment();
         SocketChannel ch = (SocketChannel) key.channel();
         try {
             buffer.clear(); // clear for read
@@ -95,9 +98,9 @@ public class HttpServer {
                 State s = decoder.decode(buffer);
                 if (s == State.ALL_READ) {
                     handler.handle(decoder.getMessage(), new IParamedRunnable() {
+                        // maybe in worker thread
                         public void run(IHttpResponse resp) {
                             atta.resp = resp;
-                            // in worker thread
                             atta.respHeader = HttpUtils.encodeResponseHeader(resp);
                             atta.respBody = ByteBuffer.wrap(resp.getContent());
                             pendings.offer(key);
@@ -136,14 +139,12 @@ public class HttpServer {
             while (ite.hasNext()) {
                 key = ite.next();
                 if (key.isValid()) {
-                    SelectAtta atta = (SelectAtta) key.attachment();
                     if (key.isAcceptable()) {
                         accept(key, selector);
                     } else if (key.isReadable()) {
-                        atta.touch(time);
-                        read(key, atta);
+                        doRead(key);
                     } else if (key.isWritable()) {
-                        write(key, atta);
+                        doWrite(key, time);
                     }
                 }
             }
