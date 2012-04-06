@@ -3,41 +3,44 @@ package me.shenfeng.http.codec;
 import me.shenfeng.http.HttpUtils;
 
 public class DynamicBytes {
-    private byte[] data;
-    private int idx = 0;
+	private byte[] data;
+	private int idx = 0;
 
-    public DynamicBytes(int size) {
-        data = new byte[size];
-    }
+	public DynamicBytes(int size) {
+		data = new byte[size];
+	}
 
-    private void expandIfNessarry(int more) {
-        if (idx + more >= data.length) {
-            byte[] tmp = new byte[data.length * 2];
-            System.arraycopy(data, 0, tmp, 0, idx);
-            data = tmp;
-        }
-    }
+	private void expandIfNessarry(int more) {
+		if (idx + more >= data.length) {
+			byte[] tmp = new byte[data.length * 2];
+			System.arraycopy(data, 0, tmp, 0, idx);
+			data = tmp;
+		}
+	}
 
-    public void write(String str) {
-        write(str.getBytes(HttpUtils.ASCII));
-    }
+	public byte[] get() {
+		return data;
+	}
 
-    public void write(byte[] d) {
-        expandIfNessarry(d.length);
-        System.arraycopy(d, 0, data, idx, d.length);
-        idx += d.length;
-    }
+	public int getCount() {
+		return idx;
+	}
 
-    public void write(byte b) {
-        expandIfNessarry(1);
-        data[idx++] = b;
-    }
+	public DynamicBytes write(byte b) {
+		expandIfNessarry(1);
+		data[idx++] = b;
+		return this;
+	}
 
-    public int getCount() {
-        return idx;
-    }
+	public DynamicBytes write(byte[] d, int offset, int length) {
+		expandIfNessarry(length);
+		System.arraycopy(d, offset, data, idx, length);
+		idx += length;
+		return this;
+	}
 
-    public byte[] get() {
-        return data;
-    }
+	public DynamicBytes write(String str) {
+		byte[] bs = str.getBytes(HttpUtils.ASCII);
+		return write(bs, 0, bs.length);
+	}
 }
