@@ -8,6 +8,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.Charset;
 import java.util.Iterator;
@@ -15,7 +16,9 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
 
-import me.shenfeng.http.codec.DynamicBytes;
+import clojure.lang.ISeq;
+import clojure.lang.Seqable;
+
 import me.shenfeng.http.codec.HttpStatus;
 
 public class HttpUtils {
@@ -36,7 +39,7 @@ public class HttpUtils {
 	public static final int SELECT_TIMEOUT = 3000;
 
 	// stop processing the response/response
-	public static final int ABORT = -1;
+	public static final int ABORT_PROCESSING = -1;
 
 	public static final int TIMEOUT_CHECK_INTEVAL = 3000;
 
@@ -46,6 +49,10 @@ public class HttpUtils {
 
 	public static final String ACCEPT_ENCODING = "Accept-Encoding";
 
+	public static final String TRANSFER_ENCODING = "Transfer-Encoding";
+
+	public static final String CHUNKED = "chunked";
+
 	public static final String HOST = "Host";
 
 	public static final String CONTENT_LENGTH = "Content-Length";
@@ -54,7 +61,7 @@ public class HttpUtils {
 
 	static {
 		byte[] body = "bad request".getBytes(ASCII);
-		Map<String, String> headers = new TreeMap<String, String>();
+		Map<String, Object> headers = new TreeMap<String, Object>();
 		headers.put(CONTENT_LENGTH, body.length + "");
 		DynamicBytes db = encodeResponseHeader(400, headers);
 		db.write(body, 0, body.length);
@@ -74,20 +81,54 @@ public class HttpUtils {
 		}
 	}
 
-	public static DynamicBytes encodeResponseHeader(int status,
+	public static ByteBuffer encodeGetRequest(String path,
 			Map<String, String> headers) {
-		DynamicBytes bytes = new DynamicBytes(196);
-		byte[] bs = HttpStatus.valueOf(status).getResponseIntialLineBytes();
-		bytes.write(bs, 0, bs.length);
+		DynamicBytes bytes = new DynamicBytes(64 + headers.size() * 48);
+
+		bytes.write("GET").write(SP).write(path).write(SP);
+		bytes.write("HTTP/1.1").write(CR).write(LF);
 		Iterator<Entry<String, String>> ite = headers.entrySet().iterator();
 		while (ite.hasNext()) {
 			Entry<String, String> e = ite.next();
-			bytes.write(e.getKey());
-			bytes.write(COLON);
-			bytes.write(SP);
-			bytes.write(e.getValue());
-			bytes.write(CR);
-			bytes.write(LF);
+			bytes.write(e.getKey()).write(COLON).write(SP).write(e.getValue());
+			bytes.write(CR).write(LF);
+		}
+
+		bytes.write(CR).write(LF);
+		ByteBuffer request = ByteBuffer.wrap(bytes.get(), 0, bytes.getCount());
+		return request;
+	}
+
+	public static DynamicBytes encodeResponseHeader(int status,
+			Map<String, Object> headers) {
+		DynamicBytes bytes = new DynamicBytes(196);
+		byte[] bs = HttpStatus.valueOf(status).getResponseIntialLineBytes();
+		bytes.write(bs, 0, bs.length);
+		Iterator<Entry<String, Object>> ite = headers.entrySet().iterator();
+		while (ite.hasNext()) {
+			Entry<String, Object> e = ite.next();
+			String k = e.getKey();
+			Object v = e.getValue();
+			if (v instanceof String) {
+				bytes.write(k);
+				bytes.write(COLON);
+				bytes.write(SP);
+				bytes.write((String) v);
+				bytes.write(CR);
+				bytes.write(LF);
+				// ring spec says it could be a seq
+			} else if (v instanceof Seqable) {
+				ISeq seq = ((Seqable) v).seq();
+				while (seq != null) {
+					bytes.write(k);
+					bytes.write(COLON);
+					bytes.write(SP);
+					bytes.write(seq.first().toString());
+					bytes.write(CR);
+					bytes.write(LF);
+					seq = seq.next();
+				}
+			}
 		}
 
 		bytes.write(CR);
@@ -166,10 +207,20 @@ public class HttpUtils {
 
 	public static byte[] readAll(File f, int length) throws IOException {
 		byte[] bytes = new byte[length];
-		FileInputStream fs = new FileInputStream(f);
-		int offset = 0;
-		while (offset < length) {
-			offset += fs.read(bytes, offset, length - offset);
+		FileInputStream fs = null;
+		try {
+			fs = new FileInputStream(f);
+			int offset = 0;
+			while (offset < length) {
+				offset += fs.read(bytes, offset, length - offset);
+			}
+		} finally {
+			if (fs != null) {
+				try {
+					fs.close();
+				} catch (Exception ignore) {
+				}
+			}
 		}
 		return bytes;
 	}
@@ -181,29 +232,7 @@ public class HttpUtils {
 		while ((read = is.read(buffer)) != -1) {
 			bytes.write(buffer, 0, read);
 		}
+		is.close();
 		return bytes;
 	}
-
-	public static String[] splitInitialLine(String sb) {
-		int aStart;
-		int aEnd;
-		int bStart;
-		int bEnd;
-		int cStart;
-		int cEnd;
-
-		aStart = findNonWhitespace(sb, 0);
-		aEnd = findWhitespace(sb, aStart);
-
-		bStart = findNonWhitespace(sb, aEnd);
-		bEnd = findWhitespace(sb, bStart);
-
-		cStart = findNonWhitespace(sb, bEnd);
-		cEnd = findEndOfString(sb);
-
-		return new String[] { sb.substring(aStart, aEnd),
-				sb.substring(bStart, bEnd),
-				cStart < cEnd ? sb.substring(cStart, cEnd) : "" };
-	}
-
 }

@@ -1,8 +1,10 @@
-pom.xml
 *jar
-/lib/
-/classes/
-.lein-failures
-.lein-deps-sum
-.project
 .classpath
+.lein-deps-sum
+.lein-failures
+.project
+/bin/
+/classes/
+/lib/
+pom.xml
+/.settings/

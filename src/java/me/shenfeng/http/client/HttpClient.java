@@ -6,23 +6,21 @@ import static java.nio.channels.SelectionKey.OP_READ;
 import static me.shenfeng.http.HttpUtils.ACCEPT;
 import static me.shenfeng.http.HttpUtils.ACCEPT_ENCODING;
 import static me.shenfeng.http.HttpUtils.BUFFER_SIZE;
-import static me.shenfeng.http.HttpUtils.COLON;
-import static me.shenfeng.http.HttpUtils.CR;
 import static me.shenfeng.http.HttpUtils.HOST;
-import static me.shenfeng.http.HttpUtils.LF;
 import static me.shenfeng.http.HttpUtils.SELECT_TIMEOUT;
-import static me.shenfeng.http.HttpUtils.SP;
 import static me.shenfeng.http.HttpUtils.TIMEOUT_CHECK_INTEVAL;
 import static me.shenfeng.http.HttpUtils.USER_AGENT;
 import static me.shenfeng.http.HttpUtils.closeQuiety;
 import static me.shenfeng.http.HttpUtils.getServerAddr;
-import static me.shenfeng.http.client.HttpClientDecoder.State.ABORTED;
-import static me.shenfeng.http.client.HttpClientDecoder.State.ALL_READ;
+import static me.shenfeng.http.client.ClientDecoderState.ABORTED;
+import static me.shenfeng.http.client.ClientDecoderState.ALL_READ;
+import static me.shenfeng.http.client.RequestState.DIRECT_CONNECTING;
+import static me.shenfeng.http.client.RequestState.FINISHED;
+import static me.shenfeng.http.client.RequestState.SOCKS_CONNECTING;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
-import java.net.Proxy.Type;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
@@ -33,14 +31,10 @@ import java.nio.channels.SocketChannel;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import me.shenfeng.http.HttpUtils;
-import me.shenfeng.http.client.ClientAtta.ClientState;
-import me.shenfeng.http.client.HttpClientDecoder.State;
-import me.shenfeng.http.codec.DynamicBytes;
 import me.shenfeng.http.codec.LineTooLargeException;
 
 public final class HttpClient {
@@ -83,9 +77,8 @@ public final class HttpClient {
 		Iterator<ClientAtta> ite = clients.iterator();
 		while (ite.hasNext()) {
 			ClientAtta client = ite.next();
-			ClientState s = client.state;
-			if (s == ClientState.DIRECT_CONNECTING
-					|| s == ClientState.SOCKS_CONNECTING) {
+			RequestState s = client.state;
+			if (s == DIRECT_CONNECTING || s == SOCKS_CONNECTING) {
 				// connecting timeout
 				if (config.connTimeOutMs + client.lastActiveTime < currentTime) {
 					ite.remove();
@@ -93,18 +86,18 @@ public final class HttpClient {
 					TimeoutException to = new TimeoutException("connect to "
 							+ client.addr + " timeout after "
 							+ config.connTimeOutMs + "ms");
-					client.handler.onThrowable(to);
+					client.decoder.listener.onThrowable(to);
 				}
-			} else {
+			} else if (s == FINISHED) {
+				ite.remove();
+			} else if (config.readingTimeoutMs + client.lastActiveTime < currentTime) {
 				// reading response timeout
-				if (config.readingTimeoutMs + client.lastActiveTime < currentTime) {
-					ite.remove();
-					closeQuiety(client.ch);
-					TimeoutException to = new TimeoutException("reading from "
-							+ client.addr + " timeout after "
-							+ config.readingTimeoutMs + "ms");
-					client.handler.onThrowable(to);
-				}
+				ite.remove();
+				closeQuiety(client.ch);
+				TimeoutException to = new TimeoutException("reading from "
+						+ client.addr + " timeout after "
+						+ config.readingTimeoutMs + "ms");
+				client.decoder.listener.onThrowable(to);
 			}
 		}
 	}
@@ -120,9 +113,10 @@ public final class HttpClient {
 				if (read == -1) {
 					// remote entity shut the socket down cleanly.
 					closeQuiety(ch);
+					break;
 				} else if (read > 0) {
 					buffer.flip();
-					State state = decoder.decode(buffer);
+					ClientDecoderState state = decoder.decode(buffer);
 					if (state == ALL_READ || state == ABORTED) {
 						closeQuiety(ch);
 						break;
@@ -158,26 +152,19 @@ public final class HttpClient {
 
 		headers.put(HOST, uri.getHost());
 		headers.put(ACCEPT, "*/*");
-		headers.put(USER_AGENT, config.userAgent);
+		if (headers.get(USER_AGENT) == null) // allow override
+			headers.put(USER_AGENT, config.userAgent);
 		headers.put(ACCEPT_ENCODING, "gzip, deflate");
 
-		DynamicBytes bytes = new DynamicBytes(64 + headers.size() * 48);
 		InetSocketAddress addr = getServerAddr(uri);
 
-		String path = proxy.type() == Type.HTTP ? url : HttpUtils.getPath(uri);
+		// String path = proxy.type() == Type.HTTP ? url :
+		// HttpUtils.getPath(uri);
+		// HTTP proxy is not supported now
+		String path = HttpUtils.getPath(uri);
 
-		bytes.write("GET").write(SP).write(path);
-		bytes.write(" HTTP/1.1").write(CR).write(LF);
-		Iterator<Entry<String, String>> ite = headers.entrySet().iterator();
-		while (ite.hasNext()) {
-			Entry<String, String> e = ite.next();
-			bytes.write(e.getKey()).write(COLON).write(SP).write(e.getValue());
-			bytes.write(CR).write(LF);
-		}
-
-		bytes.write(CR).write(LF);
-		ByteBuffer request = ByteBuffer.wrap(bytes.get(), 0, bytes.getCount());
-		pendings.offer(new ClientAtta(proxy, addr, cb, request));
+		ByteBuffer request = HttpUtils.encodeGetRequest(path, headers);
+		pendings.offer(new ClientAtta(request, addr, cb, proxy));
 		selector.wakeup();
 	}
 
@@ -190,26 +177,14 @@ public final class HttpClient {
 		ClientAtta job;
 		while ((job = pendings.poll()) != null) {
 			SocketChannel ch = SocketChannel.open();
-
 			job.ch = ch; // save for use when timeout
-
 			job.lastActiveTime = currentTime;
 			ch.configureBlocking(false);
 			ch.register(selector, OP_CONNECT, job);
 			ch.connect(job.addr);
-
 			clients.add(job);
 		}
 	}
-
-	// public void get(String uri, Proxy proxy, IHandler cb) throws
-	// URISyntaxException {
-	// get(uri, EMPTY, proxy, cb);
-	// }
-	//
-	// public void get(String uri, IHandler cb) throws URISyntaxException {
-	// get(uri, Proxy.NO_PROXY, cb);
-	// }
 
 	private void startLoop() throws IOException {
 		SelectionKey key;

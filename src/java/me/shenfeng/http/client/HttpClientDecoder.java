@@ -1,59 +1,99 @@
 package me.shenfeng.http.client;
 
+import static java.lang.Character.isWhitespace;
 import static me.shenfeng.http.HttpUtils.BUFFER_SIZE;
+import static me.shenfeng.http.HttpUtils.CHUNKED;
+import static me.shenfeng.http.HttpUtils.CONTENT_LENGTH;
 import static me.shenfeng.http.HttpUtils.CR;
 import static me.shenfeng.http.HttpUtils.LF;
 import static me.shenfeng.http.HttpUtils.MAX_LINE;
+import static me.shenfeng.http.HttpUtils.TRANSFER_ENCODING;
 import static me.shenfeng.http.HttpUtils.findEndOfString;
 import static me.shenfeng.http.HttpUtils.findNonWhitespace;
+import static me.shenfeng.http.HttpUtils.findWhitespace;
 import static me.shenfeng.http.HttpUtils.getChunkSize;
 import static me.shenfeng.http.client.IEventListener.ABORT;
+import static me.shenfeng.http.codec.HttpVersion.HTTP_1_0;
+import static me.shenfeng.http.codec.HttpVersion.HTTP_1_1;
 
 import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.TreeMap;
 
+import me.shenfeng.http.codec.HttpStatus;
+import me.shenfeng.http.codec.HttpVersion;
 import me.shenfeng.http.codec.LineTooLargeException;
+import me.shenfeng.http.codec.ProtocolException;
 
 public class HttpClientDecoder {
 
-	public static enum State {
-		ALL_READ, READ_CHUNK_DELIMITER, READ_CHUNK_FOOTER, READ_CHUNK_SIZE, READ_CHUNKED_CONTENT, READ_FIXED_LENGTH_CONTENT, READ_HEADER, READ_INITIAL, ABORTED, READ_VARIABLE_LENGTH_CONTENT
-	}
 
 	private Map<String, String> headers = new TreeMap<String, String>();
-	private IEventListener listener;
+
+	// package visible
+	IEventListener listener;
 	// single threaded, shared ok
 	private static byte[] content = new byte[BUFFER_SIZE];
 	byte[] lineBuffer = new byte[MAX_LINE];
 	int lineBufferCnt = 0;
 	int readRemaining = 0;
-	State state = State.READ_INITIAL;
-	private boolean decodingRequest;
+	ClientDecoderState state = ClientDecoderState.READ_INITIAL;
 
-	public HttpClientDecoder(IEventListener handler, boolean decodingRequest) {
-		this.listener = handler;
-		this.decodingRequest = decodingRequest;
+	public HttpClientDecoder(IEventListener listener) {
+		this.listener = listener;
 	}
 
 	private void complete() {
-		state = State.ALL_READ;
+		state = ClientDecoderState.ALL_READ;
 		listener.onCompleted();
 	}
 
-	public State decode(ByteBuffer buffer) throws LineTooLargeException {
+	private void parseInitialLine(String sb) {
+		int aStart;
+		int aEnd;
+		int bStart;
+		int bEnd;
+		int cStart;
+		int cEnd;
+
+		aStart = findNonWhitespace(sb, 0);
+		aEnd = findWhitespace(sb, aStart);
+
+		bStart = findNonWhitespace(sb, aEnd);
+		bEnd = findWhitespace(sb, bStart);
+
+		cStart = findNonWhitespace(sb, bEnd);
+		cEnd = findEndOfString(sb);
+
+		if (cStart < cEnd) {
+			int status = Integer.parseInt(sb.substring(bStart, bEnd));
+			HttpStatus s = HttpStatus.valueOf(status);
+
+			HttpVersion version = HTTP_1_1;
+			if ("HTTP/1.0".equals(sb.substring(aStart, cEnd))) {
+				version = HTTP_1_0;
+			}
+
+			if (listener.onInitialLineReceived(version, s) != ABORT) {
+				state = ClientDecoderState.READ_HEADER;
+			} else {
+				state = ClientDecoderState.ABORTED;
+			}
+
+		} else {
+			listener.onThrowable(new ProtocolException());
+		}
+	}
+
+	public ClientDecoderState decode(ByteBuffer buffer) throws LineTooLargeException {
 		String line;
 		int toRead;
-		while (buffer.hasRemaining() && state != State.ALL_READ) {
+		while (buffer.hasRemaining() && state != ClientDecoderState.ALL_READ) {
 			switch (state) {
 			case READ_INITIAL:
 				line = readLine(buffer);
 				if (line != null) {
-					if (listener.onInitialLineReceived(line) != ABORT) {
-						state = State.READ_HEADER;
-					} else {
-						state = State.ABORTED;
-					}
+					parseInitialLine(line);
 				}
 				break;
 			case READ_HEADER:
@@ -64,9 +104,9 @@ public class HttpClientDecoder {
 				if (line != null) {
 					readRemaining = getChunkSize(line);
 					if (readRemaining == 0) {
-						state = State.READ_CHUNK_FOOTER;
+						state = ClientDecoderState.READ_CHUNK_FOOTER;
 					} else {
-						state = State.READ_CHUNKED_CONTENT;
+						state = ClientDecoderState.READ_CHUNKED_CONTENT;
 					}
 				}
 				break;
@@ -74,12 +114,11 @@ public class HttpClientDecoder {
 				toRead = Math.min(buffer.remaining(), readRemaining);
 				buffer.get(content, 0, toRead);
 				if (listener.onBodyReceived(content, toRead) == ABORT) {
-					state = State.ABORTED;
+					state = ClientDecoderState.ABORTED;
 				} else {
 					readRemaining -= toRead;
 					if (readRemaining == 0) {
-						listener.onCompleted();
-						state = State.ALL_READ;
+						complete();
 					}
 				}
 				break;
@@ -87,22 +126,21 @@ public class HttpClientDecoder {
 				toRead = Math.min(buffer.remaining(), readRemaining);
 				buffer.get(content, 0, toRead);
 				if (listener.onBodyReceived(content, toRead) == ABORT) {
-					state = State.ABORTED;
+					state = ClientDecoderState.ABORTED;
 				} else {
 					readRemaining -= toRead;
 					if (readRemaining == 0) {
-						state = State.READ_CHUNK_DELIMITER;
+						state = ClientDecoderState.READ_CHUNK_DELIMITER;
 					}
 				}
 				break;
 			case READ_CHUNK_FOOTER:
 				readEmptyLine(buffer);
-				listener.onCompleted();
-				state = State.ALL_READ;
+				complete();
 				break;
 			case READ_CHUNK_DELIMITER:
 				readEmptyLine(buffer);
-				state = State.READ_CHUNK_SIZE;
+				state = ClientDecoderState.READ_CHUNK_SIZE;
 				break;
 			}
 		}
@@ -128,26 +166,24 @@ public class HttpClientDecoder {
 			line = readLine(buffer);
 		}
 		if (listener.onHeadersReceived(headers) != ABORT) {
-			String te = headers.get("Transfer-Encoding");
-			if ("chunked".equals(te)) {
-				state = State.READ_CHUNK_SIZE;
+			String te = headers.get(TRANSFER_ENCODING);
+			if (CHUNKED.equals(te)) {
+				state = ClientDecoderState.READ_CHUNK_SIZE;
 			} else {
-				String cl = headers.get("Content-Length");
+				String cl = headers.get(CONTENT_LENGTH);
 				if (cl != null) {
 					readRemaining = Integer.parseInt(cl);
 					if (readRemaining == 0) {
 						complete();
 					} else {
-						state = State.READ_FIXED_LENGTH_CONTENT;
+						state = ClientDecoderState.READ_FIXED_LENGTH_CONTENT;
 					}
-				} else if (decodingRequest) {
-					complete();
 				} else {
-					state = State.READ_VARIABLE_LENGTH_CONTENT;
+					state = ClientDecoderState.READ_VARIABLE_LENGTH_CONTENT;
 				}
 			}
 		} else {
-			state = State.ABORTED;
+			state = ClientDecoderState.ABORTED;
 		}
 	};
 
@@ -179,7 +215,7 @@ public class HttpClientDecoder {
 
 	public void reset() {
 		headers.clear();
-		state = State.READ_INITIAL;
+		state = ClientDecoderState.READ_INITIAL;
 	}
 
 	void splitAndAddHeader(String line) {
@@ -193,7 +229,7 @@ public class HttpClientDecoder {
 		nameStart = findNonWhitespace(line, 0);
 		for (nameEnd = nameStart; nameEnd < length; nameEnd++) {
 			char ch = line.charAt(nameEnd);
-			if (ch == ':' || Character.isWhitespace(ch)) {
+			if (ch == ':' || isWhitespace(ch)) {
 				break;
 			}
 		}

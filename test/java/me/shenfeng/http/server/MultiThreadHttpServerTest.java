@@ -17,11 +17,15 @@ class MultiThreadHandler implements IHandler {
 	public void handle(final HttpRequest request, final IResponseCallback cb) {
 		exec.submit(new Runnable() {
 			public void run() {
-				Map<String, String> header = new TreeMap<String, String>();
+				Map<String, Object> header = new TreeMap<String, Object>();
 				header.put("Connection", "Keep-Alive");
 				cb.run(200, header, SingleThreadHandler.body);
 			}
 		});
+	}
+
+	public void close() {
+
 	}
 }
 

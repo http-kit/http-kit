@@ -1,7 +1,7 @@
 # Http kit
 
-A fast, asynchronous HTTP server and HTTP client in pure java
-nio, Only depend on JDK.
+Event driven HTTP server and HTTP client in java and clojure, only
+depend on JDK and Clojure.
 
 I write it for the http server and http client of
 [Rssminer](http://rssminer.net)
@@ -12,8 +12,6 @@ I write it for the http server and http client of
 * Clean compact code, simple and correct is my goal. Feature rich is
   not desired.
 * Asynchronous.
-* Fast, I like fast. The server should handle 50k+ req/s if response
-  with a few kilobytes of constant string.
 * Memory efficient. Memory is cheap, but anyway, I will do my best to
   save it.
 * Handle timeout correctly. The server is intented to live behind

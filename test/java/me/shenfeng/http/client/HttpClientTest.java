@@ -7,16 +7,16 @@ import java.net.UnknownHostException;
 import java.util.Map;
 import java.util.TreeMap;
 
-
-
+import me.shenfeng.http.codec.HttpStatus;
+import me.shenfeng.http.codec.HttpVersion;
 
 import org.junit.Before;
 import org.junit.Test;
 
 class Handler implements IEventListener {
 
-    public int onInitialLineReceived(String line) {
-        System.out.println(line);
+    public int onInitialLineReceived(HttpVersion version, HttpStatus status) {
+        System.out.println(status);
         return 0;
     }
 
@@ -50,19 +50,20 @@ public class HttpClientTest {
     }
 
     @Test
-    public void testGetpythonServer() throws UnknownHostException, URISyntaxException,
-            InterruptedException {
+    public void testGetpythonServer() throws UnknownHostException,
+            URISyntaxException, InterruptedException {
         Map<String, String> headers = new TreeMap<String, String>();
-        client.get("http://wiki.nginx.org/Main", headers, Proxy.NO_PROXY, new Handler());
+        client.get("http://wiki.nginx.org/Main", headers, Proxy.NO_PROXY,
+                new Handler());
         Thread.sleep(10000000);
     }
 
     @Test
-    public void testGetGzipped() throws UnknownHostException, URISyntaxException,
-            InterruptedException {
+    public void testGetGzipped() throws UnknownHostException,
+            URISyntaxException, InterruptedException {
         Map<String, String> headers = new TreeMap<String, String>();
-        client.get("http://en.wikipedia.org/wiki/HTTP", headers, Proxy.NO_PROXY,
-                new Handler());
+        client.get("http://en.wikipedia.org/wiki/HTTP", headers,
+                Proxy.NO_PROXY, new Handler());
         Thread.sleep(10000000);
     }
 }

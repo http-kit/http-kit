@@ -8,8 +8,8 @@ import static me.shenfeng.http.HttpUtils.findWhitespace;
 import static me.shenfeng.http.HttpUtils.getChunkSize;
 import static me.shenfeng.http.codec.HttpVersion.HTTP_1_0;
 import static me.shenfeng.http.codec.HttpVersion.HTTP_1_1;
-import static me.shenfeng.http.server.HttpReqeustDecoder.State.ALL_READ;
-import static me.shenfeng.http.server.HttpReqeustDecoder.State.READ_INITIAL;
+import static me.shenfeng.http.server.ServerDecoderState.ALL_READ;
+import static me.shenfeng.http.server.ServerDecoderState.READ_INITIAL;
 
 import java.nio.ByteBuffer;
 import java.util.Map;
@@ -22,10 +22,6 @@ import me.shenfeng.http.codec.ProtocolException;
 
 public class HttpReqeustDecoder {
 
-	public static enum State {
-		PROTOCOL_ERROR, ALL_READ, READ_INITIAL, READ_HEADER, READ_FIXED_LENGTH_CONTENT, READ_CHUNK_SIZE, READ_CHUNKED_CONTENT, READ_CHUNK_FOOTER, READ_CHUNK_DELIMITER,
-	}
-
 	static final int MAX_LINE = 2048;
 
 	byte[] lineBuffer = new byte[MAX_LINE];
@@ -34,7 +30,7 @@ public class HttpReqeustDecoder {
 	HttpRequest request;
 	private Map<String, String> headers = new TreeMap<String, String>();
 	int readRemaining = 0;
-	State state;
+	ServerDecoderState state;
 	byte[] content;
 	int readContent = 0;
 	private int maxBody;
@@ -62,7 +58,6 @@ public class HttpReqeustDecoder {
 		cEnd = findEndOfString(sb);
 
 		if (cStart < cEnd) {
-
 			HttpMethod method = HttpMethod.GET;
 			String m = sb.substring(aStart, aEnd).toUpperCase();
 			if (m.equals("GET")) {
@@ -85,8 +80,9 @@ public class HttpReqeustDecoder {
 		}
 	}
 
-	public State decode(ByteBuffer buffer) throws LineTooLargeException,
-			ProtocolException, RequestTooLargeException {
+	public ServerDecoderState decode(ByteBuffer buffer)
+			throws LineTooLargeException, ProtocolException,
+			RequestTooLargeException {
 		String line;
 		while (buffer.hasRemaining() && state != ALL_READ) {
 			switch (state) {
@@ -94,7 +90,7 @@ public class HttpReqeustDecoder {
 				line = readLine(buffer);
 				if (line != null) {
 					createRequest(line);
-					state = State.READ_HEADER;
+					state = ServerDecoderState.READ_HEADER;
 				}
 				break;
 			case READ_HEADER:
@@ -105,7 +101,7 @@ public class HttpReqeustDecoder {
 				if (line != null) {
 					readRemaining = getChunkSize(line);
 					if (readRemaining == 0) {
-						state = State.READ_CHUNK_FOOTER;
+						state = ServerDecoderState.READ_CHUNK_FOOTER;
 					} else {
 						throwIfBodyIsTooLarge(readRemaining);
 						if (content == null) {
@@ -115,7 +111,7 @@ public class HttpReqeustDecoder {
 							System.arraycopy(content, 0, tmp, 0, readContent);
 							content = tmp;
 						}
-						state = State.READ_CHUNKED_CONTENT;
+						state = ServerDecoderState.READ_CHUNKED_CONTENT;
 					}
 				}
 				break;
@@ -128,7 +124,7 @@ public class HttpReqeustDecoder {
 			case READ_CHUNKED_CONTENT:
 				readFixedLength(buffer);
 				if (readRemaining == 0) {
-					state = State.READ_CHUNK_DELIMITER;
+					state = ServerDecoderState.READ_CHUNK_DELIMITER;
 				}
 				break;
 			case READ_CHUNK_FOOTER:
@@ -137,7 +133,7 @@ public class HttpReqeustDecoder {
 				break;
 			case READ_CHUNK_DELIMITER:
 				readEmptyLine(buffer);
-				state = State.READ_CHUNK_SIZE;
+				state = ServerDecoderState.READ_CHUNK_SIZE;
 				break;
 			}
 		}
@@ -164,8 +160,8 @@ public class HttpReqeustDecoder {
 		readContent += toRead;
 	}
 
-	private State readHeaders(ByteBuffer buffer) throws LineTooLargeException,
-			RequestTooLargeException {
+	private ServerDecoderState readHeaders(ByteBuffer buffer)
+			throws LineTooLargeException, RequestTooLargeException {
 		String line = readLine(buffer);
 		while (line != null && !line.isEmpty()) {
 			splitAndAddHeader(line);
@@ -175,7 +171,7 @@ public class HttpReqeustDecoder {
 
 		String te = headers.get("transfer-encoding");
 		if ("chunked".equals(te)) {
-			return State.READ_CHUNK_SIZE;
+			return ServerDecoderState.READ_CHUNK_SIZE;
 		} else {
 			String cl = headers.get("content-length");
 			if (cl != null) {
@@ -183,12 +179,12 @@ public class HttpReqeustDecoder {
 					readRemaining = Integer.parseInt(cl);
 					throwIfBodyIsTooLarge(readRemaining);
 					content = new byte[readRemaining];
-					return State.READ_FIXED_LENGTH_CONTENT;
+					return ServerDecoderState.READ_FIXED_LENGTH_CONTENT;
 				} catch (NumberFormatException e) {
-					return State.PROTOCOL_ERROR;
+					return ServerDecoderState.PROTOCOL_ERROR;
 				}
 			}
-			return State.ALL_READ;
+			return ServerDecoderState.ALL_READ;
 		}
 	}
 
@@ -219,7 +215,9 @@ public class HttpReqeustDecoder {
 	};
 
 	public void reset() {
-		state = State.READ_INITIAL;
+		state = ServerDecoderState.READ_INITIAL;
+		headers.clear();
+		readContent = 0;
 	}
 
 	void splitAndAddHeader(String sb) {

@@ -14,5 +14,4 @@ public class HttpClientConfig {
 		this.connTimeOutMs = connectionTimeOutInMs;
 		this.userAgent = userAgent;
 	}
-
 }

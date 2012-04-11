@@ -2,6 +2,9 @@ package me.shenfeng.http.client;
 
 import java.util.Map;
 
+import me.shenfeng.http.codec.HttpStatus;
+import me.shenfeng.http.codec.HttpVersion;
+
 /**
  * Will be invoked once the response/request has been fully read
  */
@@ -15,7 +18,7 @@ public interface IEventListener {
 
 	public int onHeadersReceived(Map<String, String> headers);
 
-	public int onInitialLineReceived(String line);
+	public int onInitialLineReceived(HttpVersion version, HttpStatus status);
 
 	/**
 	 * protocol error

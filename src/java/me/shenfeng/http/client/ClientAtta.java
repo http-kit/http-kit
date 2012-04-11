@@ -8,31 +8,25 @@ import java.nio.channels.SocketChannel;
 
 public class ClientAtta {
 
-	public static enum ClientState {
-		DIRECT_CONNECTING, SOCKS_CONNECTING, SOCKS_CONN_SENT, SOCKS_CONNECTED
-	}
-
-	ClientState state;
+	RequestState state;
 	Proxy proxy;
 	InetSocketAddress addr;
 	HttpClientDecoder decoder;
 	ByteBuffer request;
-	IEventListener handler;
 	long lastActiveTime;
 
 	SocketChannel ch;
 
-	public ClientAtta(Proxy proxy, InetSocketAddress server,
-			IEventListener handler, ByteBuffer request) {
+	public ClientAtta(ByteBuffer request, InetSocketAddress server,
+			IEventListener handler, Proxy proxy) {
 		this.proxy = proxy;
 		this.addr = server;
-		decoder = new HttpClientDecoder(handler, false);
+		decoder = new HttpClientDecoder(handler);
 		this.request = request;
-		this.handler = handler;
 		if (proxy.type() == Type.SOCKS) {
-			state = ClientState.SOCKS_CONNECTING;
+			state = RequestState.SOCKS_CONNECTING;
 		} else {
-			state = ClientState.DIRECT_CONNECTING;
+			state = RequestState.DIRECT_CONNECTING;
 		}
 	}
 }

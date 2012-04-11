@@ -1,6 +1,6 @@
-package me.shenfeng.http.codec;
+package me.shenfeng.http;
 
-import me.shenfeng.http.HttpUtils;
+import java.nio.charset.Charset;
 
 public class DynamicBytes {
 	private byte[] data;
@@ -12,7 +12,8 @@ public class DynamicBytes {
 
 	private void expandIfNessarry(int more) {
 		if (idx + more >= data.length) {
-			byte[] tmp = new byte[data.length * 2];
+			int after = (int) ((idx + more) * 1.33);
+			byte[] tmp = new byte[after];
 			System.arraycopy(data, 0, tmp, 0, idx);
 			data = tmp;
 		}
@@ -40,7 +41,12 @@ public class DynamicBytes {
 	}
 
 	public DynamicBytes write(String str) {
-		byte[] bs = str.getBytes(HttpUtils.ASCII);
+		return write(str, HttpUtils.ASCII);
+	}
+
+	public DynamicBytes write(String str, Charset c) {
+		byte[] bs = str.getBytes(c);
 		return write(bs, 0, bs.length);
 	}
+
 }
