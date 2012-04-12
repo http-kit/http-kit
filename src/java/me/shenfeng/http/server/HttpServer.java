@@ -103,14 +103,15 @@ public class HttpServer {
 					Iterator<SelectionKey> ite = selectedKeys.iterator();
 					while (ite.hasNext()) {
 						key = ite.next();
-						if (key.isValid()) {
-							if (key.isAcceptable()) {
-								accept(key, selector);
-							} else if (key.isReadable()) {
-								doRead(key);
-							} else if (key.isWritable()) {
-								doWrite(key);
-							}
+						if (!key.isValid()) {
+							continue;
+						}
+						if (key.isAcceptable()) {
+							accept(key, selector);
+						} else if (key.isReadable()) {
+							doRead(key);
+						} else if (key.isWritable()) {
+							doWrite(key);
 						}
 					}
 					selectedKeys.clear();

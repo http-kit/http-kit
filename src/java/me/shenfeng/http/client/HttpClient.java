@@ -11,6 +11,7 @@ import static me.shenfeng.http.HttpUtils.SELECT_TIMEOUT;
 import static me.shenfeng.http.HttpUtils.TIMEOUT_CHECK_INTEVAL;
 import static me.shenfeng.http.HttpUtils.USER_AGENT;
 import static me.shenfeng.http.HttpUtils.closeQuiety;
+import static me.shenfeng.http.HttpUtils.encodeGetRequest;
 import static me.shenfeng.http.HttpUtils.getServerAddr;
 import static me.shenfeng.http.client.ClientDecoderState.ABORTED;
 import static me.shenfeng.http.client.ClientDecoderState.ALL_READ;
@@ -158,12 +159,10 @@ public final class HttpClient {
 
 		InetSocketAddress addr = getServerAddr(uri);
 
-		// String path = proxy.type() == Type.HTTP ? url :
-		// HttpUtils.getPath(uri);
 		// HTTP proxy is not supported now
 		String path = HttpUtils.getPath(uri);
 
-		ByteBuffer request = HttpUtils.encodeGetRequest(path, headers);
+		ByteBuffer request = encodeGetRequest(path, headers);
 		pendings.offer(new ClientAtta(request, addr, cb, proxy));
 		selector.wakeup();
 	}
@@ -201,19 +200,20 @@ public final class HttpClient {
 			Iterator<SelectionKey> ite = selectedKeys.iterator();
 			while (ite.hasNext()) {
 				key = ite.next();
-				if (key.isValid()) {
-					if (key.isConnectable()) {
-						ch = (SocketChannel) key.channel();
-						if (ch.finishConnect()) {
-							ClientAtta attr = (ClientAtta) key.attachment();
-							attr.lastActiveTime = currentTime;
-							key.interestOps(SelectionKey.OP_WRITE);
-						}
-					} else if (key.isWritable()) {
-						doWrite(key);
-					} else if (key.isReadable()) {
-						doRead(key);
+				if (!key.isValid()) {
+					continue;
+				}
+				if (key.isConnectable()) {
+					ch = (SocketChannel) key.channel();
+					if (ch.finishConnect()) {
+						ClientAtta attr = (ClientAtta) key.attachment();
+						attr.lastActiveTime = currentTime;
+						key.interestOps(SelectionKey.OP_WRITE);
 					}
+				} else if (key.isWritable()) {
+					doWrite(key);
+				} else if (key.isReadable()) {
+					doRead(key);
 				}
 			}
 			if (currentTime - lastTimeoutCheckTime > TIMEOUT_CHECK_INTEVAL) {

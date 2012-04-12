@@ -1,0 +1,64 @@
+#!/bin/bash
+
+ABSOLUTE_PATH=$(readlink -f $0)
+HOME="${ABSOLUTE_PATH%/*/*}"
+REQUST_COUNT=100000
+
+start_server () {
+    java -Dsun.jnu.encoding=UTF-8 -Dfile.encoding=UTF-8 \
+        -XX:+UseCompressedOops \
+        -server \
+        -cp "lib/*:lib/dev/*:src:test:classes" \
+        clojure.main \
+        -m me.shenfeng.http.server.benchmark \
+        /dev/null $@  &
+}
+
+# echo "thisi s a test"
+bench_server () {
+    start_server --server $1
+    PID=$!
+    echo "Start $1, pid is ${PID}"
+    echo "Sleep 4 second to wait $1 start"
+    sleep 4
+    echo "Warm up $1, by $REQUST_COUNT request"
+    ab -n $REQUST_COUNT -c 50 http://localhost:9091/ > /dev/null 2>&1
+    sleep 1
+    echo "Collect data of $1"
+    ab -n $REQUST_COUNT -c 50 http://localhost:9091/ > /tmp/ben_data_$1
+    # get heap info
+    jmap -heap $PID > /tmp/ben_heap_$1
+    kill $PID
+}
+
+output_result() {
+
+    for f in $(ls /tmp/ben_heap_*)
+    do
+        echo -e "\n################# $f ####################"
+        cat $f
+        rm $f
+    done
+
+    echo -e "\n"
+
+    for f in $(ls /tmp/ben_data_*)
+    do
+        r=$(cat $f | grep 'Requests per second:')
+        printf "%s\t%s\n" "$f" "$r"
+        rm $f
+    done
+
+}
+
+cd $HOME
+case "$1" in
+    bench)
+        bench_server netty
+        bench_server jetty
+        bench_server home
+        output_result
+        ;;
+    *)
+        start_server $@
+esac

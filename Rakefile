@@ -16,3 +16,9 @@ task :clojars do
   sh 'rm *.jar pom.xml classes -rf && lein pom && lein jar '
   sh 'scp pom.xml *.jar clojars@clojars.org:'
 end
+
+desc "Benchmark to an idea how fast it can run"
+task :bench do
+  sh 'rm classes/ -rf && lein deps && lein javac'
+  sh './scripts/benchmark bench'
+end
