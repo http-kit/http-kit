@@ -17,6 +17,11 @@ task :clojars do
   sh 'scp pom.xml *.jar clojars@clojars.org:'
 end
 
+desc "Start swank server for emacs"
+task :swank do
+  sh "rm classes -rf && lein javac && lein swank"
+end
+
 desc "Benchmark to an idea how fast it can run"
 task :bench do
   sh 'rm classes/ -rf && lein deps && lein javac'

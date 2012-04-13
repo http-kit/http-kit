@@ -4,12 +4,10 @@
         [clojure.tools.cli :only [cli]]
         ring.adapter.netty))
 
-(def resp {:status  200
-           :headers {"Content-Type" "text/plain"}
-           :body    "Hello World"})
-
 (defn start-server [{:keys [server]}]
-  (let [handler (fn [req] resp)]
+  (let [handler (fn [req] {:status 200
+                          :headers {"Content-Type" "text/plain"}
+                          :body (list "Hello World", "What are you doing")})]
     (case server
       :netty
       (run-netty handler {:port 9091 :worder 6}) ; 6 worker; threads
