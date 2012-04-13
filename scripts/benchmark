@@ -8,11 +8,13 @@ REQUEST_C=100
 start_server () {
     java -Dsun.jnu.encoding=UTF-8 -Dfile.encoding=UTF-8 \
         -XX:+UseCompressedOops \
+        -XX:ParallelGCThreads=2 \
+        -Xms128m -Xmx128m \
         -server \
         -cp "lib/*:lib/dev/*:src:test:classes" \
         clojure.main \
         -m me.shenfeng.http.server.benchmark \
-        /dev/null $@  &
+        /dev/null $@ &
 }
 
 # echo "thisi s a test"

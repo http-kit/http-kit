@@ -125,8 +125,7 @@ public final class HttpClient {
     }
 
     public void get(String url, Map<String, String> headers, Proxy proxy,
-            IRespListener cb) throws URISyntaxException,
-            UnknownHostException {
+            IRespListener cb) throws URISyntaxException, UnknownHostException {
         URI uri = new URI(url);
 
         headers.put(HOST, uri.getHost());

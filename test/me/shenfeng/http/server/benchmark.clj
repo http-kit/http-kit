@@ -1,18 +1,30 @@
 (ns me.shenfeng.http.server.benchmark
   (:use ring.adapter.jetty
         me.shenfeng.http.server
+        (compojure [core :only [defroutes GET POST HEAD DELETE ANY context]]
+                   [handler :only [site]]
+                   [route :only [not-found]])
         [clojure.tools.cli :only [cli]]
         ring.adapter.netty))
 
+(defn handler [req]
+  {:status 200
+   :headers {"Content-Type" "text/plain"}
+   :body (list "Hello World", "What are you doing")})
+
+(defroutes api-routes
+  (GET "/" [] handler)
+  (GET "/other" [] handler)
+  (GET "/goog/:sdfsdf/:sdfsdf/sdfsd" [] handler)
+  (GET "/api/:version/what" [] handler))
+
 (defn start-server [{:keys [server]}]
-  (let [handler (fn [req] {:status 200
-                          :headers {"Content-Type" "text/plain"}
-                          :body (list "Hello World", "What are you doing")})]
+  (let [handler (-> api-routes site)]
     (case server
       :netty
-      (run-netty handler {:port 9091 :worder 6}) ; 6 worker; threads
+      (run-netty handler {:port 9091 :worder 4}) ; 4 worker; threads
       :home
-      (run-server handler {:port 9091 :thread 6})
+      (run-server handler {:port 9091 :thread 4})
       :jetty
       (run-jetty handler {:port 9091 :join? false}))))
 

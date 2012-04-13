@@ -229,21 +229,17 @@ public class HttpServer {
         final ServerAtta atta = (ServerAtta) key.attachment();
         SocketChannel ch = (SocketChannel) key.channel();
         try {
-            while (true) {
-                buffer.clear(); // clear for read
-                int read = ch.read(buffer);
-                if (read == -1) {
-                    // remote entity shut the socket down cleanly.
-                    closeQuiety(ch);
-                    break;
-                } else if (read > 0) {
-                    buffer.flip(); // flip for read
-                    HttpReqeustDecoder decoder = atta.decoder;
-                    ServerDecoderState s = decoder.decode(buffer);
-                    if (s == ALL_READ) {
-                        handler.handle(decoder.request, new Callback(key));
-                        break;
-                    }
+            buffer.clear(); // clear for read
+            int read = ch.read(buffer);
+            if (read == -1) {
+                // remote entity shut the socket down cleanly.
+                closeQuiety(ch);
+            } else if (read > 0) {
+                buffer.flip(); // flip for read
+                HttpReqeustDecoder decoder = atta.decoder;
+                ServerDecoderState s = decoder.decode(buffer);
+                if (s == ALL_READ) {
+                    handler.handle(decoder.request, new Callback(key));
                 }
             }
         } catch (IOException e) {

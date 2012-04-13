@@ -83,15 +83,19 @@ public class Handler implements IHandler {
 
     public void handle(final HttpRequest req, final IResponseCallback cb) {
         execs.submit(new Runnable() {
-            @SuppressWarnings("rawtypes")
+            @SuppressWarnings({ "rawtypes", "unchecked" })
             public void run() {
                 try {
                     Map resp = (Map) f.invoke(buildRequestMap(req));
-                    int status = ((Long) resp.get(STATUS)).intValue();
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> headers = (Map) resp.get(HEADERS);
-                    Object body = resp.get(BODY);
-                    cb.run(status, headers, body);
+                    if (resp != null) {
+                        int status = ((Long) resp.get(STATUS)).intValue();
+                        Map headers = (Map) resp.get(HEADERS);
+                        Object body = resp.get(BODY);
+                        cb.run(status, headers, body);
+                    } else {
+                        // when handler return null: 404
+                        cb.run(404, new TreeMap<String, Object>(), null);
+                    }
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
