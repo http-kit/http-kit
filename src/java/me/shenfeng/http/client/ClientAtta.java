@@ -1,32 +1,40 @@
 package me.shenfeng.http.client;
 
+import static me.shenfeng.http.HttpUtils.closeQuiety;
+
 import java.net.InetSocketAddress;
 import java.net.Proxy;
-import java.net.Proxy.Type;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 
 public class ClientAtta {
+    Proxy proxy;
+    InetSocketAddress addr;
+    HttpClientDecoder decoder;
+    ByteBuffer request;
+    long lastActiveTime;
+    SocketChannel ch;
 
-	RequestState state;
-	Proxy proxy;
-	InetSocketAddress addr;
-	HttpClientDecoder decoder;
-	ByteBuffer request;
-	long lastActiveTime;
+    // for timeout check
+    boolean finished = false;
 
-	SocketChannel ch;
+    public ClientAtta(ByteBuffer request, InetSocketAddress server,
+            IEventListener handler, Proxy proxy) {
+        this.proxy = proxy;
+        this.addr = server;
+        decoder = new HttpClientDecoder(handler);
+        this.request = request;
+    }
 
-	public ClientAtta(ByteBuffer request, InetSocketAddress server,
-			IEventListener handler, Proxy proxy) {
-		this.proxy = proxy;
-		this.addr = server;
-		decoder = new HttpClientDecoder(handler);
-		this.request = request;
-		if (proxy.type() == Type.SOCKS) {
-			state = RequestState.SOCKS_CONNECTING;
-		} else {
-			state = RequestState.DIRECT_CONNECTING;
-		}
-	}
+    public void finish() {
+        closeQuiety(ch);
+        finished = true;
+        decoder.listener.onCompleted();
+    }
+
+    public void finish(Throwable t) {
+        closeQuiety(ch);
+        finished = true;
+        decoder.listener.onThrowable(t);
+    }
 }

@@ -10,19 +10,19 @@ import me.shenfeng.http.codec.HttpVersion;
  */
 public interface IEventListener {
 
-	public static final int ABORT = -1;
+    public static final int ABORT = -1;
 
-	public int onBodyReceived(byte[] buf, int length);
+    public int onBodyReceived(byte[] buf, int length);
 
-	public void onCompleted();
+    public void onCompleted();
 
-	public int onHeadersReceived(Map<String, String> headers);
+    public int onHeadersReceived(Map<String, String> headers);
 
-	public int onInitialLineReceived(HttpVersion version, HttpStatus status);
+    public int onInitialLineReceived(HttpVersion version, HttpStatus status);
 
-	/**
-	 * protocol error
-	 */
-	public void onThrowable(Throwable t);
+    /**
+     * protocol error
+     */
+    public void onThrowable(Throwable t);
 
 }

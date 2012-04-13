@@ -12,6 +12,16 @@ import static me.shenfeng.http.HttpUtils.findEndOfString;
 import static me.shenfeng.http.HttpUtils.findNonWhitespace;
 import static me.shenfeng.http.HttpUtils.findWhitespace;
 import static me.shenfeng.http.HttpUtils.getChunkSize;
+import static me.shenfeng.http.client.ClientDecoderState.ABORTED;
+import static me.shenfeng.http.client.ClientDecoderState.ALL_READ;
+import static me.shenfeng.http.client.ClientDecoderState.READ_CHUNKED_CONTENT;
+import static me.shenfeng.http.client.ClientDecoderState.READ_CHUNK_DELIMITER;
+import static me.shenfeng.http.client.ClientDecoderState.READ_CHUNK_FOOTER;
+import static me.shenfeng.http.client.ClientDecoderState.READ_CHUNK_SIZE;
+import static me.shenfeng.http.client.ClientDecoderState.READ_FIXED_LENGTH_CONTENT;
+import static me.shenfeng.http.client.ClientDecoderState.READ_HEADER;
+import static me.shenfeng.http.client.ClientDecoderState.READ_INITIAL;
+import static me.shenfeng.http.client.ClientDecoderState.READ_VARIABLE_LENGTH_CONTENT;
 import static me.shenfeng.http.client.IEventListener.ABORT;
 import static me.shenfeng.http.codec.HttpVersion.HTTP_1_0;
 import static me.shenfeng.http.codec.HttpVersion.HTTP_1_1;
@@ -27,225 +37,230 @@ import me.shenfeng.http.codec.ProtocolException;
 
 public class HttpClientDecoder {
 
+    private Map<String, String> headers = new TreeMap<String, String>();
 
-	private Map<String, String> headers = new TreeMap<String, String>();
+    // package visible
+    IEventListener listener;
+    // single threaded, shared ok
+    private static byte[] bodyBuffer = new byte[BUFFER_SIZE];
+    byte[] lineBuffer = new byte[MAX_LINE];
+    int lineBufferCnt = 0;
+    int readRemaining = 0;
+    ClientDecoderState state = READ_INITIAL;
 
-	// package visible
-	IEventListener listener;
-	// single threaded, shared ok
-	private static byte[] content = new byte[BUFFER_SIZE];
-	byte[] lineBuffer = new byte[MAX_LINE];
-	int lineBufferCnt = 0;
-	int readRemaining = 0;
-	ClientDecoderState state = ClientDecoderState.READ_INITIAL;
+    public HttpClientDecoder(IEventListener listener) {
+        this.listener = listener;
+    }
 
-	public HttpClientDecoder(IEventListener listener) {
-		this.listener = listener;
-	}
+    private void parseInitialLine(String sb) throws ProtocolException {
+        int aStart;
+        int aEnd;
+        int bStart;
+        int bEnd;
+        int cStart;
+        int cEnd;
 
-	private void complete() {
-		state = ClientDecoderState.ALL_READ;
-		listener.onCompleted();
-	}
+        aStart = findNonWhitespace(sb, 0);
+        aEnd = findWhitespace(sb, aStart);
 
-	private void parseInitialLine(String sb) {
-		int aStart;
-		int aEnd;
-		int bStart;
-		int bEnd;
-		int cStart;
-		int cEnd;
+        bStart = findNonWhitespace(sb, aEnd);
+        bEnd = findWhitespace(sb, bStart);
 
-		aStart = findNonWhitespace(sb, 0);
-		aEnd = findWhitespace(sb, aStart);
+        cStart = findNonWhitespace(sb, bEnd);
+        cEnd = findEndOfString(sb);
 
-		bStart = findNonWhitespace(sb, aEnd);
-		bEnd = findWhitespace(sb, bStart);
+        if (cStart < cEnd) {
+            int status = Integer.parseInt(sb.substring(bStart, bEnd));
+            HttpStatus s = HttpStatus.valueOf(status);
 
-		cStart = findNonWhitespace(sb, bEnd);
-		cEnd = findEndOfString(sb);
+            HttpVersion version = HTTP_1_1;
+            if ("HTTP/1.0".equals(sb.substring(aStart, cEnd))) {
+                version = HTTP_1_0;
+            }
 
-		if (cStart < cEnd) {
-			int status = Integer.parseInt(sb.substring(bStart, bEnd));
-			HttpStatus s = HttpStatus.valueOf(status);
+            if (listener.onInitialLineReceived(version, s) != ABORT) {
+                state = READ_HEADER;
+            } else {
+                state = ABORTED;
+            }
 
-			HttpVersion version = HTTP_1_1;
-			if ("HTTP/1.0".equals(sb.substring(aStart, cEnd))) {
-				version = HTTP_1_0;
-			}
+        } else {
+            throw new ProtocolException("not http prototol");
+        }
+    }
 
-			if (listener.onInitialLineReceived(version, s) != ABORT) {
-				state = ClientDecoderState.READ_HEADER;
-			} else {
-				state = ClientDecoderState.ABORTED;
-			}
+    public ClientDecoderState decode(ByteBuffer buffer)
+            throws LineTooLargeException, ProtocolException {
+        String line;
+        int toRead;
+        while (buffer.hasRemaining() && state != ALL_READ && state != ABORTED) {
+            switch (state) {
+            case READ_INITIAL:
+                line = readLine(buffer);
+                if (line != null) {
+                    parseInitialLine(line);
+                }
+                break;
+            case READ_HEADER:
+                readHeaders(buffer);
+                break;
+            case READ_CHUNK_SIZE:
+                line = readLine(buffer);
+                if (line != null) {
+                    readRemaining = getChunkSize(line);
+                    if (readRemaining == 0) {
+                        state = READ_CHUNK_FOOTER;
+                    } else {
+                        state = READ_CHUNKED_CONTENT;
+                    }
+                }
+                break;
+            case READ_FIXED_LENGTH_CONTENT:
+                toRead = Math.min(buffer.remaining(), readRemaining);
+                buffer.get(bodyBuffer, 0, toRead);
+                if (listener.onBodyReceived(bodyBuffer, toRead) == ABORT) {
+                    state = ABORTED;
+                } else {
+                    readRemaining -= toRead;
+                    if (readRemaining == 0) {
+                        state = ALL_READ;
+                    }
+                }
+                break;
+            case READ_CHUNKED_CONTENT:
+                toRead = Math.min(buffer.remaining(), readRemaining);
+                buffer.get(bodyBuffer, 0, toRead);
+                if (listener.onBodyReceived(bodyBuffer, toRead) == ABORT) {
+                    state = ABORTED;
+                } else {
+                    readRemaining -= toRead;
+                    if (readRemaining == 0) {
+                        state = READ_CHUNK_DELIMITER;
+                    }
+                }
+                break;
+            case READ_CHUNK_FOOTER:
+                readEmptyLine(buffer);
+                state = ALL_READ;
+                break;
+            case READ_CHUNK_DELIMITER:
+                readEmptyLine(buffer);
+                state = READ_CHUNK_SIZE;
+                break;
+            case READ_VARIABLE_LENGTH_CONTENT:
+                toRead = buffer.remaining();
+                buffer.get(bodyBuffer, 0, toRead);
+                if (listener.onBodyReceived(bodyBuffer, toRead) == ABORT) {
+                    state = ABORTED;
+                }
+                break;
+            }
+        }
+        return state;
+    }
 
-		} else {
-			listener.onThrowable(new ProtocolException());
-		}
-	}
+    public IEventListener getListener() {
+        return listener;
+    }
 
-	public ClientDecoderState decode(ByteBuffer buffer) throws LineTooLargeException {
-		String line;
-		int toRead;
-		while (buffer.hasRemaining() && state != ClientDecoderState.ALL_READ) {
-			switch (state) {
-			case READ_INITIAL:
-				line = readLine(buffer);
-				if (line != null) {
-					parseInitialLine(line);
-				}
-				break;
-			case READ_HEADER:
-				readHeaders(buffer);
-				break;
-			case READ_CHUNK_SIZE:
-				line = readLine(buffer);
-				if (line != null) {
-					readRemaining = getChunkSize(line);
-					if (readRemaining == 0) {
-						state = ClientDecoderState.READ_CHUNK_FOOTER;
-					} else {
-						state = ClientDecoderState.READ_CHUNKED_CONTENT;
-					}
-				}
-				break;
-			case READ_FIXED_LENGTH_CONTENT:
-				toRead = Math.min(buffer.remaining(), readRemaining);
-				buffer.get(content, 0, toRead);
-				if (listener.onBodyReceived(content, toRead) == ABORT) {
-					state = ClientDecoderState.ABORTED;
-				} else {
-					readRemaining -= toRead;
-					if (readRemaining == 0) {
-						complete();
-					}
-				}
-				break;
-			case READ_CHUNKED_CONTENT:
-				toRead = Math.min(buffer.remaining(), readRemaining);
-				buffer.get(content, 0, toRead);
-				if (listener.onBodyReceived(content, toRead) == ABORT) {
-					state = ClientDecoderState.ABORTED;
-				} else {
-					readRemaining -= toRead;
-					if (readRemaining == 0) {
-						state = ClientDecoderState.READ_CHUNK_DELIMITER;
-					}
-				}
-				break;
-			case READ_CHUNK_FOOTER:
-				readEmptyLine(buffer);
-				complete();
-				break;
-			case READ_CHUNK_DELIMITER:
-				readEmptyLine(buffer);
-				state = ClientDecoderState.READ_CHUNK_SIZE;
-				break;
-			}
-		}
-		return state;
-	}
+    void readEmptyLine(ByteBuffer buffer) {
+        byte b = buffer.get();
+        if (b == CR) {
+            buffer.get(); // should be LF
+        } else if (b == LF) {
+        }
+    }
 
-	public IEventListener getListener() {
-		return listener;
-	}
+    private void readHeaders(ByteBuffer buffer) throws LineTooLargeException {
+        String line = readLine(buffer);
+        while (line != null && !line.isEmpty()) {
+            splitAndAddHeader(line);
+            line = readLine(buffer);
+        }
+        if (line == null)
+            return; // data is not received enough. for next run
+        if (listener.onHeadersReceived(headers) != ABORT) {
+            String te = headers.get(TRANSFER_ENCODING);
+            if (CHUNKED.equals(te)) {
+                state = READ_CHUNK_SIZE;
+            } else {
+                String cl = headers.get(CONTENT_LENGTH);
+                if (cl != null) {
+                    readRemaining = Integer.parseInt(cl);
+                    if (readRemaining == 0) {
+                        state = ALL_READ;
+                    } else {
+                        state = READ_FIXED_LENGTH_CONTENT;
+                    }
+                } else {
+                    state = READ_VARIABLE_LENGTH_CONTENT;
+                }
+            }
+        } else {
+            state = ABORTED;
+        }
+    };
 
-	void readEmptyLine(ByteBuffer buffer) {
-		byte b = buffer.get();
-		if (b == CR) {
-			buffer.get(); // should be LF
-		} else if (b == LF) {
-		}
-	}
+    String readLine(ByteBuffer buffer) throws LineTooLargeException {
+        byte b;
+        boolean more = true;
+        while (buffer.hasRemaining() && more) {
+            b = buffer.get();
+            if (b == CR) {
+                if (buffer.get() == LF)
+                    more = false;
+            } else if (b == LF) {
+                more = false;
+            } else {
+                lineBuffer[lineBufferCnt] = b;
+                ++lineBufferCnt;
+                if (lineBufferCnt >= MAX_LINE) {
+                    throw new LineTooLargeException("exceed max line "
+                            + MAX_LINE);
+                }
+            }
+        }
+        String line = null;
+        if (!more) {
+            line = new String(lineBuffer, 0, lineBufferCnt);
+            lineBufferCnt = 0;
+        }
+        return line;
+    }
 
-	private void readHeaders(ByteBuffer buffer) throws LineTooLargeException {
-		String line = readLine(buffer);
-		while (line != null && !line.isEmpty()) {
-			splitAndAddHeader(line);
-			line = readLine(buffer);
-		}
-		if (listener.onHeadersReceived(headers) != ABORT) {
-			String te = headers.get(TRANSFER_ENCODING);
-			if (CHUNKED.equals(te)) {
-				state = ClientDecoderState.READ_CHUNK_SIZE;
-			} else {
-				String cl = headers.get(CONTENT_LENGTH);
-				if (cl != null) {
-					readRemaining = Integer.parseInt(cl);
-					if (readRemaining == 0) {
-						complete();
-					} else {
-						state = ClientDecoderState.READ_FIXED_LENGTH_CONTENT;
-					}
-				} else {
-					state = ClientDecoderState.READ_VARIABLE_LENGTH_CONTENT;
-				}
-			}
-		} else {
-			state = ClientDecoderState.ABORTED;
-		}
-	};
+    public void reset() {
+        headers.clear();
+        state = ClientDecoderState.READ_INITIAL;
+    }
 
-	String readLine(ByteBuffer buffer) throws LineTooLargeException {
-		byte b;
-		boolean more = true;
-		while (buffer.hasRemaining() && more) {
-			b = buffer.get();
-			if (b == CR) {
-				if (buffer.get() == LF)
-					more = false;
-			} else if (b == LF) {
-				more = false;
-			} else {
-				lineBuffer[lineBufferCnt] = b;
-				++lineBufferCnt;
-				if (lineBufferCnt >= MAX_LINE) {
-					throw new LineTooLargeException();
-				}
-			}
-		}
-		String line = null;
-		if (!more) {
-			line = new String(lineBuffer, 0, lineBufferCnt);
-			lineBufferCnt = 0;
-		}
-		return line;
-	}
+    void splitAndAddHeader(String line) {
+        final int length = line.length();
+        int nameStart;
+        int nameEnd;
+        int colonEnd;
+        int valueStart;
+        int valueEnd;
 
-	public void reset() {
-		headers.clear();
-		state = ClientDecoderState.READ_INITIAL;
-	}
+        nameStart = findNonWhitespace(line, 0);
+        for (nameEnd = nameStart; nameEnd < length; nameEnd++) {
+            char ch = line.charAt(nameEnd);
+            if (ch == ':' || isWhitespace(ch)) {
+                break;
+            }
+        }
 
-	void splitAndAddHeader(String line) {
-		final int length = line.length();
-		int nameStart;
-		int nameEnd;
-		int colonEnd;
-		int valueStart;
-		int valueEnd;
+        for (colonEnd = nameEnd; colonEnd < length; colonEnd++) {
+            if (line.charAt(colonEnd) == ':') {
+                colonEnd++;
+                break;
+            }
+        }
 
-		nameStart = findNonWhitespace(line, 0);
-		for (nameEnd = nameStart; nameEnd < length; nameEnd++) {
-			char ch = line.charAt(nameEnd);
-			if (ch == ':' || isWhitespace(ch)) {
-				break;
-			}
-		}
+        valueStart = findNonWhitespace(line, colonEnd);
+        valueEnd = findEndOfString(line);
 
-		for (colonEnd = nameEnd; colonEnd < length; colonEnd++) {
-			if (line.charAt(colonEnd) == ':') {
-				colonEnd++;
-				break;
-			}
-		}
-
-		valueStart = findNonWhitespace(line, colonEnd);
-		valueEnd = findEndOfString(line);
-
-		String key = line.substring(nameStart, nameEnd);
-		String value = line.substring(valueStart, valueEnd);
-		headers.put(key, value);
-	}
+        String key = line.substring(nameStart, nameEnd);
+        String value = line.substring(valueStart, valueEnd);
+        headers.put(key, value);
+    }
 }

@@ -27,7 +27,8 @@ public class MakeupIdelConnection {
 
         final Selector selector = Selector.open();
 
-        InetSocketAddress locals[] = { new InetSocketAddress("127.0.0.1", 9091),
+        InetSocketAddress locals[] = { new InetSocketAddress("127.0.0.1",
+                9091),
         // new InetSocketAddress("192.168.1.114", 9090),
         // new InetSocketAddress("192.168.1.21", 9090),
         // new InetSocketAddress("192.168.1.22", 9090),
@@ -89,7 +90,8 @@ public class MakeupIdelConnection {
                         SocketChannel ch = (SocketChannel) key.channel();
                         if (ch.finishConnect()) {
                             ++connected;
-                            if (connected % (connectionPerIP * locals.length / 10) == 0) {
+                            if (connected
+                                    % (connectionPerIP * locals.length / 10) == 0) {
                                 System.out.println("connected: " + connected);
                             }
                             key.interestOps(SelectionKey.OP_READ);
