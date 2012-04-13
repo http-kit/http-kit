@@ -125,7 +125,7 @@ public final class HttpClient {
     }
 
     public void get(String url, Map<String, String> headers, Proxy proxy,
-            IEventListener cb) throws URISyntaxException,
+            IRespListener cb) throws URISyntaxException,
             UnknownHostException {
         URI uri = new URI(url);
 
@@ -146,7 +146,7 @@ public final class HttpClient {
     }
 
     public void post(String uri, Map<String, String> headers, Proxy proxy,
-            IEventListener cb) {
+            IRespListener cb) {
 
     }
 

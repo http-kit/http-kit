@@ -17,7 +17,7 @@ import me.shenfeng.http.DynamicBytes;
 import me.shenfeng.http.codec.HttpStatus;
 import me.shenfeng.http.codec.HttpVersion;
 
-public class TextRespListener implements IEventListener {
+public class TextRespListener implements IRespListener {
 
     private static final String CS = "charset=";
 
@@ -70,7 +70,7 @@ public class TextRespListener implements IEventListener {
 
     public int onBodyReceived(byte[] buf, int length) {
         body.append(buf, 0, length);
-        return 0;
+        return CONTINUE;
     }
 
     public void onCompleted() {
@@ -110,12 +110,12 @@ public class TextRespListener implements IEventListener {
 
     public int onHeadersReceived(Map<String, String> headers) {
         this.headers = headers;
-        return 0;
+        return CONTINUE;
     }
 
     public int onInitialLineReceived(HttpVersion version, HttpStatus status) {
         this.status = status;
-        return 0;
+        return CONTINUE;
     }
 
     public void onThrowable(Throwable t) {

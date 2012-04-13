@@ -8,9 +8,10 @@ import me.shenfeng.http.codec.HttpVersion;
 /**
  * Will be invoked once the response/request has been fully read
  */
-public interface IEventListener {
+public interface IRespListener {
 
     public static final int ABORT = -1;
+    public static final int CONTINUE = 1;
 
     public int onBodyReceived(byte[] buf, int length);
 

@@ -19,7 +19,7 @@ public class ClientAtta {
     boolean finished = false;
 
     public ClientAtta(ByteBuffer request, InetSocketAddress server,
-            IEventListener handler, Proxy proxy) {
+            IRespListener handler, Proxy proxy) {
         this.proxy = proxy;
         this.addr = server;
         decoder = new HttpClientDecoder(handler);

@@ -23,7 +23,7 @@ public class HttpClientDecoderTest {
     public void testDecodeChunkedResponse() throws IOException,
             LineTooLargeException, ProtocolException {
         HttpClientDecoder decoder = new HttpClientDecoder(
-                new IEventListener() {
+                new IRespListener() {
                     public void onThrowable(Throwable t) {
                         throw new RuntimeException(t);
                     }

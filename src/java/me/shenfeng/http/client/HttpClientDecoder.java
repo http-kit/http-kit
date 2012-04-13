@@ -22,7 +22,7 @@ import static me.shenfeng.http.client.ClientDecoderState.READ_FIXED_LENGTH_CONTE
 import static me.shenfeng.http.client.ClientDecoderState.READ_HEADER;
 import static me.shenfeng.http.client.ClientDecoderState.READ_INITIAL;
 import static me.shenfeng.http.client.ClientDecoderState.READ_VARIABLE_LENGTH_CONTENT;
-import static me.shenfeng.http.client.IEventListener.ABORT;
+import static me.shenfeng.http.client.IRespListener.ABORT;
 import static me.shenfeng.http.codec.HttpVersion.HTTP_1_0;
 import static me.shenfeng.http.codec.HttpVersion.HTTP_1_1;
 
@@ -40,7 +40,7 @@ public class HttpClientDecoder {
     private Map<String, String> headers = new TreeMap<String, String>();
 
     // package visible
-    IEventListener listener;
+    IRespListener listener;
     // single threaded, shared ok
     private static byte[] bodyBuffer = new byte[BUFFER_SIZE];
     byte[] lineBuffer = new byte[MAX_LINE];
@@ -48,7 +48,7 @@ public class HttpClientDecoder {
     int readRemaining = 0;
     ClientDecoderState state = READ_INITIAL;
 
-    public HttpClientDecoder(IEventListener listener) {
+    public HttpClientDecoder(IRespListener listener) {
         this.listener = listener;
     }
 
@@ -159,7 +159,7 @@ public class HttpClientDecoder {
         return state;
     }
 
-    public IEventListener getListener() {
+    public IRespListener getListener() {
         return listener;
     }
 
