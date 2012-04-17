@@ -198,8 +198,9 @@ public class HttpReqeustDecoder {
                 } catch (NumberFormatException e) {
                     state = PROTOCOL_ERROR;
                 }
+            } else {
+                state = ALL_READ;
             }
-            state = ALL_READ;
         }
     }
 

@@ -1,6 +1,7 @@
 package me.shenfeng.http.server;
 
 import static me.shenfeng.http.HttpUtils.CONNECTION;
+import static me.shenfeng.http.HttpUtils.CONTENT_TYPE;
 import static me.shenfeng.http.codec.HttpVersion.HTTP_1_1;
 
 import java.io.ByteArrayInputStream;
@@ -53,7 +54,7 @@ public class HttpRequest {
     }
 
     public String getContentType() {
-        return null;
+        return headers.get(CONTENT_TYPE);
     }
 
     public Map<String, String> getHeaders() {
