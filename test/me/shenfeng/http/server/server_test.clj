@@ -2,6 +2,9 @@
   (:use clojure.test
         clojure.pprint
         ring.middleware.file-info
+        (compojure [core :only [defroutes GET POST HEAD DELETE ANY context]]
+                   [handler :only [site]]
+                   [route :only [not-found]])
         me.shenfeng.http.server)
   (:require [clj-http.client :as http])
   (:import [java.io File FileOutputStream FileInputStream]
@@ -15,94 +18,36 @@
                  (.deleteOnExit))]
        (with-open [w (FileOutputStream. tmp)]
          (doseq [i (range size)]
-           (.write w ^Integer (rem i 255))))
+           (.write w ^Integer i)))
        tmp)))
 
-(deftest test-netty-ring-spec
-  (let [server (run-server (fn [req]
-                             (is (= 4347 (:server-port req)))
-                             (is (= "localhost" (:server-name req)))
-                             ;; (is (= "127.0.0.1" (:remote-addr req)))
-                             (is (= "/uri" (:uri req)))
-                             (is (= "a=b" (:query-string req)))
-                             (is (= :http (:scheme req)))
-                             (is (= :get (:request-method  req)))
-                             (is (= nil (:content-type req)))
-                             {:status  200
-                              :headers {"Content-Type" "text/plain"}
-                              :body    "Hello World"})
-                           {:port 4347})]
-    (try
-      (let [resp (http/get "http://localhost:4347/uri"
-                           {:query-params {"a" "b"}})])
-      (finally (server)))))
+(defn test-get-spec [req]
+  (is (= 4347 (:server-port req)))
+  (is (= "localhost" (:server-name req)))
+  ;; (is (= "127.0.0.1" (:remote-addr req)))
+  (is (= "/spec-get" (:uri req)))
+  (is (= "a=b" (:query-string req)))
+  (is (= :http (:scheme req)))
+  (is (= :get (:request-method  req)))
+  (is (= nil (:content-type req)))
+  {:status  200
+   :headers {"Content-Type" "text/plain"}
+   :body    "Hello World"})
 
+(defn test-post-spec [req]
+  (is (= 4347 (:server-port req)))
+  (is (= "localhost" (:server-name req)))
+  ;; (is (= "127.0.0.1" (:remote-addr req)))
+  (is (= "/spec-get" (:uri req)))
+  (is (= "a=b" (:query-string req)))
+  (is (= :http (:scheme req)))
+  (is (= :get (:request-method  req)))
+  (is (= nil (:content-type req)))
+  {:status  200
+   :headers {"Content-Type" "text/plain"}
+   :body    "Hello World"})
 
-(deftest test-body-string
-  (let [server (run-server (fn [req]
-                             {:status  200
-                              :headers {"Content-Type" "text/plain"}
-                              :body    "Hello World"})
-                           {:port 4347})]
-    (try
-      (let [resp (http/get "http://localhost:4347")]
-        (is (= (:status resp) 200))
-        (is (= (get-in resp [:headers "content-type"]) "text/plain"))
-        (is (= (:body resp) "Hello World")))
-      (finally (server)))))
-
-
-(deftest test-body-file
-  (let [server (run-server
-                (wrap-file-info (fn [req]
-                                  {:status 200
-                                   :body (gen-tempfile 67 ".txt")}))
-                {:port 4347})]
-    (try
-      (let [resp (http/get "http://localhost:4347")]
-        (is (= (:status resp) 200))
-        (is (= (get-in resp [:headers "content-type"]) "text/plain"))
-        (is (:body resp)))
-      (finally (server)))))
-
-(deftest test-body-inputstream
-  (let [server (run-server
-                (fn [req]
-                  {:status 200
-                   :body (FileInputStream. (gen-tempfile 67000 ".txt"))})
-                {:port 4347})]
-    (try
-      (Thread/sleep 300)
-      (let [resp (http/get "http://localhost:4347")]
-        (is (= (:status resp) 200))
-        (is (:body resp)))
-      (finally (server)))))
-
-(deftest test-body-iseq
-  (let [server (run-server (fn [req]
-                             {:status  200
-                              :headers {"Content-Type" "text/plain"}
-                              :body    (list "Hello " "World")})
-                           {:port 4347})]
-    (try
-      (let [resp (http/get "http://localhost:4347")]
-        (is (= (:status resp) 200))
-        (is (= (get-in resp [:headers "content-type"]) "text/plain"))
-        (is (= (:body resp) "Hello World")))
-      (finally (server)))))
-
-(deftest test-body-null
-  (let [server (run-server (fn [req]
-                             {:status  204
-                              :headers {"Content-Type" "text/plain"}})
-                           {:port 4347})]
-    (try
-      (let [resp (http/get "http://localhost:4347")]
-        (is (= (:status resp) 204))
-        (is (= (get-in resp [:headers "content-type"]) "text/plain")))
-      (finally (server)))))
-
-(def asyc-body
+(def async-body
   (reify IListenableFuture
     (addListener [this listener]
       (.start (Thread. (fn []
@@ -113,13 +58,69 @@
       {:status 204
        :headers {"Content-type" "application/json"}})))
 
+(defroutes test-routes
+  (GET "/spec-get" [] test-get-spec)
+  (GET "/spec-post" [] test-post-spec)
+  (GET "/string" [] (fn [req] {:status 200
+                              :headers {"Content-Type" "text/plain"}
+                              :body "Hello World"}))
+  (GET "/iseq" [] (fn [req] {:status 200
+                            :headers {"Content-Type" "text/plain"}
+                            :body (list "Hello " "World")}))
+  (GET "/file" [] (wrap-file-info (fn [req]
+                                    {:status 200
+                                     :body (gen-tempfile 6000 ".txt")})))
+  (GET "/null" [] (wrap-file-info (fn [req]
+                                    {:status 200
+                                     :body nil})))
+  (GET "/inputstream" [] (fn [req]
+                           {:status 200
+                            :body (FileInputStream.
+                                   (gen-tempfile 67000 ".txt"))}))
+  (GET "/async" [] (fn [req]
+                     {:status  200
+                      :body async-body})))
+
+(use-fixtures :once (fn [f]
+                      (let [server (run-server
+                                    (-> test-routes site) {:port 4347})]
+                        (try (f) (finally (server))))))
+
+(deftest test-netty-ring-spec
+  (http/get "http://localhost:4347/spec-get"
+            {:query-params {"a" "b"}})
+  (comment                              ; TODO make it pass
+    (http/post "http://localhost:4347/spec-get?a=b")))
+
+(deftest test-body-string
+  (let [resp (http/get "http://localhost:4347/string")]
+    (is (= (:status resp) 200))
+    (is (= (get-in resp [:headers "content-type"]) "text/plain"))
+    (is (= (:body resp) "Hello World"))))
+
+(deftest test-body-file
+  (let [resp (http/get "http://localhost:4347/file")]
+    (is (= (:status resp) 200))
+    (is (= (get-in resp [:headers "content-type"]) "text/plain"))
+    (is (:body resp))))
+
+(deftest test-body-inputstream
+  (let [resp (http/get "http://localhost:4347/inputstream")]
+    (is (= (:status resp) 200))
+    (is (:body resp))))
+
+(deftest test-body-iseq
+  (let [resp (http/get "http://localhost:4347/iseq")]
+    (is (= (:status resp) 200))
+    (is (= (get-in resp [:headers "content-type"]) "text/plain"))
+    (is (= (:body resp) "Hello World"))))
+
+(deftest test-body-null
+  (let [resp (http/get "http://localhost:4347/null")]
+    (is (= (:status resp) 200))
+    (is (= "" (:body resp)))))
+
 (deftest test-body-listenablefuture
-  (let [server (run-server (fn [req]
-                             {:status  200
-                              :body asyc-body})
-                           {:port 4347})]
-    (try
-      (let [resp (http/get "http://localhost:4347")]
-        (is (= (:status resp) 204))
-        (is (= (get-in resp [:headers "content-type"]) "application/json")))
-      (finally (server)))))
+  (let [resp (http/get "http://localhost:4347/async")]
+    (is (= (:status resp) 204))
+    (is (= (get-in resp [:headers "content-type"]) "application/json"))))
