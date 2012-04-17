@@ -192,9 +192,13 @@ public class HttpReqeustDecoder {
             if (cl != null) {
                 try {
                     readRemaining = Integer.parseInt(cl);
-                    throwIfBodyIsTooLarge(readRemaining);
-                    content = new byte[readRemaining];
-                    state = READ_FIXED_LENGTH_CONTENT;
+                    if (readRemaining > 0) {
+                        throwIfBodyIsTooLarge(readRemaining);
+                        content = new byte[readRemaining];
+                        state = READ_FIXED_LENGTH_CONTENT;
+                    } else {
+                        state = ALL_READ;
+                    }
                 } catch (NumberFormatException e) {
                     state = PROTOCOL_ERROR;
                 }

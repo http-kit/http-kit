@@ -29,6 +29,7 @@
   (is (= "a=b" (:query-string req)))
   (is (= :http (:scheme req)))
   (is (= :get (:request-method  req)))
+  (is (= "utf8" (:character-encoding req)))
   (is (= nil (:content-type req)))
   {:status  200
    :headers {"Content-Type" "text/plain"}
@@ -38,11 +39,13 @@
   (is (= 4347 (:server-port req)))
   (is (= "localhost" (:server-name req)))
   ;; (is (= "127.0.0.1" (:remote-addr req)))
-  (is (= "/spec-get" (:uri req)))
+  (is (= "/spec-post" (:uri req)))
   (is (= "a=b" (:query-string req)))
+  (is (= "c" (-> req :params :p)))
   (is (= :http (:scheme req)))
-  (is (= :get (:request-method  req)))
-  (is (= nil (:content-type req)))
+  (is (= :post (:request-method  req)))
+  (is (= "application/x-www-form-urlencoded" (:content-type req)))
+  (is (= "UTF-8" (:character-encoding req)))
   {:status  200
    :headers {"Content-Type" "text/plain"}
    :body    "Hello World"})
@@ -60,7 +63,7 @@
 
 (defroutes test-routes
   (GET "/spec-get" [] test-get-spec)
-  (GET "/spec-post" [] test-post-spec)
+  (POST "/spec-post" [] test-post-spec)
   (GET "/string" [] (fn [req] {:status 200
                               :headers {"Content-Type" "text/plain"}
                               :body "Hello World"}))
@@ -89,8 +92,9 @@
 (deftest test-netty-ring-spec
   (http/get "http://localhost:4347/spec-get"
             {:query-params {"a" "b"}})
-  (comment                              ; TODO make it pass
-    (http/post "http://localhost:4347/spec-get?a=b")))
+  (http/post "http://localhost:4347/spec-post?a=b"
+             {:content-type "application/x-www-form-urlencoded"
+              :body "p=c&d=e"}))
 
 (deftest test-body-string
   (let [resp (http/get "http://localhost:4347/string")]

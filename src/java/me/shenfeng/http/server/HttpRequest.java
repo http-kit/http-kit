@@ -1,5 +1,6 @@
 package me.shenfeng.http.server;
 
+import static me.shenfeng.http.HttpUtils.CHARSET;
 import static me.shenfeng.http.HttpUtils.CONNECTION;
 import static me.shenfeng.http.HttpUtils.CONTENT_TYPE;
 import static me.shenfeng.http.codec.HttpVersion.HTTP_1_1;
@@ -23,6 +24,8 @@ public class HttpRequest {
     private HttpVersion version;
     private int contentLength = 0;
     private byte[] body;
+    private String contentType;
+    private String charset = "utf8";
     private boolean isKeepAlive = false;
 
     public HttpRequest(HttpMethod method, String url, HttpVersion version) {
@@ -46,7 +49,7 @@ public class HttpRequest {
     }
 
     public String getCharactorEncoding() {
-        return "utf8";
+        return charset;
     }
 
     public int getContentLength() {
@@ -54,7 +57,7 @@ public class HttpRequest {
     }
 
     public String getContentType() {
-        return headers.get(CONTENT_TYPE);
+        return contentType;
     }
 
     public Map<String, String> getHeaders() {
@@ -113,6 +116,19 @@ public class HttpRequest {
         String con = headers.get(CONNECTION);
         if (con != null) {
             con = con.toLowerCase();
+        }
+        String ct = headers.get(CONTENT_TYPE);
+        if (ct != null) {
+            int idx = ct.indexOf(";");
+            if (idx != -1) {
+                contentType = ct.substring(0, idx);
+                idx = ct.indexOf(CHARSET, idx);
+                if (idx != -1) {
+                    charset = ct.substring(idx + CHARSET.length());
+                }
+            } else {
+                contentType = ct;
+            }
         }
 
         isKeepAlive = (version == HTTP_1_1 && !"close".equals(con))

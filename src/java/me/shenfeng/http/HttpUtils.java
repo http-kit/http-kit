@@ -25,6 +25,8 @@ public class HttpUtils {
 
     public static final Charset ASCII = Charset.forName("US-ASCII");
     public static final Charset UTF_8 = Charset.forName("utf8");
+    
+    public static final String CHARSET = "charset=";
     // Colon ':'
     public static final byte COLON = 58;
 

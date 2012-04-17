@@ -2,6 +2,7 @@ package me.shenfeng.http.client;
 
 import static java.lang.Math.min;
 import static me.shenfeng.http.HttpUtils.ASCII;
+import static me.shenfeng.http.HttpUtils.CHARSET;
 import static me.shenfeng.http.HttpUtils.CONTENT_ENCODING;
 import static me.shenfeng.http.HttpUtils.CONTENT_TYPE;
 import static me.shenfeng.http.HttpUtils.UTF_8;
@@ -19,8 +20,6 @@ import me.shenfeng.http.codec.HttpVersion;
 
 public class TextRespListener implements IRespListener {
 
-    private static final String CS = "charset=";
-
     static Charset detectCharset(Map<String, String> headers,
             DynamicBytes body) {
         Charset result = parseCharset(headers.get(CONTENT_TYPE));
@@ -28,9 +27,9 @@ public class TextRespListener implements IRespListener {
             // decode a little the find charset=???
             String s = new String(body.get(), 0, min(350, body.length()),
                     ASCII);
-            int idx = s.indexOf(CS);
+            int idx = s.indexOf(CHARSET);
             if (idx != -1) {
-                int start = idx + CS.length();
+                int start = idx + CHARSET.length();
                 int end = s.indexOf('"', start);
                 if (end != -1) {
                     try {
@@ -47,9 +46,10 @@ public class TextRespListener implements IRespListener {
         if (type != null) {
             try {
                 type = type.toLowerCase();
-                int i = type.indexOf(CS);
+                int i = type.indexOf(CHARSET);
                 if (i != -1) {
-                    String charset = type.substring(i + CS.length()).trim();
+                    String charset = type.substring(i + CHARSET.length())
+                            .trim();
                     return Charset.forName(charset);
                 }
             } catch (Exception ignore) {
