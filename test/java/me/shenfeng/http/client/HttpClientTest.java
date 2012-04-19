@@ -1,9 +1,11 @@
 package me.shenfeng.http.client;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
+import java.net.Proxy.Type;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
@@ -43,6 +45,8 @@ public class HttpClientTest {
 
     HttpClient client;
     Map<String, String> emptyHeader;
+    Proxy socksProxy = new Proxy(Type.SOCKS, new InetSocketAddress(
+            "127.0.0.1", 3128));
 
     @Before
     public void setup() throws IOException {
@@ -55,7 +59,16 @@ public class HttpClientTest {
         final CountDownLatch cd = new CountDownLatch(1);
         client.get("http://wiki.nginx.org/Main", emptyHeader, Proxy.NO_PROXY,
                 new TextRespListener(new TextHandler(cd)));
-        Assert.assertTrue(cd.await(40, TimeUnit.SECONDS));
+        Assert.assertTrue(cd.await(4000, TimeUnit.SECONDS));
+    }
+
+    @Test
+    public void testSocksProxy() throws UnknownHostException,
+            URISyntaxException, InterruptedException {
+        final CountDownLatch cd = new CountDownLatch(1);
+        client.get("http://www.baidu.com", emptyHeader, socksProxy,
+                new TextRespListener(new TextHandler(cd)));
+        Assert.assertTrue(cd.await(4000, TimeUnit.SECONDS));
     }
 
     @Test

@@ -15,9 +15,10 @@ I write it for the http server and http client of
 * Memory efficient. Memory is cheap, but anyway, I will do my best to
   save it.
 * Handle timeout correctly. The server is intented to live behind
-  Nginx, no timeout handing. The client fight alone, timeout handing
-  is a must, both connection timeout and read timeout
-* Support Socks proxy. `SSH -D` create a Socks proxy, it's so handy.
+  Nginx, no timeout handing. The client fight alone, timeout should be
+  handed correctly.
+* Support Socks proxy. `SSH -D` create a Socks server, in china, proxy
+  is a must.
 
 # Usage
 

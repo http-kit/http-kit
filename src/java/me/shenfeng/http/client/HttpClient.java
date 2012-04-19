@@ -1,6 +1,8 @@
 package me.shenfeng.http.client;
 
 import static java.lang.System.currentTimeMillis;
+import static java.net.InetAddress.getByName;
+import static java.nio.ByteBuffer.wrap;
 import static java.nio.channels.SelectionKey.OP_CONNECT;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
@@ -9,16 +11,21 @@ import static me.shenfeng.http.HttpUtils.ACCEPT_ENCODING;
 import static me.shenfeng.http.HttpUtils.BUFFER_SIZE;
 import static me.shenfeng.http.HttpUtils.HOST;
 import static me.shenfeng.http.HttpUtils.SELECT_TIMEOUT;
+import static me.shenfeng.http.HttpUtils.SOCKSV5_CON;
+import static me.shenfeng.http.HttpUtils.SOCKSV5_VERSION_AUTH;
 import static me.shenfeng.http.HttpUtils.TIMEOUT_CHECK_INTEVAL;
 import static me.shenfeng.http.HttpUtils.USER_AGENT;
 import static me.shenfeng.http.HttpUtils.encodeGetRequest;
-import static me.shenfeng.http.HttpUtils.getServerAddr;
+import static me.shenfeng.http.HttpUtils.getPath;
+import static me.shenfeng.http.HttpUtils.getPort;
 import static me.shenfeng.http.client.ClientDecoderState.ABORTED;
 import static me.shenfeng.http.client.ClientDecoderState.ALL_READ;
+import static me.shenfeng.http.client.ConnectionState.SOCKS_HTTP_REQEUST;
+import static me.shenfeng.http.client.ConnectionState.SOCKS_INIT_CONN;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.net.Proxy;
+import java.net.SocketException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
@@ -29,10 +36,9 @@ import java.nio.channels.SocketChannel;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
-
-import me.shenfeng.http.HttpUtils;
 
 public final class HttpClient {
 
@@ -40,7 +46,7 @@ public final class HttpClient {
         public void run() {
             setName("http-client");
             try {
-                startLoop();
+                eventLoop();
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -51,14 +57,11 @@ public final class HttpClient {
     private ByteBuffer buffer = ByteBuffer.allocateDirect(BUFFER_SIZE);
 
     private final HttpClientConfig config;
-
-    private ConcurrentLinkedQueue<ClientAtta> pendings = new ConcurrentLinkedQueue<ClientAtta>();
+    private Queue<ClientAtta> pendingConnect = new ConcurrentLinkedQueue<ClientAtta>();
     private long lastTimeoutCheckTime;
 
     private LinkedList<ClientAtta> clients = new LinkedList<ClientAtta>();
-
     private volatile boolean running = true;
-
     private Selector selector;
 
     public HttpClient(HttpClientConfig config) throws IOException {
@@ -86,20 +89,41 @@ public final class HttpClient {
 
     private void doRead(SelectionKey key) {
         ClientAtta atta = (ClientAtta) key.attachment();
-        HttpClientDecoder decoder = atta.decoder;
-        SocketChannel ch = (SocketChannel) key.channel();
         try {
             buffer.clear();
-            int read = ch.read(buffer);
-            System.out.println("read " + read);
+            int read = ((SocketChannel) key.channel()).read(buffer);
             if (read == -1) {
                 atta.finish();
             } else if (read > 0) {
                 buffer.flip();
-                ClientDecoderState state = decoder.decode(buffer);
-                System.out.println(state);
-                if (state == ALL_READ || state == ABORTED) {
-                    atta.finish();
+                switch (atta.state) {
+                case DIRECT_CONNECT:
+                case SOCKS_HTTP_REQEUST:
+                    HttpClientDecoder decoder = atta.decoder;
+                    ClientDecoderState state = decoder.decode(buffer);
+                    if (state == ALL_READ || state == ABORTED) {
+                        atta.finish();
+                    }
+                    break;
+                case SOCKS_VERSION_AUTH:
+                    if (read == 2) {
+                        atta.state = SOCKS_INIT_CONN;
+                        key.interestOps(OP_WRITE);
+                        // socks server should reply 2 bytes
+                    } else {
+                        atta.finish(new SocketException(
+                                "Malformed reply from SOCKS server"));
+                    }
+                    break;
+                case SOCKS_INIT_CONN:
+                    if (read == 10 && buffer.get(1) == 0) {
+                        atta.state = SOCKS_HTTP_REQEUST;
+                        key.interestOps(OP_WRITE);
+                    } else {
+                        atta.finish(new SocketException(
+                                "Malformed reply from SOCKS server"));
+                    }
+                    break;
                 }
             }
         } catch (Exception e) {
@@ -113,15 +137,40 @@ public final class HttpClient {
     private void doWrite(SelectionKey key) {
         ClientAtta atta = (ClientAtta) key.attachment();
         SocketChannel ch = (SocketChannel) key.channel();
-        ByteBuffer request = atta.request;
         try {
-            ch.write(request);
-            if (!request.hasRemaining()) {
+            switch (atta.state) {
+            case DIRECT_CONNECT:
+            case SOCKS_HTTP_REQEUST:
+                ByteBuffer request = atta.request;
+                ch.write(request);
+                if (!request.hasRemaining()) {
+                    key.interestOps(OP_READ);
+                }
+                break;
+            case SOCKS_VERSION_AUTH:
+                ByteBuffer versionAuth = wrap(SOCKSV5_VERSION_AUTH);
+                // no remaining check, since TCP has a large buffer
+                ch.write(versionAuth);
                 key.interestOps(OP_READ);
+                break;
+            case SOCKS_INIT_CONN:
+                ByteBuffer con = ByteBuffer.allocate(10);
+                con.put(SOCKSV5_CON); // 4 bytes
+                con.put(getByName(atta.url.getHost()).getAddress()); // 4 bytes
+                con.putShort((short) getPort(atta.url)); // 2 bytes
+                con.flip();
+                ch.write(con);
+                key.interestOps(OP_READ);
+                break;
             }
         } catch (IOException e) {
-            atta.finish();
+            atta.finish(e);
         }
+    }
+
+    public void get(String url, Map<String, String> headers, IRespListener cb)
+            throws URISyntaxException, UnknownHostException {
+        get(url, headers, Proxy.NO_PROXY, cb);
     }
 
     public void get(String url, Map<String, String> headers, Proxy proxy,
@@ -134,13 +183,11 @@ public final class HttpClient {
             headers.put(USER_AGENT, config.userAgent);
         headers.put(ACCEPT_ENCODING, "gzip, deflate");
 
-        InetSocketAddress addr = getServerAddr(uri);
-
         // HTTP proxy is not supported now
-        String path = HttpUtils.getPath(uri);
+        String path = getPath(uri);
 
         ByteBuffer request = encodeGetRequest(path, headers);
-        pendings.offer(new ClientAtta(request, addr, cb, proxy));
+        pendingConnect.offer(new ClientAtta(request, cb, proxy, uri));
         selector.wakeup();
     }
 
@@ -152,7 +199,7 @@ public final class HttpClient {
     private void processPendings(long currentTime) {
         ClientAtta job;
         try {
-            while ((job = pendings.poll()) != null) {
+            while ((job = pendingConnect.poll()) != null) {
                 SocketChannel ch = SocketChannel.open();
                 job.ch = ch; // save for use when timeout
                 job.lastActiveTime = currentTime;
@@ -166,7 +213,7 @@ public final class HttpClient {
         }
     }
 
-    private void startLoop() throws IOException {
+    private void eventLoop() throws IOException {
         SelectionKey key;
         SocketChannel ch;
         while (running) {
@@ -205,7 +252,6 @@ public final class HttpClient {
                     doRead(key);
                 }
             }
-
             selectedKeys.clear();
         }
     }

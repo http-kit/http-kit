@@ -1,5 +1,7 @@
 package me.shenfeng.http;
 
+import static java.net.InetAddress.getByName;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -25,7 +27,7 @@ public class HttpUtils {
 
     public static final Charset ASCII = Charset.forName("US-ASCII");
     public static final Charset UTF_8 = Charset.forName("utf8");
-    
+
     public static final String CHARSET = "charset=";
     // Colon ':'
     public static final byte COLON = 58;
@@ -65,6 +67,22 @@ public class HttpUtils {
     public static final String CONTENT_LENGTH = "Content-Length";
 
     public static final byte[] BAD_REQUEST;
+
+    // socks proxy
+    public static final byte PROTO_VER5 = 5;
+
+    public static final byte CONNECT = 1;
+
+    // socks proxy auth is not implemented
+    public static final byte NO_AUTH = 0;
+
+    public static final byte IPV4 = 1;
+
+    public static final byte[] SOCKSV5_VERSION_AUTH = new byte[] { PROTO_VER5,
+            1, NO_AUTH };
+
+    public static final byte[] SOCKSV5_CON = new byte[] { PROTO_VER5, CONNECT,
+            0, IPV4 };
 
     static {
         byte[] body = "bad request".getBytes(ASCII);
@@ -199,8 +217,7 @@ public class HttpUtils {
             return path + "?" + query;
     }
 
-    public static InetSocketAddress getServerAddr(URI uri)
-            throws UnknownHostException {
+    public static int getPort(URI uri) {
         int port = uri.getPort();
         if (port == -1) {
             if ("https".equals(uri.getScheme()))
@@ -208,8 +225,13 @@ public class HttpUtils {
             else
                 port = 80;
         }
-        InetAddress host = InetAddress.getByName(uri.getHost());
-        return new InetSocketAddress(host, port);
+        return port;
+    }
+
+    public static InetSocketAddress getServerAddr(URI uri)
+            throws UnknownHostException {
+        InetAddress host = getByName(uri.getHost());
+        return new InetSocketAddress(host, getPort(uri));
 
     }
 

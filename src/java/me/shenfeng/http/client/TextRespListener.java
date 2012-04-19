@@ -82,10 +82,6 @@ public class TextRespListener implements IRespListener {
                 encoding = encoding.toLowerCase();
                 ByteArrayInputStream bis = new ByteArrayInputStream(
                         body.get(), 0, body.length());
-                System.out.println(body.get()[0] + "\t" + body.get()[1]
-                        + "\t" + body.get()[2]);
-                System.out.println(encoding + "\t" + headers);
-                System.out.println(body.length() + " " + bis);
                 DynamicBytes unzipped = new DynamicBytes(body.length() * 6);
                 // deflate || x-deflate
                 InputStream is = ("gzip".equals(encoding) || "x-gzip"
