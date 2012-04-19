@@ -12,6 +12,8 @@ import static me.shenfeng.http.HttpUtils.findEndOfString;
 import static me.shenfeng.http.HttpUtils.findNonWhitespace;
 import static me.shenfeng.http.HttpUtils.findWhitespace;
 import static me.shenfeng.http.HttpUtils.getChunkSize;
+import static me.shenfeng.http.HttpVersion.HTTP_1_0;
+import static me.shenfeng.http.HttpVersion.HTTP_1_1;
 import static me.shenfeng.http.client.ClientDecoderState.ABORTED;
 import static me.shenfeng.http.client.ClientDecoderState.ALL_READ;
 import static me.shenfeng.http.client.ClientDecoderState.READ_CHUNKED_CONTENT;
@@ -23,19 +25,17 @@ import static me.shenfeng.http.client.ClientDecoderState.READ_HEADER;
 import static me.shenfeng.http.client.ClientDecoderState.READ_INITIAL;
 import static me.shenfeng.http.client.ClientDecoderState.READ_VARIABLE_LENGTH_CONTENT;
 import static me.shenfeng.http.client.IRespListener.ABORT;
-import static me.shenfeng.http.codec.HttpVersion.HTTP_1_0;
-import static me.shenfeng.http.codec.HttpVersion.HTTP_1_1;
 
 import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.TreeMap;
 
-import me.shenfeng.http.codec.HttpStatus;
-import me.shenfeng.http.codec.HttpVersion;
-import me.shenfeng.http.codec.LineTooLargeException;
-import me.shenfeng.http.codec.ProtocolException;
+import me.shenfeng.http.HttpStatus;
+import me.shenfeng.http.HttpVersion;
+import me.shenfeng.http.LineTooLargeException;
+import me.shenfeng.http.ProtocolException;
 
-public class HttpClientDecoder {
+public class ClientDecoder {
 
     private Map<String, String> headers = new TreeMap<String, String>();
 
@@ -48,7 +48,7 @@ public class HttpClientDecoder {
     int readRemaining = 0;
     ClientDecoderState state = READ_INITIAL;
 
-    public HttpClientDecoder(IRespListener listener) {
+    public ClientDecoder(IRespListener listener) {
         this.listener = listener;
     }
 

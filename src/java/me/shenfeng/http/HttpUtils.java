@@ -1,5 +1,6 @@
 package me.shenfeng.http;
 
+import static java.lang.Character.isWhitespace;
 import static java.net.InetAddress.getByName;
 
 import java.io.File;
@@ -16,12 +17,9 @@ import java.nio.charset.Charset;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.TreeMap;
 
 import clojure.lang.ISeq;
 import clojure.lang.Seqable;
-
-import me.shenfeng.http.codec.HttpStatus;
 
 public class HttpUtils {
 
@@ -65,34 +63,6 @@ public class HttpUtils {
     public static final String CONNECTION = "Connection";
 
     public static final String CONTENT_LENGTH = "Content-Length";
-
-    public static final byte[] BAD_REQUEST;
-
-    // socks proxy
-    public static final byte PROTO_VER5 = 5;
-
-    public static final byte CONNECT = 1;
-
-    // socks proxy auth is not implemented
-    public static final byte NO_AUTH = 0;
-
-    public static final byte IPV4 = 1;
-
-    public static final byte[] SOCKSV5_VERSION_AUTH = new byte[] { PROTO_VER5,
-            1, NO_AUTH };
-
-    public static final byte[] SOCKSV5_CON = new byte[] { PROTO_VER5, CONNECT,
-            0, IPV4 };
-
-    static {
-        byte[] body = "bad request".getBytes(ASCII);
-        Map<String, Object> headers = new TreeMap<String, Object>();
-        headers.put(CONTENT_LENGTH, body.length + "");
-        DynamicBytes db = encodeResponseHeader(400, headers);
-        db.append(body, 0, body.length);
-        BAD_REQUEST = new byte[db.length()];
-        System.arraycopy(db.get(), 0, BAD_REQUEST, 0, db.length());
-    }
 
     // space ' '
     public static final byte SP = 32;
@@ -165,7 +135,7 @@ public class HttpUtils {
     public static int findEndOfString(String sb) {
         int result;
         for (result = sb.length(); result > 0; result--) {
-            if (!Character.isWhitespace(sb.charAt(result - 1))) {
+            if (!isWhitespace(sb.charAt(result - 1))) {
                 break;
             }
         }
@@ -175,7 +145,7 @@ public class HttpUtils {
     public static int findNonWhitespace(String sb, int offset) {
         int result;
         for (result = offset; result < sb.length(); result++) {
-            if (!Character.isWhitespace(sb.charAt(result))) {
+            if (!isWhitespace(sb.charAt(result))) {
                 break;
             }
         }
@@ -185,7 +155,7 @@ public class HttpUtils {
     public static int findWhitespace(String sb, int offset) {
         int result;
         for (result = offset; result < sb.length(); result++) {
-            if (Character.isWhitespace(sb.charAt(result))) {
+            if (isWhitespace(sb.charAt(result))) {
                 break;
             }
         }

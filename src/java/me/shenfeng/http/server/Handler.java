@@ -97,6 +97,7 @@ public class Handler implements IHandler {
                         cb.run(404, new TreeMap<String, Object>(), null);
                     }
                 } catch (Exception e) {
+                    cb.run(500, new TreeMap<String, Object>(), e.getMessage());
                     e.printStackTrace();
                 }
             }

@@ -15,8 +15,8 @@ import java.util.zip.DeflaterInputStream;
 import java.util.zip.GZIPInputStream;
 
 import me.shenfeng.http.DynamicBytes;
-import me.shenfeng.http.codec.HttpStatus;
-import me.shenfeng.http.codec.HttpVersion;
+import me.shenfeng.http.HttpStatus;
+import me.shenfeng.http.HttpVersion;
 
 public class TextRespListener implements IRespListener {
 

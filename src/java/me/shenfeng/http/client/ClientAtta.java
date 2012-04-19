@@ -2,8 +2,8 @@ package me.shenfeng.http.client;
 
 import static me.shenfeng.http.HttpUtils.closeQuiety;
 import static me.shenfeng.http.HttpUtils.getServerAddr;
-import static me.shenfeng.http.client.ConnectionState.DIRECT_CONNECT;
-import static me.shenfeng.http.client.ConnectionState.SOCKS_VERSION_AUTH;
+import static me.shenfeng.http.client.ClientConnState.DIRECT_CONNECT;
+import static me.shenfeng.http.client.ClientConnState.SOCKS_VERSION_AUTH;
 
 import java.net.InetSocketAddress;
 import java.net.Proxy;
@@ -15,11 +15,11 @@ import java.nio.channels.SocketChannel;
 
 public class ClientAtta {
     InetSocketAddress addr;
-    HttpClientDecoder decoder;
+    ClientDecoder decoder;
     ByteBuffer request; // http request
     long lastActiveTime;
     SocketChannel ch;
-    ConnectionState state;
+    ClientConnState state;
     URI url; // save for socks proxy know target addr
 
     // for timeout check
@@ -39,7 +39,7 @@ public class ClientAtta {
             }
         }
         this.url = url;
-        decoder = new HttpClientDecoder(handler);
+        decoder = new ClientDecoder(handler);
         this.request = request;
     }
 

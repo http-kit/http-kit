@@ -11,17 +11,15 @@ import static me.shenfeng.http.HttpUtils.ACCEPT_ENCODING;
 import static me.shenfeng.http.HttpUtils.BUFFER_SIZE;
 import static me.shenfeng.http.HttpUtils.HOST;
 import static me.shenfeng.http.HttpUtils.SELECT_TIMEOUT;
-import static me.shenfeng.http.HttpUtils.SOCKSV5_CON;
-import static me.shenfeng.http.HttpUtils.SOCKSV5_VERSION_AUTH;
 import static me.shenfeng.http.HttpUtils.TIMEOUT_CHECK_INTEVAL;
 import static me.shenfeng.http.HttpUtils.USER_AGENT;
 import static me.shenfeng.http.HttpUtils.encodeGetRequest;
 import static me.shenfeng.http.HttpUtils.getPath;
 import static me.shenfeng.http.HttpUtils.getPort;
+import static me.shenfeng.http.client.ClientConnState.SOCKS_HTTP_REQEUST;
+import static me.shenfeng.http.client.ClientConnState.SOCKS_INIT_CONN;
 import static me.shenfeng.http.client.ClientDecoderState.ABORTED;
 import static me.shenfeng.http.client.ClientDecoderState.ALL_READ;
-import static me.shenfeng.http.client.ConnectionState.SOCKS_HTTP_REQEUST;
-import static me.shenfeng.http.client.ConnectionState.SOCKS_INIT_CONN;
 
 import java.io.IOException;
 import java.net.Proxy;
@@ -41,6 +39,22 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public final class HttpClient {
+
+    // socks proxy
+    static final byte PROTO_VER5 = 5;
+
+    static final byte CONNECT = 1;
+
+    // socks proxy auth is not implemented
+    static final byte NO_AUTH = 0;
+
+    static final byte IPV4 = 1;
+
+    static final byte[] SOCKSV5_VERSION_AUTH = new byte[] { PROTO_VER5, 1,
+            NO_AUTH };
+
+    static final byte[] SOCKSV5_CON = new byte[] { PROTO_VER5, CONNECT, 0,
+            IPV4 };
 
     private class SelectorLoopThread extends Thread {
         public void run() {
@@ -99,7 +113,7 @@ public final class HttpClient {
                 switch (atta.state) {
                 case DIRECT_CONNECT:
                 case SOCKS_HTTP_REQEUST:
-                    HttpClientDecoder decoder = atta.decoder;
+                    ClientDecoder decoder = atta.decoder;
                     ClientDecoderState state = decoder.decode(buffer);
                     if (state == ALL_READ || state == ABORTED) {
                         atta.finish();

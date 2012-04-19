@@ -2,8 +2,8 @@ package me.shenfeng.http.client;
 
 import java.util.Map;
 
-import me.shenfeng.http.codec.HttpStatus;
-import me.shenfeng.http.codec.HttpVersion;
+import me.shenfeng.http.HttpStatus;
+import me.shenfeng.http.HttpVersion;
 
 /**
  * Will be invoked once the response/request has been fully read

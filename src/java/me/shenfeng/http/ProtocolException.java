@@ -1,4 +1,4 @@
-package me.shenfeng.http.codec;
+package me.shenfeng.http;
 
 public class ProtocolException extends Exception {
 

@@ -1,7 +1,6 @@
-package me.shenfeng.http.codec;
+package me.shenfeng.http;
 
 import static me.shenfeng.http.HttpUtils.ASCII;
-import me.shenfeng.http.HttpUtils;
 
 public class HttpStatus {
 

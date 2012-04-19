@@ -9,8 +9,8 @@ import static me.shenfeng.http.HttpUtils.findEndOfString;
 import static me.shenfeng.http.HttpUtils.findNonWhitespace;
 import static me.shenfeng.http.HttpUtils.findWhitespace;
 import static me.shenfeng.http.HttpUtils.getChunkSize;
-import static me.shenfeng.http.codec.HttpVersion.HTTP_1_0;
-import static me.shenfeng.http.codec.HttpVersion.HTTP_1_1;
+import static me.shenfeng.http.HttpVersion.HTTP_1_0;
+import static me.shenfeng.http.HttpVersion.HTTP_1_1;
 import static me.shenfeng.http.server.ServerDecoderState.ALL_READ;
 import static me.shenfeng.http.server.ServerDecoderState.PROTOCOL_ERROR;
 import static me.shenfeng.http.server.ServerDecoderState.READ_CHUNKED_CONTENT;
@@ -25,12 +25,12 @@ import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.TreeMap;
 
-import me.shenfeng.http.codec.HttpMethod;
-import me.shenfeng.http.codec.HttpVersion;
-import me.shenfeng.http.codec.LineTooLargeException;
-import me.shenfeng.http.codec.ProtocolException;
+import me.shenfeng.http.HttpMethod;
+import me.shenfeng.http.HttpVersion;
+import me.shenfeng.http.LineTooLargeException;
+import me.shenfeng.http.ProtocolException;
 
-public class HttpReqeustDecoder {
+public class ReqeustDecoder {
 
     static final int MAX_LINE = 2048;
 
@@ -45,7 +45,7 @@ public class HttpReqeustDecoder {
     int readContent = 0;
     private int maxBody;
 
-    public HttpReqeustDecoder(int maxBody) {
+    public ReqeustDecoder(int maxBody) {
         this.maxBody = maxBody;
         state = READ_INITIAL;
     }

@@ -4,7 +4,6 @@ import static java.nio.channels.SelectionKey.OP_ACCEPT;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
 import static me.shenfeng.http.HttpUtils.ASCII;
-import static me.shenfeng.http.HttpUtils.BAD_REQUEST;
 import static me.shenfeng.http.HttpUtils.CONTENT_LENGTH;
 import static me.shenfeng.http.HttpUtils.SELECT_TIMEOUT;
 import static me.shenfeng.http.HttpUtils.UTF_8;
@@ -26,6 +25,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -33,8 +33,8 @@ import java.util.TreeMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import me.shenfeng.http.DynamicBytes;
-import me.shenfeng.http.codec.LineTooLargeException;
-import me.shenfeng.http.codec.ProtocolException;
+import me.shenfeng.http.LineTooLargeException;
+import me.shenfeng.http.ProtocolException;
 import clojure.lang.ISeq;
 import clojure.lang.Seqable;
 
@@ -42,7 +42,7 @@ public class HttpServer {
     private static void doWrite(SelectionKey key) throws IOException {
         ServerAtta atta = (ServerAtta) key.attachment();
         SocketChannel ch = (SocketChannel) key.channel();
-        HttpReqeustDecoder decoder = atta.decoder;
+        ReqeustDecoder decoder = atta.decoder;
         ByteBuffer header = atta.respHeader;
         ByteBuffer body = atta.respBody;
 
@@ -85,14 +85,14 @@ public class HttpServer {
     // shared, single thread
     private ByteBuffer buffer = ByteBuffer.allocateDirect(1024 * 64);
 
-    private Runnable server = new Runnable() {
+    private Runnable eventLoop = new Runnable() {
         public void run() {
             try {
                 SelectionKey key;
                 while (true) {
                     while ((key = pendings.poll()) != null) {
                         if (key.isValid()) {
-                            key.interestOps(SelectionKey.OP_WRITE);
+                            key.interestOps(OP_WRITE);
                         }
                     }
                     int select = selector.select(SELECT_TIMEOUT);
@@ -125,10 +125,19 @@ public class HttpServer {
         }
     };
 
+    private byte[] BAD_REQUEST;
+
     public HttpServer(String ip, int port, IHandler handler) {
         this.handler = handler;
         this.ip = ip;
         this.port = port;
+
+        byte[] body = "bad request".getBytes(ASCII);
+        Map<String, Object> headers = new TreeMap<String, Object>();
+        headers.put(CONTENT_LENGTH, Integer.toString(body.length));
+        DynamicBytes db = encodeResponseHeader(400, headers);
+        db.append(body, 0, body.length);
+        BAD_REQUEST = Arrays.copyOf(db.get(), db.length());
     }
 
     void accept(SelectionKey key, Selector selector) throws IOException {
@@ -164,11 +173,10 @@ public class HttpServer {
             if (body instanceof IListenableFuture) {
                 final IListenableFuture future = (IListenableFuture) body;
                 future.addListener(new Runnable() {
-                    @SuppressWarnings("rawtypes")
+                    @SuppressWarnings({ "rawtypes", "unchecked" })
                     public void run() {
                         Map resp = (Map) future.get();
                         int status = ((Long) resp.get(STATUS)).intValue();
-                        @SuppressWarnings("unchecked")
                         Map<String, Object> headers = (Map) resp.get(HEADERS);
                         Object body = resp.get(BODY);
                         new Callback(key).run(status, headers, body);
@@ -218,7 +226,7 @@ public class HttpServer {
                 byte[] b = e.getMessage().getBytes(ASCII);
                 status = 500;
                 headers.clear();
-                headers.put(CONTENT_LENGTH, b.length + "");
+                headers.put(CONTENT_LENGTH, Integer.toString(b.length));
                 atta.respBody = ByteBuffer.wrap(b);
             }
             DynamicBytes bytes = encodeResponseHeader(status, headers);
@@ -239,9 +247,8 @@ public class HttpServer {
                 closeQuiety(ch);
             } else if (read > 0) {
                 buffer.flip(); // flip for read
-                HttpReqeustDecoder decoder = atta.decoder;
-                ServerDecoderState s = decoder.decode(buffer);
-                if (s == ALL_READ) {
+                ReqeustDecoder decoder = atta.decoder;
+                if (decoder.decode(buffer) == ALL_READ) {
                     handler.handle(decoder.request, new Callback(key));
                 }
             }
@@ -262,7 +269,7 @@ public class HttpServer {
 
     public void start() throws IOException {
         bind(ip, port);
-        serverThread = new Thread(server, "server-boss");
+        serverThread = new Thread(eventLoop, "server-boss");
         serverThread.start();
     }
 

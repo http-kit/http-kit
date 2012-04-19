@@ -3,15 +3,15 @@ package me.shenfeng.http.server;
 import static me.shenfeng.http.HttpUtils.CHARSET;
 import static me.shenfeng.http.HttpUtils.CONNECTION;
 import static me.shenfeng.http.HttpUtils.CONTENT_TYPE;
-import static me.shenfeng.http.codec.HttpVersion.HTTP_1_1;
+import static me.shenfeng.http.HttpVersion.HTTP_1_1;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.util.Map;
 
+import me.shenfeng.http.HttpMethod;
 import me.shenfeng.http.HttpUtils;
-import me.shenfeng.http.codec.HttpMethod;
-import me.shenfeng.http.codec.HttpVersion;
+import me.shenfeng.http.HttpVersion;
 
 public class HttpRequest {
     private int serverPort;
