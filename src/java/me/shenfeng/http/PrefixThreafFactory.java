@@ -1,4 +1,4 @@
-package me.shenfeng.http.server;
+package me.shenfeng.http;
 
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -17,5 +17,4 @@ public class PrefixThreafFactory implements ThreadFactory {
         t.setDaemon(true);
         return t;
     }
-
 }

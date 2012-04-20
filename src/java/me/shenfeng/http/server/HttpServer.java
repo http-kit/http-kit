@@ -1,5 +1,6 @@
 package me.shenfeng.http.server;
 
+import static java.lang.Thread.currentThread;
 import static java.nio.channels.SelectionKey.OP_ACCEPT;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
@@ -26,6 +27,7 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -35,6 +37,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import me.shenfeng.http.DynamicBytes;
 import me.shenfeng.http.LineTooLargeException;
 import me.shenfeng.http.ProtocolException;
+import me.shenfeng.http.RequestTooLargeException;
 import clojure.lang.ISeq;
 import clojure.lang.Seqable;
 
@@ -87,9 +90,9 @@ public class HttpServer {
 
     private Runnable eventLoop = new Runnable() {
         public void run() {
-            try {
-                SelectionKey key;
-                while (true) {
+            SelectionKey key;
+            while (true) {
+                try {
                     while ((key = pendings.poll()) != null) {
                         if (key.isValid()) {
                             key.interestOps(OP_WRITE);
@@ -115,13 +118,17 @@ public class HttpServer {
                         }
                     }
                     selectedKeys.clear();
+                } catch (ClosedSelectorException ignore) {
+                    System.out.println("Selector closed, server stopped");
+                    selector = null;
+                    return;
+                } catch (Exception e) { // catch any exception, print it
+                    System.err.println(new Date() + ": ERROR ["
+                            + currentThread().getName()
+                            + "]; please check code.");
+                    e.printStackTrace();
                 }
-            } catch (ClosedSelectorException ignore) {
-                System.out.println("selector closed, stop server");
-                selector = null;
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            } // end of while loop
         }
     };
 
@@ -236,7 +243,7 @@ public class HttpServer {
         }
     }
 
-    private void doRead(final SelectionKey key) throws IOException {
+    private void doRead(final SelectionKey key) {
         final ServerAtta atta = (ServerAtta) key.attachment();
         SocketChannel ch = (SocketChannel) key.channel();
         try {
@@ -269,7 +276,7 @@ public class HttpServer {
 
     public void start() throws IOException {
         bind(ip, port);
-        serverThread = new Thread(eventLoop, "server-boss");
+        serverThread = new Thread(eventLoop, "http-server");
         serverThread.start();
     }
 

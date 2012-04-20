@@ -26,6 +26,8 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
 
+import me.shenfeng.http.PrefixThreafFactory;
+
 import clojure.lang.IFn;
 import clojure.lang.IPersistentMap;
 import clojure.lang.PersistentArrayMap;

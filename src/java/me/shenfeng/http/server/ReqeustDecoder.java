@@ -29,6 +29,7 @@ import me.shenfeng.http.HttpMethod;
 import me.shenfeng.http.HttpVersion;
 import me.shenfeng.http.LineTooLargeException;
 import me.shenfeng.http.ProtocolException;
+import me.shenfeng.http.RequestTooLargeException;
 
 public class ReqeustDecoder {
 

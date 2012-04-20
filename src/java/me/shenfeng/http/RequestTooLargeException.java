@@ -1,4 +1,4 @@
-package me.shenfeng.http.server;
+package me.shenfeng.http;
 
 public class RequestTooLargeException extends Exception {
 
@@ -7,5 +7,4 @@ public class RequestTooLargeException extends Exception {
     public RequestTooLargeException(String msg) {
         super(msg);
     }
-
 }

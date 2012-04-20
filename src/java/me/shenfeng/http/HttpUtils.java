@@ -62,6 +62,10 @@ public class HttpUtils {
 
     public static final String CONNECTION = "Connection";
 
+    public static final String LOCATION = "Location";
+
+    public static final String LAST_MODIFIED = "Last-Modified";
+
     public static final String CONTENT_LENGTH = "Content-Length";
 
     // space ' '
