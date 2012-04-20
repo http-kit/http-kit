@@ -182,15 +182,13 @@ public final class HttpClient {
         }
     }
 
-    public void get(String url, Map<String, String> headers, IRespListener cb)
+    public void get(URI uri, Map<String, String> headers, IRespListener cb)
             throws URISyntaxException, UnknownHostException {
-        get(url, headers, Proxy.NO_PROXY, cb);
+        get(uri, headers, Proxy.NO_PROXY, cb);
     }
 
-    public void get(String url, Map<String, String> headers, Proxy proxy,
-            IRespListener cb) throws URISyntaxException, UnknownHostException {
-        URI uri = new URI(url);
-
+    public void get(URI uri, Map<String, String> headers, Proxy proxy,
+            IRespListener cb) throws UnknownHostException {
         headers.put(HOST, uri.getHost());
         headers.put(ACCEPT, "*/*");
         if (headers.get(USER_AGENT) == null) // allow override

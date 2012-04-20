@@ -3,9 +3,10 @@ package me.shenfeng.http.client;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
+import java.net.Proxy.Type;
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
-import java.net.Proxy.Type;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
@@ -57,8 +58,8 @@ public class HttpClientTest {
     public void testGetpythonServer() throws UnknownHostException,
             URISyntaxException, InterruptedException {
         final CountDownLatch cd = new CountDownLatch(1);
-        client.get("http://wiki.nginx.org/Main", emptyHeader, Proxy.NO_PROXY,
-                new TextRespListener(new TextHandler(cd)));
+        client.get(new URI("http://wiki.nginx.org/Main"), emptyHeader,
+                Proxy.NO_PROXY, new TextRespListener(new TextHandler(cd)));
         Assert.assertTrue(cd.await(4000, TimeUnit.SECONDS));
     }
 
@@ -66,7 +67,7 @@ public class HttpClientTest {
     public void testSocksProxy() throws UnknownHostException,
             URISyntaxException, InterruptedException {
         final CountDownLatch cd = new CountDownLatch(1);
-        client.get("http://www.baidu.com", emptyHeader, socksProxy,
+        client.get(new URI("http://www.baidu.com"), emptyHeader, socksProxy,
                 new TextRespListener(new TextHandler(cd)));
         Assert.assertTrue(cd.await(4000, TimeUnit.SECONDS));
     }
@@ -75,7 +76,7 @@ public class HttpClientTest {
     public void testGetGzipped() throws UnknownHostException,
             URISyntaxException, InterruptedException {
         final CountDownLatch cd = new CountDownLatch(1);
-        client.get("http://en.wikipedia.org/wiki/HTTP", emptyHeader,
+        client.get(new URI("http://en.wikipedia.org/wiki/HTTP"), emptyHeader,
                 Proxy.NO_PROXY, new TextRespListener(new TextHandler(cd)));
         Assert.assertTrue(cd.await(1000, TimeUnit.SECONDS));
     }
@@ -84,8 +85,8 @@ public class HttpClientTest {
     public void testDecodeSinaGzipped() throws UnknownHostException,
             URISyntaxException, InterruptedException {
         final CountDownLatch cd = new CountDownLatch(1);
-        client.get("http://www.sina.com.cn/", emptyHeader, Proxy.NO_PROXY,
-                new TextRespListener(new TextHandler(cd)));
+        client.get(new URI("http://www.sina.com.cn/"), emptyHeader,
+                Proxy.NO_PROXY, new TextRespListener(new TextHandler(cd)));
         Assert.assertTrue(cd.await(4, TimeUnit.SECONDS));
     }
 
@@ -94,8 +95,8 @@ public class HttpClientTest {
     public void testDecodeNoLength() throws UnknownHostException,
             URISyntaxException, InterruptedException {
         final CountDownLatch cd = new CountDownLatch(1);
-        client.get("http://127.0.0.1:8089", emptyHeader, Proxy.NO_PROXY,
-                new TextRespListener(new TextHandler(cd)));
+        client.get(new URI("http://127.0.0.1:8089"), emptyHeader,
+                Proxy.NO_PROXY, new TextRespListener(new TextHandler(cd)));
         Assert.assertTrue(cd.await(4, TimeUnit.SECONDS));
     }
 
@@ -104,8 +105,8 @@ public class HttpClientTest {
     public void testProtocolException() throws UnknownHostException,
             URISyntaxException, InterruptedException {
         final CountDownLatch cd = new CountDownLatch(1);
-        client.get("http://127.0.0.1:8089", emptyHeader, Proxy.NO_PROXY,
-                new TextRespListener(new TextHandler(cd)));
+        client.get(new URI("http://127.0.0.1:8089"), emptyHeader,
+                Proxy.NO_PROXY, new TextRespListener(new TextHandler(cd)));
         Assert.assertTrue(cd.await(400, TimeUnit.SECONDS));
     }
 }
