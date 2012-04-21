@@ -199,6 +199,7 @@ public final class HttpClient {
         String path = getPath(uri);
 
         ByteBuffer request = encodeGetRequest(path, headers);
+        // DNS look up is done by call thread, not the http-client thread
         pendingConnect.offer(new ClientAtta(request, cb, proxy, uri));
         selector.wakeup();
     }
@@ -212,13 +213,15 @@ public final class HttpClient {
         ClientAtta job;
         try {
             while ((job = pendingConnect.poll()) != null) {
-                SocketChannel ch = SocketChannel.open();
-                job.ch = ch; // save for use when timeout
-                job.lastActiveTime = currentTime;
-                ch.configureBlocking(false);
-                ch.register(selector, OP_CONNECT, job);
-                ch.connect(job.addr);
-                clients.add(job);
+                if (job.addr != null) { // if DNS lookup fail
+                    SocketChannel ch = SocketChannel.open();
+                    job.ch = ch; // save for use when timeout
+                    job.lastActiveTime = currentTime;
+                    ch.configureBlocking(false);
+                    ch.register(selector, OP_CONNECT, job);
+                    ch.connect(job.addr);
+                    clients.add(job);
+                }
             }
         } catch (IOException e) {
             e.printStackTrace();
