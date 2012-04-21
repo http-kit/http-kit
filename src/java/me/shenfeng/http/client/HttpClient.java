@@ -16,8 +16,10 @@ import static me.shenfeng.http.HttpUtils.USER_AGENT;
 import static me.shenfeng.http.HttpUtils.encodeGetRequest;
 import static me.shenfeng.http.HttpUtils.getPath;
 import static me.shenfeng.http.HttpUtils.getPort;
+import static me.shenfeng.http.client.ClientConnState.DIRECT_CONNECTED;
 import static me.shenfeng.http.client.ClientConnState.SOCKS_HTTP_REQEUST;
 import static me.shenfeng.http.client.ClientConnState.SOCKS_INIT_CONN;
+import static me.shenfeng.http.client.ClientConnState.SOCKS_VERSION_AUTH;
 import static me.shenfeng.http.client.ClientDecoderState.ABORTED;
 import static me.shenfeng.http.client.ClientDecoderState.ALL_READ;
 
@@ -95,8 +97,19 @@ public final class HttpClient {
                 ite.remove();
             } else if (config.timeOutMs + client.lastActiveTime < currentTime) {
                 ite.remove();
-                client.finish(new TimeoutException("timeout after "
-                        + config.timeOutMs + "ms"));
+                String msg = "read socks server timeout: ";
+                switch (client.state) {
+                case DIRECT_CONNECTING:
+                    msg = "connect timeout: ";
+                    break;
+                case SOCKS_CONNECTTING:
+                    msg = "connect socks server timeout: ";
+                case DIRECT_CONNECTED:
+                    msg = "read timeout: ";
+                    break;
+                }
+                client.finish(new TimeoutException(msg + config.timeOutMs
+                        + "ms"));
             }
         }
     }
@@ -111,7 +124,7 @@ public final class HttpClient {
             } else if (read > 0) {
                 buffer.flip();
                 switch (atta.state) {
-                case DIRECT_CONNECT:
+                case DIRECT_CONNECTED:
                 case SOCKS_HTTP_REQEUST:
                     ClientDecoder decoder = atta.decoder;
                     ClientDecoderState state = decoder.decode(buffer);
@@ -153,7 +166,7 @@ public final class HttpClient {
         SocketChannel ch = (SocketChannel) key.channel();
         try {
             switch (atta.state) {
-            case DIRECT_CONNECT:
+            case DIRECT_CONNECTED:
             case SOCKS_HTTP_REQEUST:
                 ByteBuffer request = atta.request;
                 ch.write(request);
@@ -254,6 +267,14 @@ public final class HttpClient {
                     try {
                         if (ch.finishConnect()) {
                             ClientAtta attr = (ClientAtta) key.attachment();
+                            switch (attr.state) {
+                            case SOCKS_CONNECTTING:
+                                attr.state = SOCKS_VERSION_AUTH;
+                                break;
+                            case DIRECT_CONNECTING:
+                                attr.state = DIRECT_CONNECTED;
+                                break;
+                            }
                             attr.lastActiveTime = currentTime;
                             key.interestOps(OP_WRITE);
                         }

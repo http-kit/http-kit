@@ -2,8 +2,8 @@ package me.shenfeng.http.client;
 
 import static me.shenfeng.http.HttpUtils.closeQuiety;
 import static me.shenfeng.http.HttpUtils.getServerAddr;
-import static me.shenfeng.http.client.ClientConnState.DIRECT_CONNECT;
-import static me.shenfeng.http.client.ClientConnState.SOCKS_VERSION_AUTH;
+import static me.shenfeng.http.client.ClientConnState.DIRECT_CONNECTING;
+import static me.shenfeng.http.client.ClientConnState.SOCKS_CONNECTTING;
 
 import java.net.InetSocketAddress;
 import java.net.Proxy;
@@ -31,10 +31,10 @@ public class ClientAtta {
         this.url = url;
         this.request = request;
         if (proxy.type() == Type.SOCKS) {
-            state = SOCKS_VERSION_AUTH;
+            state = SOCKS_CONNECTTING;
             addr = (InetSocketAddress) proxy.address();
         } else {
-            state = DIRECT_CONNECT;
+            state = DIRECT_CONNECTING;
             try {
                 addr = getServerAddr(url);
             } catch (UnknownHostException e) {
