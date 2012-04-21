@@ -27,6 +27,9 @@ public class ClientAtta {
 
     public ClientAtta(ByteBuffer request, IRespListener handler, Proxy proxy,
             URI url) {
+        decoder = new ClientDecoder(handler);
+        this.url = url;
+        this.request = request;
         if (proxy.type() == Type.SOCKS) {
             state = SOCKS_VERSION_AUTH;
             addr = (InetSocketAddress) proxy.address();
@@ -38,9 +41,6 @@ public class ClientAtta {
                 decoder.listener.onThrowable(e);
             }
         }
-        this.url = url;
-        decoder = new ClientDecoder(handler);
-        this.request = request;
     }
 
     public void finish() {
