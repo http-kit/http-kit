@@ -114,7 +114,7 @@ public final class HttpClient {
         }
     }
 
-    private void doRead(SelectionKey key) {
+    private void doRead(SelectionKey key, long currentTime) {
         ClientAtta atta = (ClientAtta) key.attachment();
         try {
             buffer.clear();
@@ -122,6 +122,8 @@ public final class HttpClient {
             if (read == -1) {
                 atta.finish();
             } else if (read > 0) {
+                // update for timeout check
+                atta.lastActiveTime = currentTime;
                 buffer.flip();
                 switch (atta.state) {
                 case DIRECT_CONNECTED:
@@ -269,6 +271,7 @@ public final class HttpClient {
                             ClientAtta attr = (ClientAtta) key.attachment();
                             switch (attr.state) {
                             case SOCKS_CONNECTTING:
+                                // begin socks handleshake
                                 attr.state = SOCKS_VERSION_AUTH;
                                 break;
                             case DIRECT_CONNECTING:
@@ -285,7 +288,7 @@ public final class HttpClient {
                 } else if (key.isWritable()) {
                     doWrite(key);
                 } else if (key.isReadable()) {
-                    doRead(key);
+                    doRead(key, currentTime);
                 }
             }
             selectedKeys.clear();
