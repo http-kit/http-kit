@@ -1,6 +1,5 @@
 package me.shenfeng.http.server;
 
-import static java.lang.Thread.currentThread;
 import static java.nio.channels.SelectionKey.OP_ACCEPT;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
@@ -27,7 +26,6 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Arrays;
-import java.util.Date;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -38,10 +36,17 @@ import me.shenfeng.http.DynamicBytes;
 import me.shenfeng.http.LineTooLargeException;
 import me.shenfeng.http.ProtocolException;
 import me.shenfeng.http.RequestTooLargeException;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import clojure.lang.ISeq;
 import clojure.lang.Seqable;
 
 public class HttpServer {
+
+    static Logger logger = LoggerFactory.getLogger(HttpServer.class);
+
     private static void doWrite(SelectionKey key) throws IOException {
         ServerAtta atta = (ServerAtta) key.attachment();
         SocketChannel ch = (SocketChannel) key.channel();
@@ -119,14 +124,11 @@ public class HttpServer {
                     }
                     selectedKeys.clear();
                 } catch (ClosedSelectorException ignore) {
-                    System.out.println("Selector closed, server stopped");
+                    logger.info("Selector closed, server stopped");
                     selector = null;
                     return;
                 } catch (Exception e) { // catch any exception, print it
-                    System.err.println(new Date() + ": ERROR ["
-                            + currentThread().getName()
-                            + "]; please check code.");
-                    e.printStackTrace();
+                    logger.error("server event loop error", e);
                 }
             } // end of while loop
         }
@@ -163,7 +165,7 @@ public class HttpServer {
         InetSocketAddress addr = new InetSocketAddress(ip, port);
         serverChannel.socket().bind(addr);
         serverChannel.register(selector, OP_ACCEPT);
-        System.out.println("start server " + ip + "@" + port);
+        logger.info("start server " + ip + "@" + port);
     }
 
     private class Callback implements IResponseCallback {

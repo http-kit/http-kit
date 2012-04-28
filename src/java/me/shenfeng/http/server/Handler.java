@@ -29,6 +29,10 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import me.shenfeng.http.PrefixThreafFactory;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import clojure.lang.IFn;
 import clojure.lang.IPersistentMap;
 import clojure.lang.PersistentArrayMap;
@@ -37,6 +41,8 @@ public class Handler implements IHandler {
 
     final ExecutorService execs;
     final IFn f;
+
+    static Logger logger = LoggerFactory.getLogger(Handler.class);
 
     public Handler(int thread, IFn f) {
         execs = new ThreadPoolExecutor(thread, thread, 0,
@@ -103,7 +109,7 @@ public class Handler implements IHandler {
                     }
                 } catch (Exception e) {
                     cb.run(500, null, e.getMessage());
-                    e.printStackTrace();
+                    logger.error(req.getUri(), e);
                 }
             }
         });
