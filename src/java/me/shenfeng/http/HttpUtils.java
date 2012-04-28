@@ -12,7 +12,7 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
+import java.nio.channels.SelectableChannel;
 import java.nio.charset.Charset;
 import java.util.Iterator;
 import java.util.Map;
@@ -73,7 +73,7 @@ public class HttpUtils {
     // space ' '
     public static final byte SP = 32;
 
-    public static void closeQuiety(SocketChannel c) {
+    public static void closeQuiety(SelectableChannel c) {
         try {
             if (c != null) {
                 c.close();

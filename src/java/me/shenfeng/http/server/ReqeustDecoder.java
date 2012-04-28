@@ -31,12 +31,17 @@ import me.shenfeng.http.LineTooLargeException;
 import me.shenfeng.http.ProtocolException;
 import me.shenfeng.http.RequestTooLargeException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class ReqeustDecoder {
 
     static final int MAX_LINE = 2048;
 
     byte[] lineBuffer = new byte[MAX_LINE];
     int lineBufferCnt = 0;
+
+    static Logger logger = LoggerFactory.getLogger(ReqeustDecoder.class);
 
     HttpRequest request;
     private Map<String, String> headers = new TreeMap<String, String>();
@@ -269,8 +274,12 @@ public class ReqeustDecoder {
         valueEnd = findEndOfString(sb);
 
         String key = sb.substring(nameStart, nameEnd);
-        String value = sb.substring(valueStart, valueEnd);
-        headers.put(key, value);
+        if (valueStart > valueEnd) { // ignore
+            logger.warn("header error: " + sb);
+        } else {
+            String value = sb.substring(valueStart, valueEnd);
+            headers.put(key, value);
+        }
     }
 
     private void throwIfBodyIsTooLarge(int body)

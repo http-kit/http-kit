@@ -95,7 +95,7 @@ public class HttpServer {
 
     private Runnable eventLoop = new Runnable() {
         public void run() {
-            SelectionKey key;
+            SelectionKey key = null;
             while (true) {
                 try {
                     while ((key = pendings.poll()) != null) {
@@ -128,6 +128,9 @@ public class HttpServer {
                     selector = null;
                     return;
                 } catch (Exception e) { // catch any exception, print it
+                    if (key != null) {
+                        closeQuiety(key.channel());
+                    }
                     logger.error("server event loop error", e);
                 }
             } // end of while loop
