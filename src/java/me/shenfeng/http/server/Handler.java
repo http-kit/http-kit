@@ -1,6 +1,5 @@
 package me.shenfeng.http.server;
 
-import static java.util.concurrent.Executors.newFixedThreadPool;
 import static me.shenfeng.http.server.ServerConstant.BODY;
 import static me.shenfeng.http.server.ServerConstant.CHARACTER_ENCODING;
 import static me.shenfeng.http.server.ServerConstant.CONTENT_LENGTH;
@@ -24,10 +23,12 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import me.shenfeng.http.PrefixThreafFactory;
-
 import clojure.lang.IFn;
 import clojure.lang.IPersistentMap;
 import clojure.lang.PersistentArrayMap;
@@ -38,7 +39,9 @@ public class Handler implements IHandler {
     final IFn f;
 
     public Handler(int thread, IFn f) {
-        execs = newFixedThreadPool(thread, new PrefixThreafFactory("worker-"));
+        execs = new ThreadPoolExecutor(thread, thread, 0,
+                TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(386),
+                new PrefixThreafFactory("worker-"));
         this.f = f;
     }
 
@@ -99,7 +102,7 @@ public class Handler implements IHandler {
                         cb.run(404, new TreeMap<String, Object>(), null);
                     }
                 } catch (Exception e) {
-                    cb.run(500, new TreeMap<String, Object>(), e.getMessage());
+                    cb.run(500, null, e.getMessage());
                     e.printStackTrace();
                 }
             }

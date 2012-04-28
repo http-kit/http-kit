@@ -68,6 +68,8 @@ public class HttpUtils {
 
     public static final String CONTENT_LENGTH = "Content-Length";
 
+    public static final String CACHE_CONTROL = "Cache-Control";
+
     // space ' '
     public static final byte SP = 32;
 

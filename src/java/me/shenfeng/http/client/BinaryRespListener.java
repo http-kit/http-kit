@@ -23,6 +23,8 @@ public class BinaryRespListener implements IRespListener {
     }
 
     public void onCompleted() {
+        // TODO status maybe null
+        // http://localhost:9090/fav?h=moc.elcaro.sgolb
         handler.onSuccess(status.getCode(), headers, body);
     }
 
