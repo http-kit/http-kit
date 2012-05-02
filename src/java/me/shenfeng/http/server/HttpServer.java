@@ -222,8 +222,7 @@ public class HttpServer {
                     atta.respBody = ByteBuffer.wrap(b.get(), 0, b.length());
                     headers.put(CONTENT_LENGTH, Integer.toString(b.length()));
                 } else {
-                    System.err.println(body.getClass()
-                            + " is not understandable");
+                    logger.error(body.getClass() + " is not understandable");
                 }
             } catch (IOException e) {
                 byte[] b = e.getMessage().getBytes(ASCII);
