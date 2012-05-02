@@ -25,7 +25,6 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -33,9 +32,7 @@ import java.util.TreeMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import me.shenfeng.http.DynamicBytes;
-import me.shenfeng.http.LineTooLargeException;
 import me.shenfeng.http.ProtocolException;
-import me.shenfeng.http.RequestTooLargeException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,6 +80,7 @@ public class HttpServer {
 
     private IHandler handler;
     private int port;
+    private final int maxBody;
     private String ip;
     private Selector selector;
     private Thread serverThread;
@@ -137,19 +135,11 @@ public class HttpServer {
         }
     };
 
-    private byte[] BAD_REQUEST;
-
-    public HttpServer(String ip, int port, IHandler handler) {
+    public HttpServer(String ip, int port, IHandler handler, int maxBody) {
         this.handler = handler;
         this.ip = ip;
         this.port = port;
-
-        byte[] body = "bad request".getBytes(ASCII);
-        Map<String, Object> headers = new TreeMap<String, Object>();
-        headers.put(CONTENT_LENGTH, Integer.toString(body.length));
-        DynamicBytes db = encodeResponseHeader(400, headers);
-        db.append(body, 0, body.length);
-        BAD_REQUEST = Arrays.copyOf(db.get(), db.length());
+        this.maxBody = maxBody;
     }
 
     void accept(SelectionKey key, Selector selector) throws IOException {
@@ -157,7 +147,7 @@ public class HttpServer {
         SocketChannel s;
         while ((s = ch.accept()) != null) {
             s.configureBlocking(false);
-            s.register(selector, OP_READ, new ServerAtta());
+            s.register(selector, OP_READ, new ServerAtta(maxBody));
         }
     }
 
@@ -168,7 +158,8 @@ public class HttpServer {
         InetSocketAddress addr = new InetSocketAddress(ip, port);
         serverChannel.socket().bind(addr);
         serverChannel.register(selector, OP_ACCEPT);
-        logger.info("start server " + ip + "@" + port);
+        logger.info("server start {}@{}, max body: {}", new Object[] { ip,
+                port, maxBody });
     }
 
     private class Callback implements IResponseCallback {
@@ -268,13 +259,15 @@ public class HttpServer {
             closeQuiety(ch); // the remote forcibly closed the connection
         } catch (ProtocolException e) {
             closeQuiety(ch);
-        } catch (LineTooLargeException e) {
+            // LineTooLargeException, RequestTooLargeException
+        } catch (Exception e) {
+            byte[] body = e.getMessage().getBytes(ASCII);
+            Map<String, Object> headers = new TreeMap<String, Object>();
+            headers.put(CONTENT_LENGTH, body.length);
+            DynamicBytes db = encodeResponseHeader(400, headers);
+            db.append(body, 0, body.length);
             atta.respBody = null;
-            atta.respHeader = ByteBuffer.wrap(BAD_REQUEST);
-            key.interestOps(OP_WRITE);
-        } catch (RequestTooLargeException e) {
-            atta.respBody = null;
-            atta.respHeader = ByteBuffer.wrap(BAD_REQUEST);
+            atta.respHeader = ByteBuffer.wrap(db.get(), 0, db.length());
             key.interestOps(OP_WRITE);
         }
     }

@@ -3,7 +3,12 @@ package me.shenfeng.http.server;
 import java.nio.ByteBuffer;
 
 public class ServerAtta {
-    public final ReqeustDecoder decoder = new ReqeustDecoder(2048);
+
+    public ServerAtta(int maxBody) {
+        decoder = new ReqeustDecoder(maxBody); // 20k
+    }
+
+    public final ReqeustDecoder decoder;
 
     // not strictly header, if one buffer can fit, choose this buffer first
     volatile ByteBuffer respHeader;
