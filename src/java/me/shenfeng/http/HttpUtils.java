@@ -48,6 +48,8 @@ public class HttpUtils {
 
     public static final String ACCEPT = "Accept";
 
+    public static final String ETAG = "ETag";
+
     public static final String ACCEPT_ENCODING = "Accept-Encoding";
 
     public static final String TRANSFER_ENCODING = "Transfer-Encoding";
@@ -63,6 +65,10 @@ public class HttpUtils {
     public static final String CONNECTION = "Connection";
 
     public static final String LOCATION = "Location";
+
+    public static final String IF_MODIFIED_SINCE = "If-Modified-Since";
+
+    public static final String IF_NONE_MATCH = "If-None-Match";
 
     public static final String LAST_MODIFIED = "Last-Modified";
 
@@ -91,9 +97,11 @@ public class HttpUtils {
         Iterator<Entry<String, String>> ite = headers.entrySet().iterator();
         while (ite.hasNext()) {
             Entry<String, String> e = ite.next();
-            bytes.append(e.getKey()).append(COLON).append(SP)
-                    .append(e.getValue());
-            bytes.append(CR).append(LF);
+            if (e.getValue() != null) {
+                bytes.append(e.getKey()).append(COLON).append(SP)
+                        .append(e.getValue());
+                bytes.append(CR).append(LF);
+            }
         }
 
         bytes.append(CR).append(LF);

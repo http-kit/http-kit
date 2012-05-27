@@ -179,7 +179,13 @@ public class HttpServer {
                     @SuppressWarnings({ "rawtypes", "unchecked" })
                     public void run() {
                         Map resp = (Map) future.get();
-                        int status = ((Long) resp.get(STATUS)).intValue();
+                        Object s = resp.get(STATUS);
+                        int status = 200;
+                        if (s instanceof Long) {
+                            status = ((Long) s).intValue();
+                        } else if (s instanceof Integer) {
+                            status = (Integer) s;
+                        }
                         Map<String, Object> headers = (Map) resp.get(HEADERS);
                         Object body = resp.get(BODY);
                         new Callback(key).run(status, headers, body);

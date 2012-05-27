@@ -33,7 +33,7 @@ public class MultiThreadHttpServerTest {
 
     public static void main(String[] args) throws IOException {
         HttpServer server = new HttpServer("0.0.0.0", 9091,
-                new MultiThreadHandler());
+                new MultiThreadHandler(), 20480);
         server.start();
     }
 }

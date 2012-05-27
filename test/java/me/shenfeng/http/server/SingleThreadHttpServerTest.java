@@ -25,7 +25,7 @@ public class SingleThreadHttpServerTest {
         // concurrency 1024, 2000000 request, time: 16545ms; 120882.44 req/s;
         // receive: 93M data; 5.62 M/s
         HttpServer server = new HttpServer("0.0.0.0", 9091,
-                new SingleThreadHandler());
+                new SingleThreadHandler(), 20480);
         server.start();
     }
 }

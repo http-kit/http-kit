@@ -90,6 +90,17 @@ public class HttpClientTest {
         Assert.assertTrue(cd.await(4, TimeUnit.SECONDS));
     }
 
+    @Test
+    public void testAprotocolException() throws UnknownHostException,
+            URISyntaxException, InterruptedException {
+        final CountDownLatch cd = new CountDownLatch(1);
+        //http://blog.higher-order.net/feed/
+        client.get(new URI("http://weblogs.asp.net/scottgu/rss.aspx"),
+                emptyHeader, Proxy.NO_PROXY, new TextRespListener(
+                        new TextHandler(cd)));
+        Assert.assertTrue(cd.await(400, TimeUnit.SECONDS));
+    }
+
     // { echo -ne "HTTP/1.0 200 OK\r\n\r\n"; cat project.clj; } | nc -l -p 8089
     @Test
     public void testDecodeNoLength() throws UnknownHostException,
