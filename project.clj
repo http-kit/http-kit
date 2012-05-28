@@ -1,4 +1,4 @@
-(defproject me.shenfeng.http/http-kit "1.0.0-SNAPSHOT"
+(defproject me.shenfeng/http-kit "1.0.0-SNAPSHOT"
   :description "Event driven HTTP server and HTTP client in java and clojure, only depend on JDK."
   :dependencies [[org.clojure/clojure "1.4.0"]
                  [org.slf4j/slf4j-api "1.6.4"]]

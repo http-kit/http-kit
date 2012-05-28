@@ -151,7 +151,7 @@ public class HttpServer {
         }
     }
 
-    void bind(String ip, int port) throws IOException {
+    void bind() throws IOException {
         selector = Selector.open();
         serverChannel = ServerSocketChannel.open();
         serverChannel.configureBlocking(false);
@@ -278,7 +278,7 @@ public class HttpServer {
     }
 
     public void start() throws IOException {
-        bind(ip, port);
+        bind();
         serverThread = new Thread(eventLoop, "http-server");
         serverThread.start();
     }
