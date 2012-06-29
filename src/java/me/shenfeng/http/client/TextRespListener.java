@@ -20,23 +20,31 @@ import me.shenfeng.http.HttpVersion;
 
 public class TextRespListener implements IRespListener {
 
-    static Charset detectCharset(Map<String, String> headers,
+    private static Charset guess(String html, String patten) {
+        int idx = html.indexOf(patten);
+        if (idx != -1) {
+            int start = idx + patten.length();
+            int end = html.indexOf('"', start);
+            if (end != -1) {
+                try {
+                    return Charset.forName(html.substring(start, end));
+                } catch (Exception ignore) {
+                }
+            }
+        }
+        return null;
+    }
+
+    public static Charset detectCharset(Map<String, String> headers,
             DynamicBytes body) {
         Charset result = parseCharset(headers.get(CONTENT_TYPE));
         if (result == null) {
             // decode a little the find charset=???
             String s = new String(body.get(), 0, min(350, body.length()),
                     ASCII);
-            int idx = s.indexOf(CHARSET);
-            if (idx != -1) {
-                int start = idx + CHARSET.length();
-                int end = s.indexOf('"', start);
-                if (end != -1) {
-                    try {
-                        result = Charset.forName(s.substring(start, end));
-                    } catch (Exception ignore) {
-                    }
-                }
+            result = guess(s, CHARSET);
+            if (result == null) {
+                result = guess(s, "encoding=\""); // for xml
             }
         }
         return result == null ? UTF_8 : result;
