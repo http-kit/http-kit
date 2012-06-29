@@ -249,4 +249,40 @@ public class HttpUtils {
         is.close();
         return bytes;
     }
+
+    public static void splitAndAddHeader(String sb,
+            Map<String, String> headers) {
+        final int length = sb.length();
+        int nameStart;
+        int nameEnd;
+        int colonEnd;
+        int valueStart;
+        int valueEnd;
+
+        nameStart = findNonWhitespace(sb, 0);
+        for (nameEnd = nameStart; nameEnd < length; nameEnd++) {
+            char ch = sb.charAt(nameEnd);
+            if (ch == ':' || Character.isWhitespace(ch)) {
+                break;
+            }
+        }
+
+        for (colonEnd = nameEnd; colonEnd < length; colonEnd++) {
+            if (sb.charAt(colonEnd) == ':') {
+                colonEnd++;
+                break;
+            }
+        }
+
+        valueStart = findNonWhitespace(sb, colonEnd);
+        valueEnd = findEndOfString(sb);
+
+        String key = sb.substring(nameStart, nameEnd);
+        if (valueStart > valueEnd) { // ignore
+        // logger.warn("header error: " + sb);
+        } else {
+            String value = sb.substring(valueStart, valueEnd);
+            headers.put(key, value);
+        }
+    }
 }

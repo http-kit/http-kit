@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import me.shenfeng.http.HttpMethod;
+import me.shenfeng.http.HttpUtils;
 import me.shenfeng.http.HttpVersion;
 import me.shenfeng.http.LineTooLargeException;
 import me.shenfeng.http.ProtocolException;
@@ -180,7 +181,7 @@ public class ReqeustDecoder {
             RequestTooLargeException {
         String line = readLine(buffer);
         while (line != null && !line.isEmpty()) {
-            splitAndAddHeader(line);
+            HttpUtils.splitAndAddHeader(line, headers);
             line = readLine(buffer);
         }
 
@@ -245,41 +246,6 @@ public class ReqeustDecoder {
         state = READ_INITIAL;
         headers.clear();
         readContent = 0;
-    }
-
-    void splitAndAddHeader(String sb) {
-        final int length = sb.length();
-        int nameStart;
-        int nameEnd;
-        int colonEnd;
-        int valueStart;
-        int valueEnd;
-
-        nameStart = findNonWhitespace(sb, 0);
-        for (nameEnd = nameStart; nameEnd < length; nameEnd++) {
-            char ch = sb.charAt(nameEnd);
-            if (ch == ':' || Character.isWhitespace(ch)) {
-                break;
-            }
-        }
-
-        for (colonEnd = nameEnd; colonEnd < length; colonEnd++) {
-            if (sb.charAt(colonEnd) == ':') {
-                colonEnd++;
-                break;
-            }
-        }
-
-        valueStart = findNonWhitespace(sb, colonEnd);
-        valueEnd = findEndOfString(sb);
-
-        String key = sb.substring(nameStart, nameEnd);
-        if (valueStart > valueEnd) { // ignore
-            logger.warn("header error: " + sb);
-        } else {
-            String value = sb.substring(valueStart, valueEnd);
-            headers.put(key, value);
-        }
     }
 
     private void throwIfBodyIsTooLarge(int body)

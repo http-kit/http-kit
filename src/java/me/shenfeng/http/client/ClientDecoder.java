@@ -1,6 +1,5 @@
 package me.shenfeng.http.client;
 
-import static java.lang.Character.isWhitespace;
 import static me.shenfeng.http.HttpUtils.BUFFER_SIZE;
 import static me.shenfeng.http.HttpUtils.CHUNKED;
 import static me.shenfeng.http.HttpUtils.CONTENT_LENGTH;
@@ -31,6 +30,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import me.shenfeng.http.HttpStatus;
+import me.shenfeng.http.HttpUtils;
 import me.shenfeng.http.HttpVersion;
 import me.shenfeng.http.LineTooLargeException;
 import me.shenfeng.http.ProtocolException;
@@ -174,7 +174,7 @@ public class ClientDecoder {
     private void readHeaders(ByteBuffer buffer) throws LineTooLargeException {
         String line = readLine(buffer);
         while (line != null && !line.isEmpty()) {
-            splitAndAddHeader(line);
+            HttpUtils.splitAndAddHeader(line, headers);
             line = readLine(buffer);
         }
         if (line == null)
@@ -231,36 +231,5 @@ public class ClientDecoder {
     public void reset() {
         headers.clear();
         state = ClientDecoderState.READ_INITIAL;
-    }
-
-    void splitAndAddHeader(String line) {
-        final int length = line.length();
-        int nameStart;
-        int nameEnd;
-        int colonEnd;
-        int valueStart;
-        int valueEnd;
-
-        nameStart = findNonWhitespace(line, 0);
-        for (nameEnd = nameStart; nameEnd < length; nameEnd++) {
-            char ch = line.charAt(nameEnd);
-            if (ch == ':' || isWhitespace(ch)) {
-                break;
-            }
-        }
-
-        for (colonEnd = nameEnd; colonEnd < length; colonEnd++) {
-            if (line.charAt(colonEnd) == ':') {
-                colonEnd++;
-                break;
-            }
-        }
-
-        valueStart = findNonWhitespace(line, colonEnd);
-        valueEnd = findEndOfString(line);
-
-        String key = line.substring(nameStart, nameEnd);
-        String value = line.substring(valueStart, valueEnd);
-        headers.put(key, value);
     }
 }
