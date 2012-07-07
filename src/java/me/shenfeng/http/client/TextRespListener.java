@@ -11,6 +11,8 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.DeflaterInputStream;
 import java.util.zip.GZIPInputStream;
 
@@ -35,6 +37,11 @@ public class TextRespListener implements IRespListener {
         return null;
     }
 
+    // <?xml version='1.0' encoding='GBK'?>
+    // <?xml version="1.0" encoding="UTF-8"?>
+    static final Pattern ENCODING = Pattern.compile(
+            "encoding=('|\")([\\w|-]+)('|\")", Pattern.CASE_INSENSITIVE);
+
     public static Charset detectCharset(Map<String, String> headers,
             DynamicBytes body) {
         Charset result = parseCharset(headers.get(CONTENT_TYPE));
@@ -42,9 +49,16 @@ public class TextRespListener implements IRespListener {
             // decode a little the find charset=???
             String s = new String(body.get(), 0, min(350, body.length()),
                     ASCII);
+            // content="text/html;charset=gb2312"
             result = guess(s, CHARSET);
             if (result == null) {
-                result = guess(s, "encoding=\""); // for xml
+                Matcher matcher = ENCODING.matcher(s);
+                if (matcher.find()) {
+                    try {
+                        result = Charset.forName(matcher.group(2));
+                    } catch (Exception ignore) {
+                    }
+                }
             }
         }
         return result == null ? UTF_8 : result;
