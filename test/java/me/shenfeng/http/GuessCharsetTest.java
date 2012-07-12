@@ -24,7 +24,7 @@ public class GuessCharsetTest {
             dy.append(buffer, 0, read);
         }
         is.close();
-        
+
         return dy;
 
     }
@@ -35,14 +35,14 @@ public class GuessCharsetTest {
         Charset gb2312 = Charset.forName("gb2312");
         Charset c = TextRespListener.detectCharset(headers, getData("xml_gb2312"));
         System.out.println(c);
-        
+
         Assert.assertTrue(gb2312.equals(c));
         c = TextRespListener.detectCharset(headers, getData("html_gb2312"));
         Assert.assertTrue(gb2312.equals(c));
-        
+
         c = TextRespListener.detectCharset(headers, getData("beta_shield"));
         System.out.println(c);
-        
+
     }
 
 }

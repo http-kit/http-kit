@@ -1,5 +1,7 @@
 package me.shenfeng.http.client;
 
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
@@ -14,6 +16,7 @@ import java.util.concurrent.TimeUnit;
 
 import junit.framework.Assert;
 
+import org.apache.commons.io.IOUtils;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -26,6 +29,11 @@ class TextHandler implements ITextHandler {
     }
 
     public void onSuccess(int status, Map<String, String> headers, String body) {
+        try {
+            IOUtils.write(body, new FileOutputStream("/tmp/file"));
+        } catch (FileNotFoundException e) {
+        } catch (IOException e) {
+        }
         System.out.println("status: " + status + "; body length: "
                 + body.length());
         cd.countDown();
@@ -41,7 +49,10 @@ class TextHandler implements ITextHandler {
 public class HttpClientTest {
 
     public HttpClientTest() throws IOException {
-        client = new HttpClient(new HttpClientConfig());
+        String userAgent = "Mozilla/5.0 (compatible; Rssminer/1.0; +http://rssminer.net)";
+        HttpClientConfig cfg = new HttpClientConfig(45000, userAgent);
+
+        client = new HttpClient(cfg);
     }
 
     HttpClient client;
@@ -67,8 +78,9 @@ public class HttpClientTest {
     public void testSocksProxy() throws UnknownHostException,
             URISyntaxException, InterruptedException {
         final CountDownLatch cd = new CountDownLatch(1);
-        client.get(new URI("http://www.baidu.com"), emptyHeader, socksProxy,
-                new TextRespListener(new TextHandler(cd)));
+        client.get(new URI("http://feeds2.feedburner.com/dwahlin"),
+                emptyHeader, socksProxy, new TextRespListener(
+                        new TextHandler(cd)));
         Assert.assertTrue(cd.await(4000, TimeUnit.SECONDS));
     }
 
@@ -94,7 +106,7 @@ public class HttpClientTest {
     public void testAprotocolException() throws UnknownHostException,
             URISyntaxException, InterruptedException {
         final CountDownLatch cd = new CountDownLatch(1);
-        //http://blog.higher-order.net/feed/
+        // http://blog.higher-order.net/feed/
         client.get(new URI("http://weblogs.asp.net/scottgu/rss.aspx"),
                 emptyHeader, Proxy.NO_PROXY, new TextRespListener(
                         new TextHandler(cd)));

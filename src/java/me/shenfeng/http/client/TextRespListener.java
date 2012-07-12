@@ -22,6 +22,20 @@ import me.shenfeng.http.HttpVersion;
 
 public class TextRespListener implements IRespListener {
 
+    public static class AbortException extends Exception {
+        public AbortException() {
+            super("aborted");
+        }
+        private static final long serialVersionUID = 1L;
+
+    }
+
+    public static interface IFilter {
+        public boolean accept(Map<String, String> headers);
+
+        public boolean accept(DynamicBytes partialBody);
+    }
+
     private static Charset guess(String html, String patten) {
         int idx = html.indexOf(patten);
         if (idx != -1) {
@@ -47,7 +61,7 @@ public class TextRespListener implements IRespListener {
         Charset result = parseCharset(headers.get(CONTENT_TYPE));
         if (result == null) {
             // decode a little the find charset=???
-            String s = new String(body.get(), 0, min(350, body.length()),
+            String s = new String(body.get(), 0, min(512, body.length()),
                     ASCII);
             // content="text/html;charset=gb2312"
             result = guess(s, CHARSET);
@@ -84,19 +98,27 @@ public class TextRespListener implements IRespListener {
     private Map<String, String> headers;
     private HttpStatus status;
     private ITextHandler handler;
+    private IFilter filter;
 
     public TextRespListener(ITextHandler h) {
+        this(h, null);
+    }
+
+    public TextRespListener(ITextHandler h, IFilter filter) {
         body = new DynamicBytes(1024 * 16);
+        this.filter = filter;
         this.handler = h;
     }
 
     public int onBodyReceived(byte[] buf, int length) {
         body.append(buf, 0, length);
+        if (filter != null && !filter.accept(body)) {
+            return ABORT;
+        }
         return CONTINUE;
     }
 
     public void onCompleted() {
-
         String encoding = headers.get(CONTENT_ENCODING);
         String html = "";
         try {
@@ -128,6 +150,9 @@ public class TextRespListener implements IRespListener {
 
     public int onHeadersReceived(Map<String, String> headers) {
         this.headers = headers;
+        if (filter != null && !filter.accept(headers)) {
+            return ABORT;
+        }
         return CONTINUE;
     }
 

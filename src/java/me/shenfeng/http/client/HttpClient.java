@@ -40,6 +40,8 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+import me.shenfeng.http.client.TextRespListener.AbortException;
+
 public final class HttpClient {
 
     // socks proxy
@@ -130,8 +132,10 @@ public final class HttpClient {
                 case SOCKS_HTTP_REQEUST:
                     ClientDecoder decoder = atta.decoder;
                     ClientDecoderState state = decoder.decode(buffer);
-                    if (state == ALL_READ || state == ABORTED) {
+                    if (state == ALL_READ) {
                         atta.finish();
+                    } else if(state == ABORTED) {
+                        atta.finish(new AbortException());
                     }
                     break;
                 case SOCKS_VERSION_AUTH:
