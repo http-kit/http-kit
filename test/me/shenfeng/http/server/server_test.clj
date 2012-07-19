@@ -23,6 +23,7 @@
 
 (defn test-get-spec [req]
   (is (= 4347 (:server-port req)))
+  (is (= "127.0.0.1" (:remote-addr req)))
   (is (= "localhost" (:server-name req)))
   ;; (is (= "127.0.0.1" (:remote-addr req)))
   (is (= "/spec-get" (:uri req)))
@@ -37,6 +38,7 @@
 
 (defn test-post-spec [req]
   (is (= 4347 (:server-port req)))
+  (is (= "127.0.0.1" (:remote-addr req)))
   (is (= "localhost" (:server-name req)))
   ;; (is (= "127.0.0.1" (:remote-addr req)))
   (is (= "/spec-post" (:uri req)))

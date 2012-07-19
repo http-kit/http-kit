@@ -257,7 +257,9 @@ public class HttpServer {
                 buffer.flip(); // flip for read
                 ReqeustDecoder decoder = atta.decoder;
                 if (decoder.decode(buffer) == ALL_READ) {
-                    handler.handle(decoder.request, new Callback(key));
+                    HttpRequest request = decoder.request;
+                    request.setRemoteAddr(ch.socket().getRemoteSocketAddress());
+                    handler.handle(request, new Callback(key));
                 }
             }
         } catch (IOException e) {

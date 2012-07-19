@@ -72,6 +72,8 @@ public class HttpUtils {
 
     public static final String LAST_MODIFIED = "Last-Modified";
 
+    public static final String X_FORWARDED_FOR = "X-Forwarded-For";
+
     public static final String CONTENT_LENGTH = "Content-Length";
 
     public static final String CACHE_CONTROL = "Cache-Control";

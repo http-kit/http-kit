@@ -7,6 +7,8 @@ import static me.shenfeng.http.HttpVersion.HTTP_1_1;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.util.Map;
 
 import me.shenfeng.http.HttpMethod;
@@ -16,7 +18,7 @@ import me.shenfeng.http.HttpVersion;
 public class HttpRequest {
     private int serverPort;
     private String serverName;
-    private String remoteAddr;
+    private InetSocketAddress remoteAddr;
     private String queryString;
     private String uri;
     private HttpMethod method;
@@ -77,7 +79,18 @@ public class HttpRequest {
     }
 
     public String getRemoteAddr() {
-        return remoteAddr;
+        String h = headers.get(HttpUtils.X_FORWARDED_FOR);
+        if(null != h) {
+            int idx = h.indexOf(',');
+            if(idx == -1) {
+                return h;
+            } else {
+                // X-Forwarded-For: client, proxy1, proxy2
+                return h.substring(0, idx);
+            }
+        } else {
+            return remoteAddr.getAddress().getHostAddress();
+        }
     }
 
     public String getScheme() {
@@ -100,6 +113,10 @@ public class HttpRequest {
     public void setBody(byte[] body, int count) {
         this.body = body;
         this.contentLength = count;
+    }
+
+    public void setRemoteAddr(SocketAddress addr) {
+        this.remoteAddr = (InetSocketAddress)addr;
     }
 
     public void setHeaders(Map<String, String> headers) {
