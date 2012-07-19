@@ -13,7 +13,7 @@ I also add an
 [async extension](https://github.com/shenfeng/http-kit/blob/master/src/java/me/shenfeng/http/server/IListenableFuture.java)
 to the ring SPEC. The unit test has sample usage.
 
-# Why
+## Why
 
 I write it for the HTTP server and HTTP client of
 [Rssminer](http://rssminer.net)
@@ -22,15 +22,76 @@ I write it for the HTTP server and HTTP client of
 * Fast proxy some sites for Chinese user.
 * Rssminer need to be fast.
 
-# Goal
+## Goal
 * Clean compact code.
-* Asynchronous.
+* Non-blocking IO
 * Memory efficient. Memory is cheap, but anyway, I will do my best to
   save it.
 * Support Socks proxy. `SSH -D` create a Socks server, in china, proxy
   is a must.
 
-# Limitation
+## Usage
+
+### HTTP Server
+```clj
+[me.shenfeng/http-kit "1.0.1"]
+
+(:use me.shenfeng.http.server)          ; export run-server
+
+(defn app [req]
+  {:status  200
+   :headers {"Content-Type" "text/html"}
+   :body    "hello word"})
+
+(run-server app {:port 8080
+                 :thread 4              ; 4 http worker thread
+                 :ip "127.0.0.1"        ; bind to localhost
+                 :max-body 20480        ; max http request body, 20k
+                 })
+
+```
+
+### HTTP Client
+
+```java
+int socketTimeout = 60000; // 60s
+String userAgent = "bot1";
+HttpClient client = new HttpClient(new HttpClientConfig(socketTimeout, userAgent));
+
+URI uri = new URI("http://shenfeng.me");
+Map<String, String> headers = new HashMap<String, String>();
+headers.put("Cache-Control", "no-cache");
+// ... more header
+
+client.get(uri, headers, new IRespListener() { // Non-blocking. DNS lookup is in current thread
+    public void onThrowable(Throwable t) {
+        // IOException, Timeout
+    }
+
+    public int onInitialLineReceived(HttpVersion version,
+            HttpStatus status) {
+        // CONTINUE or ABORT
+        return 0;
+    }
+
+    public int onHeadersReceived(Map<String, String> headers) {
+        // CONTINUE or ABORT
+        return 0;
+    }
+
+    public void onCompleted() {
+        // All bytes are downloaded
+    }
+
+    public int onBodyReceived(byte[] buf, int length) {
+        // bytes received from remote server
+        // CONTINUE or ABORT
+        return 0;
+    }
+});
+```
+
+## Limitation
 
 ### HTTP client
 * HTTP proxy is not supported
