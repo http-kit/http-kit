@@ -2,7 +2,7 @@ task :default => :test
 
 desc "Run unit test"
 task :test do
-  sh 'rm classes -rf && lein javac && lein test'
+  sh 'rm -rf classes && lein javac && lein test'
 end
 
 desc "Install in local repository"
@@ -13,7 +13,7 @@ end
 
 desc "Install in clojars repository"
 task :clojars => :test do
-  sh 'rm *.jar pom.xml classes -rf && lein pom && lein jar '
+  sh 'rm -rf *.jar pom.xml classes && lein pom && lein jar '
   sh 'scp pom.xml *.jar clojars@clojars.org:'
 end
 
@@ -24,6 +24,6 @@ end
 
 desc "Benchmark to an idea how fast it can run"
 task :bench do
-  sh 'rm classes/ -rf && lein deps && lein javac'
+  sh 'rm -rf classes/ && lein deps && lein javac'
   sh './scripts/benchmark bench'
 end
