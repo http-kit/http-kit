@@ -34,7 +34,7 @@ I write it for the HTTP server and HTTP client of
 
 ### HTTP Server
 ```clj
-[me.shenfeng/http-kit "1.0.1"]
+[me.shenfeng/http-kit "1.0.2"]
 
 (:use me.shenfeng.http.server)          ; export run-server
 
@@ -49,6 +49,33 @@ I write it for the HTTP server and HTTP client of
                  :max-body 20480        ; max http request body, 20k
                  })
 
+```
+
+#### Async extension example
+```clj
+(:import me.shenfeng.http.server.IListenableFuture)
+
+;;; efficient hold on request, return when thing is ready
+;;; event driven
+(def async-body
+  (reify IListenableFuture
+    (addListener [this cb]
+      (.start (Thread. (fn []
+                         (println "sleep 100ms")
+                         (Thread/sleep 100)
+                         ;; inform thing is ready, adpter will
+                         ;; .get to get the real response
+                         (.run cb)))))
+    (get [this]
+      ;;this is the real ring response, {status, headers, body}
+      {:status 204
+       :headers {"Content-type" "application/json"}})))
+
+(defn app [req]
+  ;; any number will do, it's ignored.
+  ;; just transparent pass all ring middleware
+  {:status  200
+   :body    async-body})
 ```
 
 ### HTTP Client
@@ -114,9 +141,3 @@ git clone git://github.com/shenfeng/http-kit.git && cd http-kit && rake bench
 It compare with
 [ring-jetty-adapter](https://github.com/mmcgrana/ring)
 [async-ring-adapter](https://github.com/shenfeng/async-ring-adapter)
-
-# Usage
-
-## HTTP server
-
-TODO
