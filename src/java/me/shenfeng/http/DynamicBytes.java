@@ -1,6 +1,7 @@
 package me.shenfeng.http;
 
 import static me.shenfeng.http.HttpUtils.ASCII;
+import static me.shenfeng.http.HttpUtils.UTF_8;
 
 import java.nio.charset.Charset;
 import java.util.Arrays;
@@ -45,7 +46,7 @@ public class DynamicBytes {
     }
 
     public DynamicBytes append(String str) {
-        return append(str, ASCII);
+        return append(str, UTF_8);
     }
 
     public DynamicBytes append(String str, Charset c) {
