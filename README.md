@@ -141,3 +141,8 @@ git clone git://github.com/shenfeng/http-kit.git && cd http-kit && rake bench
 It compare with
 [ring-jetty-adapter](https://github.com/mmcgrana/ring)
 [async-ring-adapter](https://github.com/shenfeng/async-ring-adapter)
+
+### Update history
+
+* 1.0.3  using UTF8 to encode HTTP response header: fix can not encode
+  Chinese char
