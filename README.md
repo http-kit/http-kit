@@ -34,9 +34,9 @@ I write it for the HTTP server and HTTP client of
 
 ### HTTP Server
 ```clj
-[me.shenfeng/http-kit "1.0.2"]
+[me.shenfeng/http-kit "1.1.0"]
 
-(:use me.shenfeng.http.server)          ; export run-server
+(:use me.shenfeng.http.server)          ; export run-server and defasync
 
 (defn app [req]
   {:status  200
@@ -53,69 +53,36 @@ I write it for the HTTP server and HTTP client of
 
 #### Async extension example
 ```clj
-(:import me.shenfeng.http.server.IListenableFuture)
+(:use me.shenfeng.http.server)
 
-;;; efficient hold on request, return when thing is ready
-;;; event driven
-(def async-body
-  (reify IListenableFuture
-    (addListener [this cb]
-      (.start (Thread. (fn []
-                         (println "sleep 100ms")
-                         (Thread/sleep 100)
-                         ;; inform thing is ready, adpter will
-                         ;; .get to get the real response
-                         (.run cb)))))
-    (get [this]
-      ;;this is the real ring response, {status, headers, body}
-      {:status 204
-       :headers {"Content-type" "application/json"}})))
+(defasync async [req]
+  (.start (Thread. (fn []
+                     (Thread/sleep 1000)
+                     ;; return a ring spec response
+                     ;; call (:cb req) when response ready
+                     ((:cb req) {:status 200 :body "hello async"})))))
 
-(defn app [req]
-  ;; any number will do, it's ignored.
-  ;; just transparent pass all ring middleware
-  {:status  200
-   :body    async-body})
-```
+(run-server async {:port 8080})```
 
 ### HTTP Client
 
-```java
-int socketTimeout = 60000; // 60s
-String userAgent = "bot1";
-HttpClient client = new HttpClient(new HttpClientConfig(socketTimeout, userAgent));
+```clj
 
-URI uri = new URI("http://shenfeng.me");
-Map<String, String> headers = new HashMap<String, String>();
-headers.put("Cache-Control", "no-cache");
-// ... more header
+(defn on-response [resp]
+  ;; {:status 200 :body "....." :headers {:key val :key val}}
+  (println resp))
 
-client.get(uri, headers, new IRespListener() { // Non-blocking. DNS lookup is in current thread
-    public void onThrowable(Throwable t) {
-        // IOException, Timeout
-    }
+;;; initialize, timeout is 40s, and default user-agent
+(http/init :timeout 40000 :user-agent "http-kit/1.1")
 
-    public int onInitialLineReceived(HttpVersion version,
-            HttpStatus status) {
-        // CONTINUE or ABORT
-        return 0;
-    }
+;;; other params :headers :proxy binary? keyify?
+(http/get {:url "http://shenfeng.me" :cb on-response})
 
-    public int onHeadersReceived(Map<String, String> headers) {
-        // CONTINUE or ABORT
-        return 0;
-    }
+;;; other params :headers :proxy binary? keyify?
+(http/post {:url "http://example/"
+            :cb on-response
+            :body {"name" "http-kit" "author" "shenfeng"}  :binary? true})
 
-    public void onCompleted() {
-        // All bytes are downloaded
-    }
-
-    public int onBodyReceived(byte[] buf, int length) {
-        // bytes received from remote server
-        // CONTINUE or ABORT
-        return 0;
-    }
-});
 ```
 
 ## Limitation
@@ -146,3 +113,5 @@ It compare with
 
 * 1.0.3  using UTF8 to encode HTTP response header: fix can not encode
   Chinese char
+
+* 1.1.0 defasync and async HTTP client clojure API
