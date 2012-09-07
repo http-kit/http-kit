@@ -66,6 +66,9 @@
 (defasync test-async [req]
   ((:cb req) {:status 200 :body "hello async"}))
 
+(defasync test-async-just-body [req]
+  ((:cb req) "just-body"))
+
 (defonce tmp-server (atom nil))
 
 (defn -main [& args]
@@ -95,7 +98,8 @@
   (GET "/async" [] (fn [req]
                      {:status  200
                       :body async-body}))
-  (GET "/async2" [] test-async))
+  (GET "/async2" [] test-async)
+  (GET "/just-body" [] test-async-just-body))
 
 (use-fixtures :once (fn [f]
                       (let [server (run-server
@@ -146,3 +150,9 @@
   (let [resp (http/get "http://localhost:4347/async2")]
     (is (= (:status resp) 200))
     (is (= (:body resp) "hello async"))))
+
+(deftest test-async2
+  (let [resp (http/get "http://localhost:4347/just-body")]
+    (is (= (:status resp) 200))
+    (is (:headers resp))
+    (is (= (:body resp) "just-body"))))

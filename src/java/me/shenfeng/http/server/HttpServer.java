@@ -154,23 +154,31 @@ public class HttpServer {
         // maybe in another thread
         public void run(int status, Map<String, Object> headers, Object body) {
             ServerAtta atta = (ServerAtta) key.attachment();
-            // extend ring spec to support async response
+            // extend ring spec to support async
             if (body instanceof IListenableFuture) {
+                final int status2 = status;
+                final Map<String, Object> headers2 = headers;
                 final IListenableFuture future = (IListenableFuture) body;
                 future.addListener(new Runnable() {
                     @SuppressWarnings({"rawtypes", "unchecked"})
                     public void run() {
-                        Map resp = (Map) future.get();
-                        Object s = resp.get(STATUS);
-                        int status = 200;
-                        if (s instanceof Long) {
-                            status = ((Long) s).intValue();
-                        } else if (s instanceof Integer) {
-                            status = (Integer) s;
+                        Object r = future.get();
+                        // if is a ring spec response
+                        if (r instanceof Map) {
+                            Map resp = (Map) r;
+                            Object s = resp.get(STATUS);
+                            int status = 200;
+                            if (s instanceof Long) {
+                                status = ((Long) s).intValue();
+                            } else if (s instanceof Integer) {
+                                status = (Integer) s;
+                            }
+                            Map<String, Object> headers = (Map) resp.get(HEADERS);
+                            new Callback(key).run(status, headers, resp.get(BODY));
+                        } else {
+                            // treat it as just body
+                            new Callback(key).run(status2, headers2, r);
                         }
-                        Map<String, Object> headers = (Map) resp.get(HEADERS);
-                        Object body = resp.get(BODY);
-                        new Callback(key).run(status, headers, body);
                     }
                 });
                 return;

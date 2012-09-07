@@ -13,6 +13,7 @@
   (let [req (params 0)]
     `(defn ~name [~req]
        {:status 200
+        :headers {}
         :body (let [data# (atom {})
                     ~req (assoc ~req :cb
                                 (fn [resp#]
