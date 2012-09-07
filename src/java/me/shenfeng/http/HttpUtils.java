@@ -1,16 +1,10 @@
 package me.shenfeng.http;
 
-import static java.lang.Character.isWhitespace;
-import static java.net.InetAddress.getByName;
+import clojure.lang.ISeq;
+import clojure.lang.Seqable;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.URI;
-import java.net.UnknownHostException;
+import java.io.*;
+import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectableChannel;
 import java.nio.charset.Charset;
@@ -18,8 +12,8 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import clojure.lang.ISeq;
-import clojure.lang.Seqable;
+import static java.lang.Character.isWhitespace;
+import static java.net.InetAddress.getByName;
 
 public class HttpUtils {
 
@@ -91,7 +85,7 @@ public class HttpUtils {
     }
 
     public static ByteBuffer encodeGetRequest(String path,
-            Map<String, String> headers) {
+                                              Map<String, String> headers) {
         DynamicBytes bytes = new DynamicBytes(64 + headers.size() * 48);
 
         bytes.append("GET").append(SP).append(path).append(SP);
@@ -112,7 +106,7 @@ public class HttpUtils {
     }
 
     public static DynamicBytes encodeResponseHeader(int status,
-            Map<String, Object> headers) {
+                                                    Map<String, Object> headers) {
         DynamicBytes bytes = new DynamicBytes(196);
         byte[] bs = HttpStatus.valueOf(status).getResponseIntialLineBytes();
         bytes.append(bs, 0, bs.length);
@@ -253,7 +247,7 @@ public class HttpUtils {
     }
 
     public static void splitAndAddHeader(String sb,
-            Map<String, String> headers) {
+                                         Map<String, String> headers) {
         final int length = sb.length();
         int nameStart;
         int nameEnd;
@@ -281,7 +275,7 @@ public class HttpUtils {
 
         String key = sb.substring(nameStart, nameEnd);
         if (valueStart > valueEnd) { // ignore
-        // logger.warn("header error: " + sb);
+            // logger.warn("header error: " + sb);
         } else {
             String value = sb.substring(valueStart, valueEnd);
             headers.put(key, value);

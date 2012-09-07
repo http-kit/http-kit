@@ -9,6 +9,7 @@
                      [junit/junit "4.8.2"]
                      [ch.qos.logback/logback-classic "1.0.1"]
                      [clj-http "0.1.3"]
+                     [org.jsoup/jsoup "1.6.4"]
                      [compojure "1.0.2"]
                      [me.shenfeng/async-ring-adapter "1.0.1"]
                      [org.clojure/tools.cli "0.2.1"]

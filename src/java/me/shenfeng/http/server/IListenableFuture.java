@@ -2,12 +2,11 @@ package me.shenfeng.http.server;
 
 /**
  * An async extension to the Ring SPEC.
- *
+ * <p/>
  * You give me an runnable, You call it when things are ready.
  * Then I call the <get> method to get the real response.
  *
  * @author feng
- *
  */
 public interface IListenableFuture {
     /**

@@ -1,46 +1,24 @@
 package me.shenfeng.http.client;
 
-import static java.lang.System.currentTimeMillis;
-import static java.net.InetAddress.getByName;
-import static java.nio.ByteBuffer.wrap;
-import static java.nio.channels.SelectionKey.OP_CONNECT;
-import static java.nio.channels.SelectionKey.OP_READ;
-import static java.nio.channels.SelectionKey.OP_WRITE;
-import static me.shenfeng.http.HttpUtils.ACCEPT;
-import static me.shenfeng.http.HttpUtils.ACCEPT_ENCODING;
-import static me.shenfeng.http.HttpUtils.BUFFER_SIZE;
-import static me.shenfeng.http.HttpUtils.HOST;
-import static me.shenfeng.http.HttpUtils.SELECT_TIMEOUT;
-import static me.shenfeng.http.HttpUtils.TIMEOUT_CHECK_INTEVAL;
-import static me.shenfeng.http.HttpUtils.USER_AGENT;
-import static me.shenfeng.http.HttpUtils.encodeGetRequest;
-import static me.shenfeng.http.HttpUtils.getPath;
-import static me.shenfeng.http.HttpUtils.getPort;
-import static me.shenfeng.http.client.ClientConnState.DIRECT_CONNECTED;
-import static me.shenfeng.http.client.ClientConnState.SOCKS_HTTP_REQEUST;
-import static me.shenfeng.http.client.ClientConnState.SOCKS_INIT_CONN;
-import static me.shenfeng.http.client.ClientConnState.SOCKS_VERSION_AUTH;
-import static me.shenfeng.http.client.ClientDecoderState.ABORTED;
-import static me.shenfeng.http.client.ClientDecoderState.ALL_READ;
+import me.shenfeng.http.client.TextRespListener.AbortException;
 
 import java.io.IOException;
-import java.net.Proxy;
-import java.net.SocketException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.UnknownHostException;
+import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.Map;
-import java.util.Queue;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-import me.shenfeng.http.client.TextRespListener.AbortException;
+import static java.lang.System.currentTimeMillis;
+import static java.net.InetAddress.getByName;
+import static java.nio.ByteBuffer.wrap;
+import static java.nio.channels.SelectionKey.*;
+import static me.shenfeng.http.HttpUtils.*;
+import static me.shenfeng.http.client.ClientConnState.*;
+import static me.shenfeng.http.client.ClientDecoderState.ABORTED;
+import static me.shenfeng.http.client.ClientDecoderState.ALL_READ;
 
 public final class HttpClient {
 
@@ -54,11 +32,11 @@ public final class HttpClient {
 
     static final byte IPV4 = 1;
 
-    static final byte[] SOCKSV5_VERSION_AUTH = new byte[] { PROTO_VER5, 1,
-            NO_AUTH };
+    static final byte[] SOCKSV5_VERSION_AUTH = new byte[] {PROTO_VER5, 1,
+            NO_AUTH};
 
-    static final byte[] SOCKSV5_CON = new byte[] { PROTO_VER5, CONNECT, 0,
-            IPV4 };
+    static final byte[] SOCKSV5_CON = new byte[] {PROTO_VER5, CONNECT, 0,
+            IPV4};
 
     private class SelectorLoopThread extends Thread {
         public void run() {
@@ -101,14 +79,14 @@ public final class HttpClient {
                 ite.remove();
                 String msg = "read socks server timeout: ";
                 switch (client.state) {
-                case DIRECT_CONNECTING:
-                    msg = "connect timeout: ";
-                    break;
-                case SOCKS_CONNECTTING:
-                    msg = "connect socks server timeout: ";
-                case DIRECT_CONNECTED:
-                    msg = "read timeout: ";
-                    break;
+                    case DIRECT_CONNECTING:
+                        msg = "connect timeout: ";
+                        break;
+                    case SOCKS_CONNECTTING:
+                        msg = "connect socks server timeout: ";
+                    case DIRECT_CONNECTED:
+                        msg = "read timeout: ";
+                        break;
                 }
                 client.finish(new TimeoutException(msg + config.timeOutMs
                         + "ms"));
@@ -128,35 +106,35 @@ public final class HttpClient {
                 atta.lastActiveTime = currentTime;
                 buffer.flip();
                 switch (atta.state) {
-                case DIRECT_CONNECTED:
-                case SOCKS_HTTP_REQEUST:
-                    ClientDecoder decoder = atta.decoder;
-                    ClientDecoderState state = decoder.decode(buffer);
-                    if (state == ALL_READ) {
-                        atta.finish();
-                    } else if(state == ABORTED) {
-                        atta.finish(new AbortException());
-                    }
-                    break;
-                case SOCKS_VERSION_AUTH:
-                    if (read == 2) {
-                        atta.state = SOCKS_INIT_CONN;
-                        key.interestOps(OP_WRITE);
-                        // socks server should reply 2 bytes
-                    } else {
-                        atta.finish(new SocketException(
-                                "Malformed reply from SOCKS server"));
-                    }
-                    break;
-                case SOCKS_INIT_CONN:
-                    if (read == 10 && buffer.get(1) == 0) {
-                        atta.state = SOCKS_HTTP_REQEUST;
-                        key.interestOps(OP_WRITE);
-                    } else {
-                        atta.finish(new SocketException(
-                                "Malformed reply from SOCKS server"));
-                    }
-                    break;
+                    case DIRECT_CONNECTED:
+                    case SOCKS_HTTP_REQEUST:
+                        ClientDecoder decoder = atta.decoder;
+                        ClientDecoderState state = decoder.decode(buffer);
+                        if (state == ALL_READ) {
+                            atta.finish();
+                        } else if (state == ABORTED) {
+                            atta.finish(new AbortException());
+                        }
+                        break;
+                    case SOCKS_VERSION_AUTH:
+                        if (read == 2) {
+                            atta.state = SOCKS_INIT_CONN;
+                            key.interestOps(OP_WRITE);
+                            // socks server should reply 2 bytes
+                        } else {
+                            atta.finish(new SocketException(
+                                    "Malformed reply from SOCKS server"));
+                        }
+                        break;
+                    case SOCKS_INIT_CONN:
+                        if (read == 10 && buffer.get(1) == 0) {
+                            atta.state = SOCKS_HTTP_REQEUST;
+                            key.interestOps(OP_WRITE);
+                        } else {
+                            atta.finish(new SocketException(
+                                    "Malformed reply from SOCKS server"));
+                        }
+                        break;
                 }
             }
         } catch (Exception e) {
@@ -172,29 +150,29 @@ public final class HttpClient {
         SocketChannel ch = (SocketChannel) key.channel();
         try {
             switch (atta.state) {
-            case DIRECT_CONNECTED:
-            case SOCKS_HTTP_REQEUST:
-                ByteBuffer request = atta.request;
-                ch.write(request);
-                if (!request.hasRemaining()) {
+                case DIRECT_CONNECTED:
+                case SOCKS_HTTP_REQEUST:
+                    ByteBuffer request = atta.request;
+                    ch.write(request);
+                    if (!request.hasRemaining()) {
+                        key.interestOps(OP_READ);
+                    }
+                    break;
+                case SOCKS_VERSION_AUTH:
+                    ByteBuffer versionAuth = wrap(SOCKSV5_VERSION_AUTH);
+                    // no remaining check, since TCP has a large buffer
+                    ch.write(versionAuth);
                     key.interestOps(OP_READ);
-                }
-                break;
-            case SOCKS_VERSION_AUTH:
-                ByteBuffer versionAuth = wrap(SOCKSV5_VERSION_AUTH);
-                // no remaining check, since TCP has a large buffer
-                ch.write(versionAuth);
-                key.interestOps(OP_READ);
-                break;
-            case SOCKS_INIT_CONN:
-                ByteBuffer con = ByteBuffer.allocate(10);
-                con.put(SOCKSV5_CON); // 4 bytes
-                con.put(getByName(atta.url.getHost()).getAddress()); // 4 bytes
-                con.putShort((short) getPort(atta.url)); // 2 bytes
-                con.flip();
-                ch.write(con);
-                key.interestOps(OP_READ);
-                break;
+                    break;
+                case SOCKS_INIT_CONN:
+                    ByteBuffer con = ByteBuffer.allocate(10);
+                    con.put(SOCKSV5_CON); // 4 bytes
+                    con.put(getByName(atta.url.getHost()).getAddress()); // 4 bytes
+                    con.putShort((short) getPort(atta.url)); // 2 bytes
+                    con.flip();
+                    ch.write(con);
+                    key.interestOps(OP_READ);
+                    break;
             }
         } catch (IOException e) {
             atta.finish(e);
@@ -207,7 +185,7 @@ public final class HttpClient {
     }
 
     public void get(URI uri, Map<String, String> headers, Proxy proxy,
-            IRespListener cb) throws UnknownHostException {
+                    IRespListener cb) throws UnknownHostException {
         headers.put(HOST, uri.getHost());
         headers.put(ACCEPT, "*/*");
         if (headers.get(USER_AGENT) == null) // allow override
@@ -224,7 +202,7 @@ public final class HttpClient {
     }
 
     public void post(String uri, Map<String, String> headers, Proxy proxy,
-            IRespListener cb) {
+                     IRespListener cb) {
 
     }
 
@@ -274,13 +252,13 @@ public final class HttpClient {
                         if (ch.finishConnect()) {
                             ClientAtta attr = (ClientAtta) key.attachment();
                             switch (attr.state) {
-                            case SOCKS_CONNECTTING:
-                                // begin socks handleshake
-                                attr.state = SOCKS_VERSION_AUTH;
-                                break;
-                            case DIRECT_CONNECTING:
-                                attr.state = DIRECT_CONNECTED;
-                                break;
+                                case SOCKS_CONNECTTING:
+                                    // begin socks handleshake
+                                    attr.state = SOCKS_VERSION_AUTH;
+                                    break;
+                                case DIRECT_CONNECTING:
+                                    attr.state = DIRECT_CONNECTED;
+                                    break;
                             }
                             attr.lastActiveTime = currentTime;
                             key.interestOps(OP_WRITE);

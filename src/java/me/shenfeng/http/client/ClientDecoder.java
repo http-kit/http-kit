@@ -1,39 +1,16 @@
 package me.shenfeng.http.client;
 
-import static me.shenfeng.http.HttpUtils.BUFFER_SIZE;
-import static me.shenfeng.http.HttpUtils.CHUNKED;
-import static me.shenfeng.http.HttpUtils.CONTENT_LENGTH;
-import static me.shenfeng.http.HttpUtils.CR;
-import static me.shenfeng.http.HttpUtils.LF;
-import static me.shenfeng.http.HttpUtils.MAX_LINE;
-import static me.shenfeng.http.HttpUtils.TRANSFER_ENCODING;
-import static me.shenfeng.http.HttpUtils.findEndOfString;
-import static me.shenfeng.http.HttpUtils.findNonWhitespace;
-import static me.shenfeng.http.HttpUtils.findWhitespace;
-import static me.shenfeng.http.HttpUtils.getChunkSize;
-import static me.shenfeng.http.HttpVersion.HTTP_1_0;
-import static me.shenfeng.http.HttpVersion.HTTP_1_1;
-import static me.shenfeng.http.client.ClientDecoderState.ABORTED;
-import static me.shenfeng.http.client.ClientDecoderState.ALL_READ;
-import static me.shenfeng.http.client.ClientDecoderState.READ_CHUNKED_CONTENT;
-import static me.shenfeng.http.client.ClientDecoderState.READ_CHUNK_DELIMITER;
-import static me.shenfeng.http.client.ClientDecoderState.READ_CHUNK_FOOTER;
-import static me.shenfeng.http.client.ClientDecoderState.READ_CHUNK_SIZE;
-import static me.shenfeng.http.client.ClientDecoderState.READ_FIXED_LENGTH_CONTENT;
-import static me.shenfeng.http.client.ClientDecoderState.READ_HEADER;
-import static me.shenfeng.http.client.ClientDecoderState.READ_INITIAL;
-import static me.shenfeng.http.client.ClientDecoderState.READ_VARIABLE_LENGTH_CONTENT;
-import static me.shenfeng.http.client.IRespListener.ABORT;
+import me.shenfeng.http.*;
 
 import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.TreeMap;
 
-import me.shenfeng.http.HttpStatus;
-import me.shenfeng.http.HttpUtils;
-import me.shenfeng.http.HttpVersion;
-import me.shenfeng.http.LineTooLargeException;
-import me.shenfeng.http.ProtocolException;
+import static me.shenfeng.http.HttpUtils.*;
+import static me.shenfeng.http.HttpVersion.HTTP_1_0;
+import static me.shenfeng.http.HttpVersion.HTTP_1_1;
+import static me.shenfeng.http.client.ClientDecoderState.*;
+import static me.shenfeng.http.client.IRespListener.ABORT;
 
 public class ClientDecoder {
 
@@ -95,65 +72,65 @@ public class ClientDecoder {
         int toRead;
         while (buffer.hasRemaining() && state != ALL_READ && state != ABORTED) {
             switch (state) {
-            case READ_INITIAL:
-                line = readLine(buffer);
-                if (line != null) {
-                    parseInitialLine(line);
-                }
-                break;
-            case READ_HEADER:
-                readHeaders(buffer);
-                break;
-            case READ_CHUNK_SIZE:
-                line = readLine(buffer);
-                if (line != null) {
-                    readRemaining = getChunkSize(line);
-                    if (readRemaining == 0) {
-                        state = READ_CHUNK_FOOTER;
+                case READ_INITIAL:
+                    line = readLine(buffer);
+                    if (line != null) {
+                        parseInitialLine(line);
+                    }
+                    break;
+                case READ_HEADER:
+                    readHeaders(buffer);
+                    break;
+                case READ_CHUNK_SIZE:
+                    line = readLine(buffer);
+                    if (line != null) {
+                        readRemaining = getChunkSize(line);
+                        if (readRemaining == 0) {
+                            state = READ_CHUNK_FOOTER;
+                        } else {
+                            state = READ_CHUNKED_CONTENT;
+                        }
+                    }
+                    break;
+                case READ_FIXED_LENGTH_CONTENT:
+                    toRead = Math.min(buffer.remaining(), readRemaining);
+                    buffer.get(bodyBuffer, 0, toRead);
+                    if (listener.onBodyReceived(bodyBuffer, toRead) == ABORT) {
+                        state = ABORTED;
                     } else {
-                        state = READ_CHUNKED_CONTENT;
+                        readRemaining -= toRead;
+                        if (readRemaining == 0) {
+                            state = ALL_READ;
+                        }
                     }
-                }
-                break;
-            case READ_FIXED_LENGTH_CONTENT:
-                toRead = Math.min(buffer.remaining(), readRemaining);
-                buffer.get(bodyBuffer, 0, toRead);
-                if (listener.onBodyReceived(bodyBuffer, toRead) == ABORT) {
-                    state = ABORTED;
-                } else {
-                    readRemaining -= toRead;
-                    if (readRemaining == 0) {
-                        state = ALL_READ;
+                    break;
+                case READ_CHUNKED_CONTENT:
+                    toRead = Math.min(buffer.remaining(), readRemaining);
+                    buffer.get(bodyBuffer, 0, toRead);
+                    if (listener.onBodyReceived(bodyBuffer, toRead) == ABORT) {
+                        state = ABORTED;
+                    } else {
+                        readRemaining -= toRead;
+                        if (readRemaining == 0) {
+                            state = READ_CHUNK_DELIMITER;
+                        }
                     }
-                }
-                break;
-            case READ_CHUNKED_CONTENT:
-                toRead = Math.min(buffer.remaining(), readRemaining);
-                buffer.get(bodyBuffer, 0, toRead);
-                if (listener.onBodyReceived(bodyBuffer, toRead) == ABORT) {
-                    state = ABORTED;
-                } else {
-                    readRemaining -= toRead;
-                    if (readRemaining == 0) {
-                        state = READ_CHUNK_DELIMITER;
+                    break;
+                case READ_CHUNK_FOOTER:
+                    readEmptyLine(buffer);
+                    state = ALL_READ;
+                    break;
+                case READ_CHUNK_DELIMITER:
+                    readEmptyLine(buffer);
+                    state = READ_CHUNK_SIZE;
+                    break;
+                case READ_VARIABLE_LENGTH_CONTENT:
+                    toRead = buffer.remaining();
+                    buffer.get(bodyBuffer, 0, toRead);
+                    if (listener.onBodyReceived(bodyBuffer, toRead) == ABORT) {
+                        state = ABORTED;
                     }
-                }
-                break;
-            case READ_CHUNK_FOOTER:
-                readEmptyLine(buffer);
-                state = ALL_READ;
-                break;
-            case READ_CHUNK_DELIMITER:
-                readEmptyLine(buffer);
-                state = READ_CHUNK_SIZE;
-                break;
-            case READ_VARIABLE_LENGTH_CONTENT:
-                toRead = buffer.remaining();
-                buffer.get(bodyBuffer, 0, toRead);
-                if (listener.onBodyReceived(bodyBuffer, toRead) == ABORT) {
-                    state = ABORTED;
-                }
-                break;
+                    break;
             }
         }
         return state;
@@ -199,7 +176,9 @@ public class ClientDecoder {
         } else {
             state = ABORTED;
         }
-    };
+    }
+
+    ;
 
     String readLine(ByteBuffer buffer) throws LineTooLargeException {
         byte b;

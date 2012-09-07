@@ -1,9 +1,8 @@
 package me.shenfeng.http.server;
 
-import static me.shenfeng.http.HttpUtils.CHARSET;
-import static me.shenfeng.http.HttpUtils.CONNECTION;
-import static me.shenfeng.http.HttpUtils.CONTENT_TYPE;
-import static me.shenfeng.http.HttpVersion.HTTP_1_1;
+import me.shenfeng.http.HttpMethod;
+import me.shenfeng.http.HttpUtils;
+import me.shenfeng.http.HttpVersion;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -11,9 +10,8 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.Map;
 
-import me.shenfeng.http.HttpMethod;
-import me.shenfeng.http.HttpUtils;
-import me.shenfeng.http.HttpVersion;
+import static me.shenfeng.http.HttpUtils.*;
+import static me.shenfeng.http.HttpVersion.HTTP_1_1;
 
 public class HttpRequest {
     private int serverPort;
@@ -80,9 +78,9 @@ public class HttpRequest {
 
     public String getRemoteAddr() {
         String h = headers.get(HttpUtils.X_FORWARDED_FOR);
-        if(null != h) {
+        if (null != h) {
             int idx = h.indexOf(',');
-            if(idx == -1) {
+            if (idx == -1) {
                 return h;
             } else {
                 // X-Forwarded-For: client, proxy1, proxy2
@@ -116,7 +114,7 @@ public class HttpRequest {
     }
 
     public void setRemoteAddr(SocketAddress addr) {
-        this.remoteAddr = (InetSocketAddress)addr;
+        this.remoteAddr = (InetSocketAddress) addr;
     }
 
     public void setHeaders(Map<String, String> headers) {

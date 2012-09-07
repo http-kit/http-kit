@@ -1,44 +1,26 @@
 package me.shenfeng.http.server;
 
-import static java.nio.channels.SelectionKey.OP_ACCEPT;
-import static java.nio.channels.SelectionKey.OP_READ;
-import static java.nio.channels.SelectionKey.OP_WRITE;
-import static me.shenfeng.http.HttpUtils.ASCII;
-import static me.shenfeng.http.HttpUtils.CONTENT_LENGTH;
-import static me.shenfeng.http.HttpUtils.SELECT_TIMEOUT;
-import static me.shenfeng.http.HttpUtils.UTF_8;
-import static me.shenfeng.http.HttpUtils.closeQuiety;
-import static me.shenfeng.http.HttpUtils.encodeResponseHeader;
-import static me.shenfeng.http.HttpUtils.readAll;
-import static me.shenfeng.http.server.ServerConstant.BODY;
-import static me.shenfeng.http.server.ServerConstant.HEADERS;
-import static me.shenfeng.http.server.ServerConstant.STATUS;
-import static me.shenfeng.http.server.ServerDecoderState.ALL_READ;
+import clojure.lang.ISeq;
+import clojure.lang.Seqable;
+import me.shenfeng.http.DynamicBytes;
+import me.shenfeng.http.ProtocolException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.nio.channels.ClosedSelectorException;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
+import java.nio.channels.*;
+import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-import me.shenfeng.http.DynamicBytes;
-import me.shenfeng.http.ProtocolException;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import clojure.lang.ISeq;
-import clojure.lang.Seqable;
+import static java.nio.channels.SelectionKey.*;
+import static me.shenfeng.http.HttpUtils.*;
+import static me.shenfeng.http.HttpUtils.CONTENT_LENGTH;
+import static me.shenfeng.http.server.ServerConstant.*;
+import static me.shenfeng.http.server.ServerDecoderState.ALL_READ;
 
 public class HttpServer {
 
@@ -63,7 +45,7 @@ public class HttpServer {
             }
         } else {
             if (header.hasRemaining()) {
-                ch.write(new ByteBuffer[] { header, body });
+                ch.write(new ByteBuffer[] {header, body});
             } else {
                 ch.write(body);
             }
@@ -158,8 +140,8 @@ public class HttpServer {
         InetSocketAddress addr = new InetSocketAddress(ip, port);
         serverChannel.socket().bind(addr);
         serverChannel.register(selector, OP_ACCEPT);
-        logger.info("server start {}@{}, max body: {}", new Object[] { ip,
-                port, maxBody });
+        logger.info("server start {}@{}, max body: {}", new Object[] {ip,
+                port, maxBody});
     }
 
     private class Callback implements IResponseCallback {
@@ -176,7 +158,7 @@ public class HttpServer {
             if (body instanceof IListenableFuture) {
                 final IListenableFuture future = (IListenableFuture) body;
                 future.addListener(new Runnable() {
-                    @SuppressWarnings({ "rawtypes", "unchecked" })
+                    @SuppressWarnings({"rawtypes", "unchecked"})
                     public void run() {
                         Map resp = (Map) future.get();
                         Object s = resp.get(STATUS);

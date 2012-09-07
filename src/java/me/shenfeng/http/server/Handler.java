@@ -1,41 +1,19 @@
 package me.shenfeng.http.server;
 
-import static me.shenfeng.http.server.ServerConstant.BODY;
-import static me.shenfeng.http.server.ServerConstant.CHARACTER_ENCODING;
-import static me.shenfeng.http.server.ServerConstant.CONTENT_LENGTH;
-import static me.shenfeng.http.server.ServerConstant.CONTENT_TYPE;
-import static me.shenfeng.http.server.ServerConstant.HEADERS;
-import static me.shenfeng.http.server.ServerConstant.HTTP;
-import static me.shenfeng.http.server.ServerConstant.M_DELETE;
-import static me.shenfeng.http.server.ServerConstant.M_GET;
-import static me.shenfeng.http.server.ServerConstant.M_POST;
-import static me.shenfeng.http.server.ServerConstant.M_PUT;
-import static me.shenfeng.http.server.ServerConstant.QUERY_STRING;
-import static me.shenfeng.http.server.ServerConstant.REMOTE_ADDR;
-import static me.shenfeng.http.server.ServerConstant.REQUEST_METHOD;
-import static me.shenfeng.http.server.ServerConstant.SCHEME;
-import static me.shenfeng.http.server.ServerConstant.SERVER_NAME;
-import static me.shenfeng.http.server.ServerConstant.SERVER_PORT;
-import static me.shenfeng.http.server.ServerConstant.STATUS;
-import static me.shenfeng.http.server.ServerConstant.URI;
+import clojure.lang.IFn;
+import clojure.lang.IPersistentMap;
+import clojure.lang.PersistentArrayMap;
+import me.shenfeng.http.PrefixThreafFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
-import me.shenfeng.http.PrefixThreafFactory;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import clojure.lang.IFn;
-import clojure.lang.IPersistentMap;
-import clojure.lang.PersistentArrayMap;
+import static me.shenfeng.http.server.ServerConstant.*;
 
 public class Handler implements IHandler {
 
@@ -62,18 +40,18 @@ public class Handler implements IHandler {
         m.put(SCHEME, HTTP); // only http is supported
 
         switch (req.getMethod()) {
-        case DELETE:
-            m.put(REQUEST_METHOD, M_DELETE);
-            break;
-        case GET:
-            m.put(REQUEST_METHOD, M_GET);
-            break;
-        case POST:
-            m.put(REQUEST_METHOD, M_POST);
-            break;
-        case PUT:
-            m.put(REQUEST_METHOD, M_PUT);
-            break;
+            case DELETE:
+                m.put(REQUEST_METHOD, M_DELETE);
+                break;
+            case GET:
+                m.put(REQUEST_METHOD, M_GET);
+                break;
+            case POST:
+                m.put(REQUEST_METHOD, M_POST);
+                break;
+            case PUT:
+                m.put(REQUEST_METHOD, M_PUT);
+                break;
         }
 
         // downcase key, required by ring spec
@@ -94,7 +72,7 @@ public class Handler implements IHandler {
 
     public void handle(final HttpRequest req, final IResponseCallback cb) {
         execs.submit(new Runnable() {
-            @SuppressWarnings({ "rawtypes", "unchecked" })
+            @SuppressWarnings({"rawtypes", "unchecked"})
             public void run() {
                 try {
                     Map resp = (Map) f.invoke(buildRequestMap(req));

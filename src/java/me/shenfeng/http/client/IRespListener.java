@@ -1,9 +1,9 @@
 package me.shenfeng.http.client;
 
-import java.util.Map;
-
 import me.shenfeng.http.HttpStatus;
 import me.shenfeng.http.HttpVersion;
+
+import java.util.Map;
 
 /**
  * Will be invoked once the response/request has been fully read

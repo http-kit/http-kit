@@ -1,8 +1,8 @@
 package me.shenfeng.http.client;
 
-import java.util.Map;
-
 import me.shenfeng.http.DynamicBytes;
+
+import java.util.Map;
 
 public interface IBinaryHandler {
     void onSuccess(int status, Map<String, String> headers, DynamicBytes bytes);

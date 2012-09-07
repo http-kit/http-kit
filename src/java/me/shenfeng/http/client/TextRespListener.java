@@ -1,11 +1,8 @@
 package me.shenfeng.http.client;
 
-import static java.lang.Math.min;
-import static me.shenfeng.http.HttpUtils.ASCII;
-import static me.shenfeng.http.HttpUtils.CHARSET;
-import static me.shenfeng.http.HttpUtils.CONTENT_ENCODING;
-import static me.shenfeng.http.HttpUtils.CONTENT_TYPE;
-import static me.shenfeng.http.HttpUtils.UTF_8;
+import me.shenfeng.http.DynamicBytes;
+import me.shenfeng.http.HttpStatus;
+import me.shenfeng.http.HttpVersion;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -16,9 +13,8 @@ import java.util.regex.Pattern;
 import java.util.zip.DeflaterInputStream;
 import java.util.zip.GZIPInputStream;
 
-import me.shenfeng.http.DynamicBytes;
-import me.shenfeng.http.HttpStatus;
-import me.shenfeng.http.HttpVersion;
+import static java.lang.Math.min;
+import static me.shenfeng.http.HttpUtils.*;
 
 public class TextRespListener implements IRespListener {
 
@@ -26,6 +22,7 @@ public class TextRespListener implements IRespListener {
         public AbortException() {
             super("aborted");
         }
+
         private static final long serialVersionUID = 1L;
 
     }
@@ -57,7 +54,7 @@ public class TextRespListener implements IRespListener {
             "encoding=('|\")([\\w|-]+)('|\")", Pattern.CASE_INSENSITIVE);
 
     public static Charset detectCharset(Map<String, String> headers,
-            DynamicBytes body) {
+                                        DynamicBytes body) {
         Charset result = parseCharset(headers.get(CONTENT_TYPE));
         if (result == null) {
             // decode a little the find charset=???

@@ -1,39 +1,17 @@
 package me.shenfeng.http.server;
 
-import static me.shenfeng.http.HttpUtils.CHUNKED;
-import static me.shenfeng.http.HttpUtils.CONTENT_LENGTH;
-import static me.shenfeng.http.HttpUtils.CR;
-import static me.shenfeng.http.HttpUtils.LF;
-import static me.shenfeng.http.HttpUtils.TRANSFER_ENCODING;
-import static me.shenfeng.http.HttpUtils.findEndOfString;
-import static me.shenfeng.http.HttpUtils.findNonWhitespace;
-import static me.shenfeng.http.HttpUtils.findWhitespace;
-import static me.shenfeng.http.HttpUtils.getChunkSize;
-import static me.shenfeng.http.HttpVersion.HTTP_1_0;
-import static me.shenfeng.http.HttpVersion.HTTP_1_1;
-import static me.shenfeng.http.server.ServerDecoderState.ALL_READ;
-import static me.shenfeng.http.server.ServerDecoderState.PROTOCOL_ERROR;
-import static me.shenfeng.http.server.ServerDecoderState.READ_CHUNKED_CONTENT;
-import static me.shenfeng.http.server.ServerDecoderState.READ_CHUNK_DELIMITER;
-import static me.shenfeng.http.server.ServerDecoderState.READ_CHUNK_FOOTER;
-import static me.shenfeng.http.server.ServerDecoderState.READ_CHUNK_SIZE;
-import static me.shenfeng.http.server.ServerDecoderState.READ_FIXED_LENGTH_CONTENT;
-import static me.shenfeng.http.server.ServerDecoderState.READ_HEADER;
-import static me.shenfeng.http.server.ServerDecoderState.READ_INITIAL;
+import me.shenfeng.http.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.TreeMap;
 
-import me.shenfeng.http.HttpMethod;
-import me.shenfeng.http.HttpUtils;
-import me.shenfeng.http.HttpVersion;
-import me.shenfeng.http.LineTooLargeException;
-import me.shenfeng.http.ProtocolException;
-import me.shenfeng.http.RequestTooLargeException;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static me.shenfeng.http.HttpUtils.*;
+import static me.shenfeng.http.HttpVersion.HTTP_1_0;
+import static me.shenfeng.http.HttpVersion.HTTP_1_1;
+import static me.shenfeng.http.server.ServerDecoderState.*;
 
 public class ReqeustDecoder {
 
@@ -103,55 +81,55 @@ public class ReqeustDecoder {
         String line;
         while (buffer.hasRemaining() && state != ALL_READ) {
             switch (state) {
-            case READ_INITIAL:
-                line = readLine(buffer);
-                if (line != null) {
-                    createRequest(line);
-                    state = READ_HEADER;
-                }
-                break;
-            case READ_HEADER:
-                readHeaders(buffer);
-                break;
-            case READ_CHUNK_SIZE:
-                line = readLine(buffer);
-                if (line != null) {
-                    readRemaining = getChunkSize(line);
-                    if (readRemaining == 0) {
-                        state = READ_CHUNK_FOOTER;
-                    } else {
-                        throwIfBodyIsTooLarge(readRemaining);
-                        if (content == null) {
-                            content = new byte[readRemaining];
-                        } else if (content.length - readContent < readRemaining) {
-                            byte[] tmp = new byte[readRemaining + readContent];
-                            System.arraycopy(content, 0, tmp, 0, readContent);
-                            content = tmp;
-                        }
-                        state = READ_CHUNKED_CONTENT;
+                case READ_INITIAL:
+                    line = readLine(buffer);
+                    if (line != null) {
+                        createRequest(line);
+                        state = READ_HEADER;
                     }
-                }
-                break;
-            case READ_FIXED_LENGTH_CONTENT:
-                readFixedLength(buffer);
-                if (readRemaining == 0) {
+                    break;
+                case READ_HEADER:
+                    readHeaders(buffer);
+                    break;
+                case READ_CHUNK_SIZE:
+                    line = readLine(buffer);
+                    if (line != null) {
+                        readRemaining = getChunkSize(line);
+                        if (readRemaining == 0) {
+                            state = READ_CHUNK_FOOTER;
+                        } else {
+                            throwIfBodyIsTooLarge(readRemaining);
+                            if (content == null) {
+                                content = new byte[readRemaining];
+                            } else if (content.length - readContent < readRemaining) {
+                                byte[] tmp = new byte[readRemaining + readContent];
+                                System.arraycopy(content, 0, tmp, 0, readContent);
+                                content = tmp;
+                            }
+                            state = READ_CHUNKED_CONTENT;
+                        }
+                    }
+                    break;
+                case READ_FIXED_LENGTH_CONTENT:
+                    readFixedLength(buffer);
+                    if (readRemaining == 0) {
+                        finish();
+                    }
+                    break;
+                case READ_CHUNKED_CONTENT:
+                    readFixedLength(buffer);
+                    if (readRemaining == 0) {
+                        state = READ_CHUNK_DELIMITER;
+                    }
+                    break;
+                case READ_CHUNK_FOOTER:
+                    readEmptyLine(buffer);
                     finish();
-                }
-                break;
-            case READ_CHUNKED_CONTENT:
-                readFixedLength(buffer);
-                if (readRemaining == 0) {
-                    state = READ_CHUNK_DELIMITER;
-                }
-                break;
-            case READ_CHUNK_FOOTER:
-                readEmptyLine(buffer);
-                finish();
-                break;
-            case READ_CHUNK_DELIMITER:
-                readEmptyLine(buffer);
-                state = READ_CHUNK_SIZE;
-                break;
+                    break;
+                case READ_CHUNK_DELIMITER:
+                    readEmptyLine(buffer);
+                    state = READ_CHUNK_SIZE;
+                    break;
             }
         }
         return state;
@@ -240,7 +218,7 @@ public class ReqeustDecoder {
             lineBufferCnt = 0;
         }
         return line;
-    };
+    }
 
     public void reset() {
         state = READ_INITIAL;

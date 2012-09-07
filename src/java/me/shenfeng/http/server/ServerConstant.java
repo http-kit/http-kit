@@ -1,7 +1,8 @@
 package me.shenfeng.http.server;
 
-import static clojure.lang.Keyword.intern;
 import clojure.lang.Keyword;
+
+import static clojure.lang.Keyword.intern;
 
 public class ServerConstant {
 

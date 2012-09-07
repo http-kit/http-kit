@@ -1,10 +1,9 @@
 package me.shenfeng.http;
 
-import static me.shenfeng.http.HttpUtils.ASCII;
-import static me.shenfeng.http.HttpUtils.UTF_8;
-
 import java.nio.charset.Charset;
 import java.util.Arrays;
+
+import static me.shenfeng.http.HttpUtils.UTF_8;
 
 public class DynamicBytes {
     private byte[] data;
