@@ -117,7 +117,7 @@ public class TextRespListener implements IRespListener {
 
     public void onCompleted() {
         String encoding = headers.get(CONTENT_ENCODING);
-        String html = "";
+        String html;
         try {
             if (encoding != null) {
                 encoding = encoding.toLowerCase();
@@ -129,7 +129,7 @@ public class TextRespListener implements IRespListener {
                         .equals(encoding)) ? new GZIPInputStream(bis)
                         : new DeflaterInputStream(bis);
                 byte[] buffer = new byte[4096];
-                int read = 0;
+                int read;
                 while ((read = is.read(buffer)) != -1) {
                     unzipped.append(buffer, 0, read);
                 }

@@ -84,6 +84,7 @@ public final class HttpClient {
                         break;
                     case SOCKS_CONNECTTING:
                         msg = "connect socks server timeout: ";
+                        break;
                     case DIRECT_CONNECTED:
                         msg = "read timeout: ";
                         break;
@@ -185,7 +186,7 @@ public final class HttpClient {
     }
 
     public void get(URI uri, Map<String, String> headers, Proxy proxy,
-                    IRespListener cb) throws UnknownHostException {
+                    IRespListener cb) {
         headers.put(HOST, uri.getHost());
         headers.put(ACCEPT, "*/*");
         if (headers.get(USER_AGENT) == null) // allow override
@@ -199,11 +200,6 @@ public final class HttpClient {
         // DNS look up is done by call thread, not the http-client thread
         pendingConnect.offer(new ClientAtta(request, cb, proxy, uri));
         selector.wakeup();
-    }
-
-    public void post(String uri, Map<String, String> headers, Proxy proxy,
-                     IRespListener cb) {
-
     }
 
     private void processPendings(long currentTime) {

@@ -101,8 +101,7 @@ public class HttpUtils {
         }
 
         bytes.append(CR).append(LF);
-        ByteBuffer request = ByteBuffer.wrap(bytes.get(), 0, bytes.length());
-        return request;
+        return ByteBuffer.wrap(bytes.get(), 0, bytes.length());
     }
 
     public static DynamicBytes encodeResponseHeader(int status,
@@ -119,7 +118,7 @@ public class HttpUtils {
                 bytes.append(k);
                 bytes.append(COLON);
                 bytes.append(SP);
-                bytes.append((String) v);
+                bytes.append((String) v, HttpUtils.UTF_8);
                 bytes.append(CR);
                 bytes.append(LF);
                 // ring spec says it could be a seq
@@ -238,7 +237,7 @@ public class HttpUtils {
     public static DynamicBytes readAll(InputStream is) throws IOException {
         DynamicBytes bytes = new DynamicBytes(1024);
         byte[] buffer = new byte[4096];
-        int read = 0;
+        int read;
         while ((read = is.read(buffer)) != -1) {
             bytes.append(buffer, 0, read);
         }

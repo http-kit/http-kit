@@ -178,8 +178,6 @@ public class ClientDecoder {
         }
     }
 
-    ;
-
     String readLine(ByteBuffer buffer) throws LineTooLargeException {
         byte b;
         boolean more = true;

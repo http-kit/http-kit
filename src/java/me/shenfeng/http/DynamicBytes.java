@@ -3,8 +3,6 @@ package me.shenfeng.http;
 import java.nio.charset.Charset;
 import java.util.Arrays;
 
-import static me.shenfeng.http.HttpUtils.UTF_8;
-
 public class DynamicBytes {
     private byte[] data;
     private int idx = 0;
@@ -45,7 +43,7 @@ public class DynamicBytes {
     }
 
     public DynamicBytes append(String str) {
-        return append(str, UTF_8);
+        return append(str, HttpUtils.ASCII);
     }
 
     public DynamicBytes append(String str, Charset c) {
