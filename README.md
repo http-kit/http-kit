@@ -62,7 +62,8 @@ I write it for the HTTP server and HTTP client of
                      ;; call (:cb req) when response ready
                      ((:cb req) {:status 200 :body "hello async"})))))
 
-(run-server async {:port 8080})```
+(run-server async {:port 8080})
+```
 
 ### HTTP Client
 
