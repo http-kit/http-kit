@@ -35,6 +35,11 @@ public class DynamicBytes {
         return this;
     }
 
+    @Override
+    public String toString() {
+        return "DynamicBytes[len=" + idx + ", cap=[" + data.length + ']';
+    }
+
     public DynamicBytes append(byte[] d, int offset, int length) {
         expandIfNessarry(length);
         System.arraycopy(d, offset, data, idx, length);

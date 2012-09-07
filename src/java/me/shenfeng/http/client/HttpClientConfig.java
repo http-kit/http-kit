@@ -14,4 +14,10 @@ public class HttpClientConfig {
         this.timeOutMs = timeOutMs;
         this.userAgent = userAgent;
     }
+
+    @Override
+    public String toString() {
+        return "{timeOutMs=" + timeOutMs +
+                ", userAgent='" + userAgent + '\'' + '}';
+    }
 }

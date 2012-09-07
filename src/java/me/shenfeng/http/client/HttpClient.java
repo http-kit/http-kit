@@ -1,8 +1,11 @@
 package me.shenfeng.http.client;
 
+import me.shenfeng.http.DynamicBytes;
+import me.shenfeng.http.HttpMethod;
 import me.shenfeng.http.client.TextRespListener.AbortException;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
@@ -32,10 +35,10 @@ public final class HttpClient {
 
     static final byte IPV4 = 1;
 
-    static final byte[] SOCKSV5_VERSION_AUTH = new byte[] {PROTO_VER5, 1,
+    static final byte[] SOCKSV5_VERSION_AUTH = new byte[]{PROTO_VER5, 1,
             NO_AUTH};
 
-    static final byte[] SOCKSV5_CON = new byte[] {PROTO_VER5, CONNECT, 0,
+    static final byte[] SOCKSV5_CON = new byte[]{PROTO_VER5, CONNECT, 0,
             IPV4};
 
     private class SelectorLoopThread extends Thread {
@@ -185,21 +188,99 @@ public final class HttpClient {
         get(uri, headers, Proxy.NO_PROXY, cb);
     }
 
+    @Override
+    public String toString() {
+       return this.getClass().getCanonicalName() + config.toString();
+    }
+
+    public void post(URI uri, Map<String, String> headers, Map<String, Object> body,
+                     IRespListener cb) {
+        post(uri, headers, body, Proxy.NO_PROXY, cb);
+    }
+
     public void get(URI uri, Map<String, String> headers, Proxy proxy,
                     IRespListener cb) {
+        // copy to modify
+        if (headers == null) {
+            headers = new HashMap<String, String>();
+        } else {
+            headers = new HashMap<String, String>(headers);
+        }
+        exec(uri, HttpMethod.GET, headers, null, proxy, cb);
+    }
+
+    public void post(URI uri, Map<String, String> headers,
+                     Map<String, Object> body, Proxy proxy, IRespListener cb) {
+        // copy to modify
+        if (headers == null) {
+            headers = new HashMap<String, String>();
+        } else {
+            headers = new HashMap<String, String>(headers);
+        }
+
+        byte[] data = null;
+        if (body != null) {
+            StringBuilder sb = new StringBuilder(32);
+            for (Map.Entry<String, Object> e : body.entrySet()) {
+                if (sb.length() > 0) {
+                    sb.append("&");
+                }
+                try {
+                    sb.append(URLEncoder.encode(e.getKey(), "utf8"));
+                    sb.append("=");
+                    sb.append(URLEncoder.encode(e.getValue().toString(),
+                            "utf8"));
+                } catch (UnsupportedEncodingException ignore) {
+                }
+            }
+
+            data = sb.toString().getBytes(UTF_8);
+            headers.put(CONTENT_TYPE,
+                    "application/x-www-form-urlencoded");
+            headers.put(CONTENT_LENGTH, Integer.toString(data.length));
+        }
+        exec(uri, HttpMethod.POST, headers, data, proxy, cb);
+    }
+
+    public void exec(URI uri, HttpMethod method, Map<String, String> headers,
+                     byte[] body, Proxy proxy, IRespListener cb) {
+
         headers.put(HOST, uri.getHost());
         headers.put(ACCEPT, "*/*");
         if (headers.get(USER_AGENT) == null) // allow override
-            headers.put(USER_AGENT, config.userAgent);
+            headers.put(USER_AGENT, config.userAgent); // default
         headers.put(ACCEPT_ENCODING, "gzip, deflate");
 
-        // HTTP proxy is not supported now
+        int length = 64 + headers.size() * 48;
+        if (body != null) {
+            length += body.length;
+        }
         String path = getPath(uri);
+        DynamicBytes bytes = new DynamicBytes(length);
 
-        ByteBuffer request = encodeGetRequest(path, headers);
-        // DNS look up is done by call thread, not the http-client thread
+        bytes.append(method.toString()).append(SP).append(path).append(SP);
+        bytes.append("HTTP/1.1").append(CR).append(LF);
+        Iterator<Map.Entry<String, String>> ite = headers.entrySet().iterator();
+        while (ite.hasNext()) {
+            Map.Entry<String, String> e = ite.next();
+            if (e.getValue() != null) {
+                bytes.append(e.getKey()).append(COLON).append(SP)
+                        .append(e.getValue());
+                bytes.append(CR).append(LF);
+            }
+        }
+        bytes.append(CR).append(LF);
+        if (body != null) {
+            bytes.append(body, 0, body.length);
+        }
+
+        ByteBuffer request = ByteBuffer.wrap(bytes.get(), 0, bytes.length());
         pendingConnect.offer(new ClientAtta(request, cb, proxy, uri));
         selector.wakeup();
+    }
+
+    public static void main(String[] args) {
+        System.out.println(HttpMethod.DELETE.toString());
     }
 
     private void processPendings(long currentTime) {

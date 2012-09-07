@@ -5,7 +5,6 @@ import clojure.lang.Seqable;
 
 import java.io.*;
 import java.net.*;
-import java.nio.ByteBuffer;
 import java.nio.channels.SelectableChannel;
 import java.nio.charset.Charset;
 import java.util.Iterator;
@@ -82,26 +81,6 @@ public class HttpUtils {
             }
         } catch (Exception ignore) {
         }
-    }
-
-    public static ByteBuffer encodeGetRequest(String path,
-                                              Map<String, String> headers) {
-        DynamicBytes bytes = new DynamicBytes(64 + headers.size() * 48);
-
-        bytes.append("GET").append(SP).append(path).append(SP);
-        bytes.append("HTTP/1.1").append(CR).append(LF);
-        Iterator<Entry<String, String>> ite = headers.entrySet().iterator();
-        while (ite.hasNext()) {
-            Entry<String, String> e = ite.next();
-            if (e.getValue() != null) {
-                bytes.append(e.getKey()).append(COLON).append(SP)
-                        .append(e.getValue());
-                bytes.append(CR).append(LF);
-            }
-        }
-
-        bytes.append(CR).append(LF);
-        return ByteBuffer.wrap(bytes.get(), 0, bytes.length());
     }
 
     public static DynamicBytes encodeResponseHeader(int status,
