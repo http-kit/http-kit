@@ -63,6 +63,16 @@
       {:status 204
        :headers {"Content-type" "application/json"}})))
 
+(defasync test-async [req]
+  ((:cb req) {:status 200 :body "hello async"}))
+
+(defonce tmp-server (atom nil))
+
+(defn -main [& args]
+  (when-let [server @tmp-server]
+    (server))
+  (reset! tmp-server (run-server test-async {:port 9898})))
+
 (defroutes test-routes
   (GET "/spec-get" [] test-get-spec)
   (POST "/spec-post" [] test-post-spec)
@@ -84,7 +94,8 @@
                                    (gen-tempfile 67000 ".txt"))}))
   (GET "/async" [] (fn [req]
                      {:status  200
-                      :body async-body})))
+                      :body async-body}))
+  (GET "/async2" [] test-async))
 
 (use-fixtures :once (fn [f]
                       (let [server (run-server
@@ -130,3 +141,8 @@
   (let [resp (http/get "http://localhost:4347/async")]
     (is (= (:status resp) 204))
     (is (= (get-in resp [:headers "content-type"]) "application/json"))))
+
+(deftest test-async2
+  (let [resp (http/get "http://localhost:4347/async2")]
+    (is (= (:status resp) 200))
+    (is (= (:body resp) "hello async"))))

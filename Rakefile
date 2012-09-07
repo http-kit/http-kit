@@ -19,7 +19,7 @@ end
 
 desc "Start swank server for emacs"
 task :swank do
-  sh "rm classes -rf && lein javac && lein swank"
+  sh "rm -rf classes && lein javac && lein swank"
 end
 
 desc "Benchmark to an idea how fast it can run"
