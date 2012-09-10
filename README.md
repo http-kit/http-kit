@@ -65,7 +65,7 @@ I write it for the HTTP server and HTTP client of
 (run-server async {:port 8080})
 ```
 These is a simple live chartroom as an example of defasync:
-[example.clj](https://github.com/shenfeng/http-kit/blob/master/test/me/shenfeng/http/exmaple.clj)
+[example.clj](https://github.com/shenfeng/http-kit/blob/master/test/me/shenfeng/http/example.clj)
 
 run it:
 
