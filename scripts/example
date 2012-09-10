@@ -1,0 +1,5 @@
+#!/bin/bash
+
+rm -rf classes
+lein javac
+java -cp "$(lein classpath)" clojure.main -m me.shenfeng.http.example
