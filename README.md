@@ -34,7 +34,7 @@ I write it for the HTTP server and HTTP client of
 
 ### HTTP Server
 ```clj
-[me.shenfeng/http-kit "1.1.0"]
+[me.shenfeng/http-kit "1.1.1"]
 
 (:use me.shenfeng.http.server)          ; export run-server and defasync
 
@@ -124,3 +124,4 @@ It compare with
   Chinese char
 
 * 1.1.0 defasync and async HTTP client clojure API
+* 1.1.1 http client: allow custom ACCEPT_ENCODING, default gzip, deflate

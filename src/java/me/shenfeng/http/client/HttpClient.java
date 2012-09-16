@@ -249,7 +249,8 @@ public final class HttpClient {
         headers.put(ACCEPT, "*/*");
         if (headers.get(USER_AGENT) == null) // allow override
             headers.put(USER_AGENT, config.userAgent); // default
-        headers.put(ACCEPT_ENCODING, "gzip, deflate");
+        if (!headers.containsKey(ACCEPT_ENCODING))
+            headers.put(ACCEPT_ENCODING, "gzip, deflate");
 
         int length = 64 + headers.size() * 48;
         if (body != null) {
