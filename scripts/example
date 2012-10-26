@@ -1,5 +1,8 @@
 #!/bin/bash
 
 rm -rf classes
-lein javac
+mkdir classes
+
+find src/java -name "*.java" | xargs javac -Xlint:unchecked -encoding utf8 -cp "classes:lib/*:src/" -d classes -sourcepath src/java/
+
 java -cp "$(lein classpath)" clojure.main -m me.shenfeng.http.example

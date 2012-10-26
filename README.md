@@ -70,7 +70,7 @@ These is a simple live chartroom as an example of defasync:
 run it:
 
 ```sh
-./scripts/example # view it on http://127.0.0.1:9898/
+./scripts/example # try open two browser tab, view it on http://127.0.0.1:9898/
 ```
 
 ### HTTP Client
