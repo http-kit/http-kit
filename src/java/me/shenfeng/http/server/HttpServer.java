@@ -205,8 +205,7 @@ public class HttpServer {
                 } else if (body instanceof File) {
                     File f = (File) body;
                     // serving file is better be done by nginx
-                    long length = f.length();
-                    byte[] b = readAll(f, (int) length);
+                    byte[] b = readAll(f);
                     atta.respBody = ByteBuffer.wrap(b);
                 } else if (body instanceof Seqable) {
                     ISeq seq = ((Seqable) body).seq();

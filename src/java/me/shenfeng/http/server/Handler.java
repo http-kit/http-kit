@@ -77,7 +77,13 @@ public class Handler implements IHandler {
                 try {
                     Map resp = (Map) f.invoke(buildRequestMap(req));
                     if (resp != null) {
-                        int status = ((Long) resp.get(STATUS)).intValue();
+                        int status = 200;
+                        Object s = resp.get(STATUS);
+                        if(s instanceof Long) {
+                            status = ((Long)s).intValue();
+                        } else if (s instanceof Integer) {
+                            status = (Integer)s;
+                        }
                         Map headers = (Map) resp.get(HEADERS);
                         Object body = resp.get(BODY);
                         cb.run(status, headers, body);

@@ -193,7 +193,8 @@ public class HttpUtils {
 
     }
 
-    public static byte[] readAll(File f, int length) throws IOException {
+    public static byte[] readAll(File f) throws IOException {
+        int length = (int)f.length();
         byte[] bytes = new byte[length];
         FileInputStream fs = null;
         try {
