@@ -83,9 +83,9 @@ public class Handler implements IHandler {
                         cb.run(status, headers, body);
                     } else {
                         // when handler return null: 404
-                        cb.run(404, new TreeMap<String, Object>(), null);
+                        cb.run(404, null, null);
                     }
-                } catch (Exception e) {
+                } catch (Throwable e) {
                     cb.run(500, null, e.getMessage());
                     logger.error(req.getUri(), e);
                 }
