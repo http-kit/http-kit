@@ -1,15 +1,9 @@
 package me.shenfeng.http.server;
 
-import clojure.lang.ISeq;
-import clojure.lang.Seqable;
 import me.shenfeng.http.DynamicBytes;
 import me.shenfeng.http.ProtocolException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.*;
@@ -18,13 +12,9 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 import static java.nio.channels.SelectionKey.*;
 import static me.shenfeng.http.HttpUtils.*;
-import static me.shenfeng.http.HttpUtils.CONTENT_LENGTH;
-import static me.shenfeng.http.server.ServerConstant.*;
 import static me.shenfeng.http.server.ServerDecoderState.ALL_READ;
 
 public class HttpServer {
-
-    static Logger logger = LoggerFactory.getLogger(HttpServer.class);
 
     private static void doWrite(SelectionKey key) throws IOException {
         ServerAtta atta = (ServerAtta) key.attachment();
@@ -45,7 +35,7 @@ public class HttpServer {
             }
         } else {
             if (header.hasRemaining()) {
-                ch.write(new ByteBuffer[] {header, body});
+                ch.write(new ByteBuffer[]{header, body});
             } else {
                 ch.write(body);
             }
@@ -68,7 +58,7 @@ public class HttpServer {
     private Thread serverThread;
     private ServerSocketChannel serverChannel;
 
-    ConcurrentLinkedQueue<SelectionKey> pendings = new ConcurrentLinkedQueue<SelectionKey>();
+    private ConcurrentLinkedQueue<SelectionKey> pendings = new ConcurrentLinkedQueue<SelectionKey>();
 
     // shared, single thread
     private ByteBuffer buffer = ByteBuffer.allocateDirect(1024 * 64);
@@ -104,14 +94,13 @@ public class HttpServer {
                     }
                     selectedKeys.clear();
                 } catch (ClosedSelectorException ignore) {
-                    logger.info("Selector closed, server stopped");
                     selector = null;
                     return;
                 } catch (Exception e) { // catch any exception, print it
                     if (key != null) {
                         closeQuiety(key.channel());
                     }
-                    logger.error("server event loop error", e);
+                    e.printStackTrace();
                 }
             } // end of while loop
         }
@@ -140,97 +129,7 @@ public class HttpServer {
         InetSocketAddress addr = new InetSocketAddress(ip, port);
         serverChannel.socket().bind(addr);
         serverChannel.register(selector, OP_ACCEPT);
-        logger.info("server start {}@{}, max body: {}", new Object[] {ip,
-                port, maxBody});
-    }
-
-    private class Callback implements IResponseCallback {
-        private final SelectionKey key;
-
-        public Callback(SelectionKey key) {
-            this.key = key;
-        }
-
-        // maybe in another thread
-        public void run(int status, Map<String, Object> headers, Object body) {
-            ServerAtta atta = (ServerAtta) key.attachment();
-            // extend ring spec to support async
-            if (body instanceof IListenableFuture) {
-                final int status2 = status;
-                final Map<String, Object> headers2 = headers;
-                final IListenableFuture future = (IListenableFuture) body;
-                future.addListener(new Runnable() {
-                    @SuppressWarnings({"rawtypes", "unchecked"})
-                    public void run() {
-                        Object r = future.get();
-                        // if is a ring spec response
-                        if (r instanceof Map) {
-                            Map resp = (Map) r;
-                            Object s = resp.get(STATUS);
-                            int status = 200;
-                            if (s instanceof Long) {
-                                status = ((Long) s).intValue();
-                            } else if (s instanceof Integer) {
-                                status = (Integer) s;
-                            }
-                            Map<String, Object> headers = (Map) resp.get(HEADERS);
-                            new Callback(key).run(status, headers, resp.get(BODY));
-                        } else {
-                            // treat it as just body
-                            new Callback(key).run(status2, headers2, r);
-                        }
-                    }
-                });
-                return;
-            }
-
-            if (headers != null) {
-                // copy to modify
-                headers = new TreeMap<String, Object>(headers);
-            } else {
-                headers = new TreeMap<String, Object>();
-            }
-            try {
-                if (body == null) {
-                    atta.respBody = null;
-                    headers.put(CONTENT_LENGTH, "0");
-                } else if (body instanceof String) {
-                    byte[] b = ((String) body).getBytes(UTF_8);
-                    atta.respBody = ByteBuffer.wrap(b);
-                    headers.put(CONTENT_LENGTH, Integer.toString(b.length));
-                } else if (body instanceof InputStream) {
-                    DynamicBytes b = readAll((InputStream) body);
-                    atta.respBody = ByteBuffer.wrap(b.get(), 0, b.length());
-                    headers.put(CONTENT_LENGTH, Integer.toString(b.length()));
-                } else if (body instanceof File) {
-                    File f = (File) body;
-                    // serving file is better be done by nginx
-                    byte[] b = readAll(f);
-                    atta.respBody = ByteBuffer.wrap(b);
-                } else if (body instanceof Seqable) {
-                    ISeq seq = ((Seqable) body).seq();
-                    DynamicBytes b = new DynamicBytes(seq.count() * 512);
-                    while (seq != null) {
-                        b.append(seq.first().toString(), UTF_8);
-                        seq = seq.next();
-                    }
-                    atta.respBody = ByteBuffer.wrap(b.get(), 0, b.length());
-                    headers.put(CONTENT_LENGTH, Integer.toString(b.length()));
-                } else {
-                    logger.error(body.getClass() + " is not understandable");
-                }
-            } catch (IOException e) {
-                byte[] b = e.getMessage().getBytes(ASCII);
-                status = 500;
-                headers.clear();
-                headers.put(CONTENT_LENGTH, Integer.toString(b.length));
-                atta.respBody = ByteBuffer.wrap(b);
-            }
-            DynamicBytes bytes = encodeResponseHeader(status, headers);
-            atta.respHeader = ByteBuffer.wrap(bytes.get(), 0, bytes.length());
-            pendings.offer(key);
-            selector.wakeup();
-        }
+        System.out.println(String.format("http server start %s@%d, max body: %d", ip, port, maxBody));
     }
 
     private void doRead(final SelectionKey key) {
@@ -248,7 +147,7 @@ public class HttpServer {
                 if (decoder.decode(buffer) == ALL_READ) {
                     HttpRequest request = decoder.request;
                     request.setRemoteAddr(ch.socket().getRemoteSocketAddress());
-                    handler.handle(request, new Callback(key));
+                    handler.handle(request, new Callback(pendings, key));
                 }
             }
         } catch (IOException e) {

@@ -5,7 +5,7 @@ import java.nio.ByteBuffer;
 public class ServerAtta {
 
     public ServerAtta(int maxBody) {
-        decoder = new ReqeustDecoder(maxBody); // 20k
+        decoder = new ReqeustDecoder(maxBody);
     }
 
     public final ReqeustDecoder decoder;

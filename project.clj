@@ -1,13 +1,13 @@
 (defproject me.shenfeng/http-kit "1.1.3"
   :description "Event driven HTTP server and HTTP client in java and clojure, only depend on JDK."
-  :dependencies [[org.clojure/clojure "1.4.0"]
-                 [org.slf4j/slf4j-api "1.6.4"]]
+  :dependencies [[org.clojure/clojure "1.4.0"]]
   :warn-on-reflection true
   :javac-options {:debug "true" :fork "true" :source "1.6" :target "1.6"}
   :java-source-path "src/java"
   :test-paths ["test" "example"]
   :dev-dependencies [[swank-clojure "1.4.0"]
                      [junit/junit "4.8.2"]
+                     [org.slf4j/slf4j-api "1.6.4"]
                      [ch.qos.logback/logback-classic "1.0.1"]
                      [clj-http "0.1.3"]
                      [org.clojure/data.json "0.1.2"]

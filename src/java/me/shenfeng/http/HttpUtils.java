@@ -1,18 +1,24 @@
 package me.shenfeng.http;
 
-import clojure.lang.ISeq;
-import clojure.lang.Seqable;
+import static java.lang.Character.isWhitespace;
+import static java.net.InetAddress.getByName;
 
-import java.io.*;
-import java.net.*;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.URI;
+import java.net.UnknownHostException;
 import java.nio.channels.SelectableChannel;
 import java.nio.charset.Charset;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import static java.lang.Character.isWhitespace;
-import static java.net.InetAddress.getByName;
+import clojure.lang.ISeq;
+import clojure.lang.Seqable;
 
 public class HttpUtils {
 
@@ -107,7 +113,7 @@ public class HttpUtils {
                     bytes.append(k);
                     bytes.append(COLON);
                     bytes.append(SP);
-                    bytes.append(seq.first().toString());
+                    bytes.append(seq.first().toString(), HttpUtils.UTF_8);
                     bytes.append(CR);
                     bytes.append(LF);
                     seq = seq.next();
@@ -194,7 +200,7 @@ public class HttpUtils {
     }
 
     public static byte[] readAll(File f) throws IOException {
-        int length = (int)f.length();
+        int length = (int) f.length();
         byte[] bytes = new byte[length];
         FileInputStream fs = null;
         try {
@@ -225,8 +231,7 @@ public class HttpUtils {
         return bytes;
     }
 
-    public static void splitAndAddHeader(String sb,
-                                         Map<String, String> headers) {
+    public static void splitAndAddHeader(String sb, Map<String, String> headers) {
         final int length = sb.length();
         int nameStart;
         int nameEnd;

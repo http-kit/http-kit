@@ -1,8 +1,6 @@
 package me.shenfeng.http.server;
 
 import me.shenfeng.http.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
 import java.util.Map;
@@ -19,8 +17,6 @@ public class ReqeustDecoder {
 
     byte[] lineBuffer = new byte[MAX_LINE];
     int lineBufferCnt = 0;
-
-    static Logger logger = LoggerFactory.getLogger(ReqeustDecoder.class);
 
     HttpRequest request;
     private Map<String, String> headers = new TreeMap<String, String>();
