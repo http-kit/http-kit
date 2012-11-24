@@ -1,8 +1,9 @@
 package me.shenfeng.http.server;
 
-import me.shenfeng.http.HttpMethod;
-import me.shenfeng.http.HttpUtils;
-import me.shenfeng.http.HttpVersion;
+import static me.shenfeng.http.HttpUtils.CHARSET;
+import static me.shenfeng.http.HttpUtils.CONNECTION;
+import static me.shenfeng.http.HttpUtils.CONTENT_TYPE;
+import static me.shenfeng.http.HttpVersion.HTTP_1_1;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -10,8 +11,9 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.Map;
 
-import static me.shenfeng.http.HttpUtils.*;
-import static me.shenfeng.http.HttpVersion.HTTP_1_1;
+import me.shenfeng.http.HttpMethod;
+import me.shenfeng.http.HttpUtils;
+import me.shenfeng.http.HttpVersion;
 
 public class HttpRequest {
     private int serverPort;

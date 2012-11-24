@@ -90,7 +90,7 @@ public class HttpUtils {
     }
 
     public static DynamicBytes encodeResponseHeader(int status,
-                                                    Map<String, Object> headers) {
+            Map<String, Object> headers) {
         DynamicBytes bytes = new DynamicBytes(196);
         byte[] bs = HttpStatus.valueOf(status).getResponseIntialLineBytes();
         bytes.append(bs, 0, bs.length);

@@ -1,18 +1,31 @@
 package me.shenfeng.http.server;
 
-import me.shenfeng.http.DynamicBytes;
-import me.shenfeng.http.ProtocolException;
+import static java.nio.channels.SelectionKey.OP_ACCEPT;
+import static java.nio.channels.SelectionKey.OP_READ;
+import static java.nio.channels.SelectionKey.OP_WRITE;
+import static me.shenfeng.http.HttpUtils.ASCII;
+import static me.shenfeng.http.HttpUtils.CONTENT_LENGTH;
+import static me.shenfeng.http.HttpUtils.SELECT_TIMEOUT;
+import static me.shenfeng.http.HttpUtils.closeQuiety;
+import static me.shenfeng.http.HttpUtils.encodeResponseHeader;
+import static me.shenfeng.http.server.ServerDecoderState.ALL_READ;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.nio.channels.*;
-import java.util.*;
+import java.nio.channels.ClosedSelectorException;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-import static java.nio.channels.SelectionKey.*;
-import static me.shenfeng.http.HttpUtils.*;
-import static me.shenfeng.http.server.ServerDecoderState.ALL_READ;
+import me.shenfeng.http.DynamicBytes;
+import me.shenfeng.http.ProtocolException;
 
 public class HttpServer {
 
@@ -35,7 +48,7 @@ public class HttpServer {
             }
         } else {
             if (header.hasRemaining()) {
-                ch.write(new ByteBuffer[]{header, body});
+                ch.write(new ByteBuffer[] { header, body });
             } else {
                 ch.write(body);
             }
@@ -129,7 +142,8 @@ public class HttpServer {
         InetSocketAddress addr = new InetSocketAddress(ip, port);
         serverChannel.socket().bind(addr);
         serverChannel.register(selector, OP_ACCEPT);
-        System.out.println(String.format("http server start %s@%d, max body: %d", ip, port, maxBody));
+        System.out.println(String.format(
+                "http server start %s@%d, max body: %d", ip, port, maxBody));
     }
 
     private void doRead(final SelectionKey key) {

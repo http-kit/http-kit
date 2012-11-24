@@ -17,7 +17,6 @@ public class HttpClientConfig {
 
     @Override
     public String toString() {
-        return "{timeOutMs=" + timeOutMs +
-                ", userAgent='" + userAgent + '\'' + '}';
+        return "{timeOutMs=" + timeOutMs + ", userAgent=" + userAgent + '}';
     }
 }

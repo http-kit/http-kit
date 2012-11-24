@@ -1,10 +1,10 @@
 package me.shenfeng.http.client;
 
+import java.util.Map;
+
 import me.shenfeng.http.DynamicBytes;
 import me.shenfeng.http.HttpStatus;
 import me.shenfeng.http.HttpVersion;
-
-import java.util.Map;
 
 public class BinaryRespListener implements IRespListener {
     protected DynamicBytes body;

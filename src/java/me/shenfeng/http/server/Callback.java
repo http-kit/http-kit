@@ -1,8 +1,12 @@
 package me.shenfeng.http.server;
 
-import clojure.lang.ISeq;
-import clojure.lang.Seqable;
-import me.shenfeng.http.DynamicBytes;
+import static me.shenfeng.http.HttpUtils.ASCII;
+import static me.shenfeng.http.HttpUtils.CONTENT_LENGTH;
+import static me.shenfeng.http.HttpUtils.UTF_8;
+import static me.shenfeng.http.HttpUtils.encodeResponseHeader;
+import static me.shenfeng.http.HttpUtils.readAll;
+import static me.shenfeng.http.server.ClojureRing.BODY;
+import static me.shenfeng.http.server.ClojureRing.HEADERS;
 
 import java.io.File;
 import java.io.IOException;
@@ -13,16 +17,16 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-import static me.shenfeng.http.HttpUtils.*;
-import static me.shenfeng.http.server.ClojureRing.BODY;
-import static me.shenfeng.http.server.ClojureRing.HEADERS;
+import me.shenfeng.http.DynamicBytes;
+import clojure.lang.ISeq;
+import clojure.lang.Seqable;
 
 public class Callback implements IResponseCallback {
     private final SelectionKey key;
     private ConcurrentLinkedQueue<SelectionKey> pendings;
 
     public Callback(ConcurrentLinkedQueue<SelectionKey> pendings,
-                    SelectionKey key) {
+            SelectionKey key) {
         this.pendings = pendings;
         this.key = key;
     }
@@ -36,7 +40,7 @@ public class Callback implements IResponseCallback {
             final Map<String, Object> headers2 = headers;
             final IListenableFuture future = (IListenableFuture) body;
             future.addListener(new Runnable() {
-                @SuppressWarnings({"rawtypes", "unchecked"})
+                @SuppressWarnings({ "rawtypes", "unchecked" })
                 public void run() {
                     Object r = future.get();
                     // if is a ring spec response
@@ -44,7 +48,8 @@ public class Callback implements IResponseCallback {
                         Map resp = (Map) r;
                         Map<String, Object> headers = (Map) resp.get(HEADERS);
                         int status = ClojureRing.getStatus(resp);
-                        new Callback(pendings, key).run(status, headers, resp.get(BODY));
+                        new Callback(pendings, key).run(status, headers,
+                                resp.get(BODY));
                     } else {
                         // treat it as just body
                         new Callback(pendings, key).run(status2, headers2, r);
@@ -87,7 +92,8 @@ public class Callback implements IResponseCallback {
                 atta.respBody = ByteBuffer.wrap(b.get(), 0, b.length());
                 headers.put(CONTENT_LENGTH, Integer.toString(b.length()));
             } else {
-                throw new RuntimeException(body.getClass() + " is not understandable");
+                throw new RuntimeException(body.getClass()
+                        + " is not understandable");
             }
         } catch (IOException e) {
             byte[] b = e.getMessage().getBytes(ASCII);

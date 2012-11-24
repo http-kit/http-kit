@@ -1,8 +1,11 @@
 package me.shenfeng.http.client;
 
-import me.shenfeng.http.DynamicBytes;
-import me.shenfeng.http.HttpStatus;
-import me.shenfeng.http.HttpVersion;
+import static java.lang.Math.min;
+import static me.shenfeng.http.HttpUtils.ASCII;
+import static me.shenfeng.http.HttpUtils.CHARSET;
+import static me.shenfeng.http.HttpUtils.CONTENT_ENCODING;
+import static me.shenfeng.http.HttpUtils.CONTENT_TYPE;
+import static me.shenfeng.http.HttpUtils.UTF_8;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -13,8 +16,9 @@ import java.util.regex.Pattern;
 import java.util.zip.DeflaterInputStream;
 import java.util.zip.GZIPInputStream;
 
-import static java.lang.Math.min;
-import static me.shenfeng.http.HttpUtils.*;
+import me.shenfeng.http.DynamicBytes;
+import me.shenfeng.http.HttpStatus;
+import me.shenfeng.http.HttpVersion;
 
 public class TextRespListener implements IRespListener {
 
@@ -54,12 +58,11 @@ public class TextRespListener implements IRespListener {
             "encoding=('|\")([\\w|-]+)('|\")", Pattern.CASE_INSENSITIVE);
 
     public static Charset detectCharset(Map<String, String> headers,
-                                        DynamicBytes body) {
+            DynamicBytes body) {
         Charset result = parseCharset(headers.get(CONTENT_TYPE));
         if (result == null) {
             // decode a little the find charset=???
-            String s = new String(body.get(), 0, min(512, body.length()),
-                    ASCII);
+            String s = new String(body.get(), 0, min(512, body.length()), ASCII);
             // content="text/html;charset=gb2312"
             result = guess(s, CHARSET);
             if (result == null) {
@@ -121,8 +124,8 @@ public class TextRespListener implements IRespListener {
         try {
             if (encoding != null) {
                 encoding = encoding.toLowerCase();
-                ByteArrayInputStream bis = new ByteArrayInputStream(
-                        body.get(), 0, body.length());
+                ByteArrayInputStream bis = new ByteArrayInputStream(body.get(),
+                        0, body.length());
                 DynamicBytes unzipped = new DynamicBytes(body.length() * 6);
                 // deflate || x-deflate
                 InputStream is = ("gzip".equals(encoding) || "x-gzip"
@@ -136,8 +139,8 @@ public class TextRespListener implements IRespListener {
                 html = new String(unzipped.get(), 0, unzipped.length(),
                         detectCharset(headers, unzipped));
             } else {
-                html = new String(body.get(), 0, body.length(),
-                        detectCharset(headers, body));
+                html = new String(body.get(), 0, body.length(), detectCharset(
+                        headers, body));
             }
             handler.onSuccess(status.getCode(), headers, html);
         } catch (Exception e) {

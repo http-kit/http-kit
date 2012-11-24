@@ -6,6 +6,7 @@ import static me.shenfeng.http.server.ClojureRing.buildRequestMap;
 
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -21,14 +22,15 @@ public class RingHandler implements IHandler {
     public RingHandler(int thread, IFn f) {
         PrefixThreafFactory factory = new PrefixThreafFactory("worker-");
         // max pending request: 386
-        ArrayBlockingQueue<Runnable> queue = new ArrayBlockingQueue<Runnable>(386);
-        execs = new ThreadPoolExecutor(thread, thread, 0, TimeUnit.MILLISECONDS, queue, factory);
+        BlockingQueue<Runnable> queue = new ArrayBlockingQueue<Runnable>(386);
+        execs = new ThreadPoolExecutor(thread, thread, 0,
+                TimeUnit.MILLISECONDS, queue, factory);
         this.f = f;
     }
 
     public void handle(final HttpRequest req, final IResponseCallback cb) {
         execs.submit(new Runnable() {
-            @SuppressWarnings({"rawtypes", "unchecked"})
+            @SuppressWarnings({ "rawtypes", "unchecked" })
             public void run() {
                 try {
                     Map resp = (Map) f.invoke(buildRequestMap(req));

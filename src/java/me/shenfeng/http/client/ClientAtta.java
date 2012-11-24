@@ -1,14 +1,17 @@
 package me.shenfeng.http.client;
 
-import java.net.*;
-import java.net.Proxy.Type;
-import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
-
 import static me.shenfeng.http.HttpUtils.closeQuiety;
 import static me.shenfeng.http.HttpUtils.getServerAddr;
 import static me.shenfeng.http.client.ClientConnState.DIRECT_CONNECTING;
 import static me.shenfeng.http.client.ClientConnState.SOCKS_CONNECTTING;
+
+import java.net.InetSocketAddress;
+import java.net.Proxy;
+import java.net.Proxy.Type;
+import java.net.URI;
+import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
+import java.nio.channels.SocketChannel;
 
 public class ClientAtta {
     InetSocketAddress addr;
@@ -23,7 +26,7 @@ public class ClientAtta {
     boolean finished = false;
 
     public ClientAtta(ByteBuffer request, IRespListener handler, Proxy proxy,
-                      URI url) {
+            URI url) {
         decoder = new ClientDecoder(handler);
         this.url = url;
         this.request = request;
