@@ -63,11 +63,11 @@
       {:status 204
        :headers {"Content-type" "application/json"}})))
 
-(defasync test-async [req]
-  ((:cb req) {:status 200 :body "hello async"}))
+(defasync test-async [req] cb
+  (cb {:status 200 :body "hello async"}))
 
-(defasync test-async-just-body [req]
-  ((:cb req) "just-body"))
+(defasync test-async-just-body [req] cb
+  (cb "just-body"))
 
 (defonce tmp-server (atom nil))
 

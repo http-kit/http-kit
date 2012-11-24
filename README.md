@@ -55,12 +55,12 @@ I write it for the HTTP server and HTTP client of
 ```clj
 (:use me.shenfeng.http.server)
 
-(defasync async [req]
+(defasync async [req] cb
   (.start (Thread. (fn []
                      (Thread/sleep 1000)
                      ;; return a ring spec response
-                     ;; call (:cb req) when response ready
-                     ((:cb req) {:status 200 :body "hello async"})))))
+                     ;; call (cb req) when response ready
+                     (cb {:status 200 :body "hello async"})))))
 
 (run-server async {:port 8080})
 ```
@@ -125,3 +125,4 @@ It compare with
 
 * 1.1.0 defasync and async HTTP client clojure API
 * 1.1.1 http client: allow custom ACCEPT_ENCODING, default gzip, deflate
+* 1.1.3 better syntax for defasync

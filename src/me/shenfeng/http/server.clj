@@ -9,22 +9,20 @@
     (.start s)
     (fn [] (.close h) (.stop s))))
 
-(defmacro defasync [name params & body]
-  (let [req (params 0)]
-    `(defn ~name [~req]
-       {:status 200
-        :headers {}
-        :body (let [data# (atom {})
-                    ~req (assoc ~req :cb
-                                (fn [resp#]
-                                  (reset! data# (assoc @data# :r resp#))
-                                  (when-let [l# ^Runnable (:l @data#)]
-                                    (.run l#))))]
-                (do ~@body)
-                (reify IListenableFuture
-                  (addListener [this# listener#]
-                    (if-let [d# (:r @data#)]
-                      (.run ^Runnable listener#)
-                      (reset! data# (assoc @data# :l listener#))))
-                  (get [this#]
-                    (:r @data#))))})))
+(defmacro defasync [name [req] cb & body]
+  `(defn ~name [~req]
+     {:status 200
+      :headers {}
+      :body (let [data# (atom {})
+                  ~cb (fn [resp#]
+                        (reset! data# (assoc @data# :r resp#))
+                        (when-let [l# ^Runnable (:l @data#)]
+                          (.run l#)))]
+              (do ~@body)
+              (reify IListenableFuture
+                (addListener [this# listener#]
+                  (if-let [d# (:r @data#)]
+                    (.run ^Runnable listener#)
+                    (reset! data# (assoc @data# :l listener#))))
+                (get [this#]
+                  (:r @data#))))}))

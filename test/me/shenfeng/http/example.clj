@@ -47,9 +47,8 @@
       (swap! clients dissoc cb))
     data))
 
-(defasync polling-message [req]
-  (let [id (Integer/valueOf (-> req :params :id))
-        cb (:cb req)]
+(defasync polling-message [req] cb
+  (let [id (Integer/valueOf (-> req :params :id))]
     (let [msgs (filter #(> (-> %1 :id) id)
                        @datas)]
       (if (seq msgs)
