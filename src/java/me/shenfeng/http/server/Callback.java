@@ -65,23 +65,23 @@ public class Callback implements IResponseCallback {
         } else {
             headers = new TreeMap<String, Object>();
         }
+        ByteBuffer bodyBuffer = null, headBuffer = null;
         try {
             if (body == null) {
-                atta.respBody = null;
                 headers.put(CONTENT_LENGTH, "0");
             } else if (body instanceof String) {
                 byte[] b = ((String) body).getBytes(UTF_8);
-                atta.respBody = ByteBuffer.wrap(b);
+                bodyBuffer = ByteBuffer.wrap(b);
                 headers.put(CONTENT_LENGTH, Integer.toString(b.length));
             } else if (body instanceof InputStream) {
                 DynamicBytes b = readAll((InputStream) body);
-                atta.respBody = ByteBuffer.wrap(b.get(), 0, b.length());
+                bodyBuffer = ByteBuffer.wrap(b.get(), 0, b.length());
                 headers.put(CONTENT_LENGTH, Integer.toString(b.length()));
             } else if (body instanceof File) {
                 File f = (File) body;
                 // serving file is better be done by nginx
                 byte[] b = readAll(f);
-                atta.respBody = ByteBuffer.wrap(b);
+                bodyBuffer = ByteBuffer.wrap(b);
             } else if (body instanceof Seqable) {
                 ISeq seq = ((Seqable) body).seq();
                 DynamicBytes b = new DynamicBytes(seq.count() * 512);
@@ -89,7 +89,7 @@ public class Callback implements IResponseCallback {
                     b.append(seq.first().toString(), UTF_8);
                     seq = seq.next();
                 }
-                atta.respBody = ByteBuffer.wrap(b.get(), 0, b.length());
+                bodyBuffer = ByteBuffer.wrap(b.get(), 0, b.length());
                 headers.put(CONTENT_LENGTH, Integer.toString(b.length()));
             } else {
                 throw new RuntimeException(body.getClass()
@@ -100,10 +100,11 @@ public class Callback implements IResponseCallback {
             status = 500;
             headers.clear();
             headers.put(CONTENT_LENGTH, Integer.toString(b.length));
-            atta.respBody = ByteBuffer.wrap(b);
+            bodyBuffer = ByteBuffer.wrap(b);
         }
         DynamicBytes bytes = encodeResponseHeader(status, headers);
-        atta.respHeader = ByteBuffer.wrap(bytes.get(), 0, bytes.length());
+        headBuffer = ByteBuffer.wrap(bytes.get(), 0, bytes.length());
+        atta.addBuffer(headBuffer, bodyBuffer);
         pendings.offer(key);
         key.selector().wakeup();
     }

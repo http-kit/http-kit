@@ -19,6 +19,7 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -33,26 +34,24 @@ public class HttpServer {
         ServerAtta atta = (ServerAtta) key.attachment();
         SocketChannel ch = (SocketChannel) key.channel();
         ReqeustDecoder decoder = atta.decoder;
-        ByteBuffer header = atta.respHeader;
-        ByteBuffer body = atta.respBody;
 
-        if (body == null) {
-            ch.write(header);
-            if (!header.hasRemaining()) {
-                if (decoder.request.isKeepAlive()) {
-                    decoder.reset();
-                    key.interestOps(OP_READ);
-                } else {
-                    closeQuiety(ch);
+        LinkedList<ByteBuffer> toWrites = atta.toWrites;
+        synchronized (toWrites) {
+            if (toWrites.size() == 1) {
+                ch.write(toWrites.get(0));
+            } else {
+                ByteBuffer buffers[] = new ByteBuffer[toWrites.size()];
+                toWrites.toArray(buffers);
+                ch.write(buffers);
+            }
+            Iterator<ByteBuffer> ite = toWrites.iterator();
+            while (ite.hasNext()) {
+                if (!ite.next().hasRemaining()) {
+                    ite.remove();
                 }
             }
-        } else {
-            if (header.hasRemaining()) {
-                ch.write(new ByteBuffer[] { header, body });
-            } else {
-                ch.write(body);
-            }
-            if (!body.hasRemaining()) {
+            // all done
+            if (toWrites.size() == 0) {
                 if (decoder.request.isKeepAlive()) {
                     decoder.reset();
                     key.interestOps(OP_READ);
@@ -175,8 +174,7 @@ public class HttpServer {
             headers.put(CONTENT_LENGTH, body.length);
             DynamicBytes db = encodeResponseHeader(400, headers);
             db.append(body, 0, body.length);
-            atta.respBody = null;
-            atta.respHeader = ByteBuffer.wrap(db.get(), 0, db.length());
+            atta.addBuffer(ByteBuffer.wrap(db.get(), 0, db.length()));
             key.interestOps(OP_WRITE);
         }
     }
