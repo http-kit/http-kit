@@ -14,6 +14,7 @@ import java.util.Map;
 import me.shenfeng.http.HttpMethod;
 import me.shenfeng.http.HttpUtils;
 import me.shenfeng.http.HttpVersion;
+import me.shenfeng.http.ws.WsCon;
 
 public class HttpRequest {
     private int serverPort;
@@ -29,6 +30,8 @@ public class HttpRequest {
     private String contentType;
     private String charset = "utf8";
     private boolean isKeepAlive = false;
+    private boolean isWebSocket = false;
+    private WsCon webSocketCon;
 
     public HttpRequest(HttpMethod method, String url, HttpVersion version) {
         this.method = method;
@@ -119,6 +122,18 @@ public class HttpRequest {
         this.remoteAddr = (InetSocketAddress) addr;
     }
 
+    public void setWebSocketCon(WsCon con) {
+        this.webSocketCon = con;
+    }
+
+    public WsCon getWebSocketCon() {
+        return webSocketCon;
+    }
+
+    public boolean isWs() {
+        return isWebSocket;
+    }
+
     public void setHeaders(Map<String, String> headers) {
         String h = headers.get(HttpUtils.HOST);
         if (h != null) {
@@ -148,9 +163,8 @@ public class HttpRequest {
             }
         }
 
-        isKeepAlive = (version == HTTP_1_1 && !"close".equals(con))
-                || "keep-alive".equals(con);
-
+        isKeepAlive = (version == HTTP_1_1 && !"close".equals(con)) || "keep-alive".equals(con);
+        isWebSocket = "websocket".equals(headers.get("Upgrade"));
         this.headers = headers;
     }
 }

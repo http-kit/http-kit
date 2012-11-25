@@ -11,15 +11,7 @@ import static me.shenfeng.http.HttpUtils.findWhitespace;
 import static me.shenfeng.http.HttpUtils.getChunkSize;
 import static me.shenfeng.http.HttpVersion.HTTP_1_0;
 import static me.shenfeng.http.HttpVersion.HTTP_1_1;
-import static me.shenfeng.http.server.ServerDecoderState.ALL_READ;
-import static me.shenfeng.http.server.ServerDecoderState.PROTOCOL_ERROR;
-import static me.shenfeng.http.server.ServerDecoderState.READ_CHUNKED_CONTENT;
-import static me.shenfeng.http.server.ServerDecoderState.READ_CHUNK_DELIMITER;
-import static me.shenfeng.http.server.ServerDecoderState.READ_CHUNK_FOOTER;
-import static me.shenfeng.http.server.ServerDecoderState.READ_CHUNK_SIZE;
-import static me.shenfeng.http.server.ServerDecoderState.READ_FIXED_LENGTH_CONTENT;
-import static me.shenfeng.http.server.ServerDecoderState.READ_HEADER;
-import static me.shenfeng.http.server.ServerDecoderState.READ_INITIAL;
+
 
 import java.nio.ByteBuffer;
 import java.util.Map;
@@ -33,6 +25,10 @@ import me.shenfeng.http.ProtocolException;
 import me.shenfeng.http.RequestTooLargeException;
 
 public class ReqeustDecoder {
+    
+    public enum State {
+        PROTOCOL_ERROR, ALL_READ, READ_INITIAL, READ_HEADER, READ_FIXED_LENGTH_CONTENT, READ_CHUNK_SIZE, READ_CHUNKED_CONTENT, READ_CHUNK_FOOTER, READ_CHUNK_DELIMITER,
+    }
 
     static final int MAX_LINE = 2048;
 
@@ -42,14 +38,14 @@ public class ReqeustDecoder {
     HttpRequest request;
     private Map<String, String> headers = new TreeMap<String, String>();
     int readRemaining = 0;
-    ServerDecoderState state;
+    private State state;
     byte[] content;
     int readContent = 0;
     private int maxBody;
 
     public ReqeustDecoder(int maxBody) {
         this.maxBody = maxBody;
-        state = READ_INITIAL;
+        state = State.READ_INITIAL;
     }
 
     private void createRequest(String sb) throws ProtocolException {
@@ -92,17 +88,17 @@ public class ReqeustDecoder {
         }
     }
 
-    public ServerDecoderState decode(ByteBuffer buffer)
+    public State decode(ByteBuffer buffer)
             throws LineTooLargeException, ProtocolException,
             RequestTooLargeException {
         String line;
-        while (buffer.hasRemaining() && state != ALL_READ) {
+        while (buffer.hasRemaining() && state != State.ALL_READ) {
             switch (state) {
             case READ_INITIAL:
                 line = readLine(buffer);
                 if (line != null) {
                     createRequest(line);
-                    state = READ_HEADER;
+                    state = State.READ_HEADER;
                 }
                 break;
             case READ_HEADER:
@@ -113,7 +109,7 @@ public class ReqeustDecoder {
                 if (line != null) {
                     readRemaining = getChunkSize(line);
                     if (readRemaining == 0) {
-                        state = READ_CHUNK_FOOTER;
+                        state = State.READ_CHUNK_FOOTER;
                     } else {
                         throwIfBodyIsTooLarge(readRemaining);
                         if (content == null) {
@@ -123,7 +119,7 @@ public class ReqeustDecoder {
                             System.arraycopy(content, 0, tmp, 0, readContent);
                             content = tmp;
                         }
-                        state = READ_CHUNKED_CONTENT;
+                        state = State.READ_CHUNKED_CONTENT;
                     }
                 }
                 break;
@@ -136,7 +132,7 @@ public class ReqeustDecoder {
             case READ_CHUNKED_CONTENT:
                 readFixedLength(buffer);
                 if (readRemaining == 0) {
-                    state = READ_CHUNK_DELIMITER;
+                    state = State.READ_CHUNK_DELIMITER;
                 }
                 break;
             case READ_CHUNK_FOOTER:
@@ -145,7 +141,7 @@ public class ReqeustDecoder {
                 break;
             case READ_CHUNK_DELIMITER:
                 readEmptyLine(buffer);
-                state = READ_CHUNK_SIZE;
+                state = State.READ_CHUNK_SIZE;
                 break;
             }
         }
@@ -153,7 +149,7 @@ public class ReqeustDecoder {
     }
 
     private void finish() {
-        state = ALL_READ;
+        state = State.ALL_READ;
         request.setBody(content, readContent);
     }
 
@@ -188,7 +184,7 @@ public class ReqeustDecoder {
 
         String te = headers.get(TRANSFER_ENCODING);
         if (CHUNKED.equals(te)) {
-            state = READ_CHUNK_SIZE;
+            state = State.READ_CHUNK_SIZE;
         } else {
             String cl = headers.get(CONTENT_LENGTH);
             if (cl != null) {
@@ -197,15 +193,15 @@ public class ReqeustDecoder {
                     if (readRemaining > 0) {
                         throwIfBodyIsTooLarge(readRemaining);
                         content = new byte[readRemaining];
-                        state = READ_FIXED_LENGTH_CONTENT;
+                        state = State.READ_FIXED_LENGTH_CONTENT;
                     } else {
-                        state = ALL_READ;
+                        state = State.ALL_READ;
                     }
                 } catch (NumberFormatException e) {
-                    state = PROTOCOL_ERROR;
+                    state = State.PROTOCOL_ERROR;
                 }
             } else {
-                state = ALL_READ;
+                state = State.ALL_READ;
             }
         }
     }
@@ -238,7 +234,7 @@ public class ReqeustDecoder {
     }
 
     public void reset() {
-        state = READ_INITIAL;
+        state = State.READ_INITIAL;
         headers.clear();
         readContent = 0;
     }

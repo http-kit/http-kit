@@ -8,7 +8,6 @@ import static me.shenfeng.http.HttpUtils.CONTENT_LENGTH;
 import static me.shenfeng.http.HttpUtils.SELECT_TIMEOUT;
 import static me.shenfeng.http.HttpUtils.closeQuiety;
 import static me.shenfeng.http.HttpUtils.encodeResponseHeader;
-import static me.shenfeng.http.server.ServerDecoderState.ALL_READ;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -27,13 +26,16 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 import me.shenfeng.http.DynamicBytes;
 import me.shenfeng.http.ProtocolException;
+import me.shenfeng.http.server.ReqeustDecoder.State;
+import me.shenfeng.http.ws.WSFrame;
+import me.shenfeng.http.ws.WsCon;
+import me.shenfeng.http.ws.WsServerAtta;
 
 public class HttpServer {
 
     private static void doWrite(SelectionKey key) throws IOException {
         ServerAtta atta = (ServerAtta) key.attachment();
         SocketChannel ch = (SocketChannel) key.channel();
-        ReqeustDecoder decoder = atta.decoder;
 
         LinkedList<ByteBuffer> toWrites = atta.toWrites;
         synchronized (toWrites) {
@@ -52,8 +54,7 @@ public class HttpServer {
             }
             // all done
             if (toWrites.size() == 0) {
-                if (decoder.request.isKeepAlive()) {
-                    decoder.reset();
+                if (atta.isKeepAlive()) {
                     key.interestOps(OP_READ);
                 } else {
                     closeQuiety(ch);
@@ -130,7 +131,7 @@ public class HttpServer {
         SocketChannel s;
         while ((s = ch.accept()) != null) {
             s.configureBlocking(false);
-            s.register(selector, OP_READ, new ServerAtta(maxBody));
+            s.register(selector, OP_READ, new HttpServerAtta(maxBody));
         }
     }
 
@@ -141,8 +142,48 @@ public class HttpServer {
         InetSocketAddress addr = new InetSocketAddress(ip, port);
         serverChannel.socket().bind(addr);
         serverChannel.register(selector, OP_ACCEPT);
-        System.out.println(String.format(
-                "http server start %s@%d, max body: %d", ip, port, maxBody));
+        System.out.println(String.format("http server start %s@%d, max body: %d", ip, port,
+                maxBody));
+    }
+
+    private void decodeHttp(HttpServerAtta atta, SelectionKey key) {
+        SocketChannel ch = (SocketChannel) key.channel();
+        ReqeustDecoder decoder = atta.decoder;
+        try {
+            if (decoder.decode(buffer) == State.ALL_READ) {
+                HttpRequest request = decoder.request;
+                if (request.isWs()) {
+                    WsCon con = new WsCon(key, pendings);
+                    request.setWebSocketCon(con);
+                    key.attach(new WsServerAtta(con));
+                }
+                request.setRemoteAddr(ch.socket().getRemoteSocketAddress());
+                handler.handle(request, new ResponseCallback(pendings, key));
+            }
+        } catch (ProtocolException e) {
+            closeQuiety(ch);
+            // LineTooLargeException, RequestTooLargeException
+        } catch (Exception e) {
+            byte[] body = e.getMessage().getBytes(ASCII);
+            Map<String, Object> headers = new TreeMap<String, Object>();
+            headers.put(CONTENT_LENGTH, body.length);
+            DynamicBytes db = encodeResponseHeader(400, headers);
+            db.append(body, 0, body.length);
+            atta.addBuffer(ByteBuffer.wrap(db.get(), 0, db.length()));
+            key.interestOps(OP_WRITE);
+        }
+    }
+
+    private void decodeWs(WsServerAtta atta, SelectionKey key) {
+        try {
+            WSFrame frame = atta.decoder.decode(buffer);
+            if (frame != null) {
+                handler.handle(frame);
+                atta.reset();
+            }
+        } catch (ProtocolException e) {
+            e.printStackTrace();
+        }
     }
 
     private void doRead(final SelectionKey key) {
@@ -156,26 +197,14 @@ public class HttpServer {
                 closeQuiety(ch);
             } else if (read > 0) {
                 buffer.flip(); // flip for read
-                ReqeustDecoder decoder = atta.decoder;
-                if (decoder.decode(buffer) == ALL_READ) {
-                    HttpRequest request = decoder.request;
-                    request.setRemoteAddr(ch.socket().getRemoteSocketAddress());
-                    handler.handle(request, new Callback(pendings, key));
+                if (atta instanceof HttpServerAtta) {
+                    decodeHttp((HttpServerAtta) atta, key);
+                } else {
+                    decodeWs((WsServerAtta) atta, key);
                 }
             }
         } catch (IOException e) {
             closeQuiety(ch); // the remote forcibly closed the connection
-        } catch (ProtocolException e) {
-            closeQuiety(ch);
-            // LineTooLargeException, RequestTooLargeException
-        } catch (Exception e) {
-            byte[] body = e.getMessage().getBytes(ASCII);
-            Map<String, Object> headers = new TreeMap<String, Object>();
-            headers.put(CONTENT_LENGTH, body.length);
-            DynamicBytes db = encodeResponseHeader(400, headers);
-            db.append(body, 0, body.length);
-            atta.addBuffer(ByteBuffer.wrap(db.get(), 0, db.length()));
-            key.interestOps(OP_WRITE);
         }
     }
 

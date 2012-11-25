@@ -65,8 +65,18 @@
      :body (json-str [(on-message-received {:msg msg
                                             :author author})])}))
 
+(defonce ww (atom {}))
+
+(defwshandler chat-handler [req] con
+  (reset! ww con)
+  (clojure.pprint/pprint req)
+  (receive con (fn [msg]
+                 (println "recieved " msg)
+                 (write con (str "server echo: " msg)))))
+
 (defroutes chartrootm
   (GET "/poll" [] polling-message)
+  (GET "/ws" []  chat-handler)
   (POST "/msg" [] send-message)
   (files "")
   (not-found "<p>Page not found.</p>" ))

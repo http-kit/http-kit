@@ -1,15 +1,27 @@
 package me.shenfeng.http.server;
 
 import static clojure.lang.Keyword.intern;
+import static me.shenfeng.http.HttpUtils.ASCII;
+import static me.shenfeng.http.HttpUtils.UTF_8;
+import static me.shenfeng.http.HttpUtils.encodeResponseHeader;
+import static me.shenfeng.http.HttpUtils.readAll;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 
+import me.shenfeng.http.DynamicBytes;
+import me.shenfeng.http.HttpUtils;
 import clojure.lang.IPersistentMap;
+import clojure.lang.ISeq;
 import clojure.lang.Keyword;
 import clojure.lang.PersistentArrayMap;
+import clojure.lang.Seqable;
 
 public class ClojureRing {
 
@@ -26,6 +38,7 @@ public class ClojureRing {
     public static final Keyword CHARACTER_ENCODING = intern("character-encoding");
     public static final Keyword BODY = intern("body");
     public static final Keyword KEEP_ALIVE = intern("keep_alive");
+    public static final Keyword WEBSOCKET = intern("websocket");
 
     public static final Keyword M_GET = intern("get");
     public static final Keyword M_POST = intern("post");
@@ -47,6 +60,56 @@ public class ClojureRing {
         return status;
     }
 
+    public static ByteBuffer[] encode(int status, Map<String, Object> headers, Object body) {
+
+        if (headers != null) {
+            // copy to modify
+            headers = new TreeMap<String, Object>(headers);
+        } else {
+            headers = new TreeMap<String, Object>();
+        }
+        ByteBuffer bodyBuffer = null, headBuffer = null;
+        try {
+            if (body == null) {
+                headers.put(HttpUtils.CONTENT_LENGTH, "0");
+            } else if (body instanceof String) {
+                byte[] b = ((String) body).getBytes(UTF_8);
+                bodyBuffer = ByteBuffer.wrap(b);
+                headers.put(HttpUtils.CONTENT_LENGTH, Integer.toString(b.length));
+            } else if (body instanceof InputStream) {
+                DynamicBytes b = readAll((InputStream) body);
+                bodyBuffer = ByteBuffer.wrap(b.get(), 0, b.length());
+                headers.put(HttpUtils.CONTENT_LENGTH, Integer.toString(b.length()));
+            } else if (body instanceof File) {
+                File f = (File) body;
+                // serving file is better be done by nginx
+                byte[] b = readAll(f);
+                bodyBuffer = ByteBuffer.wrap(b);
+            } else if (body instanceof Seqable) {
+                ISeq seq = ((Seqable) body).seq();
+                DynamicBytes b = new DynamicBytes(seq.count() * 512);
+                while (seq != null) {
+                    b.append(seq.first().toString(), UTF_8);
+                    seq = seq.next();
+                }
+                bodyBuffer = ByteBuffer.wrap(b.get(), 0, b.length());
+                headers.put(HttpUtils.CONTENT_LENGTH, Integer.toString(b.length()));
+            } else {
+                throw new RuntimeException(body.getClass() + " is not understandable");
+            }
+        } catch (IOException e) {
+            byte[] b = e.getMessage().getBytes(ASCII);
+            status = 500;
+            headers.clear();
+            headers.put(HttpUtils.CONTENT_LENGTH, Integer.toString(b.length));
+            bodyBuffer = ByteBuffer.wrap(b);
+        }
+        DynamicBytes bytes = encodeResponseHeader(status, headers);
+        headBuffer = ByteBuffer.wrap(bytes.get(), 0, bytes.length());
+
+        return new ByteBuffer[] { headBuffer, bodyBuffer };
+    }
+
     public static IPersistentMap buildRequestMap(HttpRequest req) {
 
         Map<Object, Object> m = new TreeMap<Object, Object>();
@@ -56,6 +119,9 @@ public class ClojureRing {
         m.put(URI, req.getUri());
         m.put(QUERY_STRING, req.getQueryString());
         m.put(SCHEME, HTTP); // only http is supported
+        if(req.isWs()) {
+            m.put(WEBSOCKET, req.getWebSocketCon());
+        }
 
         switch (req.getMethod()) {
         case DELETE:

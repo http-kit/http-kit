@@ -22,9 +22,9 @@
   (let [handler (-> api-routes site)]
     (case server
       :netty
-      (run-netty handler {:port 9091 :worder 4}) ; 4 worker; threads
+      (run-netty handler {:port 9091 :worder 6}) ; 4 worker; threads
       :home
-      (run-server handler {:port 9091 :thread 4})
+      (run-server handler {:port 9091 :thread 6})
       :jetty
       (run-jetty handler {:port 9091 :join? false}))))
 
@@ -36,4 +36,3 @@
              ["--[no-]help" "Print this help"])]
     (when (:help options) (println banner) (System/exit 0))
     (start-server options)))
-
