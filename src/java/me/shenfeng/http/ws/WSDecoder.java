@@ -68,6 +68,8 @@ public class WSDecoder {
                     }
                     if (opcode == OPCODE_TEXT) {
                         return new TextFrame(finalFlag, content, con);
+                    } else if (opcode == OPCODE_PING) {
+                        return new PingFrame(finalFlag, content, con);
                     } else {
                         throw new RuntimeException("not impl now for opcode: " + opcode);
                     }

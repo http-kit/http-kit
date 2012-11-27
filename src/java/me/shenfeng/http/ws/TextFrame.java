@@ -14,5 +14,4 @@ public class TextFrame extends WSFrame {
     public String getText() {
         return msg;
     }
-
 }

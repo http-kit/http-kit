@@ -27,6 +27,10 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import me.shenfeng.http.DynamicBytes;
 import me.shenfeng.http.ProtocolException;
 import me.shenfeng.http.server.ReqeustDecoder.State;
+import me.shenfeng.http.ws.PingFrame;
+import me.shenfeng.http.ws.TextFrame;
+import me.shenfeng.http.ws.WSDecoder;
+import me.shenfeng.http.ws.WSEncoder;
 import me.shenfeng.http.ws.WSFrame;
 import me.shenfeng.http.ws.WsCon;
 import me.shenfeng.http.ws.WsServerAtta;
@@ -177,9 +181,13 @@ public class HttpServer {
     private void decodeWs(WsServerAtta atta, SelectionKey key) {
         try {
             WSFrame frame = atta.decoder.decode(buffer);
-            if (frame != null) {
+            if (frame instanceof TextFrame) {
                 handler.handle(frame);
                 atta.reset();
+            } else if (frame instanceof PingFrame) {
+                atta.addBuffer(WSEncoder.encode(WSDecoder.OPCODE_PONG, frame.data));
+                atta.reset();
+                key.interestOps(OP_WRITE);
             }
         } catch (ProtocolException e) {
             e.printStackTrace();
