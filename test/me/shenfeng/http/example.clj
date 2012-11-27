@@ -65,14 +65,10 @@
      :body (json-str [(on-message-received {:msg msg
                                             :author author})])}))
 
-(defonce ww (atom {}))
-
 (defwshandler chat-handler [req] con
-  (reset! ww con)
-  (clojure.pprint/pprint req)
   (receive con (fn [msg]
-                 (println "recieved " msg)
-                 (write con (str "server echo: " msg)))))
+                 ;; (info "recieved " (count msg))
+                 (write con msg))))
 
 (defroutes chartrootm
   (GET "/poll" [] polling-message)
@@ -87,6 +83,8 @@
   (when-not (nil? @server)
     (@server)
     (reset! server nil))
-  (reset! server (run-server (-> chartrootm site wrap-logging)
+  (reset! server (run-server chartrootm
+                             ;; (-> chartrootm site wrap-logging)
                              {:port 9898
-                              :thread 2})))
+                              :thread 6}))
+  (info "server started"))
