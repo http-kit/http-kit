@@ -79,7 +79,7 @@ run it:
 
 (defwshandler chat-handler [req] con
   (receive con (fn [msg]
-                  # echo back
+                 ;; just echo back
                  (write con msg))))
 
 (run-server chat-handler {:port 8080})
