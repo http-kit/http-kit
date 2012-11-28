@@ -1,7 +1,9 @@
 package me.shenfeng.http.ws;
 
+import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
+import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
@@ -38,5 +40,10 @@ public class WsCon {
     public WsCon(SelectionKey key, Queue<SelectionKey> pendings) {
         this.key = key;
         this.pendings = pendings;
+    }
+
+    public String toString() {
+        Socket s = ((SocketChannel) key.channel()).socket();
+        return "WsCon[" + s.getLocalSocketAddress() + "<->" + s.getRemoteSocketAddress();
     }
 }
