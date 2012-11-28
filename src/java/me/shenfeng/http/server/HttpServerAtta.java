@@ -8,7 +8,7 @@ public class HttpServerAtta extends ServerAtta {
     public final ReqeustDecoder decoder;
 
     public boolean isKeepAlive() {
-        return decoder.request.isKeepAlive();
+        return decoder.request != null && decoder.request.isKeepAlive();
     }
 
     public void reset() {

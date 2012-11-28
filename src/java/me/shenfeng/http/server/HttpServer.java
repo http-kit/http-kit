@@ -3,11 +3,8 @@ package me.shenfeng.http.server;
 import static java.nio.channels.SelectionKey.OP_ACCEPT;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
-import static me.shenfeng.http.HttpUtils.ASCII;
-import static me.shenfeng.http.HttpUtils.CONTENT_LENGTH;
 import static me.shenfeng.http.HttpUtils.SELECT_TIMEOUT;
 import static me.shenfeng.http.HttpUtils.closeQuiety;
-import static me.shenfeng.http.HttpUtils.encodeResponseHeader;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -19,12 +16,9 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
 import java.util.LinkedList;
-import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-import me.shenfeng.http.DynamicBytes;
 import me.shenfeng.http.ProtocolException;
 import me.shenfeng.http.server.ReqeustDecoder.State;
 import me.shenfeng.http.ws.PingFrame;
@@ -37,41 +31,44 @@ import me.shenfeng.http.ws.WsServerAtta;
 
 public class HttpServer {
 
-    private static void doWrite(SelectionKey key) throws IOException {
+    private static void doWrite(SelectionKey key) {
         ServerAtta atta = (ServerAtta) key.attachment();
         SocketChannel ch = (SocketChannel) key.channel();
-
-        LinkedList<ByteBuffer> toWrites = atta.toWrites;
-        synchronized (toWrites) {
-            if (toWrites.size() == 1) {
-                ch.write(toWrites.get(0));
-            } else {
-                ByteBuffer buffers[] = new ByteBuffer[toWrites.size()];
-                toWrites.toArray(buffers);
-                ch.write(buffers);
-            }
-            Iterator<ByteBuffer> ite = toWrites.iterator();
-            while (ite.hasNext()) {
-                if (!ite.next().hasRemaining()) {
-                    ite.remove();
-                }
-            }
-            // all done
-            if (toWrites.size() == 0) {
-                if (atta.isKeepAlive()) {
-                    key.interestOps(OP_READ);
+        try {
+            LinkedList<ByteBuffer> toWrites = atta.toWrites;
+            synchronized (toWrites) {
+                if (toWrites.size() == 1) {
+                    ch.write(toWrites.get(0));
                 } else {
-                    closeQuiety(ch);
+                    ByteBuffer buffers[] = new ByteBuffer[toWrites.size()];
+                    toWrites.toArray(buffers);
+                    ch.write(buffers);
+                }
+                Iterator<ByteBuffer> ite = toWrites.iterator();
+                while (ite.hasNext()) {
+                    if (!ite.next().hasRemaining()) {
+                        ite.remove();
+                    }
+                }
+                // all done
+                if (toWrites.size() == 0) {
+                    if (atta.isKeepAlive()) {
+                        key.interestOps(OP_READ);
+                    } else {
+                        closeQuiety(ch);
+                    }
                 }
             }
+        } catch (IOException e) {
+            closeQuiety(ch); // the remote forcibly closed the connection
         }
     }
 
-    private IHandler handler;
-    private int port;
+    private final IHandler handler;
+    private final int port;
     private final int maxBody;
     private final int maxLine;
-    private String ip;
+    private final String ip;
     private Selector selector;
     private Thread serverThread;
     private ServerSocketChannel serverChannel;
@@ -118,9 +115,10 @@ public class HttpServer {
                     if (key != null) {
                         closeQuiety(key.channel());
                     }
+                    // should not happen
                     e.printStackTrace();
                 }
-            } // end of while loop
+            }
         }
     };
 
@@ -152,8 +150,7 @@ public class HttpServer {
                 maxBody));
     }
 
-    private void decodeHttp(HttpServerAtta atta, SelectionKey key) {
-        SocketChannel ch = (SocketChannel) key.channel();
+    private void decodeHttp(HttpServerAtta atta, SelectionKey key, SocketChannel ch) {
         ReqeustDecoder decoder = atta.decoder;
         try {
             if (decoder.decode(buffer) == State.ALL_READ) {
@@ -170,17 +167,13 @@ public class HttpServer {
             closeQuiety(ch);
             // LineTooLargeException, RequestTooLargeException
         } catch (Exception e) {
-            byte[] body = e.getMessage().getBytes(ASCII);
-            Map<String, Object> headers = new TreeMap<String, Object>();
-            headers.put(CONTENT_LENGTH, body.length);
-            DynamicBytes db = encodeResponseHeader(400, headers);
-            db.append(body, 0, body.length);
-            atta.addBuffer(ByteBuffer.wrap(db.get(), 0, db.length()));
+            ByteBuffer[] buffers = ClojureRing.encode(400, null, e.getMessage());
+            atta.addBuffer(buffers);
             key.interestOps(OP_WRITE);
         }
     }
 
-    private void decodeWs(WsServerAtta atta, SelectionKey key) {
+    private void decodeWs(WsServerAtta atta, SelectionKey key, SocketChannel ch) {
         try {
             WSFrame frame = atta.decoder.decode(buffer);
             if (frame instanceof TextFrame) {
@@ -192,12 +185,12 @@ public class HttpServer {
                 key.interestOps(OP_WRITE);
             }
         } catch (ProtocolException e) {
-            e.printStackTrace();
+            // TODO error msg
+            closeQuiety(ch);
         }
     }
 
     private void doRead(final SelectionKey key) {
-        final ServerAtta atta = (ServerAtta) key.attachment();
         SocketChannel ch = (SocketChannel) key.channel();
         try {
             buffer.clear(); // clear for read
@@ -207,10 +200,11 @@ public class HttpServer {
                 closeQuiety(ch);
             } else if (read > 0) {
                 buffer.flip(); // flip for read
+                final ServerAtta atta = (ServerAtta) key.attachment();
                 if (atta instanceof HttpServerAtta) {
-                    decodeHttp((HttpServerAtta) atta, key);
+                    decodeHttp((HttpServerAtta) atta, key, ch);
                 } else {
-                    decodeWs((WsServerAtta) atta, key);
+                    decodeWs((WsServerAtta) atta, key, ch);
                 }
             }
         } catch (IOException e) {

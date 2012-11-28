@@ -47,6 +47,7 @@ public class WSDecoder {
                     payloadLength = (int) buffer.getLong(); // long is large
                 }
 
+                // TODO max length
                 content = new byte[payloadLength];
                 if (!masked) {
                     throw new ProtocolException("unmasked client to server frame");
@@ -74,8 +75,6 @@ public class WSDecoder {
                         throw new RuntimeException("not impl now for opcode: " + opcode);
                     }
                 }
-                break;
-            default:
                 break;
             }
         }
