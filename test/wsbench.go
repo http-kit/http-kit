@@ -20,6 +20,10 @@ var total = flag.Int("n", 4000000, "total request")
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	rand.Seed(time.Now().UnixNano())
+	flag.Parse()
+
+	log.Printf("c: %v, n: %v", *concurrency, *total)
 
 	chTotal := make(chan int, 10)
 	chConcurrency := make(chan int, *concurrency)
@@ -32,7 +36,7 @@ func main() {
 			t += v
 			if t > *total {
 				d := time.Since(start).Seconds()
-				log.Printf("exit, total %d, per seconds %v", *total, float64(*total) / d)
+				log.Printf("exit, total %d, per seconds %v", *total, float64(*total)/d)
 				syscall.Exit(0)
 			}
 		}
@@ -45,7 +49,7 @@ func main() {
 }
 
 func bench(conc chan int, total chan int) {
-	count := rand.Intn(10000) + 2000
+	count := rand.Intn(10000) + 1000
 	ws, err := websocket.Dial(wsurl, "", origin)
 	if err != nil {
 		log.Fatal(err)
@@ -72,7 +76,8 @@ func bench(conc chan int, total chan int) {
 			// log.Printf("received %d", n)
 		}
 	}
-	<-conc         //  allow others to run
 	total <- count // let other gorutine compute total
-	log.Printf("finished %d\n", count)
+
+	//  allow others to run
+	log.Printf("%d finished %d\n", <-conc, count)
 }

@@ -27,6 +27,7 @@ public class RingHandler implements IHandler {
         PrefixThreafFactory factory = new PrefixThreafFactory("worker-");
         // max pending request: 386
         BlockingQueue<Runnable> queue = new ArrayBlockingQueue<Runnable>(386);
+        // TODO RejectedExecutionHandler
         execs = new ThreadPoolExecutor(thread, thread, 0, TimeUnit.MILLISECONDS, queue, factory);
         this.handler = handler;
     }

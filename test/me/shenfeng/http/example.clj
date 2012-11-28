@@ -83,7 +83,7 @@
   (when-not (nil? @server)
     (@server)
     (reset! server nil))
-  (reset! server (run-server chartrootm
+  (reset! server (run-server (site chartrootm)
                              ;; (-> chartrootm site wrap-logging)
                              {:port 9898
                               :thread 6}))
