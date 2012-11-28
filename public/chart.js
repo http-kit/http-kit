@@ -1,9 +1,8 @@
 (function () {
-
   var $i = $('#i'),
       $history = $('#history');
 
-  var id = 1;
+  var max_id = 1;
 
   function add_msg (msg) {
 
@@ -24,19 +23,8 @@
         author = $.trim($('#name').val() || 'anonymous');
     if(msg) {
       $.post("/msg", {msg: msg, author: author}, function (resp) {
-        handle_msgs(resp);
         $i.val('');
       });
-    }
-  }
-
-  function handle_msgs (msgs) {
-    for(var i = 0; i < msgs.length; i++) {
-      var msg = msgs[i];
-      if(msg.id > id) {
-        add_msg(msg);
-        id = msg.id;
-      }
     }
   }
 
@@ -49,8 +37,14 @@
   });
 
   (function polling_msgs () {
-    $.get('/poll?id=' + id, function (resp) {
-      handle_msgs(resp);
+    $.get('/poll?id=' + max_id, function (msgs) {
+      for(var i = 0; i < msgs.length; i++) {
+        var msg = msgs[i];
+        if(msg.id > max_id) {
+          add_msg(msg);
+          max_id = msg.id;
+        }
+      }
       polling_msgs();
     });
   })();

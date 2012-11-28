@@ -1,10 +1,10 @@
 #!/bin/bash
-
 rm -rf classes
 mkdir classes
 
 find src/java -name "*.java" | xargs javac -g -Xlint:unchecked -encoding utf8 -cp "classes:lib/*:src/" -d classes -sourcepath src/java/
 
 java -cp "$(lein classpath)" \
-    -Xdebug -Xrunjdwp:transport=dt_socket,address=9092,server=y,suspend=n \
-    clojure.main -m me.shenfeng.http.example
+    clojure.main -m me.shenfeng.http.long-polling
+
+    # -Xdebug -Xrunjdwp:transport=dt_socket,address=9092,server=y,suspend=n \
