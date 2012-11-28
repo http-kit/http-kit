@@ -1,0 +1,88 @@
+html, body {
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background: #F6F6F6 url("/bg-content.png") repeat center top;
+}
+
+
+#i {
+    width: 400px;
+    padding: 5px 3px;
+    font-size: 14px;
+}
+
+#name {
+    width: 100px;
+    font-size: 14px;
+    padding: 5px 3px;
+    margin-right: 20px;
+}
+
+#links {
+    position: absolute;
+    right: 30px;
+    bottom: 10px;
+/* position: fixed; */
+/* width: 900px; */
+/* margin: 0 auto; */
+}
+
+a {
+    color: #369;
+    text-decoration: none;
+}
+
+a:hover {
+    padding: 2px;
+    color: white;
+    text-decoration: none;
+    background: #039;
+}
+
+#links li {
+    list-style: none;
+    float: right;
+}
+
+.author {
+    font-size: 13px;
+    color: #333;
+}
+
+#history-wrap {
+    overflow-y: auto;
+    height: 500px;
+    box-shadow: 0 0 4px #bbb;
+    margin-bottom: 20px;
+}
+
+#history {
+    margin: 0;
+    padding: 0;
+/* border: 1px solid #ccc; */
+}
+
+#history li {
+    list-style: none;
+    padding: 7px;
+    border-bottom: 1px solid #eee;
+}
+
+.time {
+    color: #666;
+    font-size: 12px;
+    float: right;
+    padding-right: 20px;
+}
+
+#page-wrap {
+    margin: 0 auto;
+    background: white;
+    width: 900px;
+    position: relative;
+    height: 800px;
+    padding: 30px;
+}

@@ -51,23 +51,3 @@
 
   $i.focus();
 })();
-
-
-var conn;
-
-function open_con () {
-  conn = new WebSocket("ws://127.0.0.1:9898/ws");
-
-  conn.onopen = function (e) {
-    console.log("open", e);
-    conn.send("1234567890");
-  };
-
-  conn.onclose = function (e) {
-    // console.log("close", e);
-  };
-  conn.onmessage = function (e) {
-    console.log("message", e.data, e);
-    // add_msg(e.data);
-  };
-}

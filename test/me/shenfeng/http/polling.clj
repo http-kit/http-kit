@@ -1,4 +1,4 @@
-(ns me.shenfeng.http.long-polling
+(ns me.shenfeng.http.polling
   (:use me.shenfeng.http.server
         [ring.middleware.file-info :only [wrap-file-info]]
         [clojure.tools.logging :only [info]]
@@ -50,6 +50,7 @@
 (defn on-mesg-received [req]
   (let [{:keys [msg author]} (-> req :params)
         data {:msg msg :author author :time (now) :id (swap! current-max-id inc)}]
+    (info "mesg received: " msg)
     (swap! all-msgs conj data)
     (doseq [client (keys @clients)]
       (send-pending-msgs client)
@@ -64,7 +65,7 @@
   (GET "/poll" [] poll-mesg)
   (GET "/ws" []  chat-handler)
   (POST "/msg" [] on-mesg-received)
-  (files "")
+  (files "" {:root "examples/polling"})
   (not-found "<p>Page not found.</p>" ))
 
 (defonce server (atom nil))
@@ -73,8 +74,6 @@
   (when-not (nil? @server)
     (@server)
     (reset! server nil))
-  (reset! server (run-server (site chartrootm)
-                             ;; (-> chartrootm site wrap-request-logging)
-                             {:port 9898
-                              :thread 6}))
+  (reset! server (run-server (-> chartrootm site wrap-request-logging)
+                             {:port 9898 :thread 6}))
   (info "server started"))

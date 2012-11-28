@@ -64,13 +64,13 @@ I write it for the HTTP server and HTTP client of
 
 (run-server async {:port 8080})
 ```
-These is a simple live chartroom as an example of defasync:
-[example.clj](https://github.com/shenfeng/http-kit/blob/master/test/me/shenfeng/http/long-polling.clj)
+These is a live chartroom as an example:
+[polling.clj](https://github.com/shenfeng/http-kit/blob/master/test/me/shenfeng/http/polling.clj)
 
 run it:
 
 ```sh
-./scripts/long-polling # try open two browser tab, view it on http://127.0.0.1:9898/
+./scripts/polling # try open two browser tab, view it on http://127.0.0.1:9898/
 ```
 
 #### Websocket [version 13, rfc rfc6455]
@@ -83,6 +83,16 @@ run it:
                  (write con msg))))
 
 (run-server chat-handler {:port 8080})
+
+```
+
+These is a live chartroom as an example:
+[websocket.clj](https://github.com/shenfeng/http-kit/blob/master/test/me/shenfeng/http/websocket.clj)
+
+run it:
+
+```sh
+./scripts/websocket # try open two browser tab, view it on http://127.0.0.1:9899/
 ```
 
 ### HTTP Client
