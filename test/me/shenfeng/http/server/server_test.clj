@@ -1,6 +1,5 @@
 (ns me.shenfeng.http.server.server-test
   (:use clojure.test
-        clojure.pprint
         ring.middleware.file-info
         (compojure [core :only [defroutes GET POST HEAD DELETE ANY context]]
                    [handler :only [site]]

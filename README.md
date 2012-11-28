@@ -34,7 +34,7 @@ I write it for the HTTP server and HTTP client of
 
 ### HTTP Server
 ```clj
-[me.shenfeng/http-kit "1.1.1"]
+[me.shenfeng/http-kit "1.1.4"]
 
 (:use me.shenfeng.http.server)          ; export run-server and defasync
 
@@ -71,6 +71,18 @@ run it:
 
 ```sh
 ./scripts/example # try open two browser tab, view it on http://127.0.0.1:9898/
+```
+
+#### Websocket [version 13, rfc rfc6455]
+```clj
+(:use me.shenfeng.http.server)
+
+(defwshandler chat-handler [req] con
+  (receive con (fn [msg]
+                  # echo back
+                 (write con msg))))
+
+(run-server chat-handler {:port 8080})
 ```
 
 ### HTTP Client
