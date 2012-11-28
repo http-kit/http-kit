@@ -13,7 +13,7 @@ I also add an
 [async extension](https://github.com/shenfeng/http-kit/blob/master/src/java/me/shenfeng/http/server/IListenableFuture.java)
 to the ring SPEC. The unit test has sample usage.
 
-## Why
+## Motivation
 
 I write it for the HTTP server and HTTP client of
 [Rssminer](http://rssminer.net)
@@ -51,7 +51,7 @@ I write it for the HTTP server and HTTP client of
 
 ```
 
-#### Async extension example
+#### Async extension [long polling]
 ```clj
 (:use me.shenfeng.http.server)
 
@@ -73,7 +73,7 @@ run it:
 ./scripts/polling # try open two browser tab, view it on http://127.0.0.1:9898/
 ```
 
-#### Websocket [version 13, rfc rfc6455]
+#### Websocket [version 13, rfc 6455]
 ```clj
 (:use me.shenfeng.http.server)
 
