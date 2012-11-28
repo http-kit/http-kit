@@ -4,12 +4,13 @@
            javax.xml.bind.DatatypeConverter
            java.security.MessageDigest))
 
-(defn run-server [handler {:keys [port thread ip max-body] :as options
-                           :or {ip "0.0.0.0" port 8090
-                                thread 2 max-body 20480}}]
+(defn run-server [handler {:keys [port thread ip max-body max-line]
+                           :or {ip "0.0.0.0" port 8090 thread 2
+                                max-body 20480 max-line 2048}}]
   (let [h (RingHandler. thread handler)
-        s (HttpServer. ip port h max-body)]
+        s (HttpServer. ip port h max-body max-line)]
     (.start s)
+    ;; return a function to stop this server
     (fn [] (.close h) (.stop s))))
 
 (defmacro defasync [name [req] cb & body]

@@ -31,13 +31,16 @@ public class SingleThreadHttpServerTest {
     public static void main(String[] args) throws IOException {
         // concurrency 1024, 2000000 request, time: 16545ms; 120882.44 req/s;
         // receive: 93M data; 5.62 M/s
-        HttpServer server = new HttpServer("0.0.0.0", 9091, new SingleThreadHandler(), 20480);
+        HttpServer server = new HttpServer("0.0.0.0", 9091, new SingleThreadHandler(), 20480,
+                2048);
         server.start();
-        
+
         // 2012/11/28
         // ab -k -n 2000000 -c 1000 http://127.0.0.1:9091/
-        // 37341.30 req/s  
-        // concurrency 1024, 2000000 request, time: 52086ms; 38398.03 req/s; receive: 27317M data; 524.46 M/s
-        // concurrency 1024, 2000000 request, time: 17340ms; 115340.25 req/s; receive: 139M data; 8.02 M/s
+        // 37341.30 req/s
+        // concurrency 1024, 2000000 request, time: 52086ms; 38398.03 req/s;
+        // receive: 27317M data; 524.46 M/s
+        // concurrency 1024, 2000000 request, time: 17340ms; 115340.25 req/s;
+        // receive: 139M data; 8.02 M/s
     }
 }

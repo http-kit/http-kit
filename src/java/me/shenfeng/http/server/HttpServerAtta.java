@@ -1,8 +1,8 @@
 package me.shenfeng.http.server;
 
 public class HttpServerAtta extends ServerAtta {
-    public HttpServerAtta(int maxBody) {
-        decoder = new ReqeustDecoder(maxBody);
+    public HttpServerAtta(int maxBody, int maxLine) {
+        decoder = new ReqeustDecoder(maxBody, maxLine);
     }
 
     public final ReqeustDecoder decoder;

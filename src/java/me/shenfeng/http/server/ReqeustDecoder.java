@@ -12,7 +12,6 @@ import static me.shenfeng.http.HttpUtils.getChunkSize;
 import static me.shenfeng.http.HttpVersion.HTTP_1_0;
 import static me.shenfeng.http.HttpVersion.HTTP_1_1;
 
-
 import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.TreeMap;
@@ -25,27 +24,27 @@ import me.shenfeng.http.ProtocolException;
 import me.shenfeng.http.RequestTooLargeException;
 
 public class ReqeustDecoder {
-    
+
     public enum State {
         PROTOCOL_ERROR, ALL_READ, READ_INITIAL, READ_HEADER, READ_FIXED_LENGTH_CONTENT, READ_CHUNK_SIZE, READ_CHUNKED_CONTENT, READ_CHUNK_FOOTER, READ_CHUNK_DELIMITER,
     }
 
     static final int MAX_LINE = 2048;
 
-    byte[] lineBuffer = new byte[MAX_LINE];
     int lineBufferCnt = 0;
 
     HttpRequest request;
-    private Map<String, String> headers = new TreeMap<String, String>();
     int readRemaining = 0;
-    private State state;
     byte[] content;
     int readContent = 0;
-    private int maxBody;
+    private final Map<String, String> headers = new TreeMap<String, String>();
+    private final int maxBody;
+    private State state = State.READ_INITIAL;
+    private final byte[] lineBuffer;
 
-    public ReqeustDecoder(int maxBody) {
+    public ReqeustDecoder(int maxBody, int maxLine) {
         this.maxBody = maxBody;
-        state = State.READ_INITIAL;
+        this.lineBuffer = new byte[maxLine];
     }
 
     private void createRequest(String sb) throws ProtocolException {
@@ -81,15 +80,13 @@ public class ReqeustDecoder {
             if ("HTTP/1.0".equals(sb.substring(cStart, cEnd))) {
                 version = HTTP_1_0;
             }
-            request = new HttpRequest(method, sb.substring(bStart, bEnd),
-                    version);
+            request = new HttpRequest(method, sb.substring(bStart, bEnd), version);
         } else {
             throw new ProtocolException("not http?");
         }
     }
 
-    public State decode(ByteBuffer buffer)
-            throws LineTooLargeException, ProtocolException,
+    public State decode(ByteBuffer buffer) throws LineTooLargeException, ProtocolException,
             RequestTooLargeException {
         String line;
         while (buffer.hasRemaining() && state != State.ALL_READ) {
@@ -217,9 +214,8 @@ public class ReqeustDecoder {
             } else if (b == LF) {
                 more = false;
             } else {
-                if (lineBufferCnt == MAX_LINE - 2) {
-                    throw new LineTooLargeException("line length exceed "
-                            + MAX_LINE);
+                if (lineBufferCnt == lineBuffer.length - 2) {
+                    throw new LineTooLargeException("line length exceed " + MAX_LINE);
                 }
                 lineBuffer[lineBufferCnt] = b;
                 ++lineBufferCnt;
@@ -239,11 +235,10 @@ public class ReqeustDecoder {
         readContent = 0;
     }
 
-    private void throwIfBodyIsTooLarge(int body)
-            throws RequestTooLargeException {
+    private void throwIfBodyIsTooLarge(int body) throws RequestTooLargeException {
         if (body > maxBody) {
-            throw new RequestTooLargeException("request body " + body
-                    + "; max request body " + maxBody);
+            throw new RequestTooLargeException("request body " + body + "; max request body "
+                    + maxBody);
         }
     }
 }

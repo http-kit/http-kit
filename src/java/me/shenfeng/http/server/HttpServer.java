@@ -70,6 +70,7 @@ public class HttpServer {
     private IHandler handler;
     private int port;
     private final int maxBody;
+    private final int maxLine;
     private String ip;
     private Selector selector;
     private Thread serverThread;
@@ -123,10 +124,11 @@ public class HttpServer {
         }
     };
 
-    public HttpServer(String ip, int port, IHandler handler, int maxBody) {
+    public HttpServer(String ip, int port, IHandler handler, int maxBody, int maxLine) {
         this.handler = handler;
         this.ip = ip;
         this.port = port;
+        this.maxLine = maxLine;
         this.maxBody = maxBody;
     }
 
@@ -135,7 +137,7 @@ public class HttpServer {
         SocketChannel s;
         while ((s = ch.accept()) != null) {
             s.configureBlocking(false);
-            s.register(selector, OP_READ, new HttpServerAtta(maxBody));
+            s.register(selector, OP_READ, new HttpServerAtta(maxBody, maxLine));
         }
     }
 

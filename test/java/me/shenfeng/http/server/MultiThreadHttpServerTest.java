@@ -40,7 +40,8 @@ class MultiThreadHandler implements IHandler {
 
 public class MultiThreadHttpServerTest {
     public static void main(String[] args) throws IOException {
-        HttpServer server = new HttpServer("0.0.0.0", 9091, new MultiThreadHandler(), 20480);
+        HttpServer server = new HttpServer("0.0.0.0", 9091, new MultiThreadHandler(), 20480,
+                2048);
         server.start();
     }
 }
