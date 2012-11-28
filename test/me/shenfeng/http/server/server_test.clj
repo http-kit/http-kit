@@ -68,6 +68,10 @@
 (defasync test-async-just-body [req] cb
   (cb "just-body"))
 
+(defwshandler ws-handler [req] con
+  (receive con (fn [msg]
+                 (write con msg))))
+
 (defonce tmp-server (atom nil))
 
 (defn -main [& args]
@@ -98,6 +102,7 @@
                      {:status  200
                       :body async-body}))
   (GET "/async2" [] test-async)
+  (GET "/ws" [] ws-handler)
   (GET "/just-body" [] test-async-just-body))
 
 (use-fixtures :once (fn [f]
@@ -155,3 +160,12 @@
     (is (= (:status resp) 200))
     (is (:headers resp))
     (is (= (:body resp) "just-body"))))
+
+;; (deftest test-ws
+;;   (let [resp (http/get "http://localhost:4347/ws"
+;;                        {:headers {"Sec-WebSocket-Key" "x3JJHMbDL1EzLkh9GBhXDw=="
+;;                                   "Upgrade" "websocket"
+;;                                   "Connection" "Upgrade"}})]
+;;     (is (= (:status resp) 101))
+;;     (is (:headers resp))
+;;     (is (= (:body resp) nil))))
