@@ -1,4 +1,4 @@
-(defproject me.shenfeng/http-kit "1.1.4"
+(defproject me.shenfeng/http-kit "1.1.5"
   :description "Event driven HTTP server and HTTP client in java and clojure, only depend on JDK."
   :dependencies [[org.clojure/clojure "1.4.0"]]
   :warn-on-reflection true
