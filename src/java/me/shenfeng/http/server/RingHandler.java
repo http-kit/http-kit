@@ -15,8 +15,10 @@ import java.util.concurrent.TimeUnit;
 
 import me.shenfeng.http.HttpUtils;
 import me.shenfeng.http.PrefixThreafFactory;
+import me.shenfeng.http.ws.CloseFrame;
 import me.shenfeng.http.ws.TextFrame;
 import me.shenfeng.http.ws.WSFrame;
+import me.shenfeng.http.ws.WsCon;
 import clojure.lang.IFn;
 
 public class RingHandler implements IHandler {
@@ -79,12 +81,14 @@ public class RingHandler implements IHandler {
         execs.shutdownNow();
     }
 
-    public void handle(final WSFrame frame) {
+    public void handle(final WsCon con, final WSFrame frame) {
         execs.submit(new Runnable() {
             public void run() {
                 try {
                     if (frame instanceof TextFrame) {
-                        frame.wsCon.onText(((TextFrame) frame).getText());
+                        con.messageRecieved(((TextFrame) frame).getText());
+                    } else if(frame instanceof CloseFrame) {
+                        con.clientClosed(((CloseFrame) frame).getStatus());
                     }
                 } catch (Throwable e) {
                     HttpUtils.printError("handle websocket frame " + frame, e);

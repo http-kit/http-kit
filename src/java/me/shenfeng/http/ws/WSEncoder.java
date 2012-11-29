@@ -5,7 +5,6 @@ import java.nio.ByteBuffer;
 import me.shenfeng.http.HttpUtils;
 
 public class WSEncoder {
-
     public static final ByteBuffer encode(byte opcode, byte[] data) {
         byte b0 = 0;
         b0 |= 1 << 7; // FIN

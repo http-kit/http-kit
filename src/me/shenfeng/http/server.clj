@@ -4,6 +4,12 @@
            javax.xml.bind.DatatypeConverter
            java.security.MessageDigest))
 
+(defn accept [key]
+  (let [md (MessageDigest/getInstance "SHA1")
+        websocket-13-guid "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"]
+    (DatatypeConverter/printBase64Binary
+     (.digest md (.getBytes ^String (str key websocket-13-guid))))))
+
 (defn run-server [handler {:keys [port thread ip max-body max-line]
                            :or {ip "0.0.0.0" port 8090 thread 2
                                 max-body 20480 max-line 2048}}]
@@ -31,17 +37,17 @@
                 (get [this#]
                   (:r @data#))))}))
 
-(defn accept [key]
-  (let [md (MessageDigest/getInstance "SHA1")
-        websocket-13-guid "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"]
-    (DatatypeConverter/printBase64Binary
-     (.digest md (.getBytes ^String (str key websocket-13-guid))))))
+(defn on-msg [^WsCon con fn]
+  (.addRecieveListener con fn))
 
-(defn receive [^WsCon con fn]
-  (.addListener con fn))
+(defn send-msg [^WsCon con msg] (.send con msg))
 
-(defn write [^WsCon con msg]
-  (.send con msg))
+(defn on-close [^WsCon con fn]
+  (.addOnCloseListener con fn))
+
+(defn close-conn
+  ([con] (.serverClose ^WsCon con))
+  ([con status] (.serverClose ^WsCon con status)))
 
 (defmacro defwshandler [name [req] con & body]
   `(defn ~name [~req]

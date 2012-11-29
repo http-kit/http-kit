@@ -57,13 +57,8 @@
       (swap! clients dissoc client))
     {:status 200 :headers {}}))
 
-(defwshandler chat-handler [req] con
-  (receive con (fn [msg]
-                 (write con msg))))
-
 (defroutes chartrootm
   (GET "/poll" [] poll-mesg)
-  (GET "/ws" []  chat-handler)
   (POST "/msg" [] on-mesg-received)
   (files "" {:root "examples/polling"})
   (not-found "<p>Page not found.</p>" ))

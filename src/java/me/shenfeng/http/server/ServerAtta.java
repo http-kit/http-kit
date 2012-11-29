@@ -5,7 +5,13 @@ import java.util.LinkedList;
 
 public abstract class ServerAtta {
     public final LinkedList<ByteBuffer> toWrites = new LinkedList<ByteBuffer>();
-
+    
+    public boolean hasPendingWrite() {
+        synchronized (toWrites) {
+            return toWrites.size() == 0;
+        }
+    }
+    
     public void addBuffer(ByteBuffer... buffer) {
         synchronized (toWrites) {
             for (ByteBuffer b : buffer) {

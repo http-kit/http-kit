@@ -6,8 +6,8 @@ public class TextFrame extends WSFrame {
 
     private final String msg;
 
-    public TextFrame(boolean finalFrame, byte[] data, WsCon con) {
-        super(finalFrame, data, con);
+    public TextFrame(boolean finalFrame, byte[] data) {
+        super(finalFrame, data);
         this.msg = new String(data, HttpUtils.UTF_8);
     }
 

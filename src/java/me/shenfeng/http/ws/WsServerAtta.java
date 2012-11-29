@@ -4,11 +4,14 @@ import me.shenfeng.http.server.ServerAtta;
 
 public class WsServerAtta extends ServerAtta {
 
-    public WSDecoder decoder;
-    boolean closeOnfinish = false;
+    final public WSDecoder decoder;
+    // may write from another thread
+    public volatile boolean closeOnfinish = false;
+    final public WsCon con;
 
     public WsServerAtta(WsCon con) {
-        this.decoder = new WSDecoder(con);
+        this.decoder = new WSDecoder();
+        this.con = con;
     }
 
     public boolean isKeepAlive() {

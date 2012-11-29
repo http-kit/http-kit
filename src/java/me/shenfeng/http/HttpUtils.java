@@ -3,13 +3,10 @@ package me.shenfeng.http;
 import static java.lang.Character.isWhitespace;
 import static java.net.InetAddress.getByName;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStreamWriter;
-import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.InetAddress;

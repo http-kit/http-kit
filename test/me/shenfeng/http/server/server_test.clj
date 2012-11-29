@@ -69,8 +69,8 @@
   (cb "just-body"))
 
 (defwshandler ws-handler [req] con
-  (receive con (fn [msg]
-                 (write con msg))))
+  (on-msg con (fn [msg]
+                (send-msg con msg))))
 
 (defonce tmp-server (atom nil))
 

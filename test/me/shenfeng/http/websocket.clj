@@ -37,14 +37,16 @@
     (let [data (merge data {:time (now) :id (swap! current-max-id inc)})]
       (swap! all-msgs conj data)))
   (doseq [client (keys @clients)]
-    (write client (json-str (get-msgs (@clients client))))))
+    (send-msg client (json-str (get-msgs (@clients client))))))
 
 (defwshandler chat-handler [req] con
   (info con "connected")
   (swap! clients assoc con 1)
   ;; (write con (json-str (get-msgs 1)))
-  (receive con (fn [msg]
-                 (on-mesg-received (read-json msg)))))
+  (on-msg con (fn [msg]
+                (on-mesg-received (read-json msg))))
+  (on-close con (fn [status]
+                  (info con "closed, status" status))))
 
 (defroutes chartrootm
   (GET "/ws" []  chat-handler)

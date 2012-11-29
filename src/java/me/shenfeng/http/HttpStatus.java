@@ -22,8 +22,7 @@ public class HttpStatus {
     /**
      * 102 Processing (WebDAV, RFC2518)
      */
-    public static final HttpStatus PROCESSING = new HttpStatus(102,
-            "Processing");
+    public static final HttpStatus PROCESSING = new HttpStatus(102, "Processing");
 
     /**
      * 200 OK
@@ -43,44 +42,38 @@ public class HttpStatus {
     /**
      * 203 Non-Authoritative Information (since HTTP/1.1)
      */
-    public static final HttpStatus NON_AUTHORITATIVE_INFORMATION = new HttpStatus(
-            203, "Non-Authoritative Information");
+    public static final HttpStatus NON_AUTHORITATIVE_INFORMATION = new HttpStatus(203,
+            "Non-Authoritative Information");
 
     /**
      * 204 No Content
      */
-    public static final HttpStatus NO_CONTENT = new HttpStatus(204,
-            "No Content");
+    public static final HttpStatus NO_CONTENT = new HttpStatus(204, "No Content");
 
     /**
      * 205 Reset Content
      */
-    public static final HttpStatus RESET_CONTENT = new HttpStatus(205,
-            "Reset Content");
+    public static final HttpStatus RESET_CONTENT = new HttpStatus(205, "Reset Content");
 
     /**
      * 206 Partial Content
      */
-    public static final HttpStatus PARTIAL_CONTENT = new HttpStatus(206,
-            "Partial Content");
+    public static final HttpStatus PARTIAL_CONTENT = new HttpStatus(206, "Partial Content");
 
     /**
      * 207 Multi-Status (WebDAV, RFC2518)
      */
-    public static final HttpStatus MULTI_STATUS = new HttpStatus(207,
-            "Multi-Status");
+    public static final HttpStatus MULTI_STATUS = new HttpStatus(207, "Multi-Status");
 
     /**
      * 300 Multiple Choices
      */
-    public static final HttpStatus MULTIPLE_CHOICES = new HttpStatus(300,
-            "Multiple Choices");
+    public static final HttpStatus MULTIPLE_CHOICES = new HttpStatus(300, "Multiple Choices");
 
     /**
      * 301 Moved Permanently
      */
-    public static final HttpStatus MOVED_PERMANENTLY = new HttpStatus(301,
-            "Moved Permanently");
+    public static final HttpStatus MOVED_PERMANENTLY = new HttpStatus(301, "Moved Permanently");
 
     /**
      * 302 Found
@@ -95,8 +88,7 @@ public class HttpStatus {
     /**
      * 304 Not Modified
      */
-    public static final HttpStatus NOT_MODIFIED = new HttpStatus(304,
-            "Not Modified");
+    public static final HttpStatus NOT_MODIFIED = new HttpStatus(304, "Not Modified");
 
     /**
      * 305 Use Proxy (since HTTP/1.1)
@@ -112,20 +104,17 @@ public class HttpStatus {
     /**
      * 400 Bad Request
      */
-    public static final HttpStatus BAD_REQUEST = new HttpStatus(400,
-            "Bad Request");
+    public static final HttpStatus BAD_REQUEST = new HttpStatus(400, "Bad Request");
 
     /**
      * 401 Unauthorized
      */
-    public static final HttpStatus UNAUTHORIZED = new HttpStatus(401,
-            "Unauthorized");
+    public static final HttpStatus UNAUTHORIZED = new HttpStatus(401, "Unauthorized");
 
     /**
      * 402 Payment Required
      */
-    public static final HttpStatus PAYMENT_REQUIRED = new HttpStatus(402,
-            "Payment Required");
+    public static final HttpStatus PAYMENT_REQUIRED = new HttpStatus(402, "Payment Required");
 
     /**
      * 403 Forbidden
@@ -146,20 +135,18 @@ public class HttpStatus {
     /**
      * 406 Not Acceptable
      */
-    public static final HttpStatus NOT_ACCEPTABLE = new HttpStatus(406,
-            "Not Acceptable");
+    public static final HttpStatus NOT_ACCEPTABLE = new HttpStatus(406, "Not Acceptable");
 
     /**
      * 407 Proxy Authentication Required
      */
-    public static final HttpStatus PROXY_AUTHENTICATION_REQUIRED = new HttpStatus(
-            407, "Proxy Authentication Required");
+    public static final HttpStatus PROXY_AUTHENTICATION_REQUIRED = new HttpStatus(407,
+            "Proxy Authentication Required");
 
     /**
      * 408 Request Timeout
      */
-    public static final HttpStatus REQUEST_TIMEOUT = new HttpStatus(408,
-            "Request Timeout");
+    public static final HttpStatus REQUEST_TIMEOUT = new HttpStatus(408, "Request Timeout");
 
     /**
      * 409 Conflict
@@ -174,8 +161,7 @@ public class HttpStatus {
     /**
      * 411 Length Required
      */
-    public static final HttpStatus LENGTH_REQUIRED = new HttpStatus(411,
-            "Length Required");
+    public static final HttpStatus LENGTH_REQUIRED = new HttpStatus(411, "Length Required");
 
     /**
      * 412 Precondition Failed
@@ -186,8 +172,8 @@ public class HttpStatus {
     /**
      * 413 Request Entity Too Large
      */
-    public static final HttpStatus REQUEST_ENTITY_TOO_LARGE = new HttpStatus(
-            413, "Request Entity Too Large");
+    public static final HttpStatus REQUEST_ENTITY_TOO_LARGE = new HttpStatus(413,
+            "Request Entity Too Large");
 
     /**
      * 414 Request-URI Too Long
@@ -204,8 +190,8 @@ public class HttpStatus {
     /**
      * 416 Requested Range Not Satisfiable
      */
-    public static final HttpStatus REQUESTED_RANGE_NOT_SATISFIABLE = new HttpStatus(
-            416, "Requested Range Not Satisfiable");
+    public static final HttpStatus REQUESTED_RANGE_NOT_SATISFIABLE = new HttpStatus(416,
+            "Requested Range Not Satisfiable");
 
     /**
      * 417 Expectation Failed
@@ -227,8 +213,7 @@ public class HttpStatus {
     /**
      * 424 Failed Dependency (WebDAV, RFC4918)
      */
-    public static final HttpStatus FAILED_DEPENDENCY = new HttpStatus(424,
-            "Failed Dependency");
+    public static final HttpStatus FAILED_DEPENDENCY = new HttpStatus(424, "Failed Dependency");
 
     /**
      * 425 Unordered Collection (WebDAV, RFC3648)
@@ -239,8 +224,7 @@ public class HttpStatus {
     /**
      * 426 Upgrade Required (RFC2817)
      */
-    public static final HttpStatus UPGRADE_REQUIRED = new HttpStatus(426,
-            "Upgrade Required");
+    public static final HttpStatus UPGRADE_REQUIRED = new HttpStatus(426, "Upgrade Required");
 
     /**
      * 500 Internal Server Error
@@ -251,14 +235,12 @@ public class HttpStatus {
     /**
      * 501 Not Implemented
      */
-    public static final HttpStatus NOT_IMPLEMENTED = new HttpStatus(501,
-            "Not Implemented");
+    public static final HttpStatus NOT_IMPLEMENTED = new HttpStatus(501, "Not Implemented");
 
     /**
      * 502 Bad Gateway
      */
-    public static final HttpStatus BAD_GATEWAY = new HttpStatus(502,
-            "Bad Gateway");
+    public static final HttpStatus BAD_GATEWAY = new HttpStatus(502, "Bad Gateway");
 
     /**
      * 503 Service Unavailable
@@ -269,20 +251,19 @@ public class HttpStatus {
     /**
      * 504 Gateway Timeout
      */
-    public static final HttpStatus GATEWAY_TIMEOUT = new HttpStatus(504,
-            "Gateway Timeout");
+    public static final HttpStatus GATEWAY_TIMEOUT = new HttpStatus(504, "Gateway Timeout");
 
     /**
      * 505 HTTP Version Not Supported
      */
-    public static final HttpStatus HTTP_VERSION_NOT_SUPPORTED = new HttpStatus(
-            505, "HTTP Version Not Supported");
+    public static final HttpStatus HTTP_VERSION_NOT_SUPPORTED = new HttpStatus(505,
+            "HTTP Version Not Supported");
 
     /**
      * 506 Variant Also Negotiates (RFC2295)
      */
-    public static final HttpStatus VARIANT_ALSO_NEGOTIATES = new HttpStatus(
-            506, "Variant Also Negotiates");
+    public static final HttpStatus VARIANT_ALSO_NEGOTIATES = new HttpStatus(506,
+            "Variant Also Negotiates");
 
     /**
      * 507 Insufficient Storage (WebDAV, RFC4918)
@@ -293,8 +274,7 @@ public class HttpStatus {
     /**
      * 510 Not Extended (RFC2774)
      */
-    public static final HttpStatus NOT_EXTENDED = new HttpStatus(510,
-            "Not Extended");
+    public static final HttpStatus NOT_EXTENDED = new HttpStatus(510, "Not Extended");
 
     public static HttpStatus valueOf(int code) {
         switch (code) {
@@ -424,8 +404,7 @@ public class HttpStatus {
     public HttpStatus(int code, String reasonPhrase) {
         this.code = code;
         this.reasonPhrase = reasonPhrase;
-        bytes = ("HTTP/1.1 " + code + " " + reasonPhrase + "\r\n")
-                .getBytes(ASCII);
+        bytes = ("HTTP/1.1 " + code + " " + reasonPhrase + "\r\n").getBytes(ASCII);
     }
 
     public int getCode() {

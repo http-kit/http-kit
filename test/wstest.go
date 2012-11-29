@@ -40,7 +40,7 @@ func main() {
 		// log.Fatal(err) not implemented expected
 	}
 	fmt.Printf("Received: %s.\n", msg[:n])
-	ws.Close()
+//	ws.Close()
 }
 
 // "/api/users/collections/{{id}}/sort"

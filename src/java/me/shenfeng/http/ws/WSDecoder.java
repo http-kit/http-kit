@@ -24,11 +24,6 @@ public class WSDecoder {
     private int maskingKey;
     private boolean finalFlag;
     private int opcode;
-    private final WsCon con;
-
-    public WSDecoder(WsCon con) {
-        this.con = con;
-    }
 
     public WSFrame decode(ByteBuffer buffer) throws ProtocolException {
         while (buffer.hasRemaining()) {
@@ -68,11 +63,13 @@ public class WSDecoder {
                         content[i] = (byte) (content[i] ^ mask[i % 4]);
                     }
                     if (opcode == OPCODE_TEXT) {
-                        return new TextFrame(finalFlag, content, con);
+                        return new TextFrame(finalFlag, content);
                     } else if (opcode == OPCODE_PING) {
-                        return new PingFrame(finalFlag, content, con);
+                        return new PingFrame(finalFlag, content);
+                    } else if (opcode == OPCODE_CLOSE) {
+                        return new CloseFrame(finalFlag, content);
                     } else {
-                        throw new RuntimeException("not impl now for opcode: " + opcode);
+                        throw new ProtocolException("not impl now for opcode: " + opcode);
                     }
                 }
                 break;
