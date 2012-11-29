@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import me.shenfeng.http.ws.WSFrame;
+import me.shenfeng.http.ws.WsCon;
 
 class SingleThreadHandler implements IHandler {
 
@@ -18,11 +19,11 @@ class SingleThreadHandler implements IHandler {
         cb.run(bytes);
     }
 
-    public void handle(WSFrame frame) {
+    public void close() {
 
     }
 
-    public void close() {
+    public void handle(WsCon con, WSFrame frame) {
 
     }
 }

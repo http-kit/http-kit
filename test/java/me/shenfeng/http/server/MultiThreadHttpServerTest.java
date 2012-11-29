@@ -8,6 +8,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import me.shenfeng.http.ws.WSFrame;
+import me.shenfeng.http.ws.WsCon;
 
 class MultiThreadHandler implements IHandler {
     private ExecutorService exec;
@@ -32,9 +33,7 @@ class MultiThreadHandler implements IHandler {
         });
     }
 
-    public void handle(WSFrame frame) {
-        // TODO Auto-generated method stub
-
+    public void handle(WsCon con, WSFrame frame) {
     }
 }
 
