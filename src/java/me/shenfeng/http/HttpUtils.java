@@ -3,16 +3,22 @@ package me.shenfeng.http;
 import static java.lang.Character.isWhitespace;
 import static java.net.InetAddress.getByName;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStreamWriter;
+import java.io.PrintStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
 import java.nio.channels.SelectableChannel;
 import java.nio.charset.Charset;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -89,8 +95,7 @@ public class HttpUtils {
         }
     }
 
-    public static DynamicBytes encodeResponseHeader(int status,
-            Map<String, Object> headers) {
+    public static DynamicBytes encodeResponseHeader(int status, Map<String, Object> headers) {
         DynamicBytes bytes = new DynamicBytes(196);
         byte[] bs = HttpStatus.valueOf(status).getResponseIntialLineBytes();
         bytes.append(bs, 0, bs.length);
@@ -160,8 +165,7 @@ public class HttpUtils {
         hex = hex.trim();
         for (int i = 0; i < hex.length(); i++) {
             char c = hex.charAt(i);
-            if (c == ';' || Character.isWhitespace(c)
-                    || Character.isISOControl(c)) {
+            if (c == ';' || Character.isWhitespace(c) || Character.isISOControl(c)) {
                 hex = hex.substring(0, i);
                 break;
             }
@@ -192,8 +196,7 @@ public class HttpUtils {
         return port;
     }
 
-    public static InetSocketAddress getServerAddr(URI uri)
-            throws UnknownHostException {
+    public static InetSocketAddress getServerAddr(URI uri) throws UnknownHostException {
         InetAddress host = getByName(uri.getHost());
         return new InetSocketAddress(host, getPort(uri));
 
@@ -229,6 +232,16 @@ public class HttpUtils {
         }
         is.close();
         return bytes;
+    }
+
+    public static final void printError(String msg, Throwable t) {
+        String error = String.format("%s [%s] ERROR - %s", new Date(), Thread.currentThread()
+                .getName(), msg);
+        StringWriter str = new StringWriter();
+        PrintWriter pw = new PrintWriter(str, false);
+        pw.println(error);
+        t.printStackTrace(pw);
+        System.err.print(str.getBuffer().toString());
     }
 
     public static void splitAndAddHeader(String sb, Map<String, String> headers) {

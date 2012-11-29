@@ -9,8 +9,8 @@ import (
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
-	origin := "http://localhost:9898/"
-	url := "ws://localhost:9898/ws"
+	origin := "http://localhost:9899/"
+	url := "ws://localhost:9899/ws"
 	ws, err := websocket.Dial(url, "", origin)
 
 	if err != nil {
@@ -19,7 +19,7 @@ func main() {
 
 	// fmt.Println(ws)
 
-	if _, err := ws.Write([]byte("hello, world!\n")); err != nil {
+	if _, err := ws.Write([]byte("\"hello, world!\"\n")); err != nil {
 		log.Fatal(err)
 	}
 
@@ -36,11 +36,11 @@ func main() {
 	} else {
 		fmt.Println("write", n)
 	}
-
 	if n, err = ws.Read(msg); err != nil {
-		log.Fatal(err)
+		// log.Fatal(err) not implemented expected
 	}
 	fmt.Printf("Received: %s.\n", msg[:n])
+	ws.Close()
 }
 
 // "/api/users/collections/{{id}}/sort"

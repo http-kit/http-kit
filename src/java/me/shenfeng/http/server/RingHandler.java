@@ -13,6 +13,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import me.shenfeng.http.HttpUtils;
 import me.shenfeng.http.PrefixThreafFactory;
 import me.shenfeng.http.ws.TextFrame;
 import me.shenfeng.http.ws.WSFrame;
@@ -68,7 +69,7 @@ public class RingHandler implements IHandler {
                     }
                 } catch (Throwable e) {
                     cb.run(encode(500, null, e.getMessage()));
-                    e.printStackTrace();
+                    HttpUtils.printError("ring handler", e);
                 }
             }
         });
@@ -81,8 +82,12 @@ public class RingHandler implements IHandler {
     public void handle(final WSFrame frame) {
         execs.submit(new Runnable() {
             public void run() {
-                if (frame instanceof TextFrame) {
-                    frame.wsCon.onText(((TextFrame) frame).getText());
+                try {
+                    if (frame instanceof TextFrame) {
+                        frame.wsCon.onText(((TextFrame) frame).getText());
+                    }
+                } catch (Throwable e) {
+                    HttpUtils.printError("handle websocket frame " + frame, e);
                 }
             }
         });

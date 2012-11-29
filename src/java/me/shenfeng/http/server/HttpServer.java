@@ -19,6 +19,7 @@ import java.util.LinkedList;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+import me.shenfeng.http.HttpUtils;
 import me.shenfeng.http.ProtocolException;
 import me.shenfeng.http.server.ReqeustDecoder.State;
 import me.shenfeng.http.ws.PingFrame;
@@ -115,8 +116,7 @@ public class HttpServer {
                     if (key != null) {
                         closeQuiety(key.channel());
                     }
-                    // should not happen
-                    e.printStackTrace();
+                    HttpUtils.printError("http server loop error, should not happend", e);
                 }
             }
         }
