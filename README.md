@@ -3,7 +3,7 @@
 * An event driven ring adapter for Clojure web app.
 * An event driven HTTP client.
 
-The ring adapter will follow [ring SPEC]
+The ring adapter follows [ring SPEC]
 (https://github.com/mmcgrana/ring/blob/master/SPEC).
 There's
 [Unit test](https://github.com/shenfeng/http-kit/blob/master/test/me/shenfeng/http/server/server_test.clj)
@@ -11,30 +11,31 @@ to make sure it.
 
 I also add an
 [async extension](https://github.com/shenfeng/http-kit/blob/master/src/java/me/shenfeng/http/server/IListenableFuture.java)
-to the ring SPEC. The unit test has sample usage.
+to the ring SPEC, for efficient long polling. The unit test has sample usage.
 
 ## Motivation
 
 I write it for the HTTP server and HTTP client of
 [Rssminer](http://rssminer.net)
 
-* Efficiently fetch feeds from Web.
-* Fast proxy some sites for Chinese user.
 * Rssminer need to be fast.
+* Efficiently fetch feeds from Web.
+* I want to learn how to write a HTTP Server from scrach
 
-## Goal
+
+## Features
 * Clean compact code.
-* Non-blocking IO
-* Memory efficient. Memory is cheap, but anyway, I will do my best to
-  save it.
-* Support Socks proxy. `SSH -D` create a Socks server, in china, proxy
-  is a must.
+* Effice support long polling
+* Support Websocket
+* Implement the ring adapter interface, just a drop in replacement to start
+* Memory efficient. Memory is cheap, but anyway, I do my best to save it.
+* Support Socks proxy. `SSH -D` create a Socks server, in china, proxy is a must.
 
 ## Usage
 
 ### HTTP Server
 ```clj
-[me.shenfeng/http-kit "1.1.5"]
+[me.shenfeng/http-kit "1.1.6"]
 
 (:use me.shenfeng.http.server)          ; export run-server and defasync
 
@@ -46,12 +47,35 @@ I write it for the HTTP server and HTTP client of
 (run-server app {:port 8080
                  :thread 4              ; 4 http worker thread
                  :ip "127.0.0.1"        ; bind to localhost
+                 :max-line 2048         ; max http header line length
                  :max-body 20480        ; max http request body, 20k
                  })
 
 ```
 
-#### Async extension [long polling]
+#### Websocket
+```clj
+(:use me.shenfeng.http.server)
+
+(defwshandler chat-handler [req] con
+  (on-mesg con (fn [msg]
+                 ;; echo back
+                 (send-mesg con msg))))
+
+(run-server chat-handler {:port 8080})
+
+```
+
+These is a live chartroom as an example:
+[websocket.clj](https://github.com/shenfeng/http-kit/blob/master/test/me/shenfeng/http/websocket.clj)
+
+run it:
+
+```sh
+./scripts/websocket # try open two browser tab, view it on http://127.0.0.1:9899/
+```
+
+#### Async extension
 ```clj
 (:use me.shenfeng.http.server)
 
@@ -71,28 +95,6 @@ run it:
 
 ```sh
 ./scripts/polling # try open two browser tab, view it on http://127.0.0.1:9898/
-```
-
-#### Websocket [version 13, rfc 6455]
-```clj
-(:use me.shenfeng.http.server)
-
-(defwshandler chat-handler [req] con
-  (receive con (fn [msg]
-                 ;; just echo back
-                 (write con msg))))
-
-(run-server chat-handler {:port 8080})
-
-```
-
-These is a live chartroom as an example:
-[websocket.clj](https://github.com/shenfeng/http-kit/blob/master/test/me/shenfeng/http/websocket.clj)
-
-run it:
-
-```sh
-./scripts/websocket # try open two browser tab, view it on http://127.0.0.1:9899/
 ```
 
 ### HTTP Client
@@ -122,10 +124,8 @@ run it:
 * HTTP proxy is not supported
 
 ### HTTP server
-* Client request is buffered in memory (can't handle very large
-  file upload)
-* No timeout handling. The server is intended to be protected by
-  others (like Nginx)
+* Client request is buffered in memory (very large file upload)
+* No timeout handling. The server is intended to be protected by others (like Nginx)
 
 # Benchmark
 
@@ -148,4 +148,4 @@ It compare with
 * 1.1.0 defasync and async HTTP client clojure API
 * 1.1.1 http client: allow custom ACCEPT_ENCODING, default gzip, deflate
 * 1.1.3 better syntax for defasync
-* 1.1.5 websocket support
+* 1.1.6 websocket support

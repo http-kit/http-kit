@@ -37,10 +37,10 @@
                 (get [this#]
                   (:r @data#))))}))
 
-(defn on-msg [^WsCon con fn]
+(defn on-mesg [^WsCon con fn]
   (.addRecieveListener con fn))
 
-(defn send-msg [^WsCon con msg] (.send con msg))
+(defn send-mesg [^WsCon con msg] (.send con msg))
 
 (defn on-close [^WsCon con fn]
   (.addOnCloseListener con fn))
