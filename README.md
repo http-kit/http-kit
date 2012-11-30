@@ -20,13 +20,13 @@ I write it for the HTTP server and HTTP client of
 
 * Rssminer need to be fast.
 * Efficiently fetch feeds from Web.
-* I want to learn how to write a HTTP Server from scrach
+* I want to learn how to write a HTTP Server from scratch
 
 
 ## Features
 * Clean compact code.
-* Effice support long polling
-* Support Websocket
+* Efficient support long polling
+* Support WebSocket
 * Implement the ring adapter interface, just a drop in replacement to start
 * Memory efficient. Memory is cheap, but anyway, I do my best to save it.
 * Support Socks proxy. `SSH -D` create a Socks server, in china, proxy is a must.
@@ -146,6 +146,6 @@ It compare with
   Chinese char
 
 * 1.1.0 defasync and async HTTP client clojure API
-* 1.1.1 http client: allow custom ACCEPT_ENCODING, default gzip, deflate
-* 1.1.3 better syntax for defasync
-* 1.1.6 websocket support
+* 1.1.1 HTTP client: allow custom ACCEPT_ENCODING, default gzip, deflate
+* 1.1.3 Better syntax for defasync
+* 1.1.6 WebSocket support
