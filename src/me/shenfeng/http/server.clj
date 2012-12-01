@@ -10,10 +10,14 @@
     (DatatypeConverter/printBase64Binary
      (.digest md (.getBytes ^String (str key websocket-13-guid))))))
 
-(defn run-server [handler {:keys [port thread ip max-body max-line]
-                           :or {ip "0.0.0.0" port 8090 thread 2
-                                max-body 20480 max-line 2048}}]
-  (let [h (RingHandler. thread handler)
+(defn run-server [handler {:keys [port thread ip max-body max-line worker-name-prefix]
+                           :or {ip "0.0.0.0"
+                                port 8090
+                                thread 2
+                                worker-name-prefix "worker-"
+                                max-body 20480
+                                max-line 2048}}]
+  (let [h (RingHandler. thread handler worker-name-prefix)
         s (HttpServer. ip port h max-body max-line)]
     (.start s)
     ;; return a function to stop this server

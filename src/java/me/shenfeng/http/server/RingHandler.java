@@ -26,8 +26,8 @@ public class RingHandler implements IHandler {
     final ExecutorService execs;
     final IFn handler;
 
-    public RingHandler(int thread, IFn handler) {
-        PrefixThreafFactory factory = new PrefixThreafFactory("worker-");
+    public RingHandler(int thread, IFn handler, String prefix) {
+        PrefixThreafFactory factory = new PrefixThreafFactory(prefix);
         // max pending request: 386
         BlockingQueue<Runnable> queue = new ArrayBlockingQueue<Runnable>(386);
         // TODO RejectedExecutionHandler
@@ -61,7 +61,6 @@ public class RingHandler implements IHandler {
                                     }
                                 }
                             });
-
                         } else {
                             cb.run(encode(status, headers, body));
                         }
@@ -87,7 +86,7 @@ public class RingHandler implements IHandler {
                 try {
                     if (frame instanceof TextFrame) {
                         con.messageRecieved(((TextFrame) frame).getText());
-                    } else if(frame instanceof CloseFrame) {
+                    } else if (frame instanceof CloseFrame) {
                         con.clientClosed(((CloseFrame) frame).getStatus());
                     }
                 } catch (Throwable e) {
