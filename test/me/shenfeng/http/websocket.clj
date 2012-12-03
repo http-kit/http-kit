@@ -48,8 +48,13 @@
   (on-close con (fn [status]
                   (info con "closed, status" status))))
 
+(defwshandler echo-handler [req] con
+  (on-mesg con (fn [msg]
+                 (send-mesg con msg))))
+
 (defroutes chartrootm
   (GET "/ws" []  chat-handler)
+  (GET "/test" []  echo-handler)
   (files "" {:root "examples/websocket"})
   (not-found "<p>Page not found.</p>" ))
 
