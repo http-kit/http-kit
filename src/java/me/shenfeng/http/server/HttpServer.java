@@ -162,8 +162,8 @@ public class HttpServer {
         InetSocketAddress addr = new InetSocketAddress(ip, port);
         serverChannel.socket().bind(addr);
         serverChannel.register(selector, OP_ACCEPT);
-        System.out.println(String.format("http server start %s@%d, max body: %d", ip, port,
-                maxBody));
+//        System.out.println(String.format("http server start %s@%d, max body: %d", ip, port,
+//                maxBody));
     }
 
     private void decodeHttp(HttpServerAtta atta, SelectionKey key, SocketChannel ch) {

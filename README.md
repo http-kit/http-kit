@@ -15,27 +15,29 @@ to the ring SPEC, for efficient long polling. The unit test has sample usage.
 
 ## Motivation
 
-I write it for the HTTP server and HTTP client of
-[Rssminer](http://rssminer.net)
+I write it for the HTTP server and HTTP client of [Rssminer](http://rssminer.net)
 
 * Rssminer need to be fast.
 * Efficiently fetch feeds from Web.
 * I want to learn how to write a HTTP Server from scratch
-
+* I need an asynchronous Server and Client to proxy blogspot like sites for Rssminer's user [a feature implemented but deleted later]
 
 ## Features
-* Clean compact code.
+* Simple and works
+* Clean compact code
 * Efficient support long polling
-* Support WebSocket
+* Efficient Support WebSocket
 * Implement the ring adapter interface, just a drop in replacement to start
 * Memory efficient. Memory is cheap, but anyway, I do my best to save it.
 * Support Socks proxy. `SSH -D` create a Socks server, in china, proxy is a must.
+
+for Efficient => just a few k of memory to maintain a connection
 
 ## Usage
 
 ### HTTP Server
 ```clj
-[me.shenfeng/http-kit "1.1.6"]
+[me.shenfeng/http-kit "1.1.8"]
 
 (:use me.shenfeng.http.server)          ; export run-server and defasync
 
@@ -47,6 +49,7 @@ I write it for the HTTP server and HTTP client of
 (run-server app {:port 8080
                  :thread 4              ; 4 http worker thread
                  :ip "127.0.0.1"        ; bind to localhost
+                 :worker-name-prefix "worker-" ; thread name worker-1, worker-2, worker-3, ......
                  :max-line 2048         ; max http header line length
                  :max-body 20480        ; max http request body, 20k
                  })
