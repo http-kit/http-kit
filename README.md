@@ -37,7 +37,7 @@ for Efficient => just a few k of memory to maintain a connection
 
 ### HTTP Server
 ```clj
-[me.shenfeng/http-kit "1.1.8"]
+[me.shenfeng/http-kit "1.2"]
 
 (:use me.shenfeng.http.server)          ; export run-server and defasync
 
@@ -152,3 +152,4 @@ It compare with
 * 1.1.1 HTTP client: allow custom ACCEPT_ENCODING, default gzip, deflate
 * 1.1.3 Better syntax for defasync
 * 1.1.6 WebSocket support
+* 1.2   fix content-type for multipart/form-data

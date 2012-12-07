@@ -5,7 +5,6 @@ import static me.shenfeng.http.HttpUtils.CONNECTION;
 import static me.shenfeng.http.HttpUtils.CONTENT_TYPE;
 import static me.shenfeng.http.HttpVersion.HTTP_1_1;
 
-import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -48,7 +47,7 @@ public class HttpRequest {
 
     public InputStream getBody() {
         if (body != null) {
-            return new ByteArrayInputStream(body, 0, contentLength);
+            return new BytesInputStream(body, 0, contentLength);
         }
         return null;
     }
@@ -149,14 +148,17 @@ public class HttpRequest {
         if (con != null) {
             con = con.toLowerCase();
         }
+
         String ct = headers.get(CONTENT_TYPE);
         if (ct != null) {
             int idx = ct.indexOf(";");
             if (idx != -1) {
-                contentType = ct.substring(0, idx);
-                idx = ct.indexOf(CHARSET, idx);
-                if (idx != -1) {
-                    charset = ct.substring(idx + CHARSET.length());
+                int cidx = ct.indexOf(CHARSET, idx);
+                if (cidx != -1) {
+                    contentType = ct.substring(0, idx);
+                    charset = ct.substring(cidx + CHARSET.length());
+                } else {
+                    contentType = ct;
                 }
             } else {
                 contentType = ct;
