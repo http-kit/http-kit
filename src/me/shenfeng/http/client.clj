@@ -9,7 +9,7 @@
 
 (def no-proxy Proxy/NO_PROXY)
 
-(defn- trasform-header [headers keyify?]
+(defn- transform-header [headers keyify?]
   (reduce (fn [m [k v]]
             (assoc m (if keyify? (keyword (str/lower-case k))
                          (str/lower-case k)) v))
@@ -20,14 +20,14 @@
     (BinaryRespListener. (reify IBinaryHandler
                            (onSuccess [this status headers bytes]
                              (cb {:body bytes
-                                  :headers (trasform-header headers keyify?)
+                                  :headers (transform-header headers keyify?)
                                   :status status}))
                            (onThrowable [this t]
                              (cb {:body t}))))
     (TextRespListener. (reify ITextHandler
                          (onSuccess [this status headers str]
                            (cb {:body str
-                                :headers (trasform-header headers keyify?)
+                                :headers (transform-header headers keyify?)
                                 :status status}))
                          (onThrowable [this t]
                            (cb {:body t}))))))
