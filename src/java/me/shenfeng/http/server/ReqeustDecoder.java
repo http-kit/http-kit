@@ -13,6 +13,7 @@ import static me.shenfeng.http.HttpVersion.HTTP_1_0;
 import static me.shenfeng.http.HttpVersion.HTTP_1_1;
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -29,17 +30,15 @@ public class ReqeustDecoder {
         PROTOCOL_ERROR, ALL_READ, READ_INITIAL, READ_HEADER, READ_FIXED_LENGTH_CONTENT, READ_CHUNK_SIZE, READ_CHUNKED_CONTENT, READ_CHUNK_FOOTER, READ_CHUNK_DELIMITER,
     }
 
-    static final int MAX_LINE = 2048;
-
-    int lineBufferCnt = 0;
-
     HttpRequest request;
     int readRemaining = 0;
     byte[] content;
-    int readContent = 0;
+    int readCount = 0;
     private final Map<String, String> headers = new TreeMap<String, String>();
     private final int maxBody;
     private State state = State.READ_INITIAL;
+
+    int lineBufferIdx = 0;
     private final byte[] lineBuffer;
 
     public ReqeustDecoder(int maxBody, int maxLine) {
@@ -108,13 +107,12 @@ public class ReqeustDecoder {
                     if (readRemaining == 0) {
                         state = State.READ_CHUNK_FOOTER;
                     } else {
-                        throwIfBodyIsTooLarge(readRemaining);
+                        throwIfBodyIsTooLarge();
                         if (content == null) {
                             content = new byte[readRemaining];
-                        } else if (content.length - readContent < readRemaining) {
-                            byte[] tmp = new byte[readRemaining + readContent];
-                            System.arraycopy(content, 0, tmp, 0, readContent);
-                            content = tmp;
+                        } else if (content.length - readCount < readRemaining) {
+                            // expand
+                            content = Arrays.copyOf(content, readRemaining + readCount);
                         }
                         state = State.READ_CHUNKED_CONTENT;
                     }
@@ -147,7 +145,7 @@ public class ReqeustDecoder {
 
     private void finish() {
         state = State.ALL_READ;
-        request.setBody(content, readContent);
+        request.setBody(content, readCount);
     }
 
     void readEmptyLine(ByteBuffer buffer) {
@@ -160,9 +158,9 @@ public class ReqeustDecoder {
 
     void readFixedLength(ByteBuffer buffer) {
         int toRead = Math.min(buffer.remaining(), readRemaining);
-        buffer.get(content, readContent, toRead);
+        buffer.get(content, readCount, toRead);
         readRemaining -= toRead;
-        readContent += toRead;
+        readCount += toRead;
     }
 
     private void readHeaders(ByteBuffer buffer) throws LineTooLargeException,
@@ -188,7 +186,7 @@ public class ReqeustDecoder {
                 try {
                     readRemaining = Integer.parseInt(cl);
                     if (readRemaining > 0) {
-                        throwIfBodyIsTooLarge(readRemaining);
+                        throwIfBodyIsTooLarge();
                         content = new byte[readRemaining];
                         state = State.READ_FIXED_LENGTH_CONTENT;
                     } else {
@@ -214,17 +212,17 @@ public class ReqeustDecoder {
             } else if (b == LF) {
                 more = false;
             } else {
-                if (lineBufferCnt == lineBuffer.length - 2) {
-                    throw new LineTooLargeException("line length exceed " + MAX_LINE);
+                if (lineBufferIdx == lineBuffer.length - 2) {
+                    throw new LineTooLargeException("line length exceed " + lineBuffer.length);
                 }
-                lineBuffer[lineBufferCnt] = b;
-                ++lineBufferCnt;
+                lineBuffer[lineBufferIdx] = b;
+                ++lineBufferIdx;
             }
         }
         String line = null;
         if (!more) {
-            line = new String(lineBuffer, 0, lineBufferCnt);
-            lineBufferCnt = 0;
+            line = new String(lineBuffer, 0, lineBufferIdx);
+            lineBufferIdx = 0;
         }
         return line;
     }
@@ -232,13 +230,13 @@ public class ReqeustDecoder {
     public void reset() {
         state = State.READ_INITIAL;
         headers.clear();
-        readContent = 0;
+        readCount = 0;
     }
 
-    private void throwIfBodyIsTooLarge(int body) throws RequestTooLargeException {
-        if (body > maxBody) {
-            throw new RequestTooLargeException("request body " + body + "; max request body "
-                    + maxBody);
+    private void throwIfBodyIsTooLarge() throws RequestTooLargeException {
+        if (readCount + readRemaining > maxBody) {
+            throw new RequestTooLargeException("request body " + (readCount + readRemaining)
+                    + "; max request body " + maxBody);
         }
     }
 }
