@@ -1,10 +1,14 @@
 (defproject me.shenfeng/http-kit "1.2"
-  :description "Event driven HTTP server and HTTP client in java and clojure, only depend on JDK."
+  :description "Event driven HTTP server and HTTP client in java and clojure"
   :dependencies [[org.clojure/clojure "1.4.0"]]
   :warn-on-reflection true
+  :url "https://github.com/shenfeng/http-kit"
   :javac-options ["-source" "1.6" "-target" "1.6"]
   :java-source-paths ["src/java"]
-  :test-paths ["test" "example"]
+  :test-paths ["test" "examples"]
+  :jar-exclusions [#".*java$"]
+  :license {:name "Apache License, Version 2.0"
+            :url "http://www.apache.org/licenses/LICENSE-2.0.html"}
   :profiles {:1.5 {:dependencies [[org.clojure/clojure "1.5.0-master-SNAPSHOT"]]}
              :dev {:dependencies [[swank-clojure "1.4.0"]
                                   [junit/junit "4.8.2"]
