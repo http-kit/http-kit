@@ -13,10 +13,10 @@
 (defn run-server [handler {:keys [port thread ip max-body max-line worker-name-prefix]
                            :or {ip "0.0.0.0"
                                 port 8090
-                                thread 2
+                                thread 4
                                 worker-name-prefix "worker-"
-                                max-body 20480
-                                max-line 2048}}]
+                                max-body 8388608 ; max http body: 8m
+                                max-line 4096}}] ; max http inital line length: 4K
   (let [h (RingHandler. thread handler worker-name-prefix)
         s (HttpServer. ip port h max-body max-line)]
     (.start s)
