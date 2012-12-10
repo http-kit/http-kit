@@ -1,4 +1,5 @@
-(ns me.shenfeng.http.websocket
+;;; run it ./scripts/websocket
+(ns websocket
   (:use me.shenfeng.http.server
         [ring.middleware.file-info :only [wrap-file-info]]
         [clojure.tools.logging :only [info]]
@@ -66,4 +67,4 @@
     (reset! server nil))
   (reset! server (run-server (-> chartrootm site wrap-request-logging)
                              {:port 9899 :thread 6}))
-  (info "server started"))
+  (info "server started. http://127.0.0.1:9899"))

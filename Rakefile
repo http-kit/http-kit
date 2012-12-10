@@ -7,7 +7,7 @@ end
 
 desc "Install in local repository"
 task :install_local => :test do
-  sh 'lein deps && rm *.jar pom.xml classes -rf && lein jar && lein install'
+  sh 'lein deps && rm -rf *.jar pom.xml classes target && lein jar && lein install'
   sh 'cd ~/workspace/rssminer && lein deps'
 end
 
@@ -19,7 +19,7 @@ end
 
 desc "Start swank server for emacs"
 task :swank do
-  sh "rm -rf classes && lein javac && lein swank"
+  sh "rm -rf classes target && lein javac && lein swank"
 end
 
 desc "Benchmark to an idea how fast it can run"

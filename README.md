@@ -70,7 +70,7 @@ for Efficient => just a few k of memory to maintain a connection
 ```
 
 These is a live chartroom as an example:
-[websocket.clj](https://github.com/shenfeng/http-kit/blob/master/test/me/shenfeng/http/websocket.clj)
+[examples/websocket](https://github.com/shenfeng/http-kit/tree/master/examples/websocket)
 
 run it:
 
@@ -92,7 +92,7 @@ run it:
 (run-server async {:port 8080})
 ```
 These is a live chartroom as an example:
-[polling.clj](https://github.com/shenfeng/http-kit/blob/master/test/me/shenfeng/http/polling.clj)
+[examples/polling](https://github.com/shenfeng/http-kit/tree/master/examples/polling)
 
 run it:
 
