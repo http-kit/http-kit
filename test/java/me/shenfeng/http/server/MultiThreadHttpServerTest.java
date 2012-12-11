@@ -42,5 +42,6 @@ public class MultiThreadHttpServerTest {
         HttpServer server = new HttpServer("0.0.0.0", 9091, new MultiThreadHandler(), 20480,
                 2048);
         server.start();
+        System.out.println("Server started on :9091");
     }
 }
