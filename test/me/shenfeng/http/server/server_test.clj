@@ -150,6 +150,8 @@
 (deftest test-chunked-encoding
   (let [size 4194304
         resp (http/post "http://localhost:4347/chunked"
+                        ;; no :length, HttpClient will split body as 2k chunk
+                        ;; server need to decode the chunked encoding
                         {:body (input-stream (gen-tempfile size ".jpg"))})]
     (is (= 200 (:status resp)))
     (is (= (str size) (:body resp)))))
