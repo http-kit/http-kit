@@ -24,7 +24,7 @@ import me.shenfeng.http.LineTooLargeException;
 import me.shenfeng.http.ProtocolException;
 import me.shenfeng.http.RequestTooLargeException;
 
-public class ReqeustDecoder {
+public class RequestDecoder {
 
     public enum State {
         PROTOCOL_ERROR, ALL_READ, READ_INITIAL, READ_HEADER, READ_FIXED_LENGTH_CONTENT, READ_CHUNK_SIZE, READ_CHUNKED_CONTENT, READ_CHUNK_FOOTER, READ_CHUNK_DELIMITER,
@@ -41,7 +41,7 @@ public class ReqeustDecoder {
     int lineBufferIdx = 0;
     private final byte[] lineBuffer;
 
-    public ReqeustDecoder(int maxBody, int maxLine) {
+    public RequestDecoder(int maxBody, int maxLine) {
         this.maxBody = maxBody;
         this.lineBuffer = new byte[maxLine];
     }

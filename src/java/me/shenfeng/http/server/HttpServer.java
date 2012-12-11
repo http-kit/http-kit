@@ -21,7 +21,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 import me.shenfeng.http.HttpUtils;
 import me.shenfeng.http.ProtocolException;
-import me.shenfeng.http.server.ReqeustDecoder.State;
+import me.shenfeng.http.server.RequestDecoder.State;
 import me.shenfeng.http.ws.CloseFrame;
 import me.shenfeng.http.ws.PingFrame;
 import me.shenfeng.http.ws.TextFrame;
@@ -167,7 +167,7 @@ public class HttpServer {
     }
 
     private void decodeHttp(HttpServerAtta atta, SelectionKey key, SocketChannel ch) {
-        ReqeustDecoder decoder = atta.decoder;
+        RequestDecoder decoder = atta.decoder;
         try {
             if (decoder.decode(buffer) == State.ALL_READ) {
                 HttpRequest request = decoder.request;
