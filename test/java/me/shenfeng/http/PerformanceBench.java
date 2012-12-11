@@ -79,6 +79,8 @@ public class PerformanceBench {
     static long start = System.currentTimeMillis();
 
     public static void main(String[] args) throws IOException {
+        
+        System.out.println("concurrency: " + concurrency + "; total requests: " + total);
 
         Selector selector = Selector.open();
 
@@ -135,9 +137,9 @@ public class PerformanceBench {
         while (true) {
             int read = ch.read(readBuffer);
             if (read == -1) {
-                ch.close();
+                ch.close(); 
                 decAndPrint();
-                D("closed, connecton new, remaining: " + remaining);
+                D("remote closed, connecton new, remaining: " + remaining);
                 connect(addr, selector);
                 break;
             } else if (read == 0) {
@@ -184,7 +186,7 @@ public class PerformanceBench {
             double ms = (double) receiveM / time * 1000;
 
             System.out
-                    .printf("concurrency %d, %d request, time: %dms; %.2f req/s; receive: %.2fM data; %.2f M/s\n",
+                    .printf("concurrency: %d; requests: %d; time: %dms; req/s: %.2f; receive bytes: %.2fM data; throughput: %.2f M/s\n",
                             concurrency, total, time, reqs, receiveM, ms);
             System.exit(0);
         }
