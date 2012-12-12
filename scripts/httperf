@@ -1,0 +1,75 @@
+#! /bin/bash
+
+echo "compile java code"
+
+TARGET=classes
+
+rm -rf $TARGET
+mkdir $TARGET
+
+CP=`lein classpath`
+
+find src/java -name "*.java" | xargs javac -Xlint:unchecked -encoding utf8 -cp $CP -d $TARGET -sourcepath src/java/
+find test/java -name "*.java" | xargs javac -g -Xlint:unchecked -encoding utf8 -cp $CP  -d $TARGET -sourcepath test/java
+
+java -cp "$CP:$TARGET" me.shenfeng.http.server.MultiThreadHttpServerTest &
+
+pid=$!
+
+echo "wait server start"
+sleep 3                         #  wait server start
+
+echo "warm up jvm"
+httperf --hog --num-calls=10000 --num-conns=10 --rate=10 --uri /sdfdsfsdfdsf --port 9091 --server localhost > /dev/null 2>&1
+
+
+# total 20W request; concurrency 500
+httperf --hog \
+    --num-calls=4000 \
+    --num-conns=500 \
+    --rate=500 \
+    --uri /sdfdsfsdfdsf \
+    --port 9091 \
+    --server localhost \
+
+    # --burst-length 3 \
+kill $pid
+
+rm -rf $TARGET
+
+<<COMMENT1
+
+Total: connections 500 requests 2000000 replies 2000000 test-duration 37.070 s
+
+Connection rate: 13.5 conn/s (74.1 ms/conn, <=500 concurrent connections)
+Connection time [ms]: min 31100.8 avg 35688.1 max 37007.4 median 35754.5 stddev 680.7
+Connection time [ms]: connect 0.1
+Connection length [replies/conn]: 4000.000
+
+Request rate: 53951.7 req/s (0.0 ms/req)
+Request size [B]: 74.0
+
+Reply rate [replies/s]: min 52371.0 avg 53759.0 max 54869.8 stddev 1015.1 (7 samples)
+Reply time [ms]: response 8.6 transfer 0.4
+Reply size [B]: header 66.0 content 14256.0 footer 0.0 (total 14322.0)
+Reply status: 1xx=0 2xx=2000000 3xx=0 4xx=0 5xx=0
+
+CPU time [s]: user 4.52 system 32.43 (user 12.2% system 87.5% total 99.7%)
+Net I/O: 758484.8 KB/s (6213.5*10^6 bps)
+
+Errors: total 0 client-timo 0 socket-timo 0 connrefused 0 connreset 0
+Errors: fd-unavail 0 addrunavail 0 ftab-full 0 other 0
+./scripts/httperf  10.86s user 34.58s system 100% cpu 45.093 total
+
+
+=====================================================================
+Intel(R) Core(TM) i7-2600 CPU @ 3.40GHz
+
+java version "1.7.0_04"
+Java HotSpot(TM) 64-Bit Server VM (build 23.0-b21, mixed mode)
+
+Linux miner 3.2.0-2-amd64 #1 SMP Sun Apr 15 16:47:38 UTC 2012 x86_64 GNU/Linux
+
+2012/12/11 Feng Shen <shenedu@gmail.com>
+
+COMMENT1
