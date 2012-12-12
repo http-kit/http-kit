@@ -61,7 +61,6 @@ public class ClojureRing {
     }
 
     public static ByteBuffer[] encode(int status, Map<String, Object> headers, Object body) {
-
         if (headers != null) {
             // copy to modify
             headers = new TreeMap<String, Object>(headers);

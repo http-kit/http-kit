@@ -27,7 +27,7 @@ import me.shenfeng.http.RequestTooLargeException;
 public class RequestDecoder {
 
     public enum State {
-        PROTOCOL_ERROR, ALL_READ, READ_INITIAL, READ_HEADER, READ_FIXED_LENGTH_CONTENT, READ_CHUNK_SIZE, READ_CHUNKED_CONTENT, READ_CHUNK_FOOTER, READ_CHUNK_DELIMITER,
+        ALL_READ, READ_INITIAL, READ_HEADER, READ_FIXED_LENGTH_CONTENT, READ_CHUNK_SIZE, READ_CHUNKED_CONTENT, READ_CHUNK_FOOTER, READ_CHUNK_DELIMITER,
     }
 
     HttpRequest request;
@@ -164,7 +164,7 @@ public class RequestDecoder {
     }
 
     private void readHeaders(ByteBuffer buffer) throws LineTooLargeException,
-            RequestTooLargeException {
+            RequestTooLargeException, ProtocolException {
         String line = readLine(buffer);
         while (line != null && !line.isEmpty()) {
             HttpUtils.splitAndAddHeader(line, headers);
@@ -193,7 +193,7 @@ public class RequestDecoder {
                         state = State.ALL_READ;
                     }
                 } catch (NumberFormatException e) {
-                    state = State.PROTOCOL_ERROR;
+                    throw new ProtocolException(e.getMessage());
                 }
             } else {
                 state = State.ALL_READ;

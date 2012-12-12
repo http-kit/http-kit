@@ -4,6 +4,7 @@ import static java.nio.channels.SelectionKey.OP_ACCEPT;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
 import static me.shenfeng.http.HttpUtils.SELECT_TIMEOUT;
+import static me.shenfeng.http.server.ClojureRing.encode;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -20,7 +21,9 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import me.shenfeng.http.HttpUtils;
+import me.shenfeng.http.LineTooLargeException;
 import me.shenfeng.http.ProtocolException;
+import me.shenfeng.http.RequestTooLargeException;
 import me.shenfeng.http.server.RequestDecoder.State;
 import me.shenfeng.http.ws.CloseFrame;
 import me.shenfeng.http.ws.PingFrame;
@@ -33,7 +36,7 @@ import me.shenfeng.http.ws.WsServerAtta;
 
 public class HttpServer {
 
-    private void closeKey(final SelectionKey key, CloseFrame frame) {
+    private void closeKey(final SelectionKey key, CloseFrame close) {
         SelectableChannel ch = key.channel();
         try {
             if (ch != null) {
@@ -43,8 +46,8 @@ public class HttpServer {
         }
 
         Object att = key.attachment();
-        if (att instanceof WsServerAtta) {
-            handler.handle(((WsServerAtta) att).con, frame);
+        if (att instanceof WsServerAtta) { // tell app connection closed
+            handler.handle(((WsServerAtta) att).con, close);
         }
     }
 
@@ -187,9 +190,12 @@ public class HttpServer {
             } while (buffer.hasRemaining()); // consume all
         } catch (ProtocolException e) {
             closeKey(key, CloseFrame.NORMAL);
-            // LineTooLargeException, RequestTooLargeException
-        } catch (Exception e) {
-            ByteBuffer[] buffers = ClojureRing.encode(400, null, e.getMessage());
+        } catch (RequestTooLargeException e) {
+            ByteBuffer[] buffers = encode(413, null, e.getMessage());
+            atta.addBuffer(buffers);
+            key.interestOps(OP_WRITE);
+        } catch (LineTooLargeException e) {
+            ByteBuffer[] buffers = encode(414, null, e.getMessage());
             atta.addBuffer(buffers);
             key.interestOps(OP_WRITE);
         }
