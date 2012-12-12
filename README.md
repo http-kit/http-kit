@@ -1,7 +1,7 @@
 # Http kit
 
-* An event driven ring adapter for Clojure web app.
-* An event driven HTTP client.
+* A high performance HTTP Server(Ring adapter) for Clojure web app.
+* A high performance HTTP Client.
 
 The ring adapter follows [ring SPEC]
 (https://github.com/mmcgrana/ring/blob/master/SPEC).
@@ -23,12 +23,11 @@ I write it for the HTTP server and HTTP client of [Rssminer](http://rssminer.net
 * I need an asynchronous Server and Client to proxy blogspot like sites for Rssminer's user [a feature implemented but deleted later]
 
 ## Features
-* Simple and works
 * Clean compact code: http-kit 1.3-SNAPSHOT => only 77k in size
-* Efficient support long polling
-* Efficient Support WebSocket
+* Efficient support [long polling](http://en.wikipedia.org/wiki/Comet_(programming))
+* Efficient Support [WebSocket](http://tools.ietf.org/html/rfc6455)
 * Implement the ring adapter interface, just a drop in replacement to start
-* Memory efficient. Memory is cheap, but anyway, I do my best to save it.
+* Memory efficient. Less than 1M of RAM for server, few kilobytes of RAM per connection
 * Support Socks proxy. `SSH -D` create a Socks server, in china, proxy is a must.
 
 for Efficient => just a few k of memory to maintain a connection
@@ -121,27 +120,41 @@ run it:
 
 ```
 
-## Limitation
+# Limitations (Non-features)
 
 ### HTTP client
 * HTTP proxy is not supported
 
 ### HTTP server
-* Client request is buffered in memory (very large file upload)
-* No timeout handling. The server is intended to be protected by others (like Nginx)
+
+There are only 3 conditions the server close the connection:
+
+* The protocol asked: not keep-alive http connection
+* client first closed it
+* there are network errors
+
+No timeout ticks. This is very useful for ajax long polling and Websocket.
 
 # Benchmark
 
-There is a script to do some simple benchmark. I use it to get some ideas
+The Server runs quite fast: It handles tens of thousands requests per seconds on moderate PC:
+
+There are scripts to do some benchmark. I use it to get some ideas
 about how fast it can send and receive bytes.
 
-#### Run it yourself
+#### ab version:
 ```sh
 git clone git://github.com/shenfeng/http-kit.git && cd http-kit && rake bench
 ```
 It compare with
 [ring-jetty-adapter](https://github.com/mmcgrana/ring)
 [async-ring-adapter](https://github.com/shenfeng/async-ring-adapter)
+
+#### [httperf version](https://github.com/shenfeng/http-kit/tree/master/scripts/httperf):
+
+```sh
+git clone git://github.com/shenfeng/http-kit.git && cd http-kit && ./scripts/httperf
+```
 
 ### Update history
 
@@ -152,4 +165,5 @@ It compare with
 * 1.1.1 HTTP client: allow custom ACCEPT_ENCODING, default gzip, deflate
 * 1.1.3 Better syntax for defasync
 * 1.1.6 WebSocket support
-* 1.2   fix content-type for multipart/form-data
+* 1.2   Fix content-type for multipart/form-data
+* 1.3   Support HTTP pipelining; HTTP/1.0 keep-alive; Better client side error reporting
