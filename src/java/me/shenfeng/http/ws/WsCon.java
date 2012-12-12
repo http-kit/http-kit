@@ -6,20 +6,20 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Queue;
 
+import me.shenfeng.http.server.HttpServer;
 import clojure.lang.IFn;
 
 public class WsCon {
     final SelectionKey key;
-    final Queue<SelectionKey> pendings;
     final List<IFn> onRecieveListeners = new ArrayList<IFn>(1);
     final List<IFn> onCloseListeners = new ArrayList<IFn>(1);
     private volatile boolean isClosedRuned = false;
+    final private HttpServer server;
 
-    public WsCon(SelectionKey key, Queue<SelectionKey> pendings) {
+    public WsCon(SelectionKey key, HttpServer server) {
         this.key = key;
-        this.pendings = pendings;
+        this.server = server;
     }
 
     public void addOnCloseListener(IFn fn) {
@@ -67,8 +67,7 @@ public class WsCon {
         ByteBuffer buffer = WSEncoder.encode(msg);
         WsServerAtta atta = (WsServerAtta) key.attachment();
         atta.addBuffer(buffer);
-        pendings.add(key);
-        key.selector().wakeup();
+        server.queueWrite(key);
     }
 
     public void serverClose() {
@@ -80,8 +79,7 @@ public class WsCon {
         WsServerAtta atta = (WsServerAtta) key.attachment();
         atta.addBuffer(WSEncoder.encode(WSDecoder.OPCODE_CLOSE, s.array()));
         atta.closeOnfinish = true;
-        pendings.add(key);
-        key.selector().wakeup();
+        server.queueWrite(key);
         onClose(status);
     }
 

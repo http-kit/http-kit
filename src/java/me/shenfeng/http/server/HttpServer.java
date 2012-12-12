@@ -92,6 +92,11 @@ public class HttpServer {
 
     private ConcurrentLinkedQueue<SelectionKey> pendings = new ConcurrentLinkedQueue<SelectionKey>();
 
+    public void queueWrite(final SelectionKey key) {
+        pendings.add(key);
+        selector.wakeup(); // JVM is smart enough: only once per loop
+    }
+
     // shared, single thread
     private ByteBuffer buffer = ByteBuffer.allocateDirect(1024 * 64);
 
@@ -162,8 +167,6 @@ public class HttpServer {
         InetSocketAddress addr = new InetSocketAddress(ip, port);
         serverChannel.socket().bind(addr);
         serverChannel.register(selector, OP_ACCEPT);
-//        System.out.println(String.format("http server start %s@%d, max body: %d", ip, port,
-//                maxBody));
     }
 
     private void decodeHttp(HttpServerAtta atta, SelectionKey key, SocketChannel ch) {
@@ -172,12 +175,12 @@ public class HttpServer {
             if (decoder.decode(buffer) == State.ALL_READ) {
                 HttpRequest request = decoder.request;
                 if (request.isWs()) {
-                    WsCon con = new WsCon(key, pendings);
+                    WsCon con = new WsCon(key, this);
                     request.setWebSocketCon(con);
                     key.attach(new WsServerAtta(con));
                 }
                 request.setRemoteAddr(ch.socket().getRemoteSocketAddress());
-                handler.handle(request, new ResponseCallback(pendings, key));
+                handler.handle(request, new ResponseCallback(key, this));
             }
         } catch (ProtocolException e) {
             closeKey(key, CloseFrame.NORMAL);

@@ -2,25 +2,22 @@ package me.shenfeng.http.server;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
-import java.util.Queue;
 
 public class ResponseCallback {
     private final SelectionKey key;
-    private final Queue<SelectionKey> pendings;
+    private final HttpServer server;
 
-    public ResponseCallback(Queue<SelectionKey> pendings, SelectionKey key) {
-        this.pendings = pendings;
+    public ResponseCallback(SelectionKey key, HttpServer server) {
         this.key = key;
+        this.server = server;
     }
 
     // maybe in another thread :worker thread
     public void run(ByteBuffer... buffers) {
         ServerAtta atta = (ServerAtta) key.attachment();
-        for (ByteBuffer b : buffers) {
-            atta.addBuffer(b);
-        }
+        atta.addBuffer(buffers);
+        // TODO make sure this works with HTTP pipeline
         atta.reset();
-        pendings.offer(key);
-        key.selector().wakeup();
+        server.queueWrite(key);
     }
 }
