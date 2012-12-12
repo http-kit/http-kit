@@ -24,7 +24,7 @@ I write it for the HTTP server and HTTP client of [Rssminer](http://rssminer.net
 
 ## Features
 * Simple and works
-* Clean compact code
+* Clean compact code: http-kit 1.3-SNAPSHOT => only 77k in size
 * Efficient support long polling
 * Efficient Support WebSocket
 * Implement the ring adapter interface, just a drop in replacement to start
