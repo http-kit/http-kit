@@ -14,6 +14,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import me.shenfeng.http.HttpUtils;
+import me.shenfeng.http.HttpVersion;
 import me.shenfeng.http.PrefixThreafFactory;
 import me.shenfeng.http.ws.CloseFrame;
 import me.shenfeng.http.ws.TextFrame;
@@ -35,34 +36,18 @@ public class RingHandler implements IHandler {
         this.handler = handler;
     }
 
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     public void handle(final HttpRequest req, final ResponseCallback cb) {
         execs.submit(new Runnable() {
-            @SuppressWarnings({ "rawtypes", "unchecked" })
             public void run() {
                 try {
                     Map resp = (Map) handler.invoke(buildRequestMap(req));
                     if (resp != null) {
-                        final Map headers = (Map) resp.get(HEADERS);
                         Object body = resp.get(BODY);
-                        final int status = getStatus(resp);
                         if (body instanceof IListenableFuture) {
-                            final IListenableFuture future = (IListenableFuture) body;
-                            future.addListener(new Runnable() {
-                                public void run() {
-                                    Object r = future.get();
-                                    if (r instanceof Map) {
-                                        Map resp2 = (Map) r;
-                                        Map<String, Object> headers2 = (Map) resp2.get(HEADERS);
-                                        int status2 = getStatus(resp2);
-                                        Object body2 = resp2.get(BODY);
-                                        cb.run(encode(status2, headers2, body2));
-                                    } else {
-                                        cb.run(encode(status, headers, r));
-                                    }
-                                }
-                            });
+                            asyncHandle(cb, resp, (IListenableFuture) body);
                         } else {
-                            cb.run(encode(status, headers, body));
+                            cb.run(encode(getStatus(resp), getHeaders(resp), body));
                         }
                     } else {
                         // when handler return null: 404
@@ -70,8 +55,33 @@ public class RingHandler implements IHandler {
                     }
                 } catch (Throwable e) {
                     cb.run(encode(500, null, e.getMessage()));
-                    HttpUtils.printError("ring handler", e);
+                    HttpUtils.printError("ring handler: " + e.getMessage(), e);
                 }
+            }
+
+            private Map<String, Object> getHeaders(final Map resp) {
+                Map<String, Object> headers = (Map) resp.get(HEADERS);
+                if (req.version == HttpVersion.HTTP_1_0 && req.isKeepAlive()
+                        && !headers.containsKey("Connection")) {
+                    // ab -k, or Nginx reverse proxy need it
+                    headers.put("Connection", "Keep-Alive");
+                }
+                return headers;
+            }
+
+            private void asyncHandle(final ResponseCallback cb, final Map resp,
+                    final IListenableFuture future) {
+                future.addListener(new Runnable() {
+                    public void run() {
+                        Object r = future.get();
+                        if (r instanceof Map) {
+                            Map resp2 = (Map) r;
+                            cb.run(encode(getStatus(resp2), getHeaders(resp2), resp2.get(BODY)));
+                        } else {
+                            cb.run(encode(getStatus(resp), getHeaders(resp), r));
+                        }
+                    }
+                });
             }
         });
     }

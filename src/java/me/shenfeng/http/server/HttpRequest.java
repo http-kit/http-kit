@@ -19,11 +19,11 @@ public class HttpRequest {
     private int serverPort;
     private String serverName;
     private InetSocketAddress remoteAddr;
-    private String queryString;
-    private String uri;
-    private HttpMethod method;
+    public final String queryString;
+    public final String uri;
+    public final HttpMethod method;
     private Map<String, String> headers;
-    private HttpVersion version;
+    public final HttpVersion version;
     private int contentLength = 0;
     private byte[] body;
     private String contentType;
@@ -72,14 +72,6 @@ public class HttpRequest {
         return serverName;
     }
 
-    public HttpMethod getMethod() {
-        return method;
-    }
-
-    public String getQueryString() {
-        return queryString;
-    }
-
     public String getRemoteAddr() {
         String h = headers.get(HttpUtils.X_FORWARDED_FOR);
         if (null != h) {
@@ -101,10 +93,6 @@ public class HttpRequest {
 
     public int getServerPort() {
         return serverPort;
-    }
-
-    public String getUri() {
-        return uri;
     }
 
     public boolean isKeepAlive() {

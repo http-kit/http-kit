@@ -172,16 +172,19 @@ public class HttpServer {
     private void decodeHttp(HttpServerAtta atta, SelectionKey key, SocketChannel ch) {
         RequestDecoder decoder = atta.decoder;
         try {
-            if (decoder.decode(buffer) == State.ALL_READ) {
-                HttpRequest request = decoder.request;
-                if (request.isWs()) {
-                    WsCon con = new WsCon(key, this);
-                    request.setWebSocketCon(con);
-                    key.attach(new WsServerAtta(con));
+            do {
+                if (decoder.decode(buffer) == State.ALL_READ) {
+                    HttpRequest request = decoder.request;
+                    if (request.isWs()) {
+                        WsCon con = new WsCon(key, this);
+                        request.setWebSocketCon(con);
+                        key.attach(new WsServerAtta(con));
+                    }
+                    request.setRemoteAddr(ch.socket().getRemoteSocketAddress());
+                    handler.handle(request, new ResponseCallback(key, this));
+                    atta.reset(); // support HTTP Pipelining
                 }
-                request.setRemoteAddr(ch.socket().getRemoteSocketAddress());
-                handler.handle(request, new ResponseCallback(key, this));
-            }
+            } while (buffer.hasRemaining()); // consume all
         } catch (ProtocolException e) {
             closeKey(key, CloseFrame.NORMAL);
             // LineTooLargeException, RequestTooLargeException
@@ -194,20 +197,22 @@ public class HttpServer {
 
     private void decodeWs(WsServerAtta atta, SelectionKey key, SocketChannel ch) {
         try {
-            WSFrame frame = atta.decoder.decode(buffer);
-            if (frame instanceof TextFrame) {
-                handler.handle(atta.con, frame);
-                atta.reset();
-            } else if (frame instanceof PingFrame) {
-                atta.addBuffer(WSEncoder.encode(WSDecoder.OPCODE_PONG, frame.data));
-                atta.reset();
-                key.interestOps(OP_WRITE);
-            } else if (frame instanceof CloseFrame) {
-                handler.handle(atta.con, frame);
-                atta.closeOnfinish = true;
-                atta.addBuffer(WSEncoder.encode(WSDecoder.OPCODE_CLOSE, frame.data));
-                key.interestOps(OP_WRITE);
-            }
+            do {
+                WSFrame frame = atta.decoder.decode(buffer);
+                if (frame instanceof TextFrame) {
+                    handler.handle(atta.con, frame);
+                    atta.reset();
+                } else if (frame instanceof PingFrame) {
+                    atta.addBuffer(WSEncoder.encode(WSDecoder.OPCODE_PONG, frame.data));
+                    atta.reset();
+                    key.interestOps(OP_WRITE);
+                } else if (frame instanceof CloseFrame) {
+                    handler.handle(atta.con, frame);
+                    atta.closeOnfinish = true;
+                    atta.addBuffer(WSEncoder.encode(WSDecoder.OPCODE_CLOSE, frame.data));
+                    key.interestOps(OP_WRITE);
+                }
+            } while (buffer.hasRemaining()); // consume all
         } catch (ProtocolException e) {
             // TODO error msg
             closeKey(key, CloseFrame.MESG_BIG);

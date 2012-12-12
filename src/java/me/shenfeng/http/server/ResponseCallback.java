@@ -16,8 +16,6 @@ public class ResponseCallback {
     public void run(ByteBuffer... buffers) {
         ServerAtta atta = (ServerAtta) key.attachment();
         atta.addBuffer(buffers);
-        // TODO make sure this works with HTTP pipeline
-        atta.reset();
         server.queueWrite(key);
     }
 }

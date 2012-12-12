@@ -116,14 +116,14 @@ public class ClojureRing {
         m.put(SERVER_PORT, req.getServerPort());
         m.put(SERVER_NAME, req.getServerName());
         m.put(REMOTE_ADDR, req.getRemoteAddr());
-        m.put(URI, req.getUri());
-        m.put(QUERY_STRING, req.getQueryString());
+        m.put(URI, req.uri);
+        m.put(QUERY_STRING, req.queryString);
         m.put(SCHEME, HTTP); // only http is supported
-        if(req.isWs()) {
+        if (req.isWs()) {
             m.put(WEBSOCKET, req.getWebSocketCon());
         }
 
-        switch (req.getMethod()) {
+        switch (req.method) {
         case DELETE:
             m.put(REQUEST_METHOD, M_DELETE);
             break;

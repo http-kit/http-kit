@@ -34,7 +34,7 @@ public class RequestDecoder {
     int readRemaining = 0;
     byte[] content;
     int readCount = 0;
-    private final Map<String, String> headers = new TreeMap<String, String>();
+    private Map<String, String> headers = new TreeMap<String, String>();
     private final int maxBody;
     private State state = State.READ_INITIAL;
 
@@ -229,8 +229,9 @@ public class RequestDecoder {
 
     public void reset() {
         state = State.READ_INITIAL;
-        headers.clear();
+        headers = new TreeMap<String, String>();
         readCount = 0;
+        content = null;
     }
 
     private void throwIfBodyIsTooLarge() throws RequestTooLargeException {
