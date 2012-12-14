@@ -7,6 +7,7 @@ import static me.shenfeng.http.server.ClojureRing.encode;
 import static me.shenfeng.http.server.ClojureRing.getStatus;
 
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
@@ -61,8 +62,10 @@ public class RingHandler implements IHandler {
 
             private Map<String, Object> getHeaders(final Map resp) {
                 Map<String, Object> headers = (Map) resp.get(HEADERS);
-                if (req.version == HttpVersion.HTTP_1_0 && req.isKeepAlive()
+                if (headers != null && req.version == HttpVersion.HTTP_1_0 && req.isKeepAlive()
                         && !headers.containsKey("Connection")) {
+                    // copy to modify
+                    headers = new TreeMap<String, Object>(headers);
                     // ab -k, or Nginx reverse proxy need it
                     headers.put("Connection", "Keep-Alive");
                 }
