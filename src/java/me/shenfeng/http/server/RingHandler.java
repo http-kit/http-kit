@@ -52,21 +52,24 @@ public class RingHandler implements IHandler {
                         }
                     } else {
                         // when handler return null: 404
-                        cb.run(encode(404, null, null));
+                        cb.run(encode(404, new TreeMap<String, Object>(), null));
                     }
                 } catch (Throwable e) {
-                    cb.run(encode(500, null, e.getMessage()));
+                    cb.run(encode(500, new TreeMap<String, Object>(), e.getMessage()));
                     HttpUtils.printError("ring handler: " + e.getMessage(), e);
                 }
             }
 
             private Map<String, Object> getHeaders(final Map resp) {
                 Map<String, Object> headers = (Map) resp.get(HEADERS);
-                if (headers != null && req.version == HttpVersion.HTTP_1_0 && req.isKeepAlive()
-                        && !headers.containsKey("Connection")) {
-                    // copy to modify
+                // copy to modify
+                if (headers == null) {
+                    headers = new TreeMap<String, Object>();
+                } else {
                     headers = new TreeMap<String, Object>(headers);
-                    // ab -k, or Nginx reverse proxy need it
+                }
+                if (req.version == HttpVersion.HTTP_1_0 && req.isKeepAlive()
+                        && !headers.containsKey("Connection")) {
                     headers.put("Connection", "Keep-Alive");
                 }
                 return headers;

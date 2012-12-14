@@ -18,6 +18,7 @@ import java.nio.channels.SocketChannel;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import me.shenfeng.http.HttpUtils;
@@ -191,11 +192,11 @@ public class HttpServer {
         } catch (ProtocolException e) {
             closeKey(key, CloseFrame.NORMAL);
         } catch (RequestTooLargeException e) {
-            ByteBuffer[] buffers = encode(413, null, e.getMessage());
+            ByteBuffer[] buffers = encode(413, new TreeMap<String, Object>(), e.getMessage());
             atta.addBuffer(buffers);
             key.interestOps(OP_WRITE);
         } catch (LineTooLargeException e) {
-            ByteBuffer[] buffers = encode(414, null, e.getMessage());
+            ByteBuffer[] buffers = encode(414, new TreeMap<String, Object>(), e.getMessage());
             atta.addBuffer(buffers);
             key.interestOps(OP_WRITE);
         }
@@ -263,6 +264,7 @@ public class HttpServer {
                     k.channel().close();
                 }
                 selector.close();
+                handler.close();
             } catch (IOException ignore) {
             }
             serverThread.interrupt();

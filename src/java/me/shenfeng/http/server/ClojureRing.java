@@ -10,9 +10,13 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.TreeMap;
 
 import me.shenfeng.http.DynamicBytes;
@@ -22,6 +26,22 @@ import clojure.lang.ISeq;
 import clojure.lang.Keyword;
 import clojure.lang.PersistentArrayMap;
 import clojure.lang.Seqable;
+
+//  SimpleDateFormat is not threadsafe
+class DateFormater extends ThreadLocal<SimpleDateFormat> {
+    protected SimpleDateFormat initialValue() {
+        // Formats into HTTP date format (RFC 822/1123).
+        SimpleDateFormat f = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.US);
+        f.setTimeZone(TimeZone.getTimeZone("GMT"));
+        return f;
+    }
+
+    private static final DateFormater FORMATER = new DateFormater();
+
+    public static String getDate() {
+        return FORMATER.get().format(new Date());
+    }
+}
 
 public class ClojureRing {
 
@@ -61,13 +81,10 @@ public class ClojureRing {
     }
 
     public static ByteBuffer[] encode(int status, Map<String, Object> headers, Object body) {
-        if (headers != null) {
-            // copy to modify
-            headers = new TreeMap<String, Object>(headers);
-        } else {
-            headers = new TreeMap<String, Object>();
-        }
+        // headers can saftly modified
         ByteBuffer bodyBuffer = null, headBuffer = null;
+        headers.put("Server", "http-kit");
+        headers.put("Date", DateFormater.getDate());
         try {
             if (body == null) {
                 headers.put(HttpUtils.CONTENT_LENGTH, "0");
@@ -149,7 +166,6 @@ public class ClojureRing {
         m.put(CONTENT_LENGTH, req.getContentLength());
         m.put(CHARACTER_ENCODING, req.getCharactorEncoding());
         m.put(BODY, req.getBody());
-        // m.put(KEEP_ALIVE, req.isKeepAlive()); it handled by server,
         return PersistentArrayMap.create(m);
     }
 }

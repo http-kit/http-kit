@@ -63,6 +63,7 @@
                  (send-mesg con msg))))
 
 (defroutes test-routes
+  (GET "/" [] "hello world")
   (GET "/spec-get" [] test-get-spec)
   (POST "/spec-post" [] test-post-spec)
   (GET "/string" [] (fn [req] {:status 200
@@ -156,12 +157,13 @@
     (is (= 200 (:status resp)))
     (is (= (str size) (:body resp)))))
 
+;;; java -cp `lein classpath` clojure.main -m me.shenfeng.http.server.server-test
 (defonce tmp-server (atom nil))
-
 (defn -main [& args]
   (when-let [server @tmp-server]
     (server))
-  (reset! tmp-server (run-server (site test-routes) {:port 4347})))
+  (reset! tmp-server (run-server (site test-routes) {:port 4347}))
+  (println "server started at :4347"))
 
 ;; (deftest test-ws
 ;;   (let [resp (http/get "http://localhost:4347/ws"
