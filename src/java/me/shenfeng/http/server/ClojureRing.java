@@ -81,7 +81,7 @@ public class ClojureRing {
     }
 
     public static ByteBuffer[] encode(int status, Map<String, Object> headers, Object body) {
-        // headers can saftly modified
+        // headers can be modified,  upper logic copy to modify
         ByteBuffer bodyBuffer = null, headBuffer = null;
         headers.put("Server", "http-kit");
         headers.put("Date", DateFormater.getDate());
@@ -98,7 +98,8 @@ public class ClojureRing {
                 headers.put(HttpUtils.CONTENT_LENGTH, Integer.toString(b.length()));
             } else if (body instanceof File) {
                 File f = (File) body;
-                // serving file is better be done by nginx
+                // length header is set by upper logic
+                // serving file is better be done by Nginx
                 byte[] b = readAll(f);
                 bodyBuffer = ByteBuffer.wrap(b);
             } else if (body instanceof Seqable) {

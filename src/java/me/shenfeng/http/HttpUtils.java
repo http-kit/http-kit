@@ -221,8 +221,8 @@ public class HttpUtils {
     }
 
     public static DynamicBytes readAll(InputStream is) throws IOException {
-        DynamicBytes bytes = new DynamicBytes(1024);
-        byte[] buffer = new byte[4096];
+        DynamicBytes bytes = new DynamicBytes(32768); // init 16k
+        byte[] buffer = new byte[16384];
         int read;
         while ((read = is.read(buffer)) != -1) {
             bytes.append(buffer, 0, read);
