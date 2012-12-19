@@ -16,8 +16,10 @@
                    (File/createTempFile "tmp_" extension)
                  (.deleteOnExit))]
        (with-open [w (FileOutputStream. tmp)]
-         (doseq [i (range size)]
-           (.write w ^Integer i)))
+         (.write w ^bytes (byte-array size
+                                      (map (fn [i]
+                                             (byte (+ (int \a) (rem i 26))))
+                                           (range size)))))
        tmp)))
 
 (defn test-get-spec [req]
@@ -62,6 +64,12 @@
   (on-mesg con (fn [msg]
                  (send-mesg con msg))))
 
+(defn response-inputstream [req]
+  (let [l (-> req :params :l Integer/valueOf)
+        file (gen-tempfile l ".txt")]
+    {:status 200
+     :body (FileInputStream. file)}))
+
 (defroutes test-routes
   (GET "/" [] "hello world")
   (GET "/spec-get" [] test-get-spec)
@@ -81,9 +89,7 @@
   (POST "/chunked" [] (fn [req] {:status 200
                                 :body (str (:content-length req))}))
   (GET "/null" [] (wrap-file-info (fn [req] {:status 200 :body nil})))
-  (GET "/inputstream" [] (fn [req]
-                           {:status 200
-                            :body (FileInputStream. (gen-tempfile 67000 ".txt"))}))
+  (GET "/inputstream" [] response-inputstream)
   (GET "/async" [] async)
   (GET "/ws" [] ws-handler)
   (GET "/just-body" [] async-just-body))
@@ -113,9 +119,11 @@
     (is (:body resp))))
 
 (deftest test-body-inputstream
-  (let [resp (http/get "http://localhost:4347/inputstream")]
-    (is (= (:status resp) 200))
-    (is (:body resp))))
+  (doseq [length (range 1 (* 1024 1024 5) 439987)] ; max 5m, many files
+    (let [uri (str "http://localhost:4347/inputstream?l=" length)
+          resp (http/get uri)]
+      (is (= (:status resp) 200))
+      (is (= length (count (:body resp)))))))
 
 (deftest test-body-iseq
   (let [resp (http/get "http://localhost:4347/iseq")]
@@ -163,7 +171,7 @@
   (when-let [server @tmp-server]
     (server))
   (reset! tmp-server (run-server (site test-routes) {:port 4347}))
-  (println "server started at :4347"))
+  (println "server started at 0.0.0.0:4347"))
 
 ;; (deftest test-ws
 ;;   (let [resp (http/get "http://localhost:4347/ws"

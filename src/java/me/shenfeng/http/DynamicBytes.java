@@ -15,8 +15,7 @@ public class DynamicBytes {
         if (idx + more > data.length) {
             int after = (int) ((idx + more) * 1.33);
             // String msg = "expand memory, from " + data.length + " to " +
-            // after + "; need "
-            // + more;
+            // after + "; need " + more;
             // System.out.println(msg);
             data = Arrays.copyOf(data, after);
         }

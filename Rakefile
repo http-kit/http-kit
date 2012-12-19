@@ -2,7 +2,7 @@ task :default => :test
 
 desc "Run unit test"
 task :test do
-  sh 'rm -rf classes && lein javac && lein test'
+  sh 'rm -rf target classes && lein javac && lein test'
 end
 
 desc "Install in local repository"
