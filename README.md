@@ -23,7 +23,8 @@ I write it for the HTTP server and HTTP client of [Rssminer](http://rssminer.net
 * I need an asynchronous Server and Client to proxy blogspot like sites for Rssminer's user [a feature implemented but deleted later]
 
 ## Features
-* Clean compact code: http-kit 1.3-SNAPSHOT => only 77k in size
+* Clean compact code: the jar size is about 78k
+* Zero dependency
 * Efficient support [long polling](http://en.wikipedia.org/wiki/Comet_(programming))
 * Efficient Support [WebSocket](http://tools.ietf.org/html/rfc6455)
 * Implement the ring adapter interface, just a drop in replacement to start
