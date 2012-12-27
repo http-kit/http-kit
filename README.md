@@ -167,4 +167,4 @@ git clone git://github.com/shenfeng/http-kit.git && cd http-kit && ./scripts/htt
 * 1.1.3 Better syntax for defasync
 * 1.1.6 WebSocket support
 * 1.2   Fix content-type for multipart/form-data
-* 1.3   Support HTTP pipelining; HTTP/1.0 keep-alive; Better client side error reporting
+* 1.3   Support HTTP/1.0 keep-alive; Better client side error reporting; Better serving larget file(mmap)

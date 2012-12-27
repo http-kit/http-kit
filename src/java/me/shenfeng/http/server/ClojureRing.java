@@ -10,6 +10,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -97,11 +98,9 @@ public class ClojureRing {
                 bodyBuffer = ByteBuffer.wrap(b.get(), 0, b.length());
                 headers.put(HttpUtils.CONTENT_LENGTH, Integer.toString(b.length()));
             } else if (body instanceof File) {
-                File f = (File) body;
                 // length header is set by upper logic
                 // serving file is better be done by Nginx
-                byte[] b = readAll(f);
-                bodyBuffer = ByteBuffer.wrap(b);
+                bodyBuffer = readAll((File)body);
             } else if (body instanceof Seqable) {
                 ISeq seq = ((Seqable) body).seq();
                 DynamicBytes b = new DynamicBytes(seq.count() * 512);

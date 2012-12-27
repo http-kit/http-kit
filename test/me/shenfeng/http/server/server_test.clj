@@ -79,16 +79,17 @@
                               :body "Hello World"}))
   (GET "/iseq" [] (fn [req] {:status 200
                             :headers {"Content-Type" "text/plain"}
-                            :body (list "Hello " "World")}))
+                            :body (range 1 10)}))
   (GET "/file" [] (wrap-file-info (fn [req]
                                     {:status 200
-                                     :body (gen-tempfile 6000 ".txt")})))
+                                     :body (let [l (Integer/valueOf (or (-> req :params :l) "5024000"))]
+                                             (gen-tempfile l ".txt"))})))
   (POST "/multipart" [] (fn [req] (let [{:keys [title file]} (:params req)]
                                    {:status 200
                                     :body (str title ": " (:size file))})))
   (POST "/chunked" [] (fn [req] {:status 200
                                 :body (str (:content-length req))}))
-  (GET "/null" [] (wrap-file-info (fn [req] {:status 200 :body nil})))
+  (GET "/null" [] (fn [req] {:status 200 :body nil}))
   (GET "/inputstream" [] response-inputstream)
   (GET "/async" [] async)
   (GET "/ws" [] ws-handler)
@@ -113,13 +114,20 @@
     (is (= (:body resp) "Hello World"))))
 
 (deftest test-body-file
+  (doseq [length (range 1 (* 1024 1024 5) 739987)]
+    (let [resp (http/get "http://localhost:4347/file?l=" length)]
+      (is (= (:status resp) 200))
+      (is (= (get-in resp [:headers "content-type"]) "text/plain"))
+      (is (= length (count (:body resp)))))))
+
+(deftest test-body-file
   (let [resp (http/get "http://localhost:4347/file")]
     (is (= (:status resp) 200))
     (is (= (get-in resp [:headers "content-type"]) "text/plain"))
     (is (:body resp))))
 
 (deftest test-body-inputstream
-  (doseq [length (range 1 (* 1024 1024 5) 439987)] ; max 5m, many files
+  (doseq [length (range 1 (* 1024 1024 5) 739987)] ; max 5m, many files
     (let [uri (str "http://localhost:4347/inputstream?l=" length)
           resp (http/get uri)]
       (is (= (:status resp) 200))
@@ -129,7 +137,7 @@
   (let [resp (http/get "http://localhost:4347/iseq")]
     (is (= (:status resp) 200))
     (is (= (get-in resp [:headers "content-type"]) "text/plain"))
-    (is (= (:body resp) "Hello World"))))
+    (is (= (:body resp) (apply str (range 1 10))))))
 
 (deftest test-body-null
   (let [resp (http/get "http://localhost:4347/null")]

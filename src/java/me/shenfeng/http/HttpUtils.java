@@ -13,7 +13,10 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.SelectableChannel;
+import java.nio.channels.FileChannel.MapMode;
 import java.nio.charset.Charset;
 import java.util.Date;
 import java.util.Iterator;
@@ -199,25 +202,32 @@ public class HttpUtils {
 
     }
 
-    public static byte[] readAll(File f) throws IOException {
+    public static ByteBuffer readAll(File f) throws IOException {
         int length = (int) f.length();
-        byte[] bytes = new byte[length];
-        FileInputStream fs = null;
-        try {
-            fs = new FileInputStream(f);
-            int offset = 0;
-            while (offset < length) {
-                offset += fs.read(bytes, offset, length - offset);
-            }
-        } finally {
-            if (fs != null) {
-                try {
-                    fs.close();
-                } catch (Exception ignore) {
+        if (length >= 1024 * 1024 * 2) { // 2M
+            FileInputStream fs = new FileInputStream(f);
+            MappedByteBuffer buffer = fs.getChannel().map(MapMode.READ_ONLY, 0, length);
+            fs.close();
+            return buffer;
+        } else {
+            byte[] bytes = new byte[length];
+            FileInputStream fs = null;
+            try {
+                fs = new FileInputStream(f);
+                int offset = 0;
+                while (offset < length) {
+                    offset += fs.read(bytes, offset, length - offset);
+                }
+            } finally {
+                if (fs != null) {
+                    try {
+                        fs.close();
+                    } catch (Exception ignore) {
+                    }
                 }
             }
+            return ByteBuffer.wrap(bytes);
         }
-        return bytes;
     }
 
     public static DynamicBytes readAll(InputStream is) throws IOException {
