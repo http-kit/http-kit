@@ -4,11 +4,7 @@
            javax.xml.bind.DatatypeConverter
            java.security.MessageDigest))
 
-(defn accept [key]
-  (let [md (MessageDigest/getInstance "SHA1")
-        websocket-13-guid "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"]
-    (DatatypeConverter/printBase64Binary
-     (.digest md (.getBytes ^String (str key websocket-13-guid))))))
+;;;; Ring server
 
 (defn run-server
   [handler {:keys [port thread ip max-body max-line worker-name-prefix]
@@ -21,39 +17,48 @@
   (let [h (RingHandler. thread handler worker-name-prefix)
         s (HttpServer. ip port h max-body max-line)]
     (.start s)
-    ;; return a function to stop this server
-    (fn [] (.close h) (.stop s))))
+    (fn stop-server [] (.close h) (.stop s))))
 
-(defmacro defasync [name [req] cb & body]
-  `(defn ~name [~req]
+;;;; Asynchronous extension
+
+(defmacro defasync [name [request] callback-name & body]
+  `(defn ~name [~request]
      {:status 200
       :headers {}
       :body (let [data# (atom {})
-                  ~cb (fn [resp#]
-                        (reset! data# (assoc @data# :r resp#))
-                        (when-let [l# ^Runnable (:l @data#)]
-                          (.run l#)))]
+                  ~callback-name
+                  (fn [response#]
+                    (reset! data# (assoc @data# :response response#))
+                    (when-let [listener# ^Runnable (:listener @data#)]
+                      (.run listener#)))]
               (do ~@body)
               (reify IListenableFuture
                 (addListener [this# listener#]
-                  (if-let [d# (:r @data#)]
+                  (if-let [d# (:response @data#)]
                     (.run ^Runnable listener#)
-                    (reset! data# (assoc @data# :l listener#))))
-                (get [this#]
-                  (:r @data#))))}))
+                    (reset! data# (assoc @data# :listener listener#))))
+                (get [this#] (:response @data#))))}))
 
-(defn on-mesg   [^WsCon con fn]  (.addRecieveListener con fn))
-(defn on-close  [^WsCon con fn]  (.addOnCloseListener con fn))
-(defn send-mesg [^WsCon con msg] (.send con msg))
+;;;; WebSockets
+
+(defn accept [key]
+  (let [md (MessageDigest/getInstance "SHA1")
+        websocket-13-guid "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"]
+    (DatatypeConverter/printBase64Binary
+     (.digest md (.getBytes (str key websocket-13-guid))))))
+
+(defn on-mesg   [^WsCon conn fn]  (.addRecieveListener conn fn))
+(defn on-close  [^WsCon conn fn]  (.addOnCloseListener conn fn))
+(defn send-mesg [^WsCon conn msg] (.send conn msg))
 (defn close-conn
-  ([con]        (.serverClose ^WsCon con))
-  ([con status] (.serverClose ^WsCon con status)))
+  ([^WsCon conn]        (.serverClose conn))
+  ([^WsCon conn status] (.serverClose conn status)))
 
-(defmacro defwshandler [name [req] con & body]
-  `(defn ~name [~req]
-     (let [~con (:websocket ~req)
-           key# (get-in ~req [:headers "sec-websocket-key"])]
-       (if (and ~con key#)
+(defmacro defwshandler [name [request] conn-name & body]
+  `(defn ~name [~request]
+     (let [~conn-name (:websocket ~request)
+           key# (get-in ~request [:headers "sec-websocket-key"])]
+       (if (and ~conn-name key#)
          (do ~@body
              {:status 101
               :headers {"Upgrade" "websocket"
@@ -63,4 +68,4 @@
                         }})
          {:status 400
           :headers {}
-          :body "websocket expected"}))))
+          :body "Websocket expected"}))))
