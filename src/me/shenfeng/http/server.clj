@@ -28,15 +28,15 @@
       :body (let [data# (atom {})
                   ~callback-name
                   (fn [response#]
-                    (reset! data# (assoc @data# :response response#))
-                    (when-let [listener# ^Runnable (:listener @data#)]
-                      (.run listener#)))]
+                    (swap! data# assoc :response response#)
+                    (when-let [listener# (:listener @data#)]
+                      (.run ^Runnable listener#)))]
               (do ~@body)
               (reify IListenableFuture
                 (addListener [this# listener#]
-                  (if-let [d# (:response @data#)]
+                  (if (:response @data#)
                     (.run ^Runnable listener#)
-                    (reset! data# (assoc @data# :listener listener#))))
+                    (swap! data# assoc :listener listener#)))
                 (get [this#] (:response @data#))))}))
 
 ;;;; WebSockets
