@@ -10,13 +10,14 @@
     (DatatypeConverter/printBase64Binary
      (.digest md (.getBytes ^String (str key websocket-13-guid))))))
 
-(defn run-server [handler {:keys [port thread ip max-body max-line worker-name-prefix]
-                           :or {ip "0.0.0.0"
-                                port 8090
-                                thread 4
-                                worker-name-prefix "worker-"
-                                max-body 8388608 ; max http body: 8m
-                                max-line 4096}}] ; max http inital line length: 4K
+(defn run-server
+  [handler {:keys [port thread ip max-body max-line worker-name-prefix]
+            :or   {ip "0.0.0.0"
+                   port 8090
+                   thread 4
+                   worker-name-prefix "worker-"
+                   max-body 8388608 ; max http body: 8m
+                   max-line 4096}}] ; max http inital line length: 4K
   (let [h (RingHandler. thread handler worker-name-prefix)
         s (HttpServer. ip port h max-body max-line)]
     (.start s)
@@ -41,16 +42,11 @@
                 (get [this#]
                   (:r @data#))))}))
 
-(defn on-mesg [^WsCon con fn]
-  (.addRecieveListener con fn))
-
+(defn on-mesg   [^WsCon con fn]  (.addRecieveListener con fn))
+(defn on-close  [^WsCon con fn]  (.addOnCloseListener con fn))
 (defn send-mesg [^WsCon con msg] (.send con msg))
-
-(defn on-close [^WsCon con fn]
-  (.addOnCloseListener con fn))
-
 (defn close-conn
-  ([con] (.serverClose ^WsCon con))
+  ([con]        (.serverClose ^WsCon con))
   ([con status] (.serverClose ^WsCon con status)))
 
 (defmacro defwshandler [name [req] con & body]
