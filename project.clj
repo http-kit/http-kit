@@ -1,7 +1,8 @@
 (defproject me.shenfeng/http-kit "1.3-SNAPSHOT"
-  :description "Event driven HTTP server and HTTP client in java and clojure"
+  :description "High-performance event-driven Clojure HTTP client/server"
   :dependencies [[org.clojure/clojure "1.4.0"]]
   :warn-on-reflection true
+  :min-lein-version "2.0.0"
   :url "https://github.com/shenfeng/http-kit"
   :javac-options ["-source" "1.6" "-target" "1.6" "-g"]
   :java-source-paths ["src/java"]
