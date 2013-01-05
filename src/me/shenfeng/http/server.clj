@@ -10,14 +10,15 @@
 (defn run-server
   "Starts Ring-compatible HTTP server and returns a nullary function that stops
   the server."
-  [handler {:keys [port thread ip max-body max-line worker-name-prefix]
-            :or   {ip "0.0.0.0"
-                   port 8090
-                   thread 4
-                   worker-name-prefix "worker-"
+  [handler {:keys [port thread ip max-body max-line worker-name-prefix queue-size]
+            :or   {ip "0.0.0.0"         ; which ip (if has many ips) to bind
+                   port 8090            ; which port listen incomming request
+                   thread 4             ; http worker thread count
+                   queue-size 512       ; max job queued before reject
+                   worker-name-prefix "worker-" ; woker thread name prefix
                    max-body 8388608 ; max http body: 8m
                    max-line 4096}}] ; max http inital line length: 4K
-  (let [h (RingHandler. thread handler worker-name-prefix)
+  (let [h (RingHandler. thread handler worker-name-prefix queue-size)
         s (HttpServer. ip port h max-body max-line)]
     (.start s)
     (fn stop-server [] (.close h) (.stop s))))

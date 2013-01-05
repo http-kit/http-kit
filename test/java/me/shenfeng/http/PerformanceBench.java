@@ -67,12 +67,12 @@ public class PerformanceBench {
         }
     }
 
-    final static int concurrency = 1000;
+    final static int concurrency = 5000;
     final static int total = 2000000;
     static int remaining = total;
     static long totalByteReceive = 0;
 
-    static InetSocketAddress addr = new InetSocketAddress("127.0.0.1", 9091);
+    static InetSocketAddress addr = new InetSocketAddress("127.0.0.1", 4347);
     static ByteBuffer readBuffer = ByteBuffer.allocateDirect(1024 * 64);
 
 
