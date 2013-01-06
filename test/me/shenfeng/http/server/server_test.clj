@@ -54,21 +54,16 @@
    :headers {"Content-Type" "text/plain"}
    :body    "Hello World"})
 
-(defasync async [req] cb
+(defasync async-handler [req] cb
   (cb {:status 200 :body "hello async"}))
 
 (defasync async-just-body [req] cb
   (cb "just-body"))
 
 (defwshandler ws-handler [req] con
-  (on-mesg con (fn [msg]
-                 (send-mesg con msg))))
+  (on-mesg con (fn [msg] (send-mesg con msg))))
 
-(defn response-inputstream [req]
-  (let [l (-> req :params :l Integer/valueOf)
-        file (gen-tempfile l ".txt")]
-    {:status 200
-     :body (FileInputStream. file)}))
+(defn to-int [int-str] (Integer/valueOf int-str))
 
 (defroutes test-routes
   (GET "/" [] "hello world")
@@ -82,18 +77,24 @@
                             :body (range 1 10)}))
   (GET "/file" [] (wrap-file-info (fn [req]
                                     {:status 200
-                                     :body (let [l (Integer/valueOf (or (-> req :params :l) "5024000"))]
+                                     :body (let [l (to-int (or (-> req :params :l) "5024000"))]
                                              (gen-tempfile l ".txt"))})))
+  (GET "/inputstream" [] (fn [req] (let [l (-> req :params :l to-int)
+                                        file (gen-tempfile l ".txt")]
+                                    {:status 200
+                                     :body (FileInputStream. file)})))
   (POST "/multipart" [] (fn [req] (let [{:keys [title file]} (:params req)]
                                    {:status 200
                                     :body (str title ": " (:size file))})))
   (POST "/chunked" [] (fn [req] {:status 200
                                 :body (str (:content-length req))}))
   (GET "/null" [] (fn [req] {:status 200 :body nil}))
-  (GET "/inputstream" [] response-inputstream)
-  (GET "/async" [] async)
-  (GET "/ws" [] ws-handler)
-  (GET "/just-body" [] async-just-body))
+  (GET "/async" [] async-handler)
+  (GET "/async-response" [] (fn [req]
+                              (async-response respond!
+                                              (future (respond! {:status 200 :body "hello async"})))))
+  (GET "/async-just-body" [] async-just-body)
+  (GET "/ws" [] ws-handler))
 
 (use-fixtures :once (fn [f]
                       (let [server (run-server
@@ -149,8 +150,18 @@
     (is (= (:status resp) 200))
     (is (= (:body resp) "hello async"))))
 
+(deftest test-async
+  (let [resp (http/get "http://localhost:4347/async")]
+    (is (= (:status resp) 200))
+    (is (= (:body resp) "hello async"))))
+
+(deftest test-async-response
+  (let [resp (http/get "http://localhost:4347/async-response")]
+    (is (= (:status resp) 200))
+    (is (= (:body resp) "hello async"))))
+
 (deftest test-async-just-body
-  (let [resp (http/get "http://localhost:4347/just-body")]
+  (let [resp (http/get "http://localhost:4347/async-just-body")]
     (is (= (:status resp) 200))
     (is (:headers resp))
     (is (= (:body resp) "just-body"))))
