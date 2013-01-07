@@ -184,13 +184,13 @@
     (is (= 200 (:status resp)))
     (is (= (str size) (:body resp)))))
 
-;;; java -cp `lein classpath` clojure.main -m me.shenfeng.http.server.server-test
 (defonce tmp-server (atom nil))
 (defn -main [& args]
   (when-let [server @tmp-server]
     (server))
-  (reset! tmp-server (run-server (site test-routes) {:port 4347}))
-  (println "server started at 0.0.0.0:4347"))
+  (reset! tmp-server (run-server (site test-routes) {:port 4348
+                                                     :queue-size 102400}))
+  (println "server started at 0.0.0.0:4348"))
 
 ;; (deftest test-ws
 ;;   (let [resp (http/get "http://localhost:4347/ws"

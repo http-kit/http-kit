@@ -23,5 +23,5 @@
                                   [compojure "1.0.2"]
                                   [me.shenfeng/async-ring-adapter "1.0.1"]
                                   [org.clojure/tools.cli "0.2.1"]
-                                  [ring/ring-jetty-adapter "1.2.0-SNAPSHOT"]
+                                  [ring/ring-jetty-adapter "1.1.6"]
                                   [ring/ring-core "1.1.6"]]}})

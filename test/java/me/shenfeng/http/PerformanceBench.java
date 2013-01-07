@@ -27,7 +27,8 @@ class SelectAttachment {
 
     public SelectAttachment(String uri) {
         this.uri = uri;
-        request = ByteBuffer.wrap(("GET " + uri + " HTTP/1.1\r\n\r\n").getBytes());
+        request = ByteBuffer.wrap(("GET " + uri + " HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
+                .getBytes());
     }
 
     public static SelectAttachment next() {
@@ -67,26 +68,30 @@ public class PerformanceBench {
         }
     }
 
-    final static int concurrency = 5000;
+    final static int concurrency = 4000;
     final static int total = 2000000;
     static int remaining = total;
     static long totalByteReceive = 0;
 
-    static InetSocketAddress addr = new InetSocketAddress("127.0.0.1", 4347);
+    static InetSocketAddress addr = new InetSocketAddress("127.0.0.1", 4348);
     static ByteBuffer readBuffer = ByteBuffer.allocateDirect(1024 * 64);
-
 
     static long start = System.currentTimeMillis();
 
-    public static void main(String[] args) throws IOException {
-        
+    public static void main(String[] args) throws IOException, InterruptedException {
+
         System.out.println("concurrency: " + concurrency + "; total requests: " + total);
 
         Selector selector = Selector.open();
 
         for (int i = 0; i < concurrency; ++i) {
+            if (i % 100 == 0) {
+                Thread.sleep(10);
+            }
             connect(addr, selector);
         }
+
+        start = System.currentTimeMillis();
 
         while (true) {
             int select = selector.select();
@@ -106,7 +111,7 @@ public class PerformanceBench {
                             ch.close();
                             e.printStackTrace();
                             D(e.getMessage() + "\t" + "close and reconnect");
-                            connect(addr, selector); //  reconnect
+                            connect(addr, selector); // reconnect
                         }
                     } else if (key.isWritable()) {
                         doWrite(key);
@@ -137,7 +142,7 @@ public class PerformanceBench {
         while (true) {
             int read = ch.read(readBuffer);
             if (read == -1) {
-                ch.close(); 
+                ch.close();
                 decAndPrint();
                 D("remote closed, connecton new, remaining: " + remaining);
                 connect(addr, selector);
