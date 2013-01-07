@@ -1,4 +1,4 @@
-package me.shenfeng.http;
+
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -93,7 +93,7 @@ public class MakeupIdelConnection {
                             }
                             key.interestOps(SelectionKey.OP_READ);
                         }
-                    }
+                    } 
                 }
                 selectedKeys.clear();
             }
