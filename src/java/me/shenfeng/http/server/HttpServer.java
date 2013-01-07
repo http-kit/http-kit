@@ -155,12 +155,17 @@ public class HttpServer {
         this.maxBody = maxBody;
     }
 
-    void accept(SelectionKey key, Selector selector) throws IOException {
+    void accept(SelectionKey key, Selector selector) {
         ServerSocketChannel ch = (ServerSocketChannel) key.channel();
         SocketChannel s;
-        while ((s = ch.accept()) != null) {
-            s.configureBlocking(false);
-            s.register(selector, OP_READ, new HttpServerAtta(maxBody, maxLine));
+        try {
+            while ((s = ch.accept()) != null) {
+                s.configureBlocking(false);
+                s.register(selector, OP_READ, new HttpServerAtta(maxBody, maxLine));
+            }
+        } catch (Exception e) {
+            // like too many open files. do not quit
+            HttpUtils.printError("accept incomming request error", e);
         }
     }
 
