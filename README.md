@@ -1,9 +1,9 @@
 # Http kit
 
+[中文文档](https://github.com/shenfeng/http-kit/blob/master/README_CN.md)
+
 * A high performance HTTP Server(Ring adapter) with async and websocket for Clojure web app.
 * A high performance async HTTP Client.
-
-[中文文档](https://github.com/shenfeng/http-kit/blob/master/README_ZH.md)
 
 ## Features
 * High performance [clojure-web-server-benchmarks](https://github.com/ptaoussanis/clojure-web-server-benchmarks)
