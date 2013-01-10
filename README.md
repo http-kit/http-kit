@@ -1,35 +1,21 @@
 # Http kit
 
-* A high performance HTTP Server(Ring adapter) for Clojure web app.
-* A high performance HTTP Client.
+* A high performance HTTP Server(Ring adapter) with async and websocket for Clojure web app.
+* A high performance async HTTP Client.
 
-The ring adapter follows [ring SPEC]
-(https://github.com/mmcgrana/ring/blob/master/SPEC).
-There's
-[Unit test](https://github.com/shenfeng/http-kit/blob/master/test/me/shenfeng/http/server/server_test.clj)
-to make sure it.
-
-I also add an
-[async extension](https://github.com/shenfeng/http-kit/blob/master/src/java/me/shenfeng/http/server/IListenableFuture.java)
-to the ring SPEC, for efficient long polling. The unit test has sample usage.
-
-## Motivation
-
-I write it for the HTTP server and HTTP client of [Rssminer](http://rssminer.net)
-
-* Rssminer need to be fast.
-* Efficiently fetch feeds from Web.
-* I want to learn how to write a HTTP Server from scratch
-* I need an asynchronous Server and Client to proxy blogspot like sites for Rssminer's user [a feature implemented but deleted later]
+[中文文档](https://github.com/shenfeng/http-kit/blob/master/README_ZH.md)
 
 ## Features
-* Clean compact code: the jar size is about 78k
-* Zero dependency
-* Efficient support [long polling](http://en.wikipedia.org/wiki/Comet_(programming))
+* High performance [clojure-web-server-benchmarks](https://github.com/ptaoussanis/clojure-web-server-benchmarks)
+* Clean compact code: the jar size is ~80k
+* Efficient support [long polling](http://en.wikipedia.org/wiki/Comet_(programming)
 * Efficient Support [WebSocket](http://tools.ietf.org/html/rfc6455)
 * Implement the ring adapter interface, just a drop in replacement to start
 * Memory efficient. Less than 1M of RAM for server, few kilobytes of RAM per connection
-* Support Socks proxy. `SSH -D` create a Socks server, in china, proxy is a must.
+
+The ring adapter follows [ring SPEC] (https://github.com/mmcgrana/ring/blob/master/SPEC). There's
+[Unit test](https://github.com/shenfeng/http-kit/blob/master/test/me/shenfeng/http/server/server_test.clj)
+to make sure it.
 
 for Efficient => just a few k of memory to maintain a connection
 
@@ -156,6 +142,19 @@ It compare with
 ```sh
 git clone git://github.com/shenfeng/http-kit.git && cd http-kit && ./scripts/httperf
 ```
+
+### Contributors
+
+[Peter Taoussanis](https://github.com/ptaoussanis)
+
+## Motivation
+
+I write it for the HTTP server and HTTP client of [Rssminer](http://rssminer.net)
+
+* Rssminer need to be fast.
+* Efficiently fetch feeds from Web.
+* I want to learn how to write a HTTP Server from scratch
+* I need an asynchronous Server and Client to proxy blogspot like sites for Rssminer's user [a feature implemented but deleted later]
 
 ### Update history
 
