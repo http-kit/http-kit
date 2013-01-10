@@ -34,9 +34,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.Proxy;
 import java.net.SocketException;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URLEncoder;
-import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
@@ -65,8 +63,7 @@ public final class HttpClient {
 
     static final byte IPV4 = 1;
 
-    static final byte[] SOCKSV5_VERSION_AUTH = new byte[] { PROTO_VER5, 1,
-            NO_AUTH };
+    static final byte[] SOCKSV5_VERSION_AUTH = new byte[] { PROTO_VER5, 1, NO_AUTH };
 
     static final byte[] SOCKSV5_CON = new byte[] { PROTO_VER5, CONNECT, 0, IPV4 };
 
@@ -121,8 +118,7 @@ public final class HttpClient {
                     msg = "read timeout: ";
                     break;
                 }
-                client.finish(new TimeoutException(msg + config.timeOutMs
-                        + "ms"));
+                client.finish(new TimeoutException(msg + config.timeOutMs + "ms"));
             }
         }
     }
@@ -155,8 +151,7 @@ public final class HttpClient {
                         key.interestOps(OP_WRITE);
                         // socks server should reply 2 bytes
                     } else {
-                        atta.finish(new SocketException(
-                                "Malformed reply from SOCKS server"));
+                        atta.finish(new SocketException("Malformed reply from SOCKS server"));
                     }
                     break;
                 case SOCKS_INIT_CONN:
@@ -164,8 +159,7 @@ public final class HttpClient {
                         atta.state = SOCKS_HTTP_REQEUST;
                         key.interestOps(OP_WRITE);
                     } else {
-                        atta.finish(new SocketException(
-                                "Malformed reply from SOCKS server"));
+                        atta.finish(new SocketException("Malformed reply from SOCKS server"));
                     }
                     break;
                 }
@@ -212,8 +206,7 @@ public final class HttpClient {
         }
     }
 
-    public void get(URI uri, Map<String, String> headers, IRespListener cb)
-            throws URISyntaxException, UnknownHostException {
+    public void get(URI uri, Map<String, String> headers, IRespListener cb) {
         get(uri, headers, Proxy.NO_PROXY, cb);
     }
 
@@ -222,13 +215,12 @@ public final class HttpClient {
         return this.getClass().getCanonicalName() + config.toString();
     }
 
-    public void post(URI uri, Map<String, String> headers,
-            Map<String, Object> body, IRespListener cb) {
+    public void post(URI uri, Map<String, String> headers, Map<String, Object> body,
+            IRespListener cb) {
         post(uri, headers, body, Proxy.NO_PROXY, cb);
     }
 
-    public void get(URI uri, Map<String, String> headers, Proxy proxy,
-            IRespListener cb) {
+    public void get(URI uri, Map<String, String> headers, Proxy proxy, IRespListener cb) {
         // copy to modify
         if (headers == null) {
             headers = new HashMap<String, String>();
@@ -238,16 +230,15 @@ public final class HttpClient {
         exec(uri, HttpMethod.GET, headers, null, proxy, cb);
     }
 
-    public void post(URI uri, Map<String, String> headers,
-            Map<String, Object> body, Proxy proxy, IRespListener cb) {
+    public void post(URI uri, Map<String, String> headers, Map<String, Object> body,
+            Proxy proxy, IRespListener cb) {
+        byte[] data = null;
         // copy to modify
         if (headers == null) {
             headers = new HashMap<String, String>();
         } else {
             headers = new HashMap<String, String>(headers);
         }
-
-        byte[] data = null;
         if (body != null) {
             StringBuilder sb = new StringBuilder(32);
             for (Map.Entry<String, Object> e : body.entrySet()) {
@@ -257,24 +248,28 @@ public final class HttpClient {
                 try {
                     sb.append(URLEncoder.encode(e.getKey(), "utf8"));
                     sb.append("=");
-                    sb.append(URLEncoder
-                            .encode(e.getValue().toString(), "utf8"));
-                } catch (UnsupportedEncodingException ignore) {
+                    sb.append(URLEncoder.encode(e.getValue().toString(), "utf8"));
+                } catch (UnsupportedEncodingException ignore) { // we has utf8
                 }
             }
 
             data = sb.toString().getBytes(UTF_8);
             headers.put(CONTENT_TYPE, "application/x-www-form-urlencoded");
-            headers.put(CONTENT_LENGTH, Integer.toString(data.length));
         }
         exec(uri, HttpMethod.POST, headers, data, proxy, cb);
     }
 
-    public void exec(URI uri, HttpMethod method, Map<String, String> headers,
-            byte[] body, Proxy proxy, IRespListener cb) {
-
+    public void exec(URI uri, HttpMethod method, Map<String, String> headers, byte[] body,
+            Proxy proxy, IRespListener cb) {
+        // copy to modify
+        if (headers == null) {
+            headers = new HashMap<String, String>();
+        } else {
+            headers = new HashMap<String, String>(headers);
+        }
         headers.put(HOST, uri.getHost());
         headers.put(ACCEPT, "*/*");
+
         if (headers.get(USER_AGENT) == null) // allow override
             headers.put(USER_AGENT, config.userAgent); // default
         if (!headers.containsKey(ACCEPT_ENCODING))
@@ -282,6 +277,7 @@ public final class HttpClient {
 
         int length = 64 + headers.size() * 48;
         if (body != null) {
+            headers.put(CONTENT_LENGTH, Integer.toString(body.length));
             length += body.length;
         }
         String path = getPath(uri);
@@ -293,8 +289,7 @@ public final class HttpClient {
         while (ite.hasNext()) {
             Map.Entry<String, String> e = ite.next();
             if (e.getValue() != null) {
-                bytes.append(e.getKey()).append(COLON).append(SP)
-                        .append(e.getValue());
+                bytes.append(e.getKey()).append(COLON).append(SP).append(e.getValue());
                 bytes.append(CR).append(LF);
             }
         }

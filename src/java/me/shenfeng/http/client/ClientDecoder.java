@@ -23,7 +23,6 @@ import static me.shenfeng.http.client.ClientDecoderState.READ_FIXED_LENGTH_CONTE
 import static me.shenfeng.http.client.ClientDecoderState.READ_HEADER;
 import static me.shenfeng.http.client.ClientDecoderState.READ_INITIAL;
 import static me.shenfeng.http.client.ClientDecoderState.READ_VARIABLE_LENGTH_CONTENT;
-import static me.shenfeng.http.client.IRespListener.ABORT;
 
 import java.nio.ByteBuffer;
 import java.util.Map;
@@ -34,6 +33,7 @@ import me.shenfeng.http.HttpUtils;
 import me.shenfeng.http.HttpVersion;
 import me.shenfeng.http.LineTooLargeException;
 import me.shenfeng.http.ProtocolException;
+import me.shenfeng.http.client.IRespListener.State;
 
 public class ClientDecoder {
 
@@ -78,7 +78,7 @@ public class ClientDecoder {
                 version = HTTP_1_0;
             }
 
-            if (listener.onInitialLineReceived(version, s) != ABORT) {
+            if (listener.onInitialLineReceived(version, s) != State.ABORT) {
                 state = READ_HEADER;
             } else {
                 state = ABORTED;
@@ -89,8 +89,8 @@ public class ClientDecoder {
         }
     }
 
-    public ClientDecoderState decode(ByteBuffer buffer)
-            throws LineTooLargeException, ProtocolException {
+    public ClientDecoderState decode(ByteBuffer buffer) throws LineTooLargeException,
+            ProtocolException {
         String line;
         int toRead;
         while (buffer.hasRemaining() && state != ALL_READ && state != ABORTED) {
@@ -118,7 +118,7 @@ public class ClientDecoder {
             case READ_FIXED_LENGTH_CONTENT:
                 toRead = Math.min(buffer.remaining(), readRemaining);
                 buffer.get(bodyBuffer, 0, toRead);
-                if (listener.onBodyReceived(bodyBuffer, toRead) == ABORT) {
+                if (listener.onBodyReceived(bodyBuffer, toRead) == State.ABORT) {
                     state = ABORTED;
                 } else {
                     readRemaining -= toRead;
@@ -130,7 +130,7 @@ public class ClientDecoder {
             case READ_CHUNKED_CONTENT:
                 toRead = Math.min(buffer.remaining(), readRemaining);
                 buffer.get(bodyBuffer, 0, toRead);
-                if (listener.onBodyReceived(bodyBuffer, toRead) == ABORT) {
+                if (listener.onBodyReceived(bodyBuffer, toRead) == State.ABORT) {
                     state = ABORTED;
                 } else {
                     readRemaining -= toRead;
@@ -150,7 +150,7 @@ public class ClientDecoder {
             case READ_VARIABLE_LENGTH_CONTENT:
                 toRead = buffer.remaining();
                 buffer.get(bodyBuffer, 0, toRead);
-                if (listener.onBodyReceived(bodyBuffer, toRead) == ABORT) {
+                if (listener.onBodyReceived(bodyBuffer, toRead) == State.ABORT) {
                     state = ABORTED;
                 }
                 break;
@@ -179,7 +179,7 @@ public class ClientDecoder {
         }
         if (line == null)
             return; // data is not received enough. for next run
-        if (listener.onHeadersReceived(headers) != ABORT) {
+        if (listener.onHeadersReceived(headers) != State.ABORT) {
             String te = headers.get(TRANSFER_ENCODING);
             if (CHUNKED.equals(te)) {
                 state = READ_CHUNK_SIZE;
@@ -215,8 +215,7 @@ public class ClientDecoder {
                 lineBuffer[lineBufferCnt] = b;
                 ++lineBufferCnt;
                 if (lineBufferCnt >= MAX_LINE) {
-                    throw new LineTooLargeException("exceed max line "
-                            + MAX_LINE);
+                    throw new LineTooLargeException("exceed max line " + MAX_LINE);
                 }
             }
         }

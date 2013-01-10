@@ -15,18 +15,17 @@ import java.nio.channels.SocketChannel;
 
 public class ClientAtta {
     InetSocketAddress addr;
-    ClientDecoder decoder;
-    ByteBuffer request; // http request
+    final ClientDecoder decoder;
+    final ByteBuffer request; // http request
     long lastActiveTime;
     SocketChannel ch;
     ClientConnState state;
-    URI url; // save for socks proxy know target addr
+    final URI url; // save for socks proxy know target addr
 
     // for timeout check
     boolean finished = false;
 
-    public ClientAtta(ByteBuffer request, IRespListener handler, Proxy proxy,
-            URI url) {
+    public ClientAtta(ByteBuffer request, IRespListener handler, Proxy proxy, URI url) {
         decoder = new ClientDecoder(handler);
         this.url = url;
         this.request = request;
@@ -44,7 +43,7 @@ public class ClientAtta {
     }
 
     public void finish() {
-        // http keep alive is not implemented, for simplicity
+        // HTTP keep-alive is not implemented, for simplicity
         closeQuiety(ch);
         finished = true;
         decoder.listener.onCompleted();

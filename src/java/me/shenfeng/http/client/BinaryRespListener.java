@@ -17,9 +17,9 @@ public class BinaryRespListener implements IRespListener {
         this.handler = h;
     }
 
-    public int onBodyReceived(byte[] buf, int length) {
+    public State onBodyReceived(byte[] buf, int length) {
         body.append(buf, 0, length);
-        return CONTINUE;
+        return State.CONTINUE;
     }
 
     public void onCompleted() {
@@ -28,14 +28,14 @@ public class BinaryRespListener implements IRespListener {
         handler.onSuccess(status.getCode(), headers, body);
     }
 
-    public int onHeadersReceived(Map<String, String> headers) {
+    public State onHeadersReceived(Map<String, String> headers) {
         this.headers = headers;
-        return CONTINUE;
+        return State.CONTINUE;
     }
 
-    public int onInitialLineReceived(HttpVersion version, HttpStatus status) {
+    public State onInitialLineReceived(HttpVersion version, HttpStatus status) {
         this.status = status;
-        return CONTINUE;
+        return State.CONTINUE;
     }
 
     public void onThrowable(Throwable t) {
