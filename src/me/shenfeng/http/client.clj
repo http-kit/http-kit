@@ -91,32 +91,12 @@
                                  (println e)))))
 
 (comment
-  ;; Usage of request
-  (try
-    (request {:url "http://127.0.0.1:8000"} resp
-             (println resp))
-    (request {:url "http://127.0.0.1:8000"} {:keys [status body headers]}
-             (println status))
-    (catch Exception e                    ; request error
-      (println e)))
+  (defmacro first-resp [{:keys [timeout]} & body])
+  (first-resp [resp [server1 (request {:url "http://127.0.0.1:8000"})
+                     server2 (request {:url "http://127.0.0.2:8000"})]]
+          ;; resp should get its value from whichever request returns first.
+          ;; Useful for load-balancing, etc.
 
-  ;; Interesting if possible
-  ;; TODO, how to write the macro?
-  (defmacro async [& body]
-    )
-  (async
-   ;; this is what clj-http use, just wrap with async, everything just works fine
-   (let [resp (request {:url "http://127.0.0.1:8000"})]
-     (println resp)))
-
-  ;; TODO, how to write the macro?
-  (defmacro select [& body])
-  (select [resp [server1 (request {:url "http://127.0.0.1:8000"})
-                 server2 (request {:url "http://127.0.0.2:8000"})
-                 timeout (timeout 100)]]
-          ;; ok, resp is what response first, usefull for load-balancing, etc
-          ;; model after go's approch to concurrency by using select, chanel, go
-
-          ;; since Clojure has powerful macro, macro means synatx abstraction
-          ;; It's possible implement something alike?
+          ;; Should be possible to do this via low-level response promise
+          ;; objects.
           ))
