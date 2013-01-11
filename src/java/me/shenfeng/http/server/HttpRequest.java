@@ -10,6 +10,7 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.Map;
 
+import me.shenfeng.http.BytesInputStream;
 import me.shenfeng.http.HttpMethod;
 import me.shenfeng.http.HttpUtils;
 import me.shenfeng.http.HttpVersion;

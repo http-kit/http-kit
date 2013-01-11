@@ -1,11 +1,15 @@
-package me.shenfeng.http.server;
+package me.shenfeng.http;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Arrays;
 
 // FOR toString
+/**
+ * No synchronization
+ * An better to String 
+ */
 public class BytesInputStream extends InputStream {
-
     private final byte[] buf;
     private final int count;
     protected int mark = 0;
@@ -16,6 +20,10 @@ public class BytesInputStream extends InputStream {
         this.buf = data;
         this.count = length;
         this.pos = offset;
+    }
+    
+    public byte[] bytes() {
+        return Arrays.copyOf(buf, count);
     }
 
     public int read() throws IOException {
@@ -50,7 +58,6 @@ public class BytesInputStream extends InputStream {
         if (n < k) {
             k = n < 0 ? 0 : n;
         }
-
         pos += k;
         return k;
     }
