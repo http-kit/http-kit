@@ -1,9 +1,7 @@
 (ns me.shenfeng.http.client
-  (:refer-clojure :exclude [get])
   (:require [clojure.string :as str])
   (:import [me.shenfeng.http.client HttpClientConfig HttpClient
-            IResponseHandler ITextHandler IBinaryHandler BinaryRespListener
-            TextRespListener RespListener$IFilter RespListener]
+            IResponseHandler TextRespListener RespListener$IFilter RespListener]
            [java.net Proxy Proxy$Type URI]
            me.shenfeng.http.HttpMethod))
 
@@ -19,23 +17,6 @@
                          (str/lower-case k)) v))
           {} headers))
 
-(defn- gen-handler [cb binary? keywordize-headers?]
-  (if binary?
-    (BinaryRespListener. (reify IBinaryHandler
-                           (onSuccess [this status headers bytes]
-                             (cb {:body bytes
-                                  :headers (normalize-headers headers keywordize-headers?)
-                                  :status status}))
-                           (onThrowable [this t]
-                             (cb {:body t}))))
-    (TextRespListener. (reify ITextHandler
-                         (onSuccess [this status headers str]
-                           (cb {:body str
-                                :headers (normalize-headers headers keywordize-headers?)
-                                :status status}))
-                         (onThrowable [this t]
-                           (cb {:body t}))))))
-
 ;;; init http client, should be called before post and get
 (defn init [& {:keys [timeout user-agent instance]
                :or {timeout 40000 user-agent "http-kit/1.3"}}]
@@ -48,19 +29,6 @@
 (defn- init-if-needed []
   (when (nil? @client)
     (init)))
-
-(defn get [{:keys [url headers cb proxy binary? keywordize-headers?]
-            :or {proxy no-proxy headers {} keywordize-headers? true cb (fn [& args])}}]
-  (init-if-needed)
-  (.get ^HttpClient @client
-        (URI. url) headers proxy (gen-handler cb binary? keywordize-headers?)))
-
-
-(defn post [{:keys [url headers body cb proxy keywordize-headers? binary?]
-             :or {proxy no-proxy headers {} keywordize-headers? true cb (fn [& args])}}]
-  (init-if-needed)
-  (.post ^HttpClient @client
-         (URI. url) headers body proxy (gen-handler cb binary? keywordize-headers?)))
 
 ;;; (request req response & forms)
 ;;; this is a low level interface, wrap with middleware for high level functionality
