@@ -1,15 +1,10 @@
 (ns me.shenfeng.http.client
   (:require [clojure.string :as str])
+  ;; TODO Remove HttpClientConfig import?
   (:import [me.shenfeng.http.client HttpClientConfig HttpClient
             IResponseHandler TextRespListener RespListener$IFilter RespListener]
            [java.net Proxy Proxy$Type URI]
            me.shenfeng.http.HttpMethod))
-
-;;; HttpClient can handler thousands of reuqest easily
-;;; Just a few kilobytes of RAM  + response
-(defonce client (atom nil))
-
-(def no-proxy Proxy/NO_PROXY)
 
 (defn- normalize-headers [headers keywordize-headers?]
   (reduce (fn [m [k v]]
@@ -17,22 +12,20 @@
                          (str/lower-case k)) v))
           {} headers))
 
-;;; init http client, should be called before post and get
-(defn init [& {:keys [timeout user-agent instance]
-               :or {timeout 40000 user-agent "http-kit/1.3"}}]
-  (if instance
-    (reset! client instance)
-    (if (nil? @client)
-      (reset! client (HttpClient. (HttpClientConfig. timeout user-agent)))
-      (throw (RuntimeException. (str "already inited " @client))))))
+(defonce default-client (atom nil))
 
-(defn- init-if-needed []
-  (when (nil? @client)
-    (init)))
+(defn init-client "Initializes and returns a new HTTP client."
+  ;; TODO HttpClientConfig deprecated in favour of per-request config?
+  [] (HttpClient. (HttpClientConfig. 40000 "http-kit/1.3")))
+
+(defn get-default-client "Returns default HTTP client, initializing as neccesary."
+  [] (if-let [c @default-client] c (reset! default-client (init-client))))
 
 ;;; (request req response & forms)
 ;;; this is a low level interface, wrap with middleware for high level functionality
-(defmacro request [{:keys [url method headers body] :or {method :get}}
+(defmacro request [{:keys [client url method headers body timeout user-agent]
+                    :or   {method :get timeout 40000 user-agent "http-kit/1.3"
+                           client (get-default-client)}}
                    resp & handler-forms]
   `(let [uri# (URI. ~url)
          method# (case ~method
@@ -42,7 +35,7 @@
      (init-if-needed)
      (.exec ^HttpClient @client uri# method# ~headers
             ~body
-            no-proxy ;; todo proxy
+            Proxy/NO_PROXY ; TODO proxy
             (RespListener.
              (reify IResponseHandler
                (onSuccess [this# status# headers# body#]
