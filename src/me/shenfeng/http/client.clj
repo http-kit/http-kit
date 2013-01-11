@@ -22,32 +22,43 @@
   [] (if-let [c @default-client] c (reset! default-client (init-client))))
 
 (defn request*
-  "Low-level asynchronous HTTP request fn. Returns a promise object to which
-  the HTTP response (or exception) will be asynchronously delivered. In most
-  cases you'll want to use the higher-level `request` macro."
-  [{:keys [client url method headers body timeout user-agent]
+  "Low-level HTTP request fn:
+
+    * When given a callback fn, asynchronously calls that fn with the HTTP
+      response (or exception) and returns nil.
+    * When no callback is given, returns a promise object to which the HTTP
+      response (or exception) will be asynchronously delivered.
+
+  In most cases you'll want to use the higher-level `request` macro."
+  [{:keys [client url method headers body timeout user-agent callback]
     :or   {method :get user-agent "http-kit/1.3" client (get-default-client)}}]
   (let [uri (URI. url)
         method (case method
                  :get  HttpMethod/GET
                  :post HttpMethod/POST
                  :put  HttpMethod/PUT)
-        response (promise)]
+        prom (when-not callback (promise))]
     (.exec ^HttpClient client uri method headers ; TODO :timeout, :user-agent
            body
            Proxy/NO_PROXY ; TODO Remove?
            (RespListener.
             (reify IResponseHandler
               (onSuccess [this status headers body]
-                (deliver response
-                         {:body body
-                          :headers (normalize-headers headers true)
-                          :status status}))
+                (let [resp {:body body
+                            :headers (normalize-headers headers true)
+                            :status status}]
+                  (if callback
+                    (callback resp)
+                    (deliver prom resp))))
               (onThrowable [this t]
-                (deliver response (Exception. t))))))
-    response))
+                (let [e (Exception. t)]
+                  (if callback
+                    (callback e)
+                    (deliver prom e)))))))
+    prom))
 
-(comment (request* {:url "http://www.cnn.com/"}))
+(comment (request* {:url "http://www.cnn.com/"})
+         (request* {:url "http://www.cnn.com/" :callback #(println %)}))
 
 (defmacro request
   "High-level request fn. TODO: Docstring"
