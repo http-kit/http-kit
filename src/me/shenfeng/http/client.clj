@@ -21,6 +21,35 @@
 (defn get-default-client "Returns default HTTP client, initializing as neccesary."
   [] (if-let [c @default-client] c (reset! default-client (init-client))))
 
+(defn request*
+  "Low-level asynchronous HTTP request fn. Returns a promise object to which
+  the HTTP response (or exception) will be asynchronously delivered. In most
+  cases you'll want to use the higher-level `request` macro."
+  [{:keys [client url method headers body timeout user-agent]
+    :or   {method :get timeout 40000 user-agent "http-kit/1.3"
+           client (get-default-client)}}]
+  (let [uri (URI. url)
+        method (case method
+                 :get  HttpMethod/GET
+                 :post HttpMethod/POST
+                 :put  HttpMethod/PUT)
+        response (promise)]
+    (.exec ^HttpClient client uri method headers ; TODO :timeout, :user-agent
+           body
+           Proxy/NO_PROXY ; TODO Remove?
+           (RespListener.
+            (reify IResponseHandler
+              (onSuccess [this status headers body]
+                (deliver response
+                         {:body body
+                          :headers (normalize-headers headers true)
+                          :status status}))
+              (onThrowable [this t]
+                (deliver response (Exception. t))))))
+    response))
+
+(comment (request* {:url "http://www.cnn.com/"}))
+
 ;;; (request req response & forms)
 ;;; this is a low level interface, wrap with middleware for high level functionality
 (defmacro request [{:keys [client url method headers body timeout user-agent]
