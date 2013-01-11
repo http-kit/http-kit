@@ -13,25 +13,25 @@
 
 (def no-proxy Proxy/NO_PROXY)
 
-(defn- transform-header [headers keyify?]
+(defn- normalize-headers [headers keywordize-headers?]
   (reduce (fn [m [k v]]
-            (assoc m (if keyify? (keyword (str/lower-case k))
+            (assoc m (if keywordize-headers? (keyword (str/lower-case k))
                          (str/lower-case k)) v))
           {} headers))
 
-(defn- gen-handler [cb binary? keyify?]
+(defn- gen-handler [cb binary? keywordize-headers?]
   (if binary?
     (BinaryRespListener. (reify IBinaryHandler
                            (onSuccess [this status headers bytes]
                              (cb {:body bytes
-                                  :headers (transform-header headers keyify?)
+                                  :headers (normalize-headers headers keywordize-headers?)
                                   :status status}))
                            (onThrowable [this t]
                              (cb {:body t}))))
     (TextRespListener. (reify ITextHandler
                          (onSuccess [this status headers str]
                            (cb {:body str
-                                :headers (transform-header headers keyify?)
+                                :headers (normalize-headers headers keywordize-headers?)
                                 :status status}))
                          (onThrowable [this t]
                            (cb {:body t}))))))
@@ -49,18 +49,18 @@
   (when (nil? @client)
     (init)))
 
-(defn get [{:keys [url headers cb proxy binary? keyify?]
-            :or {proxy no-proxy headers {} keyify? true cb (fn [& args])}}]
+(defn get [{:keys [url headers cb proxy binary? keywordize-headers?]
+            :or {proxy no-proxy headers {} keywordize-headers? true cb (fn [& args])}}]
   (init-if-needed)
   (.get ^HttpClient @client
-        (URI. url) headers proxy (gen-handler cb binary? keyify?)))
+        (URI. url) headers proxy (gen-handler cb binary? keywordize-headers?)))
 
 
-(defn post [{:keys [url headers body cb proxy keyify? binary?]
-             :or {proxy no-proxy headers {} keyify? true cb (fn [& args])}}]
+(defn post [{:keys [url headers body cb proxy keywordize-headers? binary?]
+             :or {proxy no-proxy headers {} keywordize-headers? true cb (fn [& args])}}]
   (init-if-needed)
   (.post ^HttpClient @client
-         (URI. url) headers body proxy (gen-handler cb binary? keyify?)))
+         (URI. url) headers body proxy (gen-handler cb binary? keywordize-headers?)))
 
 ;;; (request req response & forms)
 ;;; this is a low level interface, wrap with middleware for high level functionality
@@ -79,7 +79,7 @@
              (reify IResponseHandler
                (onSuccess [this# status# headers# body#]
                  (let [~resp {:body body#
-                              :headers (transform-header headers# true)
+                              :headers (normalize-headers headers# true)
                               :status status#}]
                    ;; TODO executed in http-client's loop thread?
                    ~@handler-forms))
