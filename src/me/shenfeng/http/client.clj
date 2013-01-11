@@ -26,8 +26,7 @@
   the HTTP response (or exception) will be asynchronously delivered. In most
   cases you'll want to use the higher-level `request` macro."
   [{:keys [client url method headers body timeout user-agent]
-    :or   {method :get timeout 40000 user-agent "http-kit/1.3"
-           client (get-default-client)}}]
+    :or   {method :get user-agent "http-kit/1.3" client (get-default-client)}}]
   (let [uri (URI. url)
         method (case method
                  :get  HttpMethod/GET
@@ -50,32 +49,19 @@
 
 (comment (request* {:url "http://www.cnn.com/"}))
 
-;;; (request req response & forms)
-;;; this is a low level interface, wrap with middleware for high level functionality
-(defmacro request [{:keys [client url method headers body timeout user-agent]
-                    :or   {method :get timeout 40000 user-agent "http-kit/1.3"
-                           client (get-default-client)}}
-                   resp & handler-forms]
-  `(let [uri# (URI. ~url)
-         method# (case ~method
-                   :get HttpMethod/GET
-                   :post HttpMethod/POST
-                   :put HttpMethod/PUT)]
-     (init-if-needed)
-     (.exec ^HttpClient @client uri# method# ~headers
-            ~body
-            Proxy/NO_PROXY ; TODO proxy
-            (RespListener.
-             (reify IResponseHandler
-               (onSuccess [this# status# headers# body#]
-                 (let [~resp {:body body#
-                              :headers (normalize-headers headers# true)
-                              :status status#}]
-                   ;; TODO executed in http-client's loop thread?
-                   ~@handler-forms))
-               (onThrowable [this# t#]
-                 ;; TODO executed in http-client's loop thread?
-                 (throw (Exception. t#))))))))
+(defmacro request
+  "High-level request fn. TODO: Docstring"
+  [{:keys [async? timeout] :as options :or {timeout 40000}} resp & handler-forms]
+  `(let [resp-prom# (request* ~(assoc options :timeout timeout))]
+     (if ~async?
+       resp-prom#
+       (let [resp# (deref resp-prom# ~timeout (Exception. "HTTP response timeout"))]
+         (if (instance? Exception resp#)
+           (throw resp#)
+           (let [~resp resp#]
+             ~@handler-forms))))))
+
+(comment (request {:url "http://www.cnn.com"} {:keys [body]} (println body)))
 
 (comment
   ;; Usage of request
