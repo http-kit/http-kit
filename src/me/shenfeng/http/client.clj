@@ -63,16 +63,32 @@
 (defmacro request
   "High-level request fn. TODO: Docstring"
   [{:keys [async? timeout] :as options :or {timeout 40000}} resp & handler-forms]
-  `(let [resp-prom# (request* ~(assoc options :timeout timeout))]
+  `(let [options# ~(assoc options :timeout timeout)
+         handle-resp# (fn [resp#]
+                        (if (instance? Exception resp#)
+                          (throw resp#)
+                          (let [~resp resp#]
+                            ~@handler-forms)))]
      (if ~async?
-       resp-prom#
-       (let [resp# (deref resp-prom# ~timeout (Exception. "HTTP response timeout"))]
-         (if (instance? Exception resp#)
-           (throw resp#)
-           (let [~resp resp#]
-             ~@handler-forms))))))
+       (request* (assoc options# :callback handle-resp#))
+       (handle-resp# (deref (request* options#) ~timeout
+                            (Exception. "HTTP response timeout"))))))
 
-(comment (request {:url "http://www.cnn.com"} {:keys [body]} (println body)))
+(comment
+
+  ;; TODO Test that these both work as expected, incl. error handling
+
+  ;; Synchronous
+  (try (request {:url "http://www.cnn.com"}
+                {:keys [body]} (println body) body)
+       (catch Exception e
+         (println e)))
+
+  ;; Asynchronous
+  (request {:url "http://www.cnn.com" :async? true}
+           {:keys [body]} (try (println body) body
+                               (catch Exception e
+                                 (println e)))))
 
 (comment
   ;; Usage of request
