@@ -1,14 +1,22 @@
 package me.shenfeng.http.client;
 
 public class HttpClientConfig {
-    int timeOutMs = 40000;
-    String userAgent = "ajh/1.0";
+    final int timeOutMs;
+    final String userAgent;
 
+    /**
+     * Create a default HttpClientConfig, (read || connect) timeout 40s
+     */
     public HttpClientConfig() {
+        this(40000, "http-kit/1.3");
     }
 
-    /*
-     * timeoutMS: read or connect timeout in ms
+    /**
+     * 
+     * @param timeOutMs
+     *            default read or connect timeout in milliseconds
+     * @param userAgent
+     *            default user agent
      */
     public HttpClientConfig(int timeOutMs, String userAgent) {
         this.timeOutMs = timeOutMs;
@@ -17,6 +25,6 @@ public class HttpClientConfig {
 
     @Override
     public String toString() {
-        return "{timeOutMs=" + timeOutMs + ", userAgent=" + userAgent + '}';
+        return "default config: {timeout=" + timeOutMs + "ms, useragent=" + userAgent + '}';
     }
 }

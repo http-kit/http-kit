@@ -13,17 +13,7 @@ import static me.shenfeng.http.HttpUtils.findWhitespace;
 import static me.shenfeng.http.HttpUtils.getChunkSize;
 import static me.shenfeng.http.HttpVersion.HTTP_1_0;
 import static me.shenfeng.http.HttpVersion.HTTP_1_1;
-import static me.shenfeng.http.client.ClientDecoderState.ABORTED;
-import static me.shenfeng.http.client.ClientDecoderState.ALL_READ;
-import static me.shenfeng.http.client.ClientDecoderState.READ_CHUNKED_CONTENT;
-import static me.shenfeng.http.client.ClientDecoderState.READ_CHUNK_DELIMITER;
-import static me.shenfeng.http.client.ClientDecoderState.READ_CHUNK_FOOTER;
-import static me.shenfeng.http.client.ClientDecoderState.READ_CHUNK_SIZE;
-import static me.shenfeng.http.client.ClientDecoderState.READ_FIXED_LENGTH_CONTENT;
-import static me.shenfeng.http.client.ClientDecoderState.READ_HEADER;
-import static me.shenfeng.http.client.ClientDecoderState.READ_INITIAL;
-import static me.shenfeng.http.client.ClientDecoderState.READ_VARIABLE_LENGTH_CONTENT;
-import static me.shenfeng.http.client.IRespListener.ABORT;
+import static me.shenfeng.http.client.DState.*;
 
 import java.nio.ByteBuffer;
 import java.util.Map;
@@ -34,21 +24,23 @@ import me.shenfeng.http.HttpUtils;
 import me.shenfeng.http.HttpVersion;
 import me.shenfeng.http.LineTooLargeException;
 import me.shenfeng.http.ProtocolException;
+import me.shenfeng.http.client.IRespListener.State;
 
-public class ClientDecoder {
+enum DState {
+    ALL_READ, READ_CHUNK_DELIMITER, READ_CHUNK_FOOTER, READ_CHUNK_SIZE, READ_CHUNKED_CONTENT, READ_FIXED_LENGTH_CONTENT, READ_HEADER, READ_INITIAL, ABORTED, READ_VARIABLE_LENGTH_CONTENT
+}
+
+public class Decoder {
 
     private Map<String, String> headers = new TreeMap<String, String>();
-
     // package visible
     IRespListener listener;
-    // single threaded, shared ok
-    private static byte[] bodyBuffer = new byte[BUFFER_SIZE];
     byte[] lineBuffer = new byte[MAX_LINE];
     int lineBufferCnt = 0;
     int readRemaining = 0;
-    ClientDecoderState state = READ_INITIAL;
+    DState st = READ_INITIAL;
 
-    public ClientDecoder(IRespListener listener) {
+    public Decoder(IRespListener listener) {
         this.listener = listener;
     }
 
@@ -78,10 +70,10 @@ public class ClientDecoder {
                 version = HTTP_1_0;
             }
 
-            if (listener.onInitialLineReceived(version, s) != ABORT) {
-                state = READ_HEADER;
+            if (listener.onInitialLineReceived(version, s) != State.ABORT) {
+                st = READ_HEADER;
             } else {
-                state = ABORTED;
+                st = ABORTED;
             }
 
         } else {
@@ -89,12 +81,13 @@ public class ClientDecoder {
         }
     }
 
-    public ClientDecoderState decode(ByteBuffer buffer)
-            throws LineTooLargeException, ProtocolException {
+    public DState decode(ByteBuffer buffer) throws LineTooLargeException, ProtocolException {
         String line;
         int toRead;
-        while (buffer.hasRemaining() && state != ALL_READ && state != ABORTED) {
-            switch (state) {
+        // fine, JVM is very fast for short lived var
+        byte[] bodyBuffer = new byte[BUFFER_SIZE];
+        while (buffer.hasRemaining() && st != ALL_READ && st != ABORTED) {
+            switch (st) {
             case READ_INITIAL:
                 line = readLine(buffer);
                 if (line != null) {
@@ -109,58 +102,54 @@ public class ClientDecoder {
                 if (line != null) {
                     readRemaining = getChunkSize(line);
                     if (readRemaining == 0) {
-                        state = READ_CHUNK_FOOTER;
+                        st = READ_CHUNK_FOOTER;
                     } else {
-                        state = READ_CHUNKED_CONTENT;
+                        st = READ_CHUNKED_CONTENT;
                     }
                 }
                 break;
             case READ_FIXED_LENGTH_CONTENT:
                 toRead = Math.min(buffer.remaining(), readRemaining);
                 buffer.get(bodyBuffer, 0, toRead);
-                if (listener.onBodyReceived(bodyBuffer, toRead) == ABORT) {
-                    state = ABORTED;
+                if (listener.onBodyReceived(bodyBuffer, toRead) == State.ABORT) {
+                    st = ABORTED;
                 } else {
                     readRemaining -= toRead;
                     if (readRemaining == 0) {
-                        state = ALL_READ;
+                        st = ALL_READ;
                     }
                 }
                 break;
             case READ_CHUNKED_CONTENT:
                 toRead = Math.min(buffer.remaining(), readRemaining);
                 buffer.get(bodyBuffer, 0, toRead);
-                if (listener.onBodyReceived(bodyBuffer, toRead) == ABORT) {
-                    state = ABORTED;
+                if (listener.onBodyReceived(bodyBuffer, toRead) == State.ABORT) {
+                    st = ABORTED;
                 } else {
                     readRemaining -= toRead;
                     if (readRemaining == 0) {
-                        state = READ_CHUNK_DELIMITER;
+                        st = READ_CHUNK_DELIMITER;
                     }
                 }
                 break;
             case READ_CHUNK_FOOTER:
                 readEmptyLine(buffer);
-                state = ALL_READ;
+                st = ALL_READ;
                 break;
             case READ_CHUNK_DELIMITER:
                 readEmptyLine(buffer);
-                state = READ_CHUNK_SIZE;
+                st = READ_CHUNK_SIZE;
                 break;
             case READ_VARIABLE_LENGTH_CONTENT:
                 toRead = buffer.remaining();
                 buffer.get(bodyBuffer, 0, toRead);
-                if (listener.onBodyReceived(bodyBuffer, toRead) == ABORT) {
-                    state = ABORTED;
+                if (listener.onBodyReceived(bodyBuffer, toRead) == State.ABORT) {
+                    st = ABORTED;
                 }
                 break;
             }
         }
-        return state;
-    }
-
-    public IRespListener getListener() {
-        return listener;
+        return st;
     }
 
     void readEmptyLine(ByteBuffer buffer) {
@@ -179,25 +168,25 @@ public class ClientDecoder {
         }
         if (line == null)
             return; // data is not received enough. for next run
-        if (listener.onHeadersReceived(headers) != ABORT) {
+        if (listener.onHeadersReceived(headers) != State.ABORT) {
             String te = headers.get(TRANSFER_ENCODING);
             if (CHUNKED.equals(te)) {
-                state = READ_CHUNK_SIZE;
+                st = READ_CHUNK_SIZE;
             } else {
                 String cl = headers.get(CONTENT_LENGTH);
                 if (cl != null) {
                     readRemaining = Integer.parseInt(cl);
                     if (readRemaining == 0) {
-                        state = ALL_READ;
+                        st = ALL_READ;
                     } else {
-                        state = READ_FIXED_LENGTH_CONTENT;
+                        st = READ_FIXED_LENGTH_CONTENT;
                     }
                 } else {
-                    state = READ_VARIABLE_LENGTH_CONTENT;
+                    st = READ_VARIABLE_LENGTH_CONTENT;
                 }
             }
         } else {
-            state = ABORTED;
+            st = ABORTED;
         }
     }
 
@@ -215,8 +204,7 @@ public class ClientDecoder {
                 lineBuffer[lineBufferCnt] = b;
                 ++lineBufferCnt;
                 if (lineBufferCnt >= MAX_LINE) {
-                    throw new LineTooLargeException("exceed max line "
-                            + MAX_LINE);
+                    throw new LineTooLargeException("exceed max line " + MAX_LINE);
                 }
             }
         }
@@ -230,6 +218,6 @@ public class ClientDecoder {
 
     public void reset() {
         headers.clear();
-        state = ClientDecoderState.READ_INITIAL;
+        st = DState.READ_INITIAL;
     }
 }

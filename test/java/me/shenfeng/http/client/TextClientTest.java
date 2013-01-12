@@ -8,53 +8,13 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
 
-import me.shenfeng.http.DynamicBytes;
-import me.shenfeng.http.HttpUtils;
-import me.shenfeng.http.client.TextRespListener.IFilter;
+import me.shenfeng.http.HttpMethod;
 
 import org.junit.Before;
 import org.junit.Test;
 
-class TextHandler2 implements ITextHandler {
-
-    private CountDownLatch latch;
-
-    public TextHandler2(CountDownLatch latch) {
-        this.latch = latch;
-    }
-
-    public void onSuccess(int status, Map<String, String> headers, String body) {
-        System.out.println(body.length());
-        latch.countDown();
-    }
-
-    public void onThrowable(Throwable t) {
-        t.printStackTrace();
-        latch.countDown();
-    }
-
-}
-
 public class TextClientTest {
     HttpClient client;
-
-    IFilter filter = new IFilter() {
-        public boolean accept(Map<String, String> headers) {
-            String ct = headers.get(HttpUtils.CONTENT_TYPE);
-            if (ct != null) {
-                ct = ct.toLowerCase();
-                return ct.indexOf("text") != -1 || ct.indexOf("xml") != -1;
-            }
-            return false;
-        }
-
-        public boolean accept(DynamicBytes partialBody) {
-            if (partialBody.length() > 1024 * 1024) {
-                return false;
-            }
-            return true;
-        }
-    };
 
     @Before
     public void setup() throws IOException {
@@ -69,12 +29,10 @@ public class TextClientTest {
     }
 
     @Test
-    public void testDecode() throws IOException, URISyntaxException,
-            InterruptedException {
+    public void testDecode() throws IOException, URISyntaxException, InterruptedException {
         String[] urls = new String[] { "http://feed.feedsky.com/amaze",
                 "http://macorz.cn/feed", "http://www.ourlinux.net/feed",
-                "http://blog.jjgod.org/feed/",
-                "http://www.lostleon.com/blog/feed/",
+                "http://blog.jjgod.org/feed/", "http://www.lostleon.com/blog/feed/",
                 "http://feed.feedsky.com/hellodb" };
 
         // urls = new String[] {
@@ -84,15 +42,24 @@ public class TextClientTest {
 
     }
 
-    private void runIt(String[] urls) throws URISyntaxException,
-            UnknownHostException, InterruptedException {
+    private void runIt(String[] urls) throws URISyntaxException, UnknownHostException,
+            InterruptedException {
         CountDownLatch latch = new CountDownLatch(urls.length);
         for (String url : urls) {
             TreeMap<String, String> header = new TreeMap<String, String>();
             URI uri = new URI(url);
-            TextRespListener listener = new TextRespListener(
-                    new TextHandler2(latch), filter);
-            client.get(uri, header, listener);
+            client.exec(uri, HttpMethod.GET, header, null, -1, new RespListener(
+                    new IResponseHandler() {
+
+                        public void onThrowable(Throwable t) {
+                            t.printStackTrace();
+                        }
+
+                        public void onSuccess(int status, Map<String, String> headers,
+                                Object body) {
+                            System.out.println(body);
+                        }
+                    }));
         }
 
         latch.await();
