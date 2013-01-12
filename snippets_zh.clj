@@ -59,3 +59,95 @@
   (GET "/ws" [] ws-handler))
 
 (run-server web-handler {:port 8080})
+
+(:require [me.shenfeng.http.client :as http])
+
+;; 异步调用，忽略返回的promise
+(http/get "http://host.com/path")
+
+;; 异步调用，异步处理
+(http/get "http://host.com/path" {:keys [status headers body] :as resp}
+          (if status
+            (println "Async HTTP Get: " status)
+            (println "Failed, exception is " resp)))
+
+;; 同步调用
+(let [{:keys [status headers body] :as resp} @(http/get "http://host.com/path")]
+  (if status
+    (println "HTTP Get success: " status)
+    (println "Failed, exception: " resp)))
+
+;; 异步调用，Timeout 200ms， Basic Auth user@pass， 指定User-Agent
+(let [options {:timeout 200
+               :basic-auth ["user" "pass"]
+               :headers {"User-Agent" "User-Agent-string"}}]
+  (http/get "http://host.com/path" options {:keys [status headers body] :as resp}
+            (if status
+              (println "Async HTTP Get: " status)
+              (println "Failed, exception: " resp))))
+
+(def post-options {:form-params {:params1 "value" :params2 ["v1" "v2"]}
+                   :timeout 200 ;; timeout 200ms
+                   :headers {"Key" "Value"}})
+
+;;; 异步调用，忽略返回的promise
+(http/post "http://host.com/path" post-options)
+
+;;; 异步调用，异步处理
+(http/post "http://host.com/path" post-options {:keys [status headers body] :as resp}
+           (if status
+             (println "Async HTTP Post: " status)
+             (println "Failed, exception: " resp)))
+
+;;; 同步调用
+(let [{:keys [status headers body] :as resp} @(http/post "http://host.com/path")]
+  (if status
+    (println "Sync HTTP Post: " status)
+    (println "Failed, exception: " resp)))
+
+
+;;; ----------------------------------------
+
+
+;; Asynchronous，return a promise
+(http/get "http://host.com/path")
+
+;; Asynchronous
+(http/get "http://host.com/path" {:keys [status headers body] :as resp}
+          (if status
+            (println "Async HTTP Get: " status)
+            (println "Failed, exception is " resp)))
+
+;; Synchronous
+(let [{:keys [status headers body] :as resp} @(http/get "http://host.com/path")]
+  (if status
+    (println "HTTP Get success: " status)
+    (println "Failed, exception: " resp)))
+
+;; Asynchronous: Timeout 200ms, Basic Auth user@pass, Customise User-Agent
+(let [options {:timeout 200
+               :basic-auth ["user" "pass"]
+               :headers {"User-Agent" "User-Agent-string"}}]
+  (http/get "http://host.com/path" options {:keys [status headers body] :as resp}
+            (if status
+              (println "Async HTTP Get: " status)
+              (println "Failed, exception: " resp))))
+
+(def post-options {:form-params {:params1 "value" :params2 ["v1" "v2"]}
+                   :timeout 200 ;; timeout 200ms
+                   :headers {"Key" "Value"}})
+
+;; Asynchronous，return a promise
+(http/post "http://host.com/path" post-options)
+
+;; Asynchronous
+(http/post "http://host.com/path" post-options {:keys [status headers body] :as resp}
+           (if status ;; when response is ready
+             (println "Async HTTP Post: " status)
+             (println "Failed, exception: " resp)))
+
+;;; Synchronous
+(let [{:keys [status headers body] :as resp} @(http/post "http://host.com/path")]
+  (if status
+    (println "Sync HTTP Post: " status)
+    (println "Failed, exception: " resp)))

@@ -88,22 +88,56 @@ run it:
 
 ### HTTP Client
 
+#### HTTP GET
+
+```
+;; Asynchronous，return a promise
+(http/get "http://host.com/path")
+
+;; Asynchronous
+(http/get "http://host.com/path" {:keys [status headers body] :as resp}
+          (if status
+            (println "Async HTTP Get: " status)
+            (println "Failed, exception is " resp)))
+
+;; Synchronous
+(let [{:keys [status headers body] :as resp} @(http/get "http://host.com/path")]
+  (if status
+    (println "HTTP Get success: " status)
+    (println "Failed, exception: " resp)))
+
+;; Asynchronous: Timeout 200ms, Basic Auth user@pass, Customise User-Agent
+(let [options {:timeout 200
+               :basic-auth ["user" "pass"]
+               :headers {"User-Agent" "User-Agent-string"}}]
+  (http/get "http://host.com/path" options {:keys [status headers body] :as resp}
+            (if status
+              (println "Async HTTP Get: " status)
+              (println "Failed, exception: " resp))))
+
+```
+
+#### HTTP Post
+
 ```clj
+(def post-options {:form-params {:params1 "value" :params2 ["v1" "v2"]}
+                   :timeout 200 ;; timeout 200ms
+                   :headers {"Key" "Value"}})
 
-(defn on-response [resp]
-  ;; {:status 200 :body "....." :headers {:key val :key val}}
-  (println resp))
+;; Asynchronous，return a promise
+(http/post "http://host.com/path" post-options)
 
-;;; initialize, timeout is 40s, and default user-agent
-(http/init :timeout 40000 :user-agent "http-kit/1.1")
+;; Asynchronous
+(http/post "http://host.com/path" post-options {:keys [status headers body] :as resp}
+           (if status ;; when response is ready
+             (println "Async HTTP Post: " status)
+             (println "Failed, exception: " resp)))
 
-;;; other params :headers :proxy binary? keyify?
-(http/get {:url "http://shenfeng.me" :cb on-response})
-
-;;; other params :headers :proxy binary? keyify?
-(http/post {:url "http://example/"
-            :cb on-response
-            :body {"name" "http-kit" "author" "shenfeng"}  :binary? true})
+;;; Synchronous
+(let [{:keys [status headers body] :as resp} @(http/post "http://host.com/path")]
+  (if status
+    (println "Sync HTTP Post: " status)
+    (println "Failed, exception: " resp)))
 
 ```
 

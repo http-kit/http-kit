@@ -11,7 +11,7 @@
 
 http-kit使用了和Nginx同样的并发模型，具有和Nginx相似的性能特点。
 
-## 用法
+## HTTP Server 用法
 
 ### 添加依赖
 
@@ -103,3 +103,52 @@ http-kit使用了和Nginx同样的并发模型，具有和Nginx相似的性能�
 (run-server web-handler {:port 8080})
 ```
 用WebSocket实现的聊天室， 在[examples/websocket目录](https://github.com/shenfeng/http-kit/tree/master/examples/websocket)
+
+## HTTP Client 用法
+
+```clj
+
+;; 异步调用，忽略返回的promise
+(http/get "http://host.com/path")
+
+;; 异步调用，异步处理
+(http/get "http://host.com/path" {:keys [status headers body] :as resp}
+          (if status
+            (println "Async HTTP Get: " status)
+            (println "Failed, exception is " resp)))
+
+;; 同步调用
+(let [{:keys [status headers body] :as resp} @(http/get "http://host.com/path")]
+  (if status
+    (println "HTTP Get success: " status)
+    (println "Failed, exception: " resp)))
+
+;; 异步调用，Timeout 200ms， Basic Auth user@pass， 指定User-Agent
+(let [options {:timeout 200
+               :basic-auth ["user" "pass"]
+               :headers {"User-Agent" "User-Agent-string"}}]
+  (http/get "http://host.com/path" options {:keys [status headers body] :as resp}
+            (if status
+              (println "Async HTTP Get: " status)
+              (println "Failed, exception: " resp))))
+
+(def post-options {:form-params {:params1 "value" :params2 ["v1" "v2"]}
+                   :timeout 200 ;; timeout 200ms
+                   :headers {"Key" "Value"}})
+
+;;; 异步调用，忽略返回的promise
+(http/post "http://host.com/path" post-options)
+
+;;; 异步调用，异步处理
+(http/post "http://host.com/path" post-options {:keys [status headers body] :as resp}
+           (if status
+             (println "Async HTTP Post: " status)
+             (println "Failed, exception: " resp)))
+
+;;; 同步调用
+(let [{:keys [status headers body] :as resp} @(http/post "http://host.com/path")]
+  (if status
+    (println "Sync HTTP Post: " status)
+    (println "Failed, exception: " resp)))
+
+```
