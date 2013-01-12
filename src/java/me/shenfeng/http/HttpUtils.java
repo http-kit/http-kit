@@ -39,7 +39,7 @@ public class HttpUtils {
 
     public static final byte LF = 10;
 
-    public static final int MAX_LINE = 2048;
+    public static final int MAX_LINE = 4096;
 
     public static final int BUFFER_SIZE = 1024 * 64;
 

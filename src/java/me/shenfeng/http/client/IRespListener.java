@@ -6,24 +6,29 @@ import me.shenfeng.http.HttpStatus;
 import me.shenfeng.http.HttpVersion;
 
 /**
- * Will be invoked once the response/request has been fully read
+ * Interface for response received from server
+ * 
+ * A low level interface, Can be used for very large file download
+ * 
+ * @author feng
+ * 
  */
 public interface IRespListener {
 
-    public static final int ABORT = -1;
-    public static final int CONTINUE = 1;
+    public static enum State {
+        ABORT, CONTINUE
+    }
 
-    public int onBodyReceived(byte[] buf, int length);
+    public State onBodyReceived(byte[] buf, int length);
 
     public void onCompleted();
 
-    public int onHeadersReceived(Map<String, String> headers);
+    public State onHeadersReceived(Map<String, String> headers);
 
-    public int onInitialLineReceived(HttpVersion version, HttpStatus status);
+    public State onInitialLineReceived(HttpVersion version, HttpStatus status);
 
     /**
      * protocol error
      */
     public void onThrowable(Throwable t);
-
 }
