@@ -20,40 +20,37 @@ public class HttpClientDecoderTest {
     boolean onCompleteCallded = false;
 
     @Test
-    public void testDecodeChunkedResponse() throws IOException,
-            LineTooLargeException, ProtocolException {
-        ClientDecoder decoder = new ClientDecoder(new IRespListener() {
+    public void testDecodeChunkedResponse() throws IOException, LineTooLargeException,
+            ProtocolException {
+        Decoder decoder = new Decoder(new IRespListener() {
             public void onThrowable(Throwable t) {
                 throw new RuntimeException(t);
             }
 
-            public int onInitialLineReceived(HttpVersion version,
-                    HttpStatus status) {
+            public State onInitialLineReceived(HttpVersion version, HttpStatus status) {
                 Assert.assertEquals(HttpVersion.HTTP_1_1, version);
                 Assert.assertEquals(status, HttpStatus.OK);
-                return 0;
+                return State.CONTINUE;
             }
 
-            public int onHeadersReceived(Map<String, String> headers) {
+            public State onHeadersReceived(Map<String, String> headers) {
                 Assert.assertNotNull(headers.get(TRANSFER_ENCODING));
-                return 0;
+                return State.CONTINUE;
             }
 
             public void onCompleted() {
                 onCompleteCallded = true;
             }
 
-            public int onBodyReceived(byte[] buf, int length) {
+            public State onBodyReceived(byte[] buf, int length) {
                 Assert.assertEquals(2869, length);
-                return 0;
+                return State.CONTINUE;
             }
         });
 
-        ByteBuffer buffer = ByteBuffer.wrap(Utils
-                .readAll("beta_shield_chunked"));
-        ClientDecoderState s = decoder.decode(buffer);
-        Assert.assertEquals("state should be ALL_READ", s,
-                ClientDecoderState.ALL_READ);
+        ByteBuffer buffer = ByteBuffer.wrap(Utils.readAll("beta_shield_chunked"));
+        DState s = decoder.decode(buffer);
+        Assert.assertEquals("state should be ALL_READ", s, DState.ALL_READ);
         Assert.assertTrue(onCompleteCallded);
     }
 }

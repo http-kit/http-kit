@@ -25,7 +25,6 @@ public class CloseFrame extends WSFrame {
     public static final CloseFrame MESG_BIG = new CloseFrame(true, bytes(CLOSE_MESG_BIG));
     public static final CloseFrame SERVER_ERROR = new CloseFrame(true, bytes(CLOSE_MESG_BIG));
 
-
     public CloseFrame(boolean finalFrame, byte[] data) {
         super(finalFrame, data);
     }

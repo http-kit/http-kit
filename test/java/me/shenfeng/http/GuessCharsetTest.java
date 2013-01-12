@@ -6,7 +6,7 @@ import java.nio.charset.Charset;
 import java.util.Map;
 import java.util.TreeMap;
 
-import me.shenfeng.http.client.TextRespListener;
+import me.shenfeng.http.client.RespListener;
 
 import org.junit.Assert;
 import org.junit.Test;
@@ -14,8 +14,7 @@ import org.junit.Test;
 public class GuessCharsetTest {
 
     public static DynamicBytes getData(String resource) throws IOException {
-        InputStream is = GuessCharsetTest.class.getClassLoader()
-                .getResourceAsStream(resource);
+        InputStream is = GuessCharsetTest.class.getClassLoader().getResourceAsStream(resource);
 
         DynamicBytes dy = new DynamicBytes(1000);
         byte[] buffer = new byte[8912];
@@ -33,14 +32,14 @@ public class GuessCharsetTest {
     public void testGuess() throws IOException {
         Map<String, String> headers = new TreeMap<String, String>();
         Charset gb2312 = Charset.forName("gb2312");
-        Charset c = TextRespListener.detectCharset(headers, getData("xml_gb2312"));
+        Charset c = RespListener.detectCharset(headers, getData("xml_gb2312"));
         System.out.println(c);
 
         Assert.assertTrue(gb2312.equals(c));
-        c = TextRespListener.detectCharset(headers, getData("html_gb2312"));
+        c = RespListener.detectCharset(headers, getData("html_gb2312"));
         Assert.assertTrue(gb2312.equals(c));
 
-        c = TextRespListener.detectCharset(headers, getData("beta_shield"));
+        c = RespListener.detectCharset(headers, getData("beta_shield"));
         System.out.println(c);
 
     }

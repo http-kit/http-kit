@@ -2,12 +2,14 @@
   (:refer-clojure :exclude [get])
   (:require [clojure.string :as str])
   (:import [me.shenfeng.http.client HttpClientConfig HttpClient
-            ITextHandler IBinaryHandler BinaryRespListener TextRespListener]
-           [java.net Proxy Proxy$Type URI]))
+            IResponseHandler RespListener RespListener$IFilter]
+           (java.net URI URLEncoder)
+           me.shenfeng.http.HttpMethod))
 
-(defonce client (atom nil))
-
-(def no-proxy Proxy/NO_PROXY)
+(defn- url-encode
+  "Returns an UTF-8 URL encoded version of the given string."
+  [unencoded]
+  (URLEncoder/encode unencoded "UTF-8"))
 
 (defn- transform-header [headers keyify?]
   (reduce (fn [m [k v]]
@@ -15,37 +17,30 @@
                          (str/lower-case k)) v))
           {} headers))
 
-(defn- gen-handler [cb binary? keyify?]
-  (if binary?
-    (BinaryRespListener. (reify IBinaryHandler
-                           (onSuccess [this status headers bytes]
-                             (cb {:body bytes
-                                  :headers (transform-header headers keyify?)
-                                  :status status}))
-                           (onThrowable [this t]
-                             (cb {:body t}))))
-    (TextRespListener. (reify ITextHandler
-                         (onSuccess [this status headers str]
-                           (cb {:body str
-                                :headers (transform-header headers keyify?)
-                                :status status}))
-                         (onThrowable [this t]
-                           (cb {:body t}))))))
+(defn- http-method [method-keyword]
+  (case (or method-keyword :get)
+    :get HttpMethod/GET
+    :post HttpMethod/POST
+    :put HttpMethod/PUT))
 
-;;; init http client, should be called before post and get
-(defn init [& {:keys [timeout user-agent instance]
-               :or {timeout 40000 user-agent "http-kit/1.1"}}]
-  (when (nil? @client)
-    (if instance
-      (reset! client instance)
-      (reset! client (HttpClient. (HttpClientConfig. timeout user-agent))))))
+(defn- generate-query-string
+  "Params: {:param1 \"value1\" :params2 \"value2\" :param3 [\"value3\" \"value4\"}
 
-(defn get [{:keys [url headers cb proxy binary? keyify?]
-            :or {proxy no-proxy headers {} keyify? true cb (fn [& args])}}]
-  (.get ^HttpClient @client
-        (URI. url) headers proxy (gen-handler cb binary? keyify?)))
+   Return Http Form encoded bytes array. used as HTTP body. Need to set
 
-(defn post [{:keys [url headers body cb proxy keyify? binary?]
-             :or {proxy no-proxy headers {} keyify? true cb (fn [& args])}}]
-  (.post ^HttpClient @client
-         (URI. url) headers body proxy (gen-handler cb binary? keyify?)))
+   Content-Type: application/x-www-form-urlencoded
+
+   in the Request's Headers for server to properly understand it"
+  [params]
+  (.getBytes (str/join "&"
+                       (mapcat (fn [[k v]]
+                                 (if (sequential? v)
+                                   (map #(str (url-encode (name %1))
+                                              "="
+                                              (url-encode (str %2)))
+                                        (repeat k) v)
+                                   [(str (url-encode (name k))
+                                         "="
+                                         (url-encode (str v)))]))
+                               params))
+             "UTF-8"))

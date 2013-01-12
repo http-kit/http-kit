@@ -1,5 +1,4 @@
 
-
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -93,7 +92,7 @@ public class MakeupIdelConnection {
                             }
                             key.interestOps(SelectionKey.OP_READ);
                         }
-                    } 
+                    }
                 }
                 selectedKeys.clear();
             }

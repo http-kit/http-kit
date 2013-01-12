@@ -1,5 +1,0 @@
-package me.shenfeng.http.client;
-
-public enum ClientConnState {
-    DIRECT_CONNECTING, DIRECT_CONNECTED, SOCKS_CONNECTTING, SOCKS_VERSION_AUTH, SOCKS_INIT_CONN, SOCKS_HTTP_REQEUST
-}
