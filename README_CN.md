@@ -17,7 +17,7 @@ http-kit使用了和Nginx同样的并发模型，具有和Nginx相似的性能�
 
 ```clj
 ;; 在project.clj中添加依赖
-[me.shenfeng/http-kit "1.2"]
+[me.shenfeng/http-kit "1.3-SNAPSHOT"]
 [compojure "1.1.1"]
 
 ;;; 引入依赖
@@ -105,6 +105,10 @@ http-kit使用了和Nginx同样的并发模型，具有和Nginx相似的性能�
 用WebSocket实现的聊天室， 在[examples/websocket目录](https://github.com/shenfeng/http-kit/tree/master/examples/websocket)
 
 ## HTTP Client 用法
+
+```clj
+(:require [me.shenfeng.http.client :as http])
+```
 
 ```clj
 

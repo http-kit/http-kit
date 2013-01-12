@@ -23,7 +23,7 @@ for Efficient => just a few k of memory to maintain a connection
 
 ### HTTP Server
 ```clj
-[me.shenfeng/http-kit "1.2"]
+[me.shenfeng/http-kit "1.3-SNAPSHOT"]
 
 (:use me.shenfeng.http.server)          ; export run-server and defasync
 
@@ -118,6 +118,10 @@ run it:
 ```
 
 #### HTTP Post
+
+```clj
+(:require [me.shenfeng.http.client :as http])
+```
 
 ```clj
 (def post-options {:form-params {:params1 "value" :params2 ["v1" "v2"]}
