@@ -79,9 +79,12 @@ public class RespListener implements IRespListener {
             encoding = encoding.toLowerCase();
             ByteArrayInputStream bis = new ByteArrayInputStream(body.get(), 0, body.length());
             DynamicBytes unzipped = new DynamicBytes(body.length() * 6);
+            boolean zipped = ("gzip".equals(encoding) || "x-gzip".equals(encoding));
+            if (zipped) {
+                headers.remove(CONTENT_ENCODING);
+            }
             // deflate || x-deflate
-            InputStream is = ("gzip".equals(encoding) || "x-gzip".equals(encoding)) ? new GZIPInputStream(
-                    bis) : new DeflaterInputStream(bis);
+            InputStream is = zipped ? new GZIPInputStream(bis) : new DeflaterInputStream(bis);
             byte[] buffer = new byte[4096];
             int read;
             while ((read = is.read(buffer)) != -1) {
