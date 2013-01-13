@@ -35,7 +35,7 @@ import me.shenfeng.http.ws.WSFrame;
 import me.shenfeng.http.ws.WsCon;
 import me.shenfeng.http.ws.WsServerAtta;
 
-public class HttpServer {
+public class HttpServer implements Runnable {
 
     private void closeKey(final SelectionKey key, CloseFrame close) {
         SelectableChannel ch = key.channel();
@@ -103,49 +103,6 @@ public class HttpServer {
 
     // shared, single thread
     private ByteBuffer buffer = ByteBuffer.allocateDirect(1024 * 64);
-
-    private Runnable eventLoop = new Runnable() {
-        public void run() {
-            SelectionKey key = null;
-            while (true) {
-                try {
-                    while ((key = pendings.poll()) != null) {
-                        if (key.isValid()) {
-                            key.interestOps(OP_WRITE);
-                        }
-                    }
-                    int select = selector.select(SELECT_TIMEOUT);
-                    if (select <= 0) {
-                        continue;
-                    }
-                    Set<SelectionKey> selectedKeys = selector.selectedKeys();
-                    Iterator<SelectionKey> ite = selectedKeys.iterator();
-                    while (ite.hasNext()) {
-                        key = ite.next();
-                        if (!key.isValid()) {
-                            continue;
-                        }
-                        if (key.isAcceptable()) {
-                            accept(key, selector);
-                        } else if (key.isReadable()) {
-                            doRead(key);
-                        } else if (key.isWritable()) {
-                            doWrite(key);
-                        }
-                    }
-                    selectedKeys.clear();
-                } catch (ClosedSelectorException ignore) {
-                    selector = null;
-                    return;
-                } catch (Exception e) { // catch any exception, print it
-                    if (key != null) {
-                        closeKey(key, CloseFrame.SERVER_ERROR);
-                    }
-                    HttpUtils.printError("http server loop error, should not happend", e);
-                }
-            }
-        }
-    };
 
     public HttpServer(String ip, int port, IHandler handler, int maxBody, int maxLine) {
         this.handler = handler;
@@ -255,7 +212,7 @@ public class HttpServer {
 
     public void start() throws IOException {
         bind();
-        serverThread = new Thread(eventLoop, "http-server");
+        serverThread = new Thread(this, "http-server");
         serverThread.start();
     }
 
@@ -273,6 +230,47 @@ public class HttpServer {
             } catch (IOException ignore) {
             }
             serverThread.interrupt();
+        }
+    }
+
+    public void run() {
+        SelectionKey key = null;
+        while (true) {
+            try {
+                while ((key = pendings.poll()) != null) {
+                    if (key.isValid()) {
+                        key.interestOps(OP_WRITE);
+                    }
+                }
+                int select = selector.select(SELECT_TIMEOUT);
+                if (select <= 0) {
+                    continue;
+                }
+                Set<SelectionKey> selectedKeys = selector.selectedKeys();
+                Iterator<SelectionKey> ite = selectedKeys.iterator();
+                while (ite.hasNext()) {
+                    key = ite.next();
+                    if (!key.isValid()) {
+                        continue;
+                    }
+                    if (key.isAcceptable()) {
+                        accept(key, selector);
+                    } else if (key.isReadable()) {
+                        doRead(key);
+                    } else if (key.isWritable()) {
+                        doWrite(key);
+                    }
+                }
+                selectedKeys.clear();
+            } catch (ClosedSelectorException ignore) {
+                selector = null;
+                return;
+            } catch (Exception e) { // catch any exception, print it
+                if (key != null) {
+                    closeKey(key, CloseFrame.SERVER_ERROR);
+                }
+                HttpUtils.printError("http server loop error, should not happend", e);
+            }
         }
     }
 }

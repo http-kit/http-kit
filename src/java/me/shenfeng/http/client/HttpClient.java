@@ -37,18 +37,8 @@ import me.shenfeng.http.DynamicBytes;
 import me.shenfeng.http.HttpMethod;
 import me.shenfeng.http.HttpUtils;
 
-public final class HttpClient {
+public final class HttpClient implements Runnable {
     private static final AtomicInteger ID = new AtomicInteger(0);
-
-    private class SelectorLoopThread extends Thread {
-        public void run() {
-            try {
-                eventLoop();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-    }
 
     private final Queue<Request> pendings = new ConcurrentLinkedQueue<Request>();
 
@@ -63,29 +53,28 @@ public final class HttpClient {
 
     public HttpClient(HttpClientConfig config) throws IOException {
         this.config = config;
-        selector = Selector.open();
-        SelectorLoopThread thread = new SelectorLoopThread();
         int id = ID.incrementAndGet();
         String name = "http-client";
         if (id > 1) {
             name = name + "#" + id;
         }
-        thread.setName(name);
-        thread.setDaemon(true);
-        thread.start();
+        selector = Selector.open();
+        Thread t = new Thread(this, name);
+        t.setDaemon(true);
+        t.start();
     }
 
     private void clearTimeouted(long currentTime) {
-        Request a;
-        while ((a = requests.peek()) != null) {
-            if (!a.isTimeout(currentTime)) {
+        Request r;
+        while ((r = requests.peek()) != null) {
+            if (!r.isTimeout(currentTime)) {
                 String msg;
-                if (a.connected()) {
+                if (r.connected()) {
                     msg = "read timeout: ";
                 } else {
                     msg = "connect timeout: ";
                 }
-                a.finish(new TimeoutException(msg + a.timeOutMs + "ms"));
+                r.finish(new TimeoutException(msg + r.timeOutMs + "ms"));
                 requests.poll();
             } else {
                 break;
@@ -94,42 +83,42 @@ public final class HttpClient {
     }
 
     private void doRead(SelectionKey key, long currentTime) {
-        Request atta = (Request) key.attachment();
+        Request req = (Request) key.attachment();
         try {
             buffer.clear();
             int read = ((SocketChannel) key.channel()).read(buffer);
             if (read == -1) {
-                atta.finish();
+                req.finish();
             } else if (read > 0) {
-                atta.onProgress(currentTime);
+                req.onProgress(currentTime);
                 buffer.flip();
-                Decoder decoder = atta.decoder;
+                Decoder decoder = req.decoder;
                 DState state = decoder.decode(buffer);
                 if (state == ALL_READ) {
-                    atta.finish();
+                    req.finish();
                 } else if (state == ABORTED) {
-                    atta.finish(new AbortException());
+                    req.finish(new AbortException());
                 }
             }
         } catch (Exception e) {
             // IOException the remote forcibly closed the connection
             // LineTooLargeException
             // ProtoalException
-            atta.finish(e);
+            req.finish(e);
         }
     }
 
     private void doWrite(SelectionKey key) {
-        Request atta = (Request) key.attachment();
+        Request req = (Request) key.attachment();
         SocketChannel ch = (SocketChannel) key.channel();
-        ByteBuffer request = atta.request;
         try {
+            ByteBuffer request = req.request;
             ch.write(request);
             if (!request.hasRemaining()) {
                 key.interestOps(OP_READ);
             }
         } catch (IOException e) {
-            atta.finish(e);
+            req.finish(e);
         }
     }
 
@@ -203,7 +192,7 @@ public final class HttpClient {
         }
     }
 
-    private void eventLoop() throws IOException {
+    public void run() {
         while (running) {
             try {
                 long currentTime = currentTimeMillis();
