@@ -1,12 +1,14 @@
-(ns me.shenfeng.http.server.server-test
+(ns me.shenfeng.http.server-test
   (:use clojure.test
         ring.middleware.file-info
         [clojure.java.io :only [input-stream]]
+
         (compojure [core :only [defroutes GET POST HEAD DELETE ANY context]]
                    [handler :only [site]]
                    [route :only [not-found]])
         me.shenfeng.http.server)
-  (:require [clj-http.client :as http])
+  (:require [clj-http.client :as http]
+            [clj-http.util :as u])
   (:import [java.io File FileOutputStream FileInputStream]))
 
 (defn ^File gen-tempfile
@@ -70,24 +72,24 @@
   (GET "/spec-get" [] test-get-spec)
   (POST "/spec-post" [] test-post-spec)
   (GET "/string" [] (fn [req] {:status 200
-                              :headers {"Content-Type" "text/plain"}
-                              :body "Hello World"}))
+                               :headers {"Content-Type" "text/plain"}
+                               :body "Hello World"}))
   (GET "/iseq" [] (fn [req] {:status 200
-                            :headers {"Content-Type" "text/plain"}
-                            :body (range 1 10)}))
+                             :headers {"Content-Type" "text/plain"}
+                             :body (range 1 10)}))
   (GET "/file" [] (wrap-file-info (fn [req]
                                     {:status 200
                                      :body (let [l (to-int (or (-> req :params :l) "5024000"))]
                                              (gen-tempfile l ".txt"))})))
   (GET "/inputstream" [] (fn [req] (let [l (-> req :params :l to-int)
-                                        file (gen-tempfile l ".txt")]
-                                    {:status 200
-                                     :body (FileInputStream. file)})))
+                                         file (gen-tempfile l ".txt")]
+                                     {:status 200
+                                      :body (FileInputStream. file)})))
   (POST "/multipart" [] (fn [req] (let [{:keys [title file]} (:params req)]
-                                   {:status 200
-                                    :body (str title ": " (:size file))})))
+                                    {:status 200
+                                     :body (str title ": " (:size file))})))
   (POST "/chunked" [] (fn [req] {:status 200
-                                :body (str (:content-length req))}))
+                                 :body (str (:content-length req))}))
   (GET "/null" [] (fn [req] {:status 200 :body nil}))
   (GET "/async" [] async-handler)
   (GET "/async-response" [] (fn [req]

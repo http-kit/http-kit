@@ -47,15 +47,17 @@
 (defn get-default-client "Returns default HTTP client, initializing as neccesary."
   [] (if-let [c @default-client] c (reset! default-client (init-client))))
 
-(defn- coerce-req [{:keys [headers client method body form-params timeout basic-auth]
+(defn- coerce-req [{:keys [headers client method body
+                           form-params basic-auth user-agent]
                     :as req}]
   (merge req  ;; TODO cookie
-         {:headers
-          (merge headers
-                 (when form-params
-                   {"Content-Type" "application/x-www-form-urlencoded"})
-                 (when basic-auth
-                   {"Authorization" (basic-auth-value basic-auth)}))}
+         {:headers (merge headers
+                          (when form-params
+                            {"Content-Type" "application/x-www-form-urlencoded"})
+                          (when basic-auth
+                            {"Authorization" (basic-auth-value basic-auth)})
+                          (when user-agent
+                            {"User-Agent" user-agent}))}
          {:body (or (when form-params
                       (form-body form-params)) body)}
          {:client (or client (get-default-client))
@@ -126,13 +128,3 @@
   ([url req resp & forms]
      `(let [req# (merge {:method :post :url ~url} ~req)]
         (request req# ~resp ~@forms))))
-
-(comment
-  (let [a (post "http://127.0.0.1:9091" {:timeout 900
-                                         :form-params {:param1 "abc" :param2 ["a" "b"]}
-                                         :basic-auth ["user" "password"]}
-                {:keys [status headers body] :as resp}
-                (if status
-                  (println status)
-                  (do (.printStackTrace resp))))]
-    (println @a)))
