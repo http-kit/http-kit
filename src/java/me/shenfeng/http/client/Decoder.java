@@ -32,10 +32,10 @@ enum DState {
 
 public class Decoder {
 
-    private Map<String, String> headers = new TreeMap<String, String>();
+    private final Map<String, String> headers = new TreeMap<String, String>();
     // package visible
-    IRespListener listener;
-    byte[] lineBuffer = new byte[MAX_LINE];
+    final IRespListener listener;
+    final byte[] lineBuffer = new byte[MAX_LINE];
     int lineBufferCnt = 0;
     int readRemaining = 0;
     DState st = READ_INITIAL;

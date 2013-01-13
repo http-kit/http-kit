@@ -12,12 +12,9 @@ import static me.shenfeng.http.HttpUtils.CONTENT_LENGTH;
 import static me.shenfeng.http.HttpUtils.CR;
 import static me.shenfeng.http.HttpUtils.HOST;
 import static me.shenfeng.http.HttpUtils.LF;
-import static me.shenfeng.http.HttpUtils.SELECT_TIMEOUT;
 import static me.shenfeng.http.HttpUtils.SP;
-import static me.shenfeng.http.HttpUtils.TIMEOUT_CHECK_INTEVAL;
 import static me.shenfeng.http.HttpUtils.USER_AGENT;
 import static me.shenfeng.http.HttpUtils.getPath;
-import static me.shenfeng.http.client.ConnState.DIRECT_CONNECTED;
 import static me.shenfeng.http.client.DState.ABORTED;
 import static me.shenfeng.http.client.DState.ALL_READ;
 
@@ -29,8 +26,8 @@ import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.Map;
+import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -53,11 +50,10 @@ public final class HttpClient {
         }
     }
 
-    private final Queue<Attament> pendingConnect = new ConcurrentLinkedQueue<Attament>();
+    private final Queue<Request> pendings = new ConcurrentLinkedQueue<Request>();
 
-    private long lastTimeoutCheckTime;
+    private final PriorityQueue<Request> requests = new PriorityQueue<Request>();
 
-    private final LinkedList<Attament> clients = new LinkedList<Attament>();
     private volatile boolean running = true;
 
     private final HttpClientConfig config;
@@ -80,35 +76,32 @@ public final class HttpClient {
     }
 
     private void clearTimeouted(long currentTime) {
-        Iterator<Attament> ite = clients.iterator();
-        while (ite.hasNext()) {
-            Attament c = ite.next();
-            ite.remove();
-            if (!c.finished && (c.timeOutMs + c.lastActiveTime < currentTime)) {
-                String msg = "read socks server timeout: ";
-                switch (c.state) {
-                case DIRECT_CONNECTING:
-                    msg = "connect timeout: ";
-                    break;
-                case DIRECT_CONNECTED:
+        Request a;
+        while ((a = requests.peek()) != null) {
+            if (!a.isTimeout(currentTime)) {
+                String msg;
+                if (a.connected()) {
                     msg = "read timeout: ";
-                    break;
+                } else {
+                    msg = "connect timeout: ";
                 }
-                c.finish(new TimeoutException(msg + c.timeOutMs + "ms"));
+                a.finish(new TimeoutException(msg + a.timeOutMs + "ms"));
+                requests.poll();
+            } else {
+                break;
             }
         }
     }
 
     private void doRead(SelectionKey key, long currentTime) {
-        Attament atta = (Attament) key.attachment();
+        Request atta = (Request) key.attachment();
         try {
             buffer.clear();
             int read = ((SocketChannel) key.channel()).read(buffer);
             if (read == -1) {
                 atta.finish();
             } else if (read > 0) {
-                // update for timeout check
-                atta.lastActiveTime = currentTime;
+                atta.onProgress(currentTime);
                 buffer.flip();
                 Decoder decoder = atta.decoder;
                 DState state = decoder.decode(buffer);
@@ -127,7 +120,7 @@ public final class HttpClient {
     }
 
     private void doWrite(SelectionKey key) {
-        Attament atta = (Attament) key.attachment();
+        Request atta = (Request) key.attachment();
         SocketChannel ch = (SocketChannel) key.channel();
         ByteBuffer request = atta.request;
         try {
@@ -188,62 +181,53 @@ public final class HttpClient {
         if (timeoutMs == -1) {
             timeoutMs = config.timeOutMs;
         }
-        pendingConnect.offer(new Attament(request, cb, timeoutMs, uri));
+        pendings.offer(new Request(request, cb, timeoutMs, uri, requests));
         selector.wakeup();
     }
 
     private void processPendings(long currentTime) {
-        Attament job;
+        Request job;
         try {
-            while ((job = pendingConnect.poll()) != null) {
+            while ((job = pendings.poll()) != null) {
                 if (job.addr != null) { // if DNS lookup fail
                     SocketChannel ch = SocketChannel.open();
                     job.ch = ch; // save for use when timeout
-                    job.lastActiveTime = currentTime;
                     ch.configureBlocking(false);
                     ch.register(selector, OP_CONNECT, job);
                     ch.connect(job.addr);
-                    clients.add(job);
+                    requests.offer(job);
                 }
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            HttpUtils.printError("error when process requests", e);
         }
     }
 
     private void eventLoop() throws IOException {
-        lastTimeoutCheckTime = System.currentTimeMillis();
         while (running) {
-            Set<SelectionKey> selectedKeys;
             try {
                 long currentTime = currentTimeMillis();
                 processPendings(currentTime);
-                // TODO timeout should be check more frequently. use a
-                // PriorityQueue?
-                if (currentTime - lastTimeoutCheckTime > TIMEOUT_CHECK_INTEVAL) {
-                    clearTimeouted(currentTime);
-                    lastTimeoutCheckTime = currentTime;
-                }
-                int select = selector.select(SELECT_TIMEOUT);
-                if (select <= 0) {
-                    continue;
-                }
-                selectedKeys = selector.selectedKeys();
-                Iterator<SelectionKey> ite = selectedKeys.iterator();
-                while (ite.hasNext()) {
-                    SelectionKey key = ite.next();
-                    if (!key.isValid()) {
-                        continue;
+                int select = selector.select(1000);
+                if (select > 0) {
+                    Set<SelectionKey> selectedKeys = selector.selectedKeys();
+                    Iterator<SelectionKey> ite = selectedKeys.iterator();
+                    while (ite.hasNext()) {
+                        SelectionKey key = ite.next();
+                        if (!key.isValid()) {
+                            continue;
+                        }
+                        if (key.isConnectable()) {
+                            finishConnect(key, currentTime);
+                        } else if (key.isWritable()) {
+                            doWrite(key);
+                        } else if (key.isReadable()) {
+                            doRead(key, currentTime);
+                        }
                     }
-                    if (key.isConnectable()) {
-                        finishConnect(key, currentTime);
-                    } else if (key.isWritable()) {
-                        doWrite(key);
-                    } else if (key.isReadable()) {
-                        doRead(key, currentTime);
-                    }
+                    selectedKeys.clear();
                 }
-                selectedKeys.clear();
+                clearTimeouted(currentTime);
             } catch (Exception e) {
                 HttpUtils.printError("Please catch this exception", e);
             }
@@ -252,11 +236,11 @@ public final class HttpClient {
 
     private void finishConnect(SelectionKey key, long currentTime) {
         SocketChannel ch = (SocketChannel) key.channel();
-        Attament attr = (Attament) key.attachment();
+        Request attr = (Request) key.attachment();
         try {
             if (ch.finishConnect()) {
-                attr.state = DIRECT_CONNECTED;
-                attr.lastActiveTime = currentTime;
+                attr.setConnected();
+                attr.onProgress(currentTime);
                 key.interestOps(OP_WRITE);
             }
         } catch (IOException e) {
