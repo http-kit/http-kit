@@ -40,9 +40,9 @@
 (defonce default-client (atom nil))
 
 (defn init-client "Initializes and returns a new HTTP client."
-  [& {:keys [timeout user-agent] :as default-request-opts
-      :or {timeout 40000 user-agent "http-kit/1.3"}}]
-  (HttpClient. (HttpClientConfig. timeout user-agent)))
+  [& {:keys [timeout user-agent keep-alive]
+      :or {timeout 40000 user-agent "http-kit/1.3" keep-alive 120000}}]
+  (HttpClient. (HttpClientConfig. timeout user-agent keep-alive)))
 
 (defn get-default-client "Returns default HTTP client, initializing as neccesary."
   [] (if-let [c @default-client] c (reset! default-client (init-client))))

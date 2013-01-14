@@ -17,7 +17,6 @@ import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
 import java.util.TreeMap;
@@ -34,6 +33,7 @@ public final class HttpClient implements Runnable {
 
     private final Queue<Request> pendings = new ConcurrentLinkedQueue<Request>();
     private final PriorityQueue<Request> requests = new PriorityQueue<Request>();
+    private final PriorityQueue<PersistentConn> keepalives = new PriorityQueue<PersistentConn>();
 
     private volatile boolean running = true;
 
@@ -55,10 +55,10 @@ public final class HttpClient implements Runnable {
         t.start();
     }
 
-    private void clearTimeouted(long currentTime) {
+    private void clearTimeouted(long now) {
         Request r;
         while ((r = requests.peek()) != null) {
-            if (!r.isTimeout(currentTime)) {
+            if (r.isTimeout(now)) {
                 String msg;
                 if (r.connected()) {
                     msg = "read timeout: ";
@@ -71,30 +71,56 @@ public final class HttpClient implements Runnable {
                 break;
             }
         }
+
+        PersistentConn pc;
+        while ((pc = keepalives.peek()) != null) {
+            if (pc.isTimeout(now)) {
+                try {
+                    pc.key.channel().close();
+                } catch (IOException ignore) {
+                }
+                keepalives.poll();
+            } else {
+                break;
+            }
+        }
     }
 
-    private void doRead(SelectionKey key, long currentTime) {
+    private void doRead(SelectionKey key, long now) {
         Request req = (Request) key.attachment();
+        SocketChannel ch = (SocketChannel) key.channel();
         try {
             buffer.clear();
-            SocketChannel ch = (SocketChannel) key.channel();
             int read = ch.read(buffer);
             if (read == -1) {
-                req.finish(); // read all, remove closed it
+                closeQuiety(key);
+                req.finish(); // read all, remote closed it cleanly
             } else if (read > 0) {
-                req.onProgress(currentTime);
+                req.onProgress(now);
                 buffer.flip();
                 try {
                     if (req.decoder.decode(buffer) == ALL_READ) {
                         req.finish();
+                        keepalives.offer(new PersistentConn(now + config.keepalive, req.addr,
+                                key));
                     }
                 } catch (HTTPException e) {
+                    closeQuiety(key);
                     req.finish(e);
                 }
             }
         } catch (IOException e) {
+            closeQuiety(key);
             // IOException the remote forcibly closed the connection
             req.finish(e);
+        }
+    }
+
+    private void closeQuiety(SelectionKey key) {
+        try {
+            keepalives.remove(key);
+            key.channel().close();
+        } catch (Exception ignore) {
         }
     }
 
@@ -164,13 +190,13 @@ public final class HttpClient implements Runnable {
         }
     }
 
-    private void finishConnect(SelectionKey key, long currentTime) {
+    private void finishConnect(SelectionKey key, long now) {
         SocketChannel ch = (SocketChannel) key.channel();
         Request attr = (Request) key.attachment();
         try {
             if (ch.finishConnect()) {
                 attr.setConnected();
-                attr.onProgress(currentTime);
+                attr.onProgress(now);
                 key.interestOps(OP_WRITE);
             }
         } catch (IOException e) {
@@ -182,11 +208,20 @@ public final class HttpClient implements Runnable {
         Request job;
         try {
             while ((job = pendings.poll()) != null) {
-                SocketChannel ch = SocketChannel.open();
-                ch.configureBlocking(false);
-                ch.register(selector, OP_CONNECT, job);
-                ch.connect(job.addr);
-                requests.offer(job);
+                PersistentConn con = keepalives.remove(job.addr);
+                if (con != null) { // keep alive
+                    // System.out.println("hit keep-alived, total: " +
+                    // keepalives.size());
+                    SelectionKey key = con.key;
+                    key.attach(job);
+                    key.interestOps(OP_WRITE);
+                } else {
+                    SocketChannel ch = SocketChannel.open();
+                    ch.configureBlocking(false);
+                    ch.register(selector, OP_CONNECT, job);
+                    ch.connect(job.addr);
+                    requests.offer(job);
+                }
             }
         } catch (IOException e) {
             HttpUtils.printError("error when try to connect", e);
@@ -197,8 +232,7 @@ public final class HttpClient implements Runnable {
         while (running) {
             try {
                 long now = currentTimeMillis();
-                processPendings(now);
-                int select = selector.select(1000);
+                int select = selector.select(2000);
                 if (select > 0) {
                     Set<SelectionKey> selectedKeys = selector.selectedKeys();
                     Iterator<SelectionKey> ite = selectedKeys.iterator();
@@ -217,6 +251,7 @@ public final class HttpClient implements Runnable {
                     }
                     selectedKeys.clear();
                 }
+                processPendings(now);
                 clearTimeouted(now);
             } catch (Exception e) {
                 HttpUtils.printError("Please catch this exception", e);

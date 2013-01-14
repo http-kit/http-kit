@@ -2,7 +2,6 @@ package me.shenfeng.http.client;
 
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.util.PriorityQueue;
 
 public class Request implements Comparable<Request> {
 
@@ -47,7 +46,7 @@ public class Request implements Comparable<Request> {
     }
 
     public boolean isTimeout(long now) {
-        return timeoutTs > now;
+        return timeoutTs < now;
     }
 
     public void finish(Throwable t) {

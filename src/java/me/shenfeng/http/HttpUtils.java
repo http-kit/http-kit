@@ -15,7 +15,6 @@ import java.net.URI;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
-import java.nio.channels.SelectableChannel;
 import java.nio.channels.FileChannel.MapMode;
 import java.nio.charset.Charset;
 import java.util.Date;
@@ -85,15 +84,6 @@ public class HttpUtils {
 
     // space ' '
     public static final byte SP = 32;
-
-    public static void closeQuiety(SelectableChannel c) {
-        try {
-            if (c != null) {
-                c.close();
-            }
-        } catch (Exception ignore) {
-        }
-    }
 
     public static DynamicBytes encodeResponseHeader(int status, Map<String, Object> headers) {
         DynamicBytes bytes = new DynamicBytes(196);

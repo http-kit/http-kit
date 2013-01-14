@@ -11,6 +11,7 @@
   (GET "/get" [] "hello world")
   (POST "/post" [] "hello world")
   (ANY "/ua" [] (fn [req] ((-> req :headers) "user-agent")))
+  (GET "/keep-alive" [] (fn [req] (-> req :params :id)))
   (POST "/form-params" [] (fn [req] (-> req :params :param1))))
 
 (use-fixtures :once (fn [f]
@@ -41,23 +42,29 @@
     (doseq [_ (range 0 200)]
       (is (= 200 (:status @(http/get url)))))))
 
-;; On Macbook Air:
-;; "clj-http, concurrency 1, 2000 requests: Elapsed time: 9891.066 msecs"
-;; "http-kit, concurrency 10, 2000 requests: Elapsed time: 766.363 msecs"
-;; "http-kit, concurrency 1, 2000 requests: Elapsed time: 1624.183 msecs"
+(deftest test-keep-alive-does-not-messup
+  (let [url "http://127.0.0.1:4347/keep-alive?id="]
+    (doseq [id (range 0 100)]
+      (is (= (str id) (:body @(http/get (str url id))))))
+    (doseq [ids (partition 10 (range 0 100))]
+      (let [requests (doall (map (fn [id] (http/get (str url id) {} {:keys [body]}
+                                                   (is (= (str id) body))))
+                                 ids))]
+        (doseq [r requests]
+          (is (= 200 (:status @r))))))))
 
 (deftest performance-bench
   (let [url "http://127.0.0.1:4347/get"]
-    (Thread/sleep 1500)
+    (Thread/sleep 1000)
     (bench "clj-http, concurrency 1, 2000 requests: "
            (doseq [_ (range 0 2000)] (clj-http/get url)))
-    (Thread/sleep 1500)
+    (Thread/sleep 1000)
     (bench "http-kit, concurrency 10, 2000 requests: "
            (doseq [_ (range 0 200)]
              (let [requests (doall (map (fn [u] (http/get u))
                                         (repeat 10 url)))]
                (doseq [r requests] @r)))) ; wait
-    (Thread/sleep 1500)
+    (Thread/sleep 1000)
     (bench "http-kit, concurrency 1, 2000 requests: "
            (doseq [_ (range 0 2000)] @(http/get url)))))
 
