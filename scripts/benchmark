@@ -11,7 +11,7 @@ start_server () {
         -XX:ParallelGCThreads=2 \
         -Xms128m -Xmx128m \
         -server \
-        -cp "lib/*:lib/dev/*:src:test:classes" \
+        -cp "lib/*:lib/dev/*:src:test:classes:target/classes" \
         clojure.main \
         -m me.shenfeng.http.server.benchmark \
         /dev/null $@ &

@@ -56,7 +56,7 @@ public class HttpClientTest {
 
     public HttpClientTest() throws IOException {
         String userAgent = "Mozilla/5.0 (compatible; Rssminer/1.0; +http://rssminer.net)";
-        HttpClientConfig cfg = new HttpClientConfig(45000, userAgent);
+        HttpClientConfig cfg = new HttpClientConfig(45000, userAgent, 100000);
 
         client = new HttpClient(cfg);
     }

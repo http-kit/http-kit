@@ -39,18 +39,22 @@
             (str (- finish start) "ms"))
       resp)))
 
-(defasync poll-mesg [req] client
-  (let [id (Integer/valueOf (-> req :params :id))]
-    (let [msgs (get-msgs id)]
-      (if (seq msgs)
-        (client {:status 200
-                 :headers json-header
-                 :body (json-str msgs)})
-        (swap! clients assoc client id)))))
+(defn poll-mesg [req]
+  (let [id (Integer/valueOf (-> req :params :id))
+        msgs (get-msgs id)]
+    (async-response respond!
+                    (if (seq msgs)
+                      (respond! {:status 200
+                                 :headers json-header
+                                 :body (json-str msgs)})
+                      (swap! clients assoc respond! id)))))
 
 (defn on-mesg-received [req]
   (let [{:keys [msg author]} (-> req :params)
-        data {:msg msg :author author :time (now) :id (swap! current-max-id inc)}]
+        data {:msg msg
+              :author author
+              :time (now)
+              :id (swap! current-max-id inc)}]
     (info "mesg received: " msg)
     (swap! all-msgs conj data)
     (doseq [client (keys @clients)]

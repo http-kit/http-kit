@@ -40,14 +40,15 @@
   (doseq [client (keys @clients)]
     (send-mesg client (json-str (get-msgs (@clients client))))))
 
-(defwshandler chat-handler [req] con
-  (info con "connected")
-  (swap! clients assoc con 1)
-  ;; (write con (json-str (get-msgs 1)))
-  (on-mesg con (fn [msg]
-                 (on-mesg-received (read-json msg))))
-  (on-close con (fn [status]
-                  (info con "closed, status" status))))
+(defn chat-handler [req]
+  (when-ws-request req con
+                   (info con "connected")
+                   (swap! clients assoc con 1)
+                   ;; (write con (json-str (get-msgs 1)))
+                   (on-mesg con (fn [msg]
+                                  (on-mesg-received (read-json msg))))
+                   (on-close con (fn [status]
+                                   (info con "closed, status" status)))))
 
 (defwshandler echo-handler [req] con
   (on-mesg con (fn [msg]

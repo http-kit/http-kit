@@ -18,7 +18,7 @@ public class TextClientTest {
 
     @Before
     public void setup() throws IOException {
-        client = new HttpClient(new HttpClientConfig());
+        client = new HttpClient(new HttpClientConfig(40000, "user-agent", 40000));
     }
 
     @Test

@@ -2,7 +2,7 @@
 
 echo "compile java code"
 
-TARGET=classes
+TARGET=target/classes
 
 rm -rf $TARGET
 mkdir $TARGET

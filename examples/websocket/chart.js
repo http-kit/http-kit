@@ -30,7 +30,6 @@
                   "</span>: "].join('');
     // console.log(msg, ymdate(msg.time));
     $history.append('<li>' + author + msg.msg + t +'</li>');
-    $history.find('li:last')[0].scrollIntoView();
   }
 
   function send_to_server () {
