@@ -133,8 +133,9 @@ public class PriorityQueue<E> {
     public E remove(Object o) {
         for (int i = 0; i < size; i++) {
             if (queue[i].equals(o)) {
+                E e = (E) queue[i];
                 removeAt(i);
-                return (E) queue[i];
+                return e;
             }
         }
         return null;

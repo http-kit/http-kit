@@ -25,4 +25,8 @@ public class PersistentConn implements Comparable<PersistentConn> {
     public boolean isTimeout(long now) {
         return timeoutTs < now;
     }
+
+    public String toString() {
+        return addr + "; timeout=" + (timeoutTs - System.currentTimeMillis()) + "ms";
+    }
 }
