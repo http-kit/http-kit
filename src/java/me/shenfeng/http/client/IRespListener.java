@@ -15,17 +15,14 @@ import me.shenfeng.http.HttpVersion;
  */
 public interface IRespListener {
 
-    public static enum State {
-        ABORT, CONTINUE
-    }
-
-    public State onBodyReceived(byte[] buf, int length);
+    public void onBodyReceived(byte[] buf, int length) throws AbortException;
 
     public void onCompleted();
 
-    public State onHeadersReceived(Map<String, String> headers);
+    public void onHeadersReceived(Map<String, String> headers) throws AbortException;
 
-    public State onInitialLineReceived(HttpVersion version, HttpStatus status);
+    public void onInitialLineReceived(HttpVersion version, HttpStatus status)
+            throws AbortException;
 
     /**
      * protocol error

@@ -1,6 +1,8 @@
 package me.shenfeng.http.client;
 
-public class TimeoutException extends Exception {
+import me.shenfeng.http.HTTPException;
+
+public class TimeoutException extends HTTPException {
 
     private static final long serialVersionUID = 1L;
 

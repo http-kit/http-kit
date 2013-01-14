@@ -37,72 +37,19 @@ import me.shenfeng.http.ws.WsServerAtta;
 
 public class HttpServer implements Runnable {
 
-    private void closeKey(final SelectionKey key, CloseFrame close) {
-        SelectableChannel ch = key.channel();
-        try {
-            if (ch != null) {
-                ch.close();
-            }
-        } catch (Exception ignore) {
-        }
-
-        Object att = key.attachment();
-        if (att instanceof WsServerAtta) { // tell app connection closed
-            handler.handle(((WsServerAtta) att).con, close);
-        }
-    }
-
-    private void doWrite(SelectionKey key) {
-        ServerAtta atta = (ServerAtta) key.attachment();
-        SocketChannel ch = (SocketChannel) key.channel();
-        try {
-            LinkedList<ByteBuffer> toWrites = atta.toWrites;
-            synchronized (toWrites) {
-                if (toWrites.size() == 1) {
-                    ch.write(toWrites.get(0));
-                } else {
-                    ByteBuffer buffers[] = new ByteBuffer[toWrites.size()];
-                    toWrites.toArray(buffers);
-                    ch.write(buffers);
-                }
-                Iterator<ByteBuffer> ite = toWrites.iterator();
-                while (ite.hasNext()) {
-                    if (!ite.next().hasRemaining()) {
-                        ite.remove();
-                    }
-                }
-                // all done
-                if (toWrites.size() == 0) {
-                    if (atta.isKeepAlive()) {
-                        key.interestOps(OP_READ);
-                    } else {
-                        closeKey(key, CloseFrame.NORMAL);
-                    }
-                }
-            }
-        } catch (IOException e) { // the remote forcibly closed the connection
-            closeKey(key, CloseFrame.AWAY);
-        }
-    }
-
     private final IHandler handler;
+
     private final int port;
+
     private final int maxBody;
     private final int maxLine;
     private final String ip;
     private Selector selector;
     private Thread serverThread;
     private ServerSocketChannel serverChannel;
-
-    private ConcurrentLinkedQueue<SelectionKey> pendings = new ConcurrentLinkedQueue<SelectionKey>();
-
-    public void queueWrite(final SelectionKey key) {
-        pendings.add(key);
-        selector.wakeup(); // JVM is smart enough: only once per loop
-    }
-
+    private final ConcurrentLinkedQueue<SelectionKey> pendings = new ConcurrentLinkedQueue<SelectionKey>();
     // shared, single thread
-    private ByteBuffer buffer = ByteBuffer.allocateDirect(1024 * 64);
+    private final ByteBuffer buffer = ByteBuffer.allocateDirect(1024 * 64);
 
     public HttpServer(String ip, int port, IHandler handler, int maxBody, int maxLine) {
         this.handler = handler;
@@ -133,6 +80,21 @@ public class HttpServer implements Runnable {
         InetSocketAddress addr = new InetSocketAddress(ip, port);
         serverChannel.socket().bind(addr);
         serverChannel.register(selector, OP_ACCEPT);
+    }
+
+    private void closeKey(final SelectionKey key, CloseFrame close) {
+        SelectableChannel ch = key.channel();
+        try {
+            if (ch != null) {
+                ch.close();
+            }
+        } catch (Exception ignore) {
+        }
+
+        Object att = key.attachment();
+        if (att instanceof WsServerAtta) { // tell app connection closed
+            handler.handle(((WsServerAtta) att).con, close);
+        }
     }
 
     private void decodeHttp(HttpServerAtta atta, SelectionKey key, SocketChannel ch) {
@@ -210,27 +172,42 @@ public class HttpServer implements Runnable {
         }
     }
 
-    public void start() throws IOException {
-        bind();
-        serverThread = new Thread(this, "http-server");
-        serverThread.start();
+    private void doWrite(SelectionKey key) {
+        ServerAtta atta = (ServerAtta) key.attachment();
+        SocketChannel ch = (SocketChannel) key.channel();
+        try {
+            LinkedList<ByteBuffer> toWrites = atta.toWrites;
+            synchronized (toWrites) {
+                if (toWrites.size() == 1) {
+                    ch.write(toWrites.get(0));
+                } else {
+                    ByteBuffer buffers[] = new ByteBuffer[toWrites.size()];
+                    toWrites.toArray(buffers);
+                    ch.write(buffers);
+                }
+                Iterator<ByteBuffer> ite = toWrites.iterator();
+                while (ite.hasNext()) {
+                    if (!ite.next().hasRemaining()) {
+                        ite.remove();
+                    }
+                }
+                // all done
+                if (toWrites.size() == 0) {
+                    if (atta.isKeepAlive()) {
+                        key.interestOps(OP_READ);
+                    } else {
+                        closeKey(key, CloseFrame.NORMAL);
+                    }
+                }
+            }
+        } catch (IOException e) { // the remote forcibly closed the connection
+            closeKey(key, CloseFrame.AWAY);
+        }
     }
 
-    public void stop() {
-        if (selector != null) {
-            try {
-                serverChannel.close();
-                serverChannel = null;
-                Set<SelectionKey> keys = selector.keys();
-                for (SelectionKey k : keys) {
-                    k.channel().close();
-                }
-                selector.close();
-                handler.close();
-            } catch (IOException ignore) {
-            }
-            serverThread.interrupt();
-        }
+    public void queueWrite(final SelectionKey key) {
+        pendings.add(key);
+        selector.wakeup(); // JVM is smart enough: only once per loop
     }
 
     public void run() {
@@ -271,6 +248,29 @@ public class HttpServer implements Runnable {
                 }
                 HttpUtils.printError("http server loop error, should not happend", e);
             }
+        }
+    }
+
+    public void start() throws IOException {
+        bind();
+        serverThread = new Thread(this, "http-server");
+        serverThread.start();
+    }
+
+    public void stop() {
+        if (selector != null) {
+            try {
+                serverChannel.close();
+                serverChannel = null;
+                Set<SelectionKey> keys = selector.keys();
+                for (SelectionKey k : keys) {
+                    k.channel().close();
+                }
+                selector.close();
+                handler.close();
+            } catch (IOException ignore) {
+            }
+            serverThread.interrupt();
         }
     }
 }

@@ -1,14 +1,6 @@
 package me.shenfeng.http.server;
 
-import static me.shenfeng.http.HttpUtils.CHUNKED;
-import static me.shenfeng.http.HttpUtils.CONTENT_LENGTH;
-import static me.shenfeng.http.HttpUtils.CR;
-import static me.shenfeng.http.HttpUtils.LF;
-import static me.shenfeng.http.HttpUtils.TRANSFER_ENCODING;
-import static me.shenfeng.http.HttpUtils.findEndOfString;
-import static me.shenfeng.http.HttpUtils.findNonWhitespace;
-import static me.shenfeng.http.HttpUtils.findWhitespace;
-import static me.shenfeng.http.HttpUtils.getChunkSize;
+import static me.shenfeng.http.HttpUtils.*;
 import static me.shenfeng.http.HttpVersion.HTTP_1_0;
 import static me.shenfeng.http.HttpVersion.HTTP_1_1;
 

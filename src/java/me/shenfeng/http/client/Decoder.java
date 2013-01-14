@@ -1,19 +1,9 @@
 package me.shenfeng.http.client;
 
-import static me.shenfeng.http.HttpUtils.BUFFER_SIZE;
-import static me.shenfeng.http.HttpUtils.CHUNKED;
-import static me.shenfeng.http.HttpUtils.CONTENT_LENGTH;
-import static me.shenfeng.http.HttpUtils.CR;
-import static me.shenfeng.http.HttpUtils.LF;
-import static me.shenfeng.http.HttpUtils.MAX_LINE;
-import static me.shenfeng.http.HttpUtils.TRANSFER_ENCODING;
-import static me.shenfeng.http.HttpUtils.findEndOfString;
-import static me.shenfeng.http.HttpUtils.findNonWhitespace;
-import static me.shenfeng.http.HttpUtils.findWhitespace;
-import static me.shenfeng.http.HttpUtils.getChunkSize;
+import static me.shenfeng.http.HttpUtils.*;
 import static me.shenfeng.http.HttpVersion.HTTP_1_0;
 import static me.shenfeng.http.HttpVersion.HTTP_1_1;
-import static me.shenfeng.http.client.DState.*;
+import static me.shenfeng.http.client.State.*;
 
 import java.nio.ByteBuffer;
 import java.util.Map;
@@ -24,10 +14,9 @@ import me.shenfeng.http.HttpUtils;
 import me.shenfeng.http.HttpVersion;
 import me.shenfeng.http.LineTooLargeException;
 import me.shenfeng.http.ProtocolException;
-import me.shenfeng.http.client.IRespListener.State;
 
-enum DState {
-    ALL_READ, READ_CHUNK_DELIMITER, READ_CHUNK_FOOTER, READ_CHUNK_SIZE, READ_CHUNKED_CONTENT, READ_FIXED_LENGTH_CONTENT, READ_HEADER, READ_INITIAL, ABORTED, READ_VARIABLE_LENGTH_CONTENT
+enum State {
+    ALL_READ, READ_CHUNK_DELIMITER, READ_CHUNK_FOOTER, READ_CHUNK_SIZE, READ_CHUNKED_CONTENT, READ_FIXED_LENGTH_CONTENT, READ_HEADER, READ_INITIAL, READ_VARIABLE_LENGTH_CONTENT
 }
 
 public class Decoder {
@@ -38,13 +27,13 @@ public class Decoder {
     final byte[] lineBuffer = new byte[MAX_LINE];
     int lineBufferCnt = 0;
     int readRemaining = 0;
-    DState st = READ_INITIAL;
+    State state = READ_INITIAL;
 
     public Decoder(IRespListener listener) {
         this.listener = listener;
     }
 
-    private void parseInitialLine(String sb) throws ProtocolException {
+    private void parseInitialLine(String sb) throws ProtocolException, AbortException {
         int aStart;
         int aEnd;
         int bStart;
@@ -70,24 +59,22 @@ public class Decoder {
                 version = HTTP_1_0;
             }
 
-            if (listener.onInitialLineReceived(version, s) != State.ABORT) {
-                st = READ_HEADER;
-            } else {
-                st = ABORTED;
-            }
+            listener.onInitialLineReceived(version, s);
+            state = READ_HEADER;
 
         } else {
-            throw new ProtocolException("not http prototol");
+            throw new ProtocolException("not http prototol? " + sb);
         }
     }
 
-    public DState decode(ByteBuffer buffer) throws LineTooLargeException, ProtocolException {
+    public State decode(ByteBuffer buffer) throws LineTooLargeException, ProtocolException,
+            AbortException {
         String line;
         int toRead;
         // fine, JVM is very fast for short lived var
         byte[] bodyBuffer = new byte[BUFFER_SIZE];
-        while (buffer.hasRemaining() && st != ALL_READ && st != ABORTED) {
-            switch (st) {
+        while (buffer.hasRemaining() && state != ALL_READ) {
+            switch (state) {
             case READ_INITIAL:
                 line = readLine(buffer);
                 if (line != null) {
@@ -102,54 +89,46 @@ public class Decoder {
                 if (line != null) {
                     readRemaining = getChunkSize(line);
                     if (readRemaining == 0) {
-                        st = READ_CHUNK_FOOTER;
+                        state = READ_CHUNK_FOOTER;
                     } else {
-                        st = READ_CHUNKED_CONTENT;
+                        state = READ_CHUNKED_CONTENT;
                     }
                 }
                 break;
             case READ_FIXED_LENGTH_CONTENT:
                 toRead = Math.min(buffer.remaining(), readRemaining);
                 buffer.get(bodyBuffer, 0, toRead);
-                if (listener.onBodyReceived(bodyBuffer, toRead) == State.ABORT) {
-                    st = ABORTED;
-                } else {
-                    readRemaining -= toRead;
-                    if (readRemaining == 0) {
-                        st = ALL_READ;
-                    }
+                listener.onBodyReceived(bodyBuffer, toRead);
+                readRemaining -= toRead;
+                if (readRemaining == 0) {
+                    state = ALL_READ;
                 }
                 break;
             case READ_CHUNKED_CONTENT:
                 toRead = Math.min(buffer.remaining(), readRemaining);
                 buffer.get(bodyBuffer, 0, toRead);
-                if (listener.onBodyReceived(bodyBuffer, toRead) == State.ABORT) {
-                    st = ABORTED;
-                } else {
-                    readRemaining -= toRead;
-                    if (readRemaining == 0) {
-                        st = READ_CHUNK_DELIMITER;
-                    }
+                listener.onBodyReceived(bodyBuffer, toRead);
+                readRemaining -= toRead;
+                if (readRemaining == 0) {
+                    state = READ_CHUNK_DELIMITER;
                 }
                 break;
             case READ_CHUNK_FOOTER:
                 readEmptyLine(buffer);
-                st = ALL_READ;
+                state = ALL_READ;
                 break;
             case READ_CHUNK_DELIMITER:
                 readEmptyLine(buffer);
-                st = READ_CHUNK_SIZE;
+                state = READ_CHUNK_SIZE;
                 break;
             case READ_VARIABLE_LENGTH_CONTENT:
                 toRead = buffer.remaining();
                 buffer.get(bodyBuffer, 0, toRead);
-                if (listener.onBodyReceived(bodyBuffer, toRead) == State.ABORT) {
-                    st = ABORTED;
-                }
+                listener.onBodyReceived(bodyBuffer, toRead);
                 break;
             }
         }
-        return st;
+        return state;
     }
 
     void readEmptyLine(ByteBuffer buffer) {
@@ -160,7 +139,7 @@ public class Decoder {
         }
     }
 
-    private void readHeaders(ByteBuffer buffer) throws LineTooLargeException {
+    private void readHeaders(ByteBuffer buffer) throws LineTooLargeException, AbortException {
         String line = readLine(buffer);
         while (line != null && !line.isEmpty()) {
             HttpUtils.splitAndAddHeader(line, headers);
@@ -168,26 +147,24 @@ public class Decoder {
         }
         if (line == null)
             return; // data is not received enough. for next run
-        if (listener.onHeadersReceived(headers) != State.ABORT) {
-            String te = headers.get(TRANSFER_ENCODING);
-            if (CHUNKED.equals(te)) {
-                st = READ_CHUNK_SIZE;
-            } else {
-                String cl = headers.get(CONTENT_LENGTH);
-                if (cl != null) {
-                    readRemaining = Integer.parseInt(cl);
-                    if (readRemaining == 0) {
-                        st = ALL_READ;
-                    } else {
-                        st = READ_FIXED_LENGTH_CONTENT;
-                    }
-                } else {
-                    st = READ_VARIABLE_LENGTH_CONTENT;
-                }
-            }
+        listener.onHeadersReceived(headers);
+        String te = headers.get(TRANSFER_ENCODING);
+        if (CHUNKED.equals(te)) {
+            state = READ_CHUNK_SIZE;
         } else {
-            st = ABORTED;
+            String cl = headers.get(CONTENT_LENGTH);
+            if (cl != null) {
+                readRemaining = Integer.parseInt(cl);
+                if (readRemaining == 0) {
+                    state = ALL_READ;
+                } else {
+                    state = READ_FIXED_LENGTH_CONTENT;
+                }
+            } else {
+                state = READ_VARIABLE_LENGTH_CONTENT;
+            }
         }
+
     }
 
     String readLine(ByteBuffer buffer) throws LineTooLargeException {
@@ -218,6 +195,6 @@ public class Decoder {
 
     public void reset() {
         headers.clear();
-        st = DState.READ_INITIAL;
+        state = State.READ_INITIAL;
     }
 }

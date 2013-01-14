@@ -1,6 +1,6 @@
 package me.shenfeng.http;
 
-public class RequestTooLargeException extends Exception {
+public class RequestTooLargeException extends HTTPException {
 
     private static final long serialVersionUID = 1L;
 

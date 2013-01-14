@@ -1,10 +1,10 @@
 package me.shenfeng.http;
 
-public class ProtocolException extends HTTPException {
+public class HTTPException extends Exception {
 
     private static final long serialVersionUID = 1L;
 
-    public ProtocolException(String msg) {
+    public HTTPException(String msg) {
         super(msg);
     }
 }

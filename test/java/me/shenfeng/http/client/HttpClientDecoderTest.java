@@ -21,36 +21,34 @@ public class HttpClientDecoderTest {
 
     @Test
     public void testDecodeChunkedResponse() throws IOException, LineTooLargeException,
-            ProtocolException {
+            ProtocolException, AbortException {
         Decoder decoder = new Decoder(new IRespListener() {
             public void onThrowable(Throwable t) {
                 throw new RuntimeException(t);
             }
 
-            public State onInitialLineReceived(HttpVersion version, HttpStatus status) {
+            public void onInitialLineReceived(HttpVersion version, HttpStatus status)
+                    throws AbortException {
                 Assert.assertEquals(HttpVersion.HTTP_1_1, version);
                 Assert.assertEquals(status, HttpStatus.OK);
-                return State.CONTINUE;
             }
 
-            public State onHeadersReceived(Map<String, String> headers) {
+            public void onHeadersReceived(Map<String, String> headers) throws AbortException {
                 Assert.assertNotNull(headers.get(TRANSFER_ENCODING));
-                return State.CONTINUE;
             }
 
             public void onCompleted() {
                 onCompleteCallded = true;
             }
 
-            public State onBodyReceived(byte[] buf, int length) {
+            public void onBodyReceived(byte[] buf, int length) throws AbortException {
                 Assert.assertEquals(2869, length);
-                return State.CONTINUE;
             }
         });
 
         ByteBuffer buffer = ByteBuffer.wrap(Utils.readAll("beta_shield_chunked"));
-        DState s = decoder.decode(buffer);
-        Assert.assertEquals("state should be ALL_READ", s, DState.ALL_READ);
+        State s = decoder.decode(buffer);
+        Assert.assertEquals("state should be ALL_READ", s, State.ALL_READ);
         Assert.assertTrue(onCompleteCallded);
     }
 }

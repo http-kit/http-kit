@@ -152,12 +152,11 @@ public class RespListener implements IRespListener {
         this(handler, IFilter.ACCEPT_ALL);
     }
 
-    public State onBodyReceived(byte[] buf, int length) {
-        body.append(buf, 0, length);
+    public void onBodyReceived(byte[] buf, int length) throws AbortException {
         if (filter != null && !filter.accept(body)) {
-            return State.ABORT;
+            throw new AbortException("Regected when reading body, length: " + body.length());
         }
-        return State.CONTINUE;
+        body.append(buf, 0, length);
     }
 
     public void onCompleted() {
@@ -180,16 +179,15 @@ public class RespListener implements IRespListener {
         handler.onThrowable(t);
     }
 
-    public State onHeadersReceived(Map<String, String> headers) {
+    public void onHeadersReceived(Map<String, String> headers) throws AbortException {
         this.headers = headers;
         if (filter != null && !filter.accept(headers)) {
-            return State.ABORT;
+            throw new AbortException("Rejected when header received");
         }
-        return State.CONTINUE;
     }
 
-    public State onInitialLineReceived(HttpVersion version, HttpStatus status) {
+    public void onInitialLineReceived(HttpVersion version, HttpStatus status)
+            throws AbortException {
         this.status = status;
-        return State.CONTINUE;
     }
 }

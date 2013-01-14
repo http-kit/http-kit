@@ -1,9 +1,11 @@
 package me.shenfeng.http.client;
 
-public class AbortException extends Exception {
+import me.shenfeng.http.HTTPException;
 
-    public AbortException() {
-        super("aborted");
+public class AbortException extends HTTPException {
+
+    public AbortException(String msg) {
+        super(msg);
     }
 
     private static final long serialVersionUID = 1L;

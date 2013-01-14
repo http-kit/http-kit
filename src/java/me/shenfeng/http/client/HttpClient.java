@@ -4,36 +4,28 @@ import static java.lang.System.currentTimeMillis;
 import static java.nio.channels.SelectionKey.OP_CONNECT;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
-import static me.shenfeng.http.HttpUtils.ACCEPT;
-import static me.shenfeng.http.HttpUtils.ACCEPT_ENCODING;
-import static me.shenfeng.http.HttpUtils.BUFFER_SIZE;
-import static me.shenfeng.http.HttpUtils.COLON;
-import static me.shenfeng.http.HttpUtils.CONTENT_LENGTH;
-import static me.shenfeng.http.HttpUtils.CR;
-import static me.shenfeng.http.HttpUtils.HOST;
-import static me.shenfeng.http.HttpUtils.LF;
-import static me.shenfeng.http.HttpUtils.SP;
-import static me.shenfeng.http.HttpUtils.USER_AGENT;
-import static me.shenfeng.http.HttpUtils.getPath;
-import static me.shenfeng.http.client.DState.ABORTED;
-import static me.shenfeng.http.client.DState.ALL_READ;
+import static me.shenfeng.http.HttpUtils.*;
+import static me.shenfeng.http.client.State.ALL_READ;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.URI;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import me.shenfeng.http.DynamicBytes;
+import me.shenfeng.http.HTTPException;
 import me.shenfeng.http.HttpMethod;
 import me.shenfeng.http.HttpUtils;
 
@@ -41,7 +33,6 @@ public final class HttpClient implements Runnable {
     private static final AtomicInteger ID = new AtomicInteger(0);
 
     private final Queue<Request> pendings = new ConcurrentLinkedQueue<Request>();
-
     private final PriorityQueue<Request> requests = new PriorityQueue<Request>();
 
     private volatile boolean running = true;
@@ -86,24 +77,23 @@ public final class HttpClient implements Runnable {
         Request req = (Request) key.attachment();
         try {
             buffer.clear();
-            int read = ((SocketChannel) key.channel()).read(buffer);
+            SocketChannel ch = (SocketChannel) key.channel();
+            int read = ch.read(buffer);
             if (read == -1) {
-                req.finish();
+                req.finish(); // read all, remove closed it
             } else if (read > 0) {
                 req.onProgress(currentTime);
                 buffer.flip();
-                Decoder decoder = req.decoder;
-                DState state = decoder.decode(buffer);
-                if (state == ALL_READ) {
-                    req.finish();
-                } else if (state == ABORTED) {
-                    req.finish(new AbortException());
+                try {
+                    if (req.decoder.decode(buffer) == ALL_READ) {
+                        req.finish();
+                    }
+                } catch (HTTPException e) {
+                    req.finish(e);
                 }
             }
-        } catch (Exception e) {
+        } catch (IOException e) {
             // IOException the remote forcibly closed the connection
-            // LineTooLargeException
-            // ProtoalException
             req.finish(e);
         }
     }
@@ -122,18 +112,13 @@ public final class HttpClient implements Runnable {
         }
     }
 
-    @Override
-    public String toString() {
-        return this.getClass().getCanonicalName() + config.toString();
-    }
-
     public void exec(URI uri, HttpMethod method, Map<String, String> headers, byte[] body,
             int timeoutMs, IRespListener cb) {
         // copy to modify
         if (headers == null) {
-            headers = new HashMap<String, String>();
+            headers = new TreeMap<String, String>();
         } else {
-            headers = new HashMap<String, String>(headers);
+            headers = new TreeMap<String, String>(headers);
         }
         headers.put(HOST, uri.getHost());
         headers.put(ACCEPT, "*/*");
@@ -152,7 +137,7 @@ public final class HttpClient implements Runnable {
         DynamicBytes bytes = new DynamicBytes(length);
 
         bytes.append(method.toString()).append(SP).append(path).append(SP);
-        bytes.append("HTTP/1.1").append(CR).append(LF);
+        bytes.append("HTTP/1.1\r\n");
         Iterator<Map.Entry<String, String>> ite = headers.entrySet().iterator();
         while (ite.hasNext()) {
             Map.Entry<String, String> e = ite.next();
@@ -170,56 +155,12 @@ public final class HttpClient implements Runnable {
         if (timeoutMs == -1) {
             timeoutMs = config.timeOutMs;
         }
-        pendings.offer(new Request(request, cb, timeoutMs, uri, requests));
-        selector.wakeup();
-    }
-
-    private void processPendings(long currentTime) {
-        Request job;
         try {
-            while ((job = pendings.poll()) != null) {
-                if (job.addr != null) { // if DNS lookup fail
-                    SocketChannel ch = SocketChannel.open();
-                    job.ch = ch; // save for use when timeout
-                    ch.configureBlocking(false);
-                    ch.register(selector, OP_CONNECT, job);
-                    ch.connect(job.addr);
-                    requests.offer(job);
-                }
-            }
-        } catch (IOException e) {
-            HttpUtils.printError("error when process requests", e);
-        }
-    }
-
-    public void run() {
-        while (running) {
-            try {
-                long currentTime = currentTimeMillis();
-                processPendings(currentTime);
-                int select = selector.select(1000);
-                if (select > 0) {
-                    Set<SelectionKey> selectedKeys = selector.selectedKeys();
-                    Iterator<SelectionKey> ite = selectedKeys.iterator();
-                    while (ite.hasNext()) {
-                        SelectionKey key = ite.next();
-                        if (!key.isValid()) {
-                            continue;
-                        }
-                        if (key.isConnectable()) {
-                            finishConnect(key, currentTime);
-                        } else if (key.isWritable()) {
-                            doWrite(key);
-                        } else if (key.isReadable()) {
-                            doRead(key, currentTime);
-                        }
-                    }
-                    selectedKeys.clear();
-                }
-                clearTimeouted(currentTime);
-            } catch (Exception e) {
-                HttpUtils.printError("Please catch this exception", e);
-            }
+            InetSocketAddress addr = getServerAddr(uri); // Maybe slow
+            pendings.offer(new Request(addr, request, cb, requests, timeoutMs));
+            selector.wakeup();
+        } catch (UnknownHostException e) {
+            cb.onThrowable(e);
         }
     }
 
@@ -237,10 +178,61 @@ public final class HttpClient implements Runnable {
         }
     }
 
+    private void processPendings(long currentTime) {
+        Request job;
+        try {
+            while ((job = pendings.poll()) != null) {
+                SocketChannel ch = SocketChannel.open();
+                ch.configureBlocking(false);
+                ch.register(selector, OP_CONNECT, job);
+                ch.connect(job.addr);
+                requests.offer(job);
+            }
+        } catch (IOException e) {
+            HttpUtils.printError("error when try to connect", e);
+        }
+    }
+
+    public void run() {
+        while (running) {
+            try {
+                long now = currentTimeMillis();
+                processPendings(now);
+                int select = selector.select(1000);
+                if (select > 0) {
+                    Set<SelectionKey> selectedKeys = selector.selectedKeys();
+                    Iterator<SelectionKey> ite = selectedKeys.iterator();
+                    while (ite.hasNext()) {
+                        SelectionKey key = ite.next();
+                        if (!key.isValid()) {
+                            continue;
+                        }
+                        if (key.isConnectable()) {
+                            finishConnect(key, now);
+                        } else if (key.isWritable()) {
+                            doWrite(key);
+                        } else if (key.isReadable()) {
+                            doRead(key, now);
+                        }
+                    }
+                    selectedKeys.clear();
+                }
+                clearTimeouted(now);
+            } catch (Exception e) {
+                HttpUtils.printError("Please catch this exception", e);
+            }
+        }
+    }
+
     public void stop() throws IOException {
         running = false;
         if (selector != null) {
             selector.close();
         }
+    }
+
+    @Override
+    public String toString() {
+        return this.getClass().getCanonicalName() + config.toString();
     }
 }

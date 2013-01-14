@@ -1,41 +1,27 @@
 package me.shenfeng.http.client;
 
-import static me.shenfeng.http.HttpUtils.closeQuiety;
-import static me.shenfeng.http.HttpUtils.getServerAddr;
-
 import java.net.InetSocketAddress;
-import java.net.URI;
-import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
 import java.util.PriorityQueue;
 
 public class Request implements Comparable<Request> {
 
-    InetSocketAddress addr;
-    SocketChannel ch;
-
+    final InetSocketAddress addr;
     final Decoder decoder;
     final ByteBuffer request; // HTTP request
-
     private final PriorityQueue<Request> clients;
-
     public final int timeOutMs;
 
     private long timeoutTs;
     private boolean connected = false;
 
-    public Request(ByteBuffer request, IRespListener handler, int timeOutMs, URI url,
-            PriorityQueue<Request> clients) {
+    public Request(InetSocketAddress addr, ByteBuffer request, IRespListener handler,
+            PriorityQueue<Request> clients, int timeOutMs) {
         this.decoder = new Decoder(handler);
         this.timeOutMs = timeOutMs;
         this.request = request;
         this.clients = clients;
-        try {
-            addr = getServerAddr(url); // Maybe slow
-        } catch (UnknownHostException e) {
-            decoder.listener.onThrowable(e);
-        }
+        this.addr = addr;
         timeoutTs = this.timeOutMs + System.currentTimeMillis();
     }
 
@@ -48,7 +34,7 @@ public class Request implements Comparable<Request> {
     public void finish() {
         // HTTP keep-alive is not implemented, for simplicity
         clients.remove(this);
-        closeQuiety(ch);
+        // closeQuiety(ch);
         decoder.listener.onCompleted();
     }
 
@@ -65,7 +51,7 @@ public class Request implements Comparable<Request> {
     }
 
     public void finish(Throwable t) {
-        closeQuiety(ch);
+        // closeQuiety(ch);
         clients.remove(this);
         decoder.listener.onThrowable(t);
     }
