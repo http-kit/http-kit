@@ -10,6 +10,7 @@ import static me.shenfeng.http.client.State.ALL_READ;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
@@ -27,6 +28,7 @@ import me.shenfeng.http.DynamicBytes;
 import me.shenfeng.http.HTTPException;
 import me.shenfeng.http.HttpMethod;
 import me.shenfeng.http.HttpUtils;
+import me.shenfeng.http.ProtocolException;
 
 public final class HttpClient implements Runnable {
     private static final AtomicInteger ID = new AtomicInteger(0);
@@ -107,11 +109,14 @@ public final class HttpClient implements Runnable {
                 } catch (HTTPException e) {
                     closeQuiety(key);
                     req.finish(e);
+                } catch (Exception e) {
+                    closeQuiety(key);
+                    req.finish();
+                    HttpUtils.printError("Should not happend!!", e); // decoding
                 }
             }
-        } catch (IOException e) {
+        } catch (IOException e) { // The remote forcibly closed the connection
             closeQuiety(key);
-            // IOException the remote forcibly closed the connection
             req.finish(e);
         }
     }
@@ -134,12 +139,25 @@ public final class HttpClient implements Runnable {
                 key.interestOps(OP_READ);
             }
         } catch (IOException e) {
+            closeQuiety(key);
             req.finish(e);
         }
     }
 
-    public void exec(URI uri, HttpMethod method, Map<String, String> headers, byte[] body,
+    public void exec(String url, HttpMethod method, Map<String, String> headers, byte[] body,
             int timeoutMs, IRespListener cb) {
+        URI uri = null;
+        try {
+            uri = new URI(url);
+        } catch (URISyntaxException e) {
+            cb.onThrowable(e);
+            return;
+        }
+        if (!"http".equals(uri.getScheme())) {
+            cb.onThrowable(new ProtocolException("Scheme " + uri.getScheme()
+                    + " is not supported"));
+            return;
+        }
         // copy to modify
         if (headers == null) {
             headers = new TreeMap<String, String>();
@@ -192,26 +210,24 @@ public final class HttpClient implements Runnable {
 
     private void finishConnect(SelectionKey key, long now) {
         SocketChannel ch = (SocketChannel) key.channel();
-        Request attr = (Request) key.attachment();
+        Request req = (Request) key.attachment();
         try {
             if (ch.finishConnect()) {
-                attr.setConnected();
-                attr.onProgress(now);
+                req.setConnected();
+                req.onProgress(now);
                 key.interestOps(OP_WRITE);
             }
         } catch (IOException e) {
-            attr.finish(e);
+            req.finish(e);
         }
     }
 
     private void processPendings(long currentTime) {
-        Request job;
-        try {
-            while ((job = pendings.poll()) != null) {
+        Request job = null;
+        while ((job = pendings.poll()) != null) {
+            try {
                 PersistentConn con = keepalives.remove(job.addr);
                 if (con != null) { // keep alive
-                    // System.out.println("hit keep-alived, total: " +
-                    // keepalives.size());
                     SelectionKey key = con.key;
                     key.attach(job);
                     key.interestOps(OP_WRITE);
@@ -222,9 +238,10 @@ public final class HttpClient implements Runnable {
                     ch.connect(job.addr);
                     requests.offer(job);
                 }
+            } catch (IOException e) {
+                job.finish(e);
+                HttpUtils.printError("Try to connect " + job.addr, e);
             }
-        } catch (IOException e) {
-            HttpUtils.printError("error when try to connect", e);
         }
     }
 
@@ -248,13 +265,13 @@ public final class HttpClient implements Runnable {
                         } else if (key.isReadable()) {
                             doRead(key, now);
                         }
+                        ite.remove();
                     }
-                    selectedKeys.clear();
                 }
                 processPendings(now);
                 clearTimeouted(now);
             } catch (Exception e) {
-                HttpUtils.printError("Please catch this exception", e);
+                HttpUtils.printError("Please catch this exception!!", e);
             }
         }
     }

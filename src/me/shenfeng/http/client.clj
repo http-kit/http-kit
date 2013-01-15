@@ -72,14 +72,13 @@
    See also `request`."
   [req callback & [error-callback]]
   (let [{:keys [client url method headers body timeout]} (coerce-req req)
-        uri (URI. url)
         method (case method
                  :get  HttpMethod/GET
                  :delete HttpMethod/DELETE
                  :post HttpMethod/POST
                  :put  HttpMethod/PUT)
         response (promise)]
-    (.exec ^HttpClient client uri method headers body
+    (.exec ^HttpClient client url method headers body
            (or timeout -1) ; -1 for client default
            (RespListener.
             (reify IResponseHandler

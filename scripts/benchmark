@@ -1,7 +1,5 @@
 #!/bin/bash
 
-ABSOLUTE_PATH=$(readlink -f $0)
-HOME="${ABSOLUTE_PATH%/*/*}"
 REQUEST_N=150000
 REQUEST_C=100
 
@@ -53,7 +51,6 @@ output_result() {
 
 }
 
-cd $HOME
 case "$1" in
     bench)
         bench_server netty

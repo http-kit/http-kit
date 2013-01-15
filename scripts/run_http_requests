@@ -1,0 +1,12 @@
+#!/bin/bash
+rm -rf classes target
+mkdir classes
+mkdir target
+
+CP="classes:$(lein classpath)"
+
+find src/java -name "*.java" | xargs javac -g -Xlint:unchecked -encoding utf8 -cp "$CP" -d classes -sourcepath src/java/
+
+java -cp "$CP" \
+    -Xdebug -Xrunjdwp:transport=dt_socket,address=9092,server=y,suspend=n \
+    clojure.main -m me.shenfeng.http.client-test

@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.net.Proxy.Type;
-import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.util.Map;
@@ -80,7 +79,7 @@ public class HttpClientTest {
     }
 
     public void get(String url) throws URISyntaxException {
-        client.exec(new URI(url), HttpMethod.GET, emptyHeader, null, -1, listener);
+        client.exec(url, HttpMethod.GET, emptyHeader, null, -1, listener);
     }
 
     @Test

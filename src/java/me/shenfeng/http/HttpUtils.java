@@ -151,7 +151,7 @@ public class HttpUtils {
         return result;
     }
 
-    public static int getChunkSize(String hex) {
+    public static int getChunkSize(String hex) throws ProtocolException {
         hex = hex.trim();
         for (int i = 0; i < hex.length(); i++) {
             char c = hex.charAt(i);
@@ -160,8 +160,11 @@ public class HttpUtils {
                 break;
             }
         }
-
-        return Integer.parseInt(hex, 16);
+        try {
+            return Integer.parseInt(hex, 16);
+        } catch (Exception e) {
+            throw new ProtocolException("Expect chunk size to be a number: " + hex);
+        }
     }
 
     public static String getPath(URI uri) {
@@ -189,7 +192,6 @@ public class HttpUtils {
     public static InetSocketAddress getServerAddr(URI uri) throws UnknownHostException {
         InetAddress host = getByName(uri.getHost());
         return new InetSocketAddress(host, getPort(uri));
-
     }
 
     public static ByteBuffer readAll(File f) throws IOException {

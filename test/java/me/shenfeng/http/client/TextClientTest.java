@@ -1,7 +1,6 @@
 package me.shenfeng.http.client;
 
 import java.io.IOException;
-import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.util.Map;
@@ -47,8 +46,7 @@ public class TextClientTest {
         CountDownLatch latch = new CountDownLatch(urls.length);
         for (String url : urls) {
             TreeMap<String, String> header = new TreeMap<String, String>();
-            URI uri = new URI(url);
-            client.exec(uri, HttpMethod.GET, header, null, -1, new RespListener(
+            client.exec(url, HttpMethod.GET, header, null, -1, new RespListener(
                     new IResponseHandler() {
 
                         public void onThrowable(Throwable t) {
