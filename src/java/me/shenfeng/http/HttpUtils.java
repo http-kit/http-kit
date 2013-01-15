@@ -48,39 +48,37 @@ public class HttpUtils {
 
     public static final int TIMEOUT_CHECK_INTEVAL = 3000;
 
-    public static final String USER_AGENT = "User-Agent";
+    // public static final String USER_AGENT = "user-agent";
 
-    public static final String ACCEPT = "Accept";
+    // public static final String ACCEPT = "Accept";
 
-    public static final String ETAG = "ETag";
+    // public static final String ETAG = "ETag";
 
-    public static final String ACCEPT_ENCODING = "Accept-Encoding";
+    // public static final String ACCEPT_ENCODING = "accept-encoding";
 
-    public static final String TRANSFER_ENCODING = "Transfer-Encoding";
+    public static final String TRANSFER_ENCODING = "transfer-encoding";
 
-    public static final String CONTENT_ENCODING = "Content-Encoding";
+    public static final String CONTENT_ENCODING = "content-encoding";
 
-    public static final String CONTENT_TYPE = "Content-Type";
+    public static final String CONTENT_TYPE = "content-type";
 
     public static final String CHUNKED = "chunked";
 
-    public static final String HOST = "Host";
+    public static final String CONNECTION = "connection";
 
-    public static final String CONNECTION = "Connection";
+    // public static final String LOCATION = "location";
 
-    public static final String LOCATION = "Location";
+    // public static final String IF_MODIFIED_SINCE = "If-Modified-Since";
 
-    public static final String IF_MODIFIED_SINCE = "If-Modified-Since";
+    // public static final String IF_NONE_MATCH = "If-None-Match";
 
-    public static final String IF_NONE_MATCH = "If-None-Match";
+    // public static final String LAST_MODIFIED = "Last-Modified";
 
-    public static final String LAST_MODIFIED = "Last-Modified";
+    public static final String X_FORWARDED_FOR = "x-forwarded-for";
 
-    public static final String X_FORWARDED_FOR = "X-Forwarded-For";
+    public static final String CONTENT_LENGTH = "content-length";
 
-    public static final String CONTENT_LENGTH = "Content-Length";
-
-    public static final String CACHE_CONTROL = "Cache-Control";
+    // public static final String CACHE_CONTROL = "Cache-Control";
 
     // space ' '
     public static final byte SP = 32;
@@ -165,6 +163,21 @@ public class HttpUtils {
         } catch (Exception e) {
             throw new ProtocolException("Expect chunk size to be a number: " + hex);
         }
+    }
+
+    public static String camelCase(String key) {
+        StringBuilder sb = new StringBuilder(key.length());
+        boolean upper = true;
+        for (int i = 0; i < key.length(); i++) {
+            char c = key.charAt(i);
+            if (upper) {
+                sb.append(Character.toUpperCase(c));
+            } else {
+                sb.append(Character.toLowerCase(c));
+            }
+            upper = c == '-';
+        }
+        return sb.toString();
     }
 
     public static String getPath(URI uri) {
@@ -274,7 +287,7 @@ public class HttpUtils {
             // logger.warn("header error: " + sb);
         } else {
             String value = sb.substring(valueStart, valueEnd);
-            headers.put(key, value);
+            headers.put(key.toLowerCase(), value);
         }
     }
 }

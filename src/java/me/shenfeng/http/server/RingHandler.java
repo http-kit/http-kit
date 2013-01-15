@@ -109,7 +109,7 @@ public class RingHandler implements IHandler {
             HttpUtils.printError("queue size exceeds the limit " + queueSize
                     + ", please increase :queue-size when run-server if this happens often", e);
             cb.run(encode(503, new TreeMap<String, Object>(),
-                    "server is overloaded, please try later"));
+                    "Server is overloaded, please try later"));
         }
     }
 

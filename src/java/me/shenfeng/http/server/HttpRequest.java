@@ -17,7 +17,7 @@ import me.shenfeng.http.HttpVersion;
 import me.shenfeng.http.ws.WsCon;
 
 public class HttpRequest {
-    private int serverPort;
+    private int serverPort = 80;
     private String serverName;
     private InetSocketAddress remoteAddr;
     public final String queryString;
@@ -123,7 +123,7 @@ public class HttpRequest {
     }
 
     public void setHeaders(Map<String, String> headers) {
-        String h = headers.get(HttpUtils.HOST);
+        String h = headers.get("host");
         if (h != null) {
             int idx = h.indexOf(':');
             if (idx != -1) {
@@ -155,7 +155,7 @@ public class HttpRequest {
         }
 
         isKeepAlive = (version == HTTP_1_1 && !"close".equals(con)) || "keep-alive".equals(con);
-        isWebSocket = "websocket".equals(headers.get("Upgrade"));
+        isWebSocket = "websocket".equals(headers.get("upgrade"));
         this.headers = headers;
     }
 }

@@ -24,77 +24,54 @@
                                            (range size)))))
        tmp)))
 
-(defn test-get-spec [req]
-  (is (= 4347 (:server-port req)))
-  (is (= "127.0.0.1" (:remote-addr req)))
-  (is (= "localhost" (:server-name req)))
-  ;; (is (= "127.0.0.1" (:remote-addr req)))
-  (is (= "/spec-get" (:uri req)))
-  (is (= "a=b" (:query-string req)))
-  (is (= :http (:scheme req)))
-  (is (= :get (:request-method  req)))
-  (is (= "utf8" (:character-encoding req)))
-  (is (= nil (:content-type req)))
-  {:status  200
-   :headers {"Content-Type" "text/plain"}
-   :body    "Hello World"})
-
-(defn test-post-spec [req]
-  ;; TODO fix this, http header name are case-insensitive
-  (is (= 4347 (:server-port req)))
-  (is (= "127.0.0.1" (:remote-addr req)))
-  (is (= "localhost" (:server-name req)))
-  (is (= "127.0.0.1" (:remote-addr req)))
-  (is (= "/spec-post" (:uri req)))
-  (is (= "a=b" (:query-string req)))
-  ;; ;; (is (= "c" (-> req :params :p)))
-  (is (= :http (:scheme req)))
-  (is (= :post (:request-method  req)))
-  ;; (is (= "application/x-www-form-urlencoded" (:content-type req)))
-  ;; (is (= "UTF-8" (:character-encoding req)))
-  {:status  200
-   :headers {"Content-Type" "text/plain"}
-   :body    "Hello World"})
+(defn to-int [int-str] (Integer/valueOf int-str))
 
 (defasync async-handler [req] cb
   (cb {:status 200 :body "hello async"}))
 
-(defasync async-just-body [req] cb
-  (cb "just-body"))
+(defasync async-just-body [req] cb (cb "just-body"))
+
+(defn async-response-handler [req]
+  (async-response respond
+                  (future (respond
+                           {:status 200 :body "hello async"}))))
 
 (defwshandler ws-handler [req] con
   (on-mesg con (fn [msg] (send-mesg con msg))))
 
-(defn to-int [int-str] (Integer/valueOf int-str))
+(defn file-handler [req]
+  {:status 200
+   :body (let [l (to-int (or (-> req :params :l) "5024000"))]
+           (gen-tempfile l ".txt"))})
+
+(defn inputstream-handler [req]
+  (let [l (-> req :params :l to-int)
+        file (gen-tempfile l ".txt")]
+    {:status 200
+     :body (FileInputStream. file)}))
+
+(defn multipart-handler [req]
+  (let [{:keys [title file]} (:params req)]
+    {:status 200
+     :body (str title ": " (:size file))}))
 
 (defroutes test-routes
   (GET "/" [] "hello world")
-  (GET "/spec-get" [] test-get-spec)
-  (POST "/spec-post" [] test-post-spec)
+  (ANY "/spec" [] (fn [req] (pr-str (dissoc req :body))))
   (GET "/string" [] (fn [req] {:status 200
-                               :headers {"Content-Type" "text/plain"}
-                               :body "Hello World"}))
+                              :headers {"Content-Type" "text/plain"}
+                              :body "Hello World"}))
   (GET "/iseq" [] (fn [req] {:status 200
-                             :headers {"Content-Type" "text/plain"}
-                             :body (range 1 10)}))
-  (GET "/file" [] (wrap-file-info (fn [req]
-                                    {:status 200
-                                     :body (let [l (to-int (or (-> req :params :l) "5024000"))]
-                                             (gen-tempfile l ".txt"))})))
-  (GET "/inputstream" [] (fn [req] (let [l (-> req :params :l to-int)
-                                         file (gen-tempfile l ".txt")]
-                                     {:status 200
-                                      :body (FileInputStream. file)})))
-  (POST "/multipart" [] (fn [req] (let [{:keys [title file]} (:params req)]
-                                    {:status 200
-                                     :body (str title ": " (:size file))})))
+                            :headers {"Content-Type" "text/plain"}
+                            :body (range 1 10)}))
+  (GET "/file" [] (wrap-file-info file-handler))
+  (GET "/inputstream" [] inputstream-handler)
+  (POST "/multipart" [] multipart-handler)
   (POST "/chunked" [] (fn [req] {:status 200
-                                 :body (str (:content-length req))}))
+                                :body (str (:content-length req))}))
   (GET "/null" [] (fn [req] {:status 200 :body nil}))
   (GET "/async" [] async-handler)
-  (GET "/async-response" [] (fn [req]
-                              (async-response respond!
-                                              (future (respond! {:status 200 :body "hello async"})))))
+  (GET "/async-response" [] async-response-handler)
   (GET "/async-just-body" [] async-just-body)
   (GET "/ws" [] ws-handler))
 
@@ -103,12 +80,34 @@
                                     (site test-routes) {:port 4347})]
                         (try (f) (finally (server))))))
 
-(deftest test-netty-ring-spec
-  (http/get "http://localhost:4347/spec-get"
-            {:query-params {"a" "b"}})
-  (http/post "http://localhost:4347/spec-post?a=b"
-             {:headers {"Content-Type" "application/x-www-form-urlencoded"}
-              :body "p=c&d=e"}))
+(deftest test-ring-spec
+  (let [req (-> (http/get "http://localhost:4347/spec?c=d"
+                          {:query-params {"a" "b"}})
+                :body read-string)]
+    (is (= 4347 (:server-port req)))
+    (is (= "127.0.0.1" (:remote-addr req)))
+    (is (= "localhost" (:server-name req)))
+    (is (= "/spec" (:uri req)))
+    (is (= "a=b" (:query-string req)))
+    (is (= :http (:scheme req)))
+    (is (= :get (:request-method  req)))
+    (is (= "utf8" (:character-encoding req)))
+    (is (= nil (:content-type req))))
+  (let [req (-> (http/post "http://localhost:4347/spec?a=b"
+                           {:headers {"content-typE"
+                                      "application/x-www-form-urlencoded"}
+                            :body "p=c&d=e"})
+                :body read-string)]
+    (is (= 4347 (:server-port req)))
+    (is (= "127.0.0.1" (:remote-addr req)))
+    (is (= "localhost" (:server-name req)))
+    (is (= "/spec" (:uri req)))
+    (is (= "a=b" (:query-string req)))
+    (is (= "c" (-> req :params :p)))
+    (is (= :http (:scheme req)))
+    (is (= :post (:request-method  req)))
+    (is (= "application/x-www-form-urlencoded" (:content-type req)))
+    (is (= "utf8" (:character-encoding req)))))
 
 (deftest test-body-string
   (let [resp (http/get "http://localhost:4347/string")]

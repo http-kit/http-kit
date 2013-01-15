@@ -9,8 +9,8 @@
 
 (defn- normalize-headers [headers keywordize-headers?]
   (reduce (fn [m [k v]]
-            (assoc m (if keywordize-headers? (keyword (str/lower-case k))
-                         (str/lower-case k)) v))
+            (assoc m (if keywordize-headers? (keyword k) ; is lowercased
+                         k) v))
           {} headers))
 
 (defn- url-encode [unencoded] (URLEncoder/encode unencoded "UTF-8"))

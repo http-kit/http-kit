@@ -18,6 +18,7 @@ import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.Set;
 import java.util.TreeMap;
@@ -154,27 +155,30 @@ public final class HttpClient implements Runnable {
             return;
         }
         if (!"http".equals(uri.getScheme())) {
-            cb.onThrowable(new ProtocolException("Scheme " + uri.getScheme()
-                    + " is not supported"));
+            cb.onThrowable(new ProtocolException(uri.getScheme() + " is not supported"));
             return;
         }
-        // copy to modify
-        if (headers == null) {
-            headers = new TreeMap<String, String>();
-        } else {
-            headers = new TreeMap<String, String>(headers);
-        }
-        headers.put(HOST, uri.getHost());
-        headers.put(ACCEPT, "*/*");
 
-        if (headers.get(USER_AGENT) == null) // allow override
-            headers.put(USER_AGENT, config.userAgent); // default
-        if (!headers.containsKey(ACCEPT_ENCODING))
-            headers.put(ACCEPT_ENCODING, "gzip, deflate");
+        // copy to modify, normalize
+        TreeMap<String, String> tmp = new TreeMap<String, String>();
+        if (headers != null) {
+            for (Entry<String, String> e : headers.entrySet()) {
+                tmp.put(HttpUtils.camelCase(e.getKey()), e.getValue());
+            }
+        }
+        headers = tmp;
+        // TODO with port
+        headers.put("Host", uri.getHost());
+        headers.put("Accept", "*/*");
+
+        if (!headers.containsKey("User-Agent")) // allow override
+            headers.put("User-Agent", config.userAgent); // default
+        if (!headers.containsKey("Accept-Encoding"))
+            headers.put("Accept-Encoding", "gzip, deflate");
 
         int length = 64 + headers.size() * 48;
         if (body != null) {
-            headers.put(CONTENT_LENGTH, Integer.toString(body.length));
+            headers.put("Content-Length", Integer.toString(body.length));
             length += body.length;
         }
         String path = getPath(uri);

@@ -14,13 +14,10 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeMap;
 
 import me.shenfeng.http.DynamicBytes;
-import me.shenfeng.http.HttpUtils;
 import clojure.lang.IPersistentMap;
 import clojure.lang.ISeq;
 import clojure.lang.Keyword;
@@ -79,6 +76,8 @@ public class ClojureRing {
         }
         return status;
     }
+    
+    public static final String CL = "Content-Length";
 
     public static ByteBuffer[] encode(int status, Map<String, Object> headers, Object body) {
         // headers can be modified
@@ -87,15 +86,15 @@ public class ClojureRing {
         headers.put("Date", DateFormater.getDate());
         try {
             if (body == null) {
-                headers.put(HttpUtils.CONTENT_LENGTH, "0");
+                headers.put(CL, "0");
             } else if (body instanceof String) {
                 byte[] b = ((String) body).getBytes(UTF_8);
                 bodyBuffer = ByteBuffer.wrap(b);
-                headers.put(HttpUtils.CONTENT_LENGTH, Integer.toString(b.length));
+                headers.put(CL, Integer.toString(b.length));
             } else if (body instanceof InputStream) {
                 DynamicBytes b = readAll((InputStream) body);
                 bodyBuffer = ByteBuffer.wrap(b.get(), 0, b.length());
-                headers.put(HttpUtils.CONTENT_LENGTH, Integer.toString(b.length()));
+                headers.put(CL, Integer.toString(b.length()));
             } else if (body instanceof File) {
                 // length header is set by upper logic
                 // serving file is better be done by Nginx
@@ -108,7 +107,7 @@ public class ClojureRing {
                     seq = seq.next();
                 }
                 bodyBuffer = ByteBuffer.wrap(b.get(), 0, b.length());
-                headers.put(HttpUtils.CONTENT_LENGTH, Integer.toString(b.length()));
+                headers.put(CL, Integer.toString(b.length()));
             } else {
                 throw new RuntimeException(body.getClass() + " is not understandable");
             }
@@ -116,7 +115,7 @@ public class ClojureRing {
             byte[] b = e.getMessage().getBytes(ASCII);
             status = 500;
             headers.clear();
-            headers.put(HttpUtils.CONTENT_LENGTH, Integer.toString(b.length));
+            headers.put(CL, Integer.toString(b.length));
             bodyBuffer = ByteBuffer.wrap(b);
         }
         DynamicBytes bytes = encodeResponseHeader(status, headers);
@@ -153,14 +152,8 @@ public class ClojureRing {
             break;
         }
 
-        // downcase key, required by ring spec
-        Set<Entry<String, String>> sets = req.getHeaders().entrySet();
-        Map<String, String> downCased = new TreeMap<String, String>();
-        for (Entry<String, String> e : sets) {
-            downCased.put(e.getKey().toLowerCase(), e.getValue());
-        }
-
-        m.put(HEADERS, PersistentArrayMap.create(downCased));
+        // key is already downcased, required by ring spec
+        m.put(HEADERS, PersistentArrayMap.create(req.getHeaders()));
         m.put(CONTENT_TYPE, req.getContentType());
         m.put(CONTENT_LENGTH, req.getContentLength());
         m.put(CHARACTER_ENCODING, req.getCharactorEncoding());
