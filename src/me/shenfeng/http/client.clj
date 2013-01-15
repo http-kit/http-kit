@@ -74,6 +74,8 @@
   (let [{:keys [client url method headers body timeout]} (coerce-req req)
         method (case method
                  :get  HttpMethod/GET
+                 :head HttpMethod/HEAD
+                 :options HttpMethod/OPTIONS
                  :delete HttpMethod/DELETE
                  :post HttpMethod/POST
                  :put  HttpMethod/PUT)
@@ -119,22 +121,34 @@
   [options resp & handler]
   `(request* ~options (fn [~resp] ~@handler)))
 
-(defmacro get
-  "Issues an asynchronous HTTP GET request. See `Request` for more debail."
-  ([url]
-     `(request {:method :get :url ~url} resp# nil))
-  ([url req]
-     `(get ~url ~req resp# nil))
-  ([url req resp & forms]
-     `(let [req# (assoc ~req :method :get :url ~url)]
-        (request req#  ~resp ~@forms))))
+(defmacro ^{:private true} gen-method [method]
+  (let [key (keyword method)
+        url 'url req 'req resp 'resp forms 'forms]
+    `(defmacro ~method
+       "Issues an asynchronous HTTP request. See `request` for more debail."
+       ([~url]
+          `(request {:method ~~key :url ~~url} ~'resp# nil))
+       ([~url ~req]
+          `(let [~'req# (merge {:method ~~key :url ~~url} ~~req)]
+             (request ~'req# ~'resp# nil)))
+       ([~url ~req ~resp & ~forms]
+          `(let [~'req# (merge {:method ~~key :url ~~url} ~~req)]
+             (request ~'req# ~~resp ~@~forms))))))
 
-(defmacro post
-  "Issues an asynchronous HTTP POST request. See `Request` for more debail."
-  ([url]
-     `(request {:method :post :url ~url} resp# nil))
-  ([url req]
-     `(post ~url ~req resp# nil))
-  ([url req resp & forms]
-     `(let [req# (merge {:method :post :url ~url} ~req)]
-        (request req# ~resp ~@forms))))
+(gen-method get)
+(gen-method delete)
+(gen-method head)
+(gen-method post)
+(gen-method put)
+(gen-method options)
+
+(comment
+  (defmacro get
+    "Issues an asynchronous HTTP GET request. See `Request` for more debail."
+    ([url]
+       `(request {:method :get :url ~url} resp# nil))
+    ([url req]
+       `(get ~url ~req resp# nil))
+    ([url req resp & forms]
+       `(let [req# (assoc ~req :method :get :url ~url)]
+          (request req#  ~resp ~@forms)))))

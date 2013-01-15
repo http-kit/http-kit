@@ -1,5 +1,5 @@
 package me.shenfeng.http;
 
 public enum HttpMethod {
-    GET, DELETE, PUT, POST
+    GET, DELETE, PUT, POST, HEAD, OPTIONS
 }

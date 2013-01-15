@@ -12,6 +12,7 @@
 (defroutes test-routes
   (GET "/get" [] "hello world")
   (POST "/post" [] "hello world")
+  (DELETE "/delete" [] "deleted")
   (ANY "/ua" [] (fn [req] ((-> req :headers) "user-agent")))
   (GET "/keep-alive" [] (fn [req] (-> req :params :id)))
   (POST "/form-params" [] (fn [req] (-> req :params :param1))))
@@ -34,6 +35,8 @@
   (is (= 200 (:status @(http/get "http://127.0.0.1:4347/get"))))
   (is (= 404 (:status @(http/get "http://127.0.0.1:4347/404"))))
   (is (= 200 (:status @(http/post "http://127.0.0.1:4347/post"))))
+  (is (= 200 (:status @(http/delete "http://127.0.0.1:4347/delete"))))
+  (is (= 200 (:status @(http/head "http://127.0.0.1:4347/get"))))
   (is (= 200 (:status @(http/post "http://127.0.0.1:4347/post"))))
   (is (= 404 (:status @(http/get "http://127.0.0.1:4347/404"))))
   (let [url "http://127.0.0.1:4347/get"]

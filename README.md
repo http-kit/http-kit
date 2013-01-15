@@ -127,7 +127,7 @@ run it:
 
 ```
 
-#### HTTP Post
+#### HTTP POST
 
 ```clj
 (def post-options {:form-params {:params1 "value" :params2 ["v1" "v2"]}
@@ -150,6 +150,10 @@ run it:
     (println "Failed, exception: " resp)))
 
 ```
+
+### HTTP HEAD, OPTIONS, DELETE, PUT
+
+Just like `get` and `post`
 
 ## Benchmark
 
