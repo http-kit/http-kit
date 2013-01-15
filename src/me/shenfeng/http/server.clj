@@ -14,7 +14,7 @@
             :or   {ip "0.0.0.0"         ; which ip (if has many ips) to bind
                    port 8090            ; which port listen incomming request
                    thread 4             ; http worker thread count
-                   queue-size 512       ; max job queued before reject
+                   queue-size 20480     ; max job queued before reject to project self
                    worker-name-prefix "worker-" ; woker thread name prefix
                    max-body 8388608 ; max http body: 8m
                    max-line 4096}}] ; max http inital line length: 4K

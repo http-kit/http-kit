@@ -30,7 +30,7 @@ For Efficience => just a few k of memory to maintain a connection
 
 ### HTTP Server
 ```clj
-[me.shenfeng/http-kit "1.3-SNAPSHOT"]
+[me.shenfeng/http-kit "2.0-SNAPSHOT"]
 
 (:use me.shenfeng.http.server)          ; export run-server and defasync
 
