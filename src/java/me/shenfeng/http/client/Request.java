@@ -31,9 +31,7 @@ public class Request implements Comparable<Request> {
     }
 
     public void finish() {
-        // HTTP keep-alive is not implemented, for simplicity
         clients.remove(this);
-        // closeQuiety(ch);
         decoder.listener.onCompleted();
     }
 
@@ -50,7 +48,6 @@ public class Request implements Comparable<Request> {
     }
 
     public void finish(Throwable t) {
-        // closeQuiety(ch);
         clients.remove(this);
         decoder.listener.onThrowable(t);
     }

@@ -142,10 +142,10 @@ public class RequestDecoder {
 
     void readEmptyLine(ByteBuffer buffer) {
         byte b = buffer.get();
-        if (b == CR) {
+        if (b == CR && buffer.hasRemaining()) {
             buffer.get(); // should be LF
-        } else if (b == LF) {
         }
+        // else if (b == LF)
     }
 
     void readFixedLength(ByteBuffer buffer) {
@@ -199,8 +199,10 @@ public class RequestDecoder {
         while (buffer.hasRemaining() && more) {
             b = buffer.get();
             if (b == CR) {
-                if (buffer.get() == LF)
-                    more = false;
+                more = false;
+                if (buffer.hasRemaining()) {
+                    buffer.get(); // LF
+                }
             } else if (b == LF) {
                 more = false;
             } else {

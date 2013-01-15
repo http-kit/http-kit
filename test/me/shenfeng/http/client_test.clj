@@ -3,8 +3,10 @@
         [me.shenfeng.http.server :only [run-server]]
         (compojure [core :only [defroutes GET POST HEAD DELETE ANY context]]
                    [handler :only [site]]
-                   [route :only [not-found]]))
+                   [route :only [not-found]])
+        (clojure.tools [logging :only [info]]))
   (:require [me.shenfeng.http.client :as http]
+            [clojure.java.io :as io]
             [clj-http.client :as clj-http]))
 
 (defroutes test-routes
@@ -85,3 +87,25 @@
                      (is (= 200 status))
                      (is (= "value" body)))]
     @p)) ;; wait
+
+;; run many HTTP request to detect any error
+;; RUN it: scripts/run_http_requests
+(defn -main [& args]
+  (let [ua "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.40 Safari/537.11"
+        urls (shuffle (line-seq (io/reader "/tmp/urls")))]
+    (doall
+     (map-indexed (fn [idx urls]
+                    (let [s (System/currentTimeMillis)
+                          requests (map (fn [url]
+                                          (http/get url {:timeout 1000 :user-agent ua}
+                                                    {:keys [status body] :as resp}
+                                                    (let [e (- (System/currentTimeMillis) s)]
+                                                      (if (instance? java.io.InputStream body)
+                                                        (info status "=====binary=====" url body)
+                                                        (if status
+                                                          (info status url "time" (str e "ms") "length: " (count body))
+                                                          (info url resp))))))
+                                        urls)]
+                      (doseq [r (doall requests)] @r) ; wait
+                      (info idx "takes time" (- (System/currentTimeMillis) s))))
+                  (partition 30 urls)))))

@@ -51,17 +51,20 @@ public class Decoder {
         cEnd = findEndOfString(sb);
 
         if (cStart < cEnd) {
-            int status = Integer.parseInt(sb.substring(bStart, bEnd));
-            HttpStatus s = HttpStatus.valueOf(status);
+            try {
+                int status = Integer.parseInt(sb.substring(bStart, bEnd));
+                HttpStatus s = HttpStatus.valueOf(status);
 
-            HttpVersion version = HTTP_1_1;
-            if ("HTTP/1.0".equals(sb.substring(aStart, cEnd))) {
-                version = HTTP_1_0;
+                HttpVersion version = HTTP_1_1;
+                if ("HTTP/1.0".equals(sb.substring(aStart, cEnd))) {
+                    version = HTTP_1_0;
+                }
+
+                listener.onInitialLineReceived(version, s);
+                state = READ_HEADER;
+            } catch (NumberFormatException e) {
+                throw new ProtocolException("not http prototol? " + sb);
             }
-
-            listener.onInitialLineReceived(version, s);
-            state = READ_HEADER;
-
         } else {
             throw new ProtocolException("not http prototol? " + sb);
         }
@@ -133,9 +136,8 @@ public class Decoder {
 
     void readEmptyLine(ByteBuffer buffer) {
         byte b = buffer.get();
-        if (b == CR) {
+        if (b == CR && buffer.hasRemaining()) {
             buffer.get(); // should be LF
-        } else if (b == LF) {
         }
     }
 
@@ -173,8 +175,10 @@ public class Decoder {
         while (buffer.hasRemaining() && more) {
             b = buffer.get();
             if (b == CR) {
-                if (buffer.get() == LF)
-                    more = false;
+                more = false;
+                if (buffer.hasRemaining()) {
+                    buffer.get(); // LF
+                }
             } else if (b == LF) {
                 more = false;
             } else {

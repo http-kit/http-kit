@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.DeflaterInputStream;
@@ -22,6 +23,7 @@ import me.shenfeng.http.DynamicBytes;
 import me.shenfeng.http.HttpStatus;
 import me.shenfeng.http.HttpUtils;
 import me.shenfeng.http.HttpVersion;
+import me.shenfeng.http.ProtocolException;
 
 /**
  * Accumulate all the response, call upper logic at once, for easy use
@@ -63,13 +65,17 @@ public class RespListener implements IRespListener {
     }
 
     private boolean isText() {
-        String type = headers.get(HttpUtils.CONTENT_TYPE);
-        if (type != null) {
-            type = type.toLowerCase();
-            // TODO may miss something
-            return type.contains("text") || type.contains("json");
+        if(status == HttpStatus.OK) {
+            String type = headers.get(HttpUtils.CONTENT_TYPE);
+            if (type != null) {
+                type = type.toLowerCase();
+                // TODO may miss something
+                return type.contains("text") || type.contains("json");
+            } else {
+                return false;
+            }
         } else {
-            return false;
+            return true;
         }
     }
 
@@ -137,7 +143,9 @@ public class RespListener implements IRespListener {
     }
 
     private final DynamicBytes body;
-    private Map<String, String> headers;
+
+    // can be empty
+    private Map<String, String> headers = new TreeMap<String, String>();
     private HttpStatus status;
     private final IResponseHandler handler;
     private final IFilter filter;
@@ -160,6 +168,10 @@ public class RespListener implements IRespListener {
     }
 
     public void onCompleted() {
+        if (status == null) {
+            handler.onThrowable(new ProtocolException("No status"));
+            return;
+        }
         try {
             DynamicBytes bytes = unzipBody();
             if (isText()) {
