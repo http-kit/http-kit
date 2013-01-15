@@ -14,9 +14,11 @@
           {} headers))
 
 (defn- url-encode [unencoded] (URLEncoder/encode unencoded "UTF-8"))
+
 (defn- utf8-bytes [#^String s] (.getBytes s "UTF-8"))
-(defn- base64-encode [bytes]
-  (DatatypeConverter/printBase64Binary bytes))
+
+(defn- base64-encode [bytes] (DatatypeConverter/printBase64Binary bytes))
+
 (defn- basic-auth-value [basic-auth]
   (let [basic-auth (if (string? basic-auth)
                      basic-auth
@@ -105,13 +107,21 @@
                 (do (println \"Exception: \" resp) resp)))
 
      ;; Synchronous
-     @(request ...) or (deref (request ...) timeout-ms timeout-val)
+     (let [{:keys [status body headers] :as esp} @(request ...)]) or
+     (deref (request ...) timeout-ms timeout-val)
+
+     ;; Issue 2 asynchronous requests, then wait for results
+    (let [resp1 (request ...)
+          resp2 (request ...)]
+      (println \"resp1's status: \" (:status @resp1))
+      (println \"resp2's status: \" (:status @resp2)))
 
   See lower-level `request*` for options."
   [options resp & handler]
   `(request* ~options (fn [~resp] ~@handler)))
 
 (defmacro get
+  "Issues an asynchronous HTTP GET request. See `Request` for more debail."
   ([url]
      `(request {:method :get :url ~url} resp# nil))
   ([url req]
@@ -121,6 +131,7 @@
         (request req#  ~resp ~@forms))))
 
 (defmacro post
+  "Issues an asynchronous HTTP POST request. See `Request` for more debail."
   ([url]
      `(request {:method :post :url ~url} resp# nil))
   ([url req]

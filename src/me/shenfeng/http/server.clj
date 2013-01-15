@@ -30,8 +30,8 @@
   `(callback-name ring-response)` is executed in any thread:
 
      (defn my-async-handler! [request]
-       (async-response respond!
-         (future (respond! {:status  200
+       (async-response respond
+         (future (respond {:status  200
                             :headers {\"Content-Type\" \"text/html\"}
                             :body    \"This is an async response!\"}))))
 
@@ -71,10 +71,28 @@
     (DatatypeConverter/printBase64Binary
      (.digest md (.getBytes (str key websocket-13-guid))))))
 
-(defn on-mesg   [^WsCon conn fn]  (.addRecieveListener conn fn))
-(defn on-close  [^WsCon conn fn]  (.addOnCloseListener conn fn))
-(defn send-mesg [^WsCon conn msg] (.send conn msg))
+(defn on-mesg
+  "Register a function to be called when there is message from client.
+  (on-mesg ws-connection
+           (fn [message]
+             (println \"on-mesg\" message)))"
+  [^WsCon conn fn]  (.addRecieveListener conn fn))
+
+
+(defn on-close
+  "Register a function to be called when the connecton is closed.
+  (on-close ws-connection
+            (fn [status]
+              (println \"websocket connection closed\")))"
+  [^WsCon conn fn]  (.addOnCloseListener conn fn))
+
+(defn send-mesg
+  "Send message to client. Can be called on any thread.
+  (send-mesg ws-connection \"Message from server\")"
+  [^WsCon conn msg] (.send conn msg))
+
 (defn close-conn
+  "Close the websocket connection."
   ([^WsCon conn]        (.serverClose conn))
   ([^WsCon conn status] (.serverClose conn status)))
 
