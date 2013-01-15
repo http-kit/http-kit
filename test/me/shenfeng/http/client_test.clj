@@ -1,5 +1,6 @@
 (ns me.shenfeng.http.client-test
   (:use clojure.test
+        [ring.adapter.jetty :only [run-jetty]]
         [me.shenfeng.http.server :only [run-server]]
         (compojure [core :only [defroutes GET POST HEAD DELETE ANY context]]
                    [handler :only [site]]
@@ -18,34 +19,36 @@
   (POST "/form-params" [] (fn [req] (-> req :params :param1))))
 
 (use-fixtures :once (fn [f]
-                      (let [server (run-server
-                                    (site test-routes) {:port 4347})]
+                      (let [server (run-server (site test-routes) {:port 4347})]
+                        ;; start http-kit server & jetty server
+                        (run-jetty (site test-routes) {:port 14347 :join? false})
                         (try (f) (finally (server))))))
 
 (defmacro bench
   [title & forms]
   `(let [start# (. System (nanoTime))]
      ~@forms
-     (prn (str ~title "Elapsed time: "
-               (/ (double (- (. System (nanoTime)) start#)) 1000000.0)
-               " msecs"))))
+     (println (str ~title "Elapsed time: "
+                   (/ (double (- (. System (nanoTime)) start#)) 1000000.0)
+                   " msecs"))))
 
 (deftest test-http-client
-  (is (= 200 (:status @(http/get "http://127.0.0.1:4347/get"))))
-  (is (= 200 (:status @(http/get "http://127.0.0.1:4347/get"))))
-  (is (= 404 (:status @(http/get "http://127.0.0.1:4347/404"))))
-  (is (= 200 (:status @(http/post "http://127.0.0.1:4347/post"))))
-  (is (= 200 (:status @(http/delete "http://127.0.0.1:4347/delete"))))
-  (is (= 200 (:status @(http/head "http://127.0.0.1:4347/get"))))
-  (is (= 200 (:status @(http/post "http://127.0.0.1:4347/post"))))
-  (is (= 404 (:status @(http/get "http://127.0.0.1:4347/404"))))
-  (let [url "http://127.0.0.1:4347/get"]
-    (doseq [_ (range 0 10)]
-      (let [requests (doall (map (fn [u] (http/get u)) (repeat 20 url)))]
-        (doseq [r requests]
-          (is (= 200 (:status @r))))))
-    (doseq [_ (range 0 200)]
-      (is (= 200 (:status @(http/get url)))))))
+  (doseq [host ["http://127.0.0.1:4347" "http://127.0.0.1:14347"]]
+    (is (= 200 (:status @(http/get (str host "/get")))))
+    (is (= 200 (:status @(http/get (str host "/get")))))
+    (is (= 404 (:status @(http/get (str host "/404")))))
+    (is (= 200 (:status @(http/post (str host "/post")))))
+    (is (= 200 (:status @(http/delete (str host "/delete")))))
+    (is (= 200 (:status @(http/head (str host "/get")))))
+    (is (= 200 (:status @(http/post (str host "/post")))))
+    (is (= 404 (:status @(http/get (str host "/404")))))
+    (let [url (str host "/get")]
+      (doseq [_ (range 0 10)]
+        (let [requests (doall (map (fn [u] (http/get u)) (repeat 20 url)))]
+          (doseq [r requests]
+            (is (= 200 (:status @r))))))
+      (doseq [_ (range 0 200)]
+        (is (= 200 (:status @(http/get url))))))))
 
 (deftest test-keep-alive-does-not-messup
   (let [url "http://127.0.0.1:4347/keep-alive?id="]
@@ -59,19 +62,20 @@
           (is (= 200 (:status @r))))))))
 
 (deftest performance-bench
-  (let [url "http://127.0.0.1:4347/get"]
-    (Thread/sleep 1000)
-    (bench "clj-http, concurrency 1, 2000 requests: "
-           (doseq [_ (range 0 2000)] (clj-http/get url)))
-    (Thread/sleep 1000)
-    (bench "http-kit, concurrency 10, 2000 requests: "
-           (doseq [_ (range 0 200)]
+  (doseq [{:keys [url name]} [{:url "http://127.0.0.1:14347/get" :name "jetty server"}
+                              {:url "http://127.0.0.1:4347/get" :name "http-kit server"}]]
+    (println (str "\nWarm up " name " by 10000 requests. "
+                  "It may take some time\n"))
+    (doseq [_ (range 0 10000)] (clj-http/get url) (http/get url))
+    (bench "clj-http, concurrency 1, 4000 requests: "
+           (doseq [_ (range 0 4000)] (clj-http/get url)))
+    (bench "http-kit, concurrency 1, 4000 requests: "
+           (doseq [_ (range 0 4000)] @(http/get url)))
+    (bench "http-kit, concurrency 10, 4000 requests: "
+           (doseq [_ (range 0 400)]
              (let [requests (doall (map (fn [u] (http/get u))
                                         (repeat 10 url)))]
-               (doseq [r requests] @r)))) ; wait
-    (Thread/sleep 1000)
-    (bench "http-kit, concurrency 1, 2000 requests: "
-           (doseq [_ (range 0 2000)] @(http/get url)))))
+               (doseq [r requests] @r)))))) ; wait
 
 (deftest test-http-client-user-agent
   (let [ua "test-ua"
