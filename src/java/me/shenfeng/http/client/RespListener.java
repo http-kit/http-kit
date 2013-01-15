@@ -65,7 +65,7 @@ public class RespListener implements IRespListener {
     }
 
     private boolean isText() {
-        if(status == HttpStatus.OK) {
+        if (status == HttpStatus.OK) {
             String type = headers.get(HttpUtils.CONTENT_TYPE);
             if (type != null) {
                 type = type.toLowerCase();
@@ -81,7 +81,7 @@ public class RespListener implements IRespListener {
 
     private DynamicBytes unzipBody() throws IOException {
         String encoding = headers.get(CONTENT_ENCODING);
-        if (encoding != null) {
+        if (encoding != null && body.length() > 0) {
             encoding = encoding.toLowerCase();
             ByteArrayInputStream bis = new ByteArrayInputStream(body.get(), 0, body.length());
             DynamicBytes unzipped = new DynamicBytes(body.length() * 6);

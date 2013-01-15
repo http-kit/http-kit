@@ -9,6 +9,7 @@ import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.TreeMap;
 
+import me.shenfeng.http.HttpMethod;
 import me.shenfeng.http.HttpStatus;
 import me.shenfeng.http.HttpUtils;
 import me.shenfeng.http.HttpVersion;
@@ -28,9 +29,11 @@ public class Decoder {
     int lineBufferCnt = 0;
     int readRemaining = 0;
     State state = READ_INITIAL;
+    public final HttpMethod method;
 
-    public Decoder(IRespListener listener) {
+    public Decoder(IRespListener listener, HttpMethod method) {
         this.listener = listener;
+        this.method = method;
     }
 
     private void parseInitialLine(String sb) throws ProtocolException, AbortException {
@@ -150,6 +153,11 @@ public class Decoder {
         if (line == null)
             return; // data is not received enough. for next run
         listener.onHeadersReceived(headers);
+        if (method == HttpMethod.HEAD) {
+            state = ALL_READ;
+            return;
+        }
+
         String te = headers.get(TRANSFER_ENCODING);
         if (CHUNKED.equals(te)) {
             state = READ_CHUNK_SIZE;

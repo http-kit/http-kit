@@ -3,6 +3,8 @@ package me.shenfeng.http.client;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 
+import me.shenfeng.http.HttpMethod;
+
 public class Request implements Comparable<Request> {
 
     final InetSocketAddress addr;
@@ -15,8 +17,8 @@ public class Request implements Comparable<Request> {
     private boolean connected = false;
 
     public Request(InetSocketAddress addr, ByteBuffer request, IRespListener handler,
-            PriorityQueue<Request> clients, int timeOutMs) {
-        this.decoder = new Decoder(handler);
+            PriorityQueue<Request> clients, int timeOutMs, HttpMethod method) {
+        this.decoder = new Decoder(handler, method);
         this.timeOutMs = timeOutMs;
         this.request = request;
         this.clients = clients;

@@ -205,7 +205,7 @@ public final class HttpClient implements Runnable {
         }
         try {
             InetSocketAddress addr = getServerAddr(uri); // Maybe slow
-            pendings.offer(new Request(addr, request, cb, requests, timeoutMs));
+            pendings.offer(new Request(addr, request, cb, requests, timeoutMs, method));
             selector.wakeup();
         } catch (UnknownHostException e) {
             cb.onThrowable(e);
