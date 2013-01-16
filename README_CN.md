@@ -1,15 +1,27 @@
 # Http Kit
 
-高性能HTTP Server (Ring adapter)， HTTP Client
+高性能HTTP Server (Ring adapter)， HTTP Client。使你的Clojure Web 程序拥有类似Nginx的性能
 
 ## 特点
 
-* 高性能。第三方独立测评结果 [clojure-web-server-benchmarks](https://github.com/ptaoussanis/clojure-web-server-benchmarks) ＝> 在Macbook Air上，每秒处理数万Requests，
-* 高并发支持：仅需几K内存来保持一个HTTP连接，空闲连接几乎不影响latency。
-* 高效支持[HTTP长连](http://en.wikipedia.org/wiki/Comet_(programming)
-* 高效支持[WebSocket](http://tools.ietf.org/html/rfc6455)
+* 从头写，jar文件仅80k => 代码少，bug少
+* 为高性能服务器打造
 
-http-kit使用了和Nginx同样的并发模型，具有和Nginx相似的性能特点。
+### HTTP Server
+
+* **性能** 第三方独立测评结果: [clojure-web-server-benchmarks](https://github.com/ptaoussanis/clojure-web-server-benchmarks)
+* 并发支持：仅需几K内存来保持一个HTTP连接，空闲连接几乎不影响latency。
+* 支持Async [HTTP长连](http://en.wikipedia.org/wiki/Comet_(programming)，实时push 更新给客户端
+* 支持 [WebSocket](http://tools.ietf.org/html/rfc6455)，实时双向通讯
+
+### HTTP Client
+
+* 同步的感觉，异步的API(promise)，需要结果，加@就行
+* 每个请求可独立设置超时： *服务器程序，超时很重要*
+* keep-alive： *如果对方服务器支持。为性能，不遗余力*
+* 线程安全
+
+http-kit使用了和Nginx相似的并发模型，具有和Nginx相似的并发处理能力。
 
 ## HTTP Server 用法
 
@@ -108,51 +120,42 @@ http-kit使用了和Nginx同样的并发模型，具有和Nginx相似的性能�
 
 ```clj
 (:require [me.shenfeng.http.client :as http])
+; 包括 `http/get`, `http/post`, `http/put` `http/delete` `http/put`
 ```
 
 ```clj
 
-;; 异步调用，忽略返回的promise
+;; 异步调用，返回的promise，忽略结果
 (http/get "http://host.com/path")
 
 ;; 异步调用，异步处理
-(http/get "http://host.com/path" {:keys [status headers body] :as resp}
-          (if status
-            (println "Async HTTP Get: " status)
-            (println "Failed, exception is " resp)))
+(let [options {:timeout 200             ; ms
+               :basic-auth ["user" "pass"]
+               :user-agent "User-Agent-string"
+               :headers {"X-Header" "Value"}}]
+  (http/get "http://host.com/path" options {:keys [status headers body] :as resp}
+            (if status
+              (println "Async HTTP GET: " status)
+              (println "Failed, exception is " resp))))
 
 ;; 同步调用
 (let [{:keys [status headers body] :as resp} @(http/get "http://host.com/path")]
   (if status
-    (println "HTTP Get success: " status)
+    (println "HTTP GET success: " status)
     (println "Failed, exception: " resp)))
 
-;; 异步调用，Timeout 200ms， Basic Auth user@pass， 指定User-Agent
-(let [options {:timeout 200
-               :basic-auth ["user" "pass"]
-               :headers {"User-Agent" "User-Agent-string"}}]
-  (http/get "http://host.com/path" options {:keys [status headers body] :as resp}
-            (if status
-              (println "Async HTTP Get: " status)
-              (println "Failed, exception: " resp))))
+;; 并发调用，同步处理
+(let [resp1 (http/get "http://host.com/path1")
+      resp2 (http/get "http://host.com/path2")]
+  (println "Response 1's status " {:status @resp1})
+  (println "Response 2's status " {:status @resp2}))
 
-(def post-options {:form-params {:params1 "value" :params2 ["v1" "v2"]}
-                   :timeout 200 ;; timeout 200ms
-                   :headers {"Key" "Value"}})
-
-;;; 异步调用，忽略返回的promise
-(http/post "http://host.com/path" post-options)
-
-;;; 异步调用，异步处理
-(http/post "http://host.com/path" post-options {:keys [status headers body] :as resp}
-           (if status
-             (println "Async HTTP Post: " status)
-             (println "Failed, exception: " resp)))
-
-;;; 同步调用
-(let [{:keys [status headers body] :as resp} @(http/post "http://host.com/path")]
+;; Form提交
+(let [form-parms {:name "http-kit" :features ["async" "client" "server"]}
+      {:keys [status headers body] :as resp} (http/post "http://host.com/path1"
+                                                        {:form-parmas form-parms})]
   (if status
-    (println "Sync HTTP Post: " status)
-    (println "Failed, exception: " resp)))
+    (println "Async HTTP POST: " status)
+    (println "Failed, exception is " resp)))
 
 ```
