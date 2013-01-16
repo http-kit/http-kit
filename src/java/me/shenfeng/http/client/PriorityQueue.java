@@ -244,4 +244,9 @@ public class PriorityQueue<E> {
         }
         queue[k] = key;
     }
+
+    @Override
+    public String toString() {
+        return "size=" + size;
+    }
 }

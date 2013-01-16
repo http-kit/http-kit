@@ -68,11 +68,11 @@ public final class HttpClient implements Runnable {
                 } else {
                     msg = "connect timeout: ";
                 }
+                // will remove it
                 r.finish(new TimeoutException(msg + r.timeOutMs + "ms"));
                 if (r.key != null) {
                     closeQuitely(r.key);
                 }
-                requests.poll();
             } else {
                 break;
             }
@@ -95,7 +95,6 @@ public final class HttpClient implements Runnable {
         buffer.clear();
         int read = 0;
         try {
-            // TODO a while read, save the add then remove keep-alive
             read = ch.read(buffer);
         } catch (IOException e) { // The remote forcibly closed the connection
             closeQuitely(key);
@@ -103,8 +102,8 @@ public final class HttpClient implements Runnable {
         }
 
         if (read == -1) { // read all, remote closed it cleanly
+            keepalives.remove(key);// opps, just added
             closeQuitely(key);
-            keepalives.remove(key);// opps, just add
             req.finish();
         } else if (read > 0) {
             req.onProgress(now);
@@ -237,6 +236,7 @@ public final class HttpClient implements Runnable {
                 if (key.isValid()) {
                     key.attach(job);
                     key.interestOps(OP_WRITE);
+                    requests.offer(job);
                     continue;
                 } else {
                     // this should not happen often
@@ -246,9 +246,9 @@ public final class HttpClient implements Runnable {
             try {
                 SocketChannel ch = SocketChannel.open();
                 ch.configureBlocking(false);
-                ch.connect(job.addr);
                 // saved for timeout
                 job.key = ch.register(selector, OP_CONNECT, job);
+                ch.connect(job.addr);
                 requests.offer(job);
             } catch (IOException e) {
                 job.finish(e);

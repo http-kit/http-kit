@@ -46,8 +46,10 @@
       :or {timeout 40000 user-agent "http-kit/1.3" keep-alive 120000}}]
   (HttpClient. (HttpClientConfig. timeout user-agent keep-alive)))
 
-(defn get-default-client "Returns default HTTP client, initializing as neccesary."
-  [] (if-let [c @default-client] c (reset! default-client (init-client))))
+(let [lock (Object.)]
+  (defn get-default-client "Returns default HTTP client, initializing as neccesary."
+    [] (locking lock
+         (if-let [c @default-client] c (reset! default-client (init-client))))))
 
 (defn- coerce-req [{:keys [headers client method body
                            form-params basic-auth user-agent]

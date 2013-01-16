@@ -38,10 +38,10 @@ public class Request implements Comparable<Request> {
     }
 
     public void finish() {
+        clients.remove(this);
         if (isDone)
             return;
         isDone = true;
-        clients.remove(this);
         decoder.listener.onCompleted();
     }
 
@@ -58,10 +58,10 @@ public class Request implements Comparable<Request> {
     }
 
     public void finish(Throwable t) {
+        clients.remove(this);
         if (isDone)
             return;
         isDone = true;
-        clients.remove(this);
         decoder.listener.onThrowable(t);
     }
 

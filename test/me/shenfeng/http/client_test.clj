@@ -63,17 +63,18 @@
     (is (= u (:body @(http/get url2))))
     (is (= u (:body (clj-http/get url2))))))
 
-(defn rand-keep-alive []
-  {:headers {"Connection" (cond  (> (rand-int 10) 7) "Close"
+(defn- rand-keep-alive []
+  ;; TODO has issue in linux
+  {:headers {"Connection" (cond  (> (rand-int 10) 8) "Close"
                                  :else "keep-alive")}})
 
 (deftest test-keep-alive-does-not-messup
   (let [url "http://127.0.0.1:4347/keep-alive?id="]
     (doseq [id (range 0 100)]
-      (is (= (str id) (:body @(http/get (str url id) (rand-keep-alive))))))
-    (doseq [ids (partition 10 (range 0 100))]
+      (is (= (str id) (:body @(http/get (str url id))))))
+    (doseq [ids (partition 10 (range 0 300))]
       (let [requests (doall (map (fn [id]
-                                   (http/get (str url id) (rand-keep-alive)
+                                   (http/get (str url id) {}
                                              {:keys [body]}
                                              (is (= (str id) body))))
                                  ids))]
@@ -116,6 +117,8 @@
                      (is (= "value" body)))]
     @p)) ;; wait
 
+;; @(http/get "http://127.0.0.1:4348" {:headers {"Connection" "Close"}})
+
 ;; run many HTTP request to detect any error
 ;; RUN it: scripts/run_http_requests
 (defn -main [& args]
@@ -125,16 +128,16 @@
      (map-indexed (fn [idx urls]
                     (println urls)
                     (let [s (System/currentTimeMillis)
-                          requests (map (fn [url]
-                                          (http/get url {:timeout 1000 :user-agent ua}
-                                                    {:keys [status body] :as resp}
-                                                    (let [e (- (System/currentTimeMillis) s)]
-                                                      (if (instance? java.io.InputStream body)
-                                                        (info status "=====binary=====" url body)
-                                                        (if status
-                                                          (info status url "time" (str e "ms") "length: " (count body))
-                                                          (info url resp))))))
-                                        urls)]
+                          requests (pmap (fn [url]
+                                           (http/get url {:timeout 1000 :user-agent ua}
+                                                     {:keys [status body] :as resp}
+                                                     (let [e (- (System/currentTimeMillis) s)]
+                                                       (if (instance? java.io.InputStream body)
+                                                         (info status "=====binary=====" url body)
+                                                         (if status
+                                                           (info status url "time" (str e "ms") "length: " (count body))
+                                                           (info url resp))))))
+                                         urls)]
                       (doseq [r (doall requests)] @r) ; wait
                       (info idx "takes time" (- (System/currentTimeMillis) s))))
-                  (partition 30 urls)))))
+                  (partition 100 urls)))))
