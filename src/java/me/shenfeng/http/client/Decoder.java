@@ -100,6 +100,7 @@ public class Decoder {
                         state = READ_CHUNKED_CONTENT;
                     }
                 }
+
                 break;
             case READ_FIXED_LENGTH_CONTENT:
                 toRead = Math.min(buffer.remaining(), readRemaining);

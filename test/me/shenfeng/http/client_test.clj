@@ -99,9 +99,10 @@
 ;; RUN it: scripts/run_http_requests
 (defn -main [& args]
   (let [ua "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.40 Safari/537.11"
-        urls (shuffle (line-seq (io/reader "/tmp/urls")))]
+        urls (shuffle (set (line-seq (io/reader "/tmp/urls"))))]
     (doall
      (map-indexed (fn [idx urls]
+                    (println urls)
                     (let [s (System/currentTimeMillis)
                           requests (map (fn [url]
                                           (http/get url {:timeout 1000 :user-agent ua}

@@ -9,9 +9,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
@@ -222,14 +224,20 @@ public class HttpUtils {
     }
 
     public static String getPath(URI uri) {
-        String path = uri.getPath();
-        String query = uri.getRawQuery();
-        if ("".equals(path))
-            path = "/";
-        if (query == null)
-            return path;
-        else
-            return path + "?" + query;
+        String path;
+        try {
+            // TODO this is wrong
+            path = URLEncoder.encode(uri.getPath(), "utf8");
+            String query = uri.getRawQuery();
+            if ("".equals(path))
+                path = "/";
+            if (query == null)
+                return path;
+            else
+                return path + "?" + query;
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public static int getPort(URI uri) {

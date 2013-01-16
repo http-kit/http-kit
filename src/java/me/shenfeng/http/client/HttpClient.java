@@ -69,6 +69,9 @@ public final class HttpClient implements Runnable {
                     msg = "connect timeout: ";
                 }
                 r.finish(new TimeoutException(msg + r.timeOutMs + "ms"));
+                if (r.key != null) {
+                    closeQuiety(r.key);
+                }
                 requests.poll();
             } else {
                 break;
@@ -140,6 +143,7 @@ public final class HttpClient implements Runnable {
                 key.interestOps(OP_READ);
             }
         } catch (IOException e) {
+            // maybe keep-alive, need to remove
             closeQuiety(key);
             req.finish(e);
         }
@@ -222,6 +226,10 @@ public final class HttpClient implements Runnable {
                 key.interestOps(OP_WRITE);
             }
         } catch (IOException e) {
+            try {
+                ch.close(); // not added to keep-alive yet
+            } catch (IOException ignore) {
+            }
             req.finish(e);
         }
     }
@@ -233,15 +241,20 @@ public final class HttpClient implements Runnable {
                 PersistentConn con = keepalives.remove(job.addr);
                 if (con != null) { // keep alive
                     SelectionKey key = con.key;
-                    key.attach(job);
-                    key.interestOps(OP_WRITE);
-                } else {
-                    SocketChannel ch = SocketChannel.open();
-                    ch.configureBlocking(false);
-                    ch.register(selector, OP_CONNECT, job);
-                    ch.connect(job.addr);
-                    requests.offer(job);
+                    if (key.isValid()) {
+                        key.attach(job);
+                        key.interestOps(OP_WRITE);
+                        continue;
+                    } else {
+                        key.channel().close();
+                    }
                 }
+                SocketChannel ch = SocketChannel.open();
+                ch.configureBlocking(false);
+                ch.connect(job.addr);
+                // saved for timeout
+                job.key = ch.register(selector, OP_CONNECT, job);
+                requests.offer(job);
             } catch (IOException e) {
                 job.finish(e);
                 HttpUtils.printError("Try to connect " + job.addr, e);

@@ -7,6 +7,7 @@ import java.nio.ByteBuffer;
 import java.util.Map;
 
 import junit.framework.Assert;
+import me.shenfeng.http.HttpMethod;
 import me.shenfeng.http.HttpStatus;
 import me.shenfeng.http.HttpVersion;
 import me.shenfeng.http.LineTooLargeException;
@@ -44,7 +45,7 @@ public class HttpClientDecoderTest {
             public void onBodyReceived(byte[] buf, int length) throws AbortException {
                 Assert.assertEquals(2869, length);
             }
-        });
+        }, HttpMethod.GET);
 
         ByteBuffer buffer = ByteBuffer.wrap(Utils.readAll("beta_shield_chunked"));
         State s = decoder.decode(buffer);

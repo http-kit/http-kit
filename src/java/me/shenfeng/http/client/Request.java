@@ -2,6 +2,7 @@ package me.shenfeng.http.client;
 
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.nio.channels.SelectionKey;
 
 import me.shenfeng.http.HttpMethod;
 
@@ -12,6 +13,10 @@ public class Request implements Comparable<Request> {
     final ByteBuffer request; // HTTP request
     private final PriorityQueue<Request> clients;
     public final int timeOutMs;
+
+    private boolean isDone = false; // for only call once
+
+    SelectionKey key; // for timeout
 
     private long timeoutTs;
     private boolean connected = false;
@@ -33,6 +38,9 @@ public class Request implements Comparable<Request> {
     }
 
     public void finish() {
+        if (isDone)
+            return;
+        isDone = true;
         clients.remove(this);
         decoder.listener.onCompleted();
     }
@@ -50,6 +58,9 @@ public class Request implements Comparable<Request> {
     }
 
     public void finish(Throwable t) {
+        if (isDone)
+            return;
+        isDone = true;
         clients.remove(this);
         decoder.listener.onThrowable(t);
     }
