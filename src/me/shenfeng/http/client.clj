@@ -88,11 +88,15 @@
                 (let [resp {:body body
                             :headers (normalize-headers headers true)
                             :status status}]
-                  (callback resp)
-                  (deliver response resp)))
+                  (try
+                    (callback resp)
+                    (finally
+                     (deliver response resp)))))
               (onThrowable [this t]
-                ((or error-callback callback) t)
-                (deliver response t)))))
+                (try
+                  ((or error-callback callback) t)
+                  (finally
+                   (deliver response t)))))))
     response))
 
 (defmacro request

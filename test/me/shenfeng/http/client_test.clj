@@ -63,20 +63,28 @@
     (is (= u (:body @(http/get url2))))
     (is (= u (:body (clj-http/get url2))))))
 
+(defn rand-keep-alive []
+  {:headers {"Connection" (cond  (> (rand-int 10) 7) "Close"
+                                 :else "keep-alive")}})
+
 (deftest test-keep-alive-does-not-messup
   (let [url "http://127.0.0.1:4347/keep-alive?id="]
     (doseq [id (range 0 100)]
-      (is (= (str id) (:body @(http/get (str url id))))))
+      (is (= (str id) (:body @(http/get (str url id) (rand-keep-alive))))))
     (doseq [ids (partition 10 (range 0 100))]
-      (let [requests (doall (map (fn [id] (http/get (str url id) {} {:keys [body]}
-                                                   (is (= (str id) body))))
+      (let [requests (doall (map (fn [id]
+                                   (http/get (str url id) (rand-keep-alive)
+                                             {:keys [body]}
+                                             (is (= (str id) body))))
                                  ids))]
         (doseq [r requests]
           (is (= 200 (:status @r))))))))
 
 (deftest performance-bench
-  (doseq [{:keys [url name]} [{:url "http://127.0.0.1:14347/get" :name "jetty server"}
-                              {:url "http://127.0.0.1:4347/get" :name "http-kit server"}]]
+  (doseq [{:keys [url name]} [{:url "http://127.0.0.1:14347/get"
+                               :name "jetty server"}
+                              {:url "http://127.0.0.1:4347/get"
+                               :name "http-kit server"}]]
     (println (str "\nWarm up " name " by 10000 requests. "
                   "It may take some time\n"))
     (doseq [_ (range 0 10000)] (clj-http/get url) (http/get url))

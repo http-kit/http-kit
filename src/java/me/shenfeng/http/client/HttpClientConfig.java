@@ -22,6 +22,7 @@ public class HttpClientConfig {
 
     @Override
     public String toString() {
-        return "default config: {timeout=" + timeOutMs + "ms, useragent=" + userAgent + '}';
+        return "default config: {timeout=" + timeOutMs + "ms, useragent=" + userAgent
+                + ", keepalive=" + keepalive + "ms}";
     }
 }

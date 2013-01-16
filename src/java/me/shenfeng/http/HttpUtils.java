@@ -243,6 +243,16 @@ public class HttpUtils {
         return port;
     }
 
+    public static String getHost(URI uri) {
+        String host = uri.getHost();
+        int port = uri.getPort();
+
+        if (port != -1) {
+            host += ":" + port;
+        }
+        return host;
+    }
+
     public static InetSocketAddress getServerAddr(URI uri) throws UnknownHostException {
         InetAddress host = getByName(uri.getHost());
         return new InetSocketAddress(host, getPort(uri));
