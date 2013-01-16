@@ -181,11 +181,11 @@ public final class HttpClient implements Runnable {
             headers.put("Content-Length", Integer.toString(body.length));
             length += body.length;
         }
-        String path = getPath(uri);
+        DynamicBytes path = HttpUtils.encodeURI(getPath(uri));
         DynamicBytes bytes = new DynamicBytes(length);
 
-        bytes.append(method.toString()).append(SP).append(path).append(SP);
-        bytes.append("HTTP/1.1\r\n");
+        bytes.append(method.toString()).append(SP).append(path.get(), 0, path.length());
+        bytes.append(" HTTP/1.1\r\n");
         Iterator<Map.Entry<String, String>> ite = headers.entrySet().iterator();
         while (ite.hasNext()) {
             Map.Entry<String, String> e = ite.next();

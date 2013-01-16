@@ -119,6 +119,47 @@ public class HttpUtils {
         return bytes;
     }
 
+    private static final byte[] ALPHAS = "0123456789ABCDEF".getBytes();
+
+    // like javascript's encodeURI
+    // https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Global_Objects/encodeURI
+    public static DynamicBytes encodeURI(String url) {
+        byte[] bytes = url.getBytes(UTF_8);
+        DynamicBytes buffer = new DynamicBytes(bytes.length * 2);
+        boolean e = true;
+        for (byte b : bytes) {
+            int c = b < 0 ? b + 256 : b;
+            if (c < '!' || c > '~') {
+                e = true;
+            } else {
+                switch (c) {
+                case '"':
+                case '%':
+                case '<':
+                case '>':
+                case '\\':
+                case '^':
+                case '`':
+                case '{':
+                case '}':
+                case '|':
+                    e = true;
+                    break;
+                default:
+                    e = false;
+                }
+            }
+            if (e) {
+                buffer.append((byte) '%');
+                buffer.append(ALPHAS[c / 16]);
+                buffer.append(ALPHAS[c % 16]);
+            } else {
+                buffer.append(b);
+            }
+        }
+        return buffer;
+    }
+
     public static int findEndOfString(String sb) {
         int result;
         for (result = sb.length(); result > 0; result--) {
@@ -283,7 +324,7 @@ public class HttpUtils {
         valueEnd = findEndOfString(sb);
 
         String key = sb.substring(nameStart, nameEnd);
-        if (valueStart > valueEnd) { // ignore
+        if (valueStart > valueEnd) { // ignoreq
             // logger.warn("header error: " + sb);
         } else {
             String value = sb.substring(valueStart, valueEnd);
