@@ -13,6 +13,7 @@
 (defroutes test-routes
   (GET "/get" [] "hello world")
   (POST "/post" [] "hello world")
+  (ANY "/unicode" [] (fn [req] (-> req :params :str)))
   (DELETE "/delete" [] "deleted")
   (ANY "/ua" [] (fn [req] ((-> req :headers) "user-agent")))
   (GET "/keep-alive" [] (fn [req] (-> req :params :id)))
@@ -49,6 +50,18 @@
             (is (= 200 (:status @r))))))
       (doseq [_ (range 0 200)]
         (is (= 200 (:status @(http/get url))))))))
+
+(deftest test-unicode-encoding
+  (let [u "高性能HTTPServer和Client"
+        url "http://127.0.0.1:4347/unicode"
+        url1 (str url "?str=" u)
+        url2 (str "http://127.0.0.1:4347/unicode?str=" u)]
+    (is (= u (:body @(http/get url1))))
+    (is (= u (:body (clj-http/get url1))))
+    (is (= u (:body @(http/post url {:form-params {:str u}}))))
+    (is (= u (:body (clj-http/post url {:form-params {:str u}}))))
+    (is (= u (:body @(http/get url2))))
+    (is (= u (:body (clj-http/get url2))))))
 
 (deftest test-keep-alive-does-not-messup
   (let [url "http://127.0.0.1:4347/keep-alive?id="]
