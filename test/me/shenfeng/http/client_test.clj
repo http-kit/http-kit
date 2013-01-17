@@ -35,10 +35,11 @@
 
 (deftest test-http-client
   (doseq [host ["http://127.0.0.1:4347" "http://127.0.0.1:14347"]]
-    (is (= 200 (:status @(http/get (str host "/get")))))
-    (is (= 200 (:status @(http/get (str host "/get")))))
+    (is (= 200 (:status @(http/get (str host "/get") (fn [resp]
+                                                       (is (= 200 (:status resp))))))))
     (is (= 404 (:status @(http/get (str host "/404")))))
-    (is (= 200 (:status @(http/post (str host "/post")))))
+    (is (= 200 (:status @(http/post (str host "/post") (fn [resp]
+                                                         (is (= 200 (:status resp))))))))
     (is (= 200 (:status @(http/delete (str host "/delete")))))
     (is (= 200 (:status @(http/head (str host "/get")))))
     (is (= 200 (:status @(http/post (str host "/post")))))
@@ -74,9 +75,9 @@
       (is (= (str id) (:body @(http/get (str url id))))))
     (doseq [ids (partition 10 (range 0 300))]
       (let [requests (doall (map (fn [id]
-                                   (http/get (str url id) {}
-                                             {:keys [body]}
-                                             (is (= (str id) body))))
+                                   (http/get (str url id)
+                                             (fn [{:keys [body]}]
+                                               (is (= (str id) body)))))
                                  ids))]
         (doseq [r requests]
           (is (= 200 (:status @r))))))))
@@ -112,9 +113,10 @@
 
 (deftest test-http-client-async
   (let [url "http://127.0.0.1:4347/form-params"
-        p (http/post url {:form-params {:param1 "value"}} {:keys [status body]}
-                     (is (= 200 status))
-                     (is (= "value" body)))]
+        p (http/post url {:form-params {:param1 "value"}}
+                     (fn [{:keys [status body]}]
+                       (is (= 200 status))
+                       (is (= "value" body))))]
     @p)) ;; wait
 
 ;; @(http/get "http://127.0.0.1:4348" {:headers {"Connection" "Close"}})
@@ -130,13 +132,13 @@
                     (let [s (System/currentTimeMillis)
                           requests (pmap (fn [url]
                                            (http/get url {:timeout 1000 :user-agent ua}
-                                                     {:keys [status body] :as resp}
-                                                     (let [e (- (System/currentTimeMillis) s)]
-                                                       (if (instance? java.io.InputStream body)
-                                                         (info status "=====binary=====" url body)
-                                                         (if status
-                                                           (info status url "time" (str e "ms") "length: " (count body))
-                                                           (info url resp))))))
+                                                     (fn [{:keys [status body] :as resp}]
+                                                       (let [e (- (System/currentTimeMillis) s)]
+                                                         (if (instance? java.io.InputStream body)
+                                                           (info status "=====binary=====" url body)
+                                                           (if status
+                                                             (info status url "time" (str e "ms") "length: " (count body))
+                                                             (info url resp)))))))
                                          urls)]
                       (doseq [r (doall requests)] @r) ; wait
                       (info idx "takes time" (- (System/currentTimeMillis) s))))
