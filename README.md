@@ -159,7 +159,11 @@ git clone git://github.com/shenfeng/http-kit.git && cd http-kit && ./scripts/htt
 
 ## Contributors
 
-[Peter Taoussanis](https://github.com/ptaoussanis)
+*sort by emacs `sort-line`*
+
+* [Max Penet](https://github.com/mpenet)
+* [Peter Taoussanis](https://github.com/ptaoussanis)
+
 
 ## Motivation
 
