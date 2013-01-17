@@ -41,9 +41,9 @@
                          k) v))
           {} headers))
 
-(defn- url-encode [unencoded] (URLEncoder/encode unencoded "UTF-8"))
+(defn- url-encode [unencoded] (URLEncoder/encode unencoded "utf8"))
 
-(defn- utf8-bytes [#^String s] (.getBytes s "UTF-8"))
+(defn- utf8-bytes [#^String s] (.getBytes s "utf8"))
 
 (defn- base64-encode [bytes] (DatatypeConverter/printBase64Binary bytes))
 
@@ -53,19 +53,17 @@
                      (str (first basic-auth) ":" (second basic-auth)))]
     (str "Basic " (base64-encode (utf8-bytes basic-auth)))))
 
-(defn- form-body [params]
-  (.getBytes (str/join "&"
-                       (mapcat (fn [[k v]]
-                                 (if (sequential? v)
-                                   (map #(str (url-encode (name %1))
-                                              "="
-                                              (url-encode (str %2)))
-                                        (repeat k) v)
-                                   [(str (url-encode (name k))
-                                         "="
-                                         (url-encode (str v)))]))
-                               params))
-             "UTF-8"))
+(defn- query-string [params]
+  (str/join "&" (mapcat (fn [[k v]]
+                          (if (sequential? v)
+                            (map #(str (url-encode (name %1))
+                                       "="
+                                       (url-encode (str %2)))
+                                 (repeat k) v)
+                            [(str (url-encode (name k))
+                                  "="
+                                  (url-encode (str v)))]))
+                        params)))
 
 (defonce default-client (atom nil))
 
@@ -79,7 +77,7 @@
     [] (locking lock
          (if-let [c @default-client] c (reset! default-client (init-client))))))
 
-(defn- coerce-req [{:keys [headers client method body
+(defn- coerce-req [{:keys [headers client method body query-params url
                            form-params basic-auth user-agent]
                     :as req}]
   (merge req  ;; TODO cookie
@@ -90,8 +88,14 @@
                             {"Authorization" (basic-auth-value basic-auth)})
                           (when user-agent
                             {"User-Agent" user-agent}))}
+         {:url (if query-params
+                 (let [idx (.indexOf ^String url (int \?))]
+                   (if (== -1 idx)
+                     (str url "?" (query-string query-params))
+                     (str url "&" (query-string query-params))))
+                 url)}
          {:body (or (when form-params
-                      (form-body form-params)) body)}
+                      (utf8-bytes (query-string form-params))) body)}
          {:client (or client (get-default-client))
           :method (or method :get)}))
 

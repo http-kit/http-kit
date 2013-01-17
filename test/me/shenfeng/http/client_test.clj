@@ -17,13 +17,16 @@
   (DELETE "/delete" [] "deleted")
   (ANY "/ua" [] (fn [req] ((-> req :headers) "user-agent")))
   (GET "/keep-alive" [] (fn [req] (-> req :params :id)))
-  (POST "/form-params" [] (fn [req] (-> req :params :param1))))
+  (ANY "/params" [] (fn [req] (-> req :params :param1))))
 
 (use-fixtures :once (fn [f]
                       (let [server (run-server (site test-routes) {:port 4347})]
                         ;; start http-kit server & jetty server
                         (run-jetty (site test-routes) {:port 14347 :join? false})
                         (try (f) (finally (server))))))
+
+(comment
+  (defonce server1 (run-server (site test-routes) {:port 4347})))
 
 (defmacro bench
   [title & forms]
@@ -51,6 +54,8 @@
             (is (= 200 (:status @r))))))
       (doseq [_ (range 0 200)]
         (is (= 200 (:status @(http/get url))))))))
+
+
 
 (deftest test-unicode-encoding
   (let [u "高性能HTTPServer和Client"
@@ -106,13 +111,21 @@
     (is (= ua (:body @(http/get url {:user-agent ua}))))
     (is (= ua (:body @(http/post url {:user-agent ua}))))))
 
+(deftest test-query-string
+  (let [p1 "this is a test"
+        query-params {:query-params {:param1 p1}}]
+    (is (= p1 (:body @(http/get "http://127.0.0.1:4347/params" query-params))))
+    (is (= p1 (:body @(http/post "http://127.0.0.1:4347/params" query-params))))
+    (is (= p1 (:body @(http/get "http://127.0.0.1:4347/params?a=b" query-params))))
+    (is (= p1 (:body @(http/post "http://127.0.0.1:4347/params?a=b" query-params))))))
+
 (deftest test-http-client-form-params
-  (let [url "http://127.0.0.1:4347/form-params"
+  (let [url "http://127.0.0.1:4347/params"
         value "value"]
     (is (= value (:body @(http/post url {:form-params {:param1 value}}))))))
 
 (deftest test-http-client-async
-  (let [url "http://127.0.0.1:4347/form-params"
+  (let [url "http://127.0.0.1:4347/params"
         p (http/post url {:form-params {:param1 "value"}}
                      (fn [{:keys [status body]}]
                        (is (= 200 status))
