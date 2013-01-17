@@ -123,23 +123,30 @@
 
 ;; run many HTTP request to detect any error
 ;; RUN it: scripts/run_http_requests
+(def chrome "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.40 Safari/537.11")
+
+(defn- callback [{:keys [status body error request]}]
+  (let [e (- (System/currentTimeMillis) (:request-start-time request))
+        url (request :url)]
+    (if error
+      (info error url)
+      (if (instance? java.io.InputStream body)
+        (info status "=====binary=====" url body)
+        (info status url "time" (str e "ms") "length: " (count body))))))
+
+(defn- get-url [url]
+  (let [s (System/currentTimeMillis)
+        options {:request-start-time (System/currentTimeMillis)
+                 :timeout 1000
+                 :user-agent chrome}]
+    (http/get url options callback)))
+
+(defn- fetch-group-urls [group-idx urls]
+  (let [s (System/currentTimeMillis)
+        requests (doall (pmap get-url urls))]
+    (doseq [r requests] @r) ; wait
+    (info group-idx "takes time" (- (System/currentTimeMillis) s))))
+
 (defn -main [& args]
-  (let [ua "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.40 Safari/537.11"
-        urls (shuffle (set (line-seq (io/reader "/tmp/urls"))))]
-    (doall
-     (map-indexed (fn [idx urls]
-                    (println urls)
-                    (let [s (System/currentTimeMillis)
-                          requests (pmap (fn [url]
-                                           (http/get url {:timeout 1000 :user-agent ua}
-                                                     (fn [{:keys [status body] :as resp}]
-                                                       (let [e (- (System/currentTimeMillis) s)]
-                                                         (if (instance? java.io.InputStream body)
-                                                           (info status "=====binary=====" url body)
-                                                           (if status
-                                                             (info status url "time" (str e "ms") "length: " (count body))
-                                                             (info url resp)))))))
-                                         urls)]
-                      (doseq [r (doall requests)] @r) ; wait
-                      (info idx "takes time" (- (System/currentTimeMillis) s))))
-                  (partition 100 urls)))))
+  (let [urls (shuffle (set (line-seq (io/reader "/tmp/urls"))))]
+    (doall (map-indexed fetch-group-urls (partition 1000 urls)))))

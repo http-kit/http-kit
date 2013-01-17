@@ -116,19 +116,18 @@
             (reify IResponseHandler
               (onSuccess [this status headers body]
                 (let [resp {:body body
+                            :request req
                             :headers (normalize-headers headers true)
                             :status status}]
-                  (try
-                    (when callback
-                      (callback resp))
-                    (finally
-                     (deliver response resp)))))
+                  (try (when callback (callback resp))
+                       (finally
+                        (deliver response resp)))))
               (onThrowable [this t]
-                (try
-                  (when-let [cb (or error-callback callback)]
-                    (cb t))
-                  (finally
-                   (deliver response t)))))))
+                (let [resp {:error t :request req}]
+                  (try (when-let [cb (or error-callback (:error-handler req) callback)]
+                         (cb resp))
+                       (finally
+                        (deliver response resp))))))))
     response))
 
 (defmacro ^{:private true} gen-method [method]
