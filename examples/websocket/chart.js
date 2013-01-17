@@ -1,10 +1,11 @@
+var conn;
 (function () {
   var $i = $('#i'),
       $history = $('#history');
 
   var max_id = 1;
 
-  var conn = new WebSocket("ws://127.0.0.1:9899/ws");
+  conn = new WebSocket("ws://127.0.0.1:9899/ws");
 
   conn.onopen = function (e) {
     conn.send(JSON.stringify({command: 'getall'}));

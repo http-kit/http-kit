@@ -2,9 +2,13 @@
 rm -rf classes
 mkdir classes
 
-find src/java -name "*.java" | xargs javac -g -Xlint:unchecked -encoding utf8 -cp "classes:lib/*:src/" -d classes -sourcepath src/java/
+CP="classes:$(lein classpath):examples/websocket/"
 
-java -cp "classes:$(lein classpath):examples/websocket/" \
+find src/java -name "*.java" | xargs javac -g -Xlint:unchecked -encoding utf8 -cp "$CP" -d classes -sourcepath src/java/
+
+java -cp "$CP" \
     clojure.main -m websocket
+
+
 
     # -Xdebug -Xrunjdwp:transport=dt_socket,address=9092,server=y,suspend=n \

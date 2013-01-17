@@ -52,6 +52,9 @@ public class WSDecoder {
             case MASKING_KEY:
                 maskingKey = buffer.getInt();
                 state = State.PAYLOAD;
+                if (opcode == OPCODE_CLOSE && payloadLength == 0) {
+                    return new CloseFrame(finalFlag, content);
+                }
                 break;
             case PAYLOAD:
                 int toRead = Math.min(buffer.remaining(), payloadLength - payloadRead);
