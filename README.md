@@ -103,18 +103,20 @@ run it:
 ;; Handle response asynchronously
 (let [options {:timeout 200             ; ms
                :basic-auth ["user" "pass"]
+               :query-params {:param "value"}
                :user-agent "User-Agent-string"
                :headers {"X-Header" "Value"}}]
-  (http/get "http://host.com/path" options {:keys [status headers body] :as resp}
-            (if status
-              (println "Async HTTP GET: " status)
-              (println "Failed, exception is " resp))))
+  (http/get "http://host.com/path" options
+            (fn [{:keys [status headers body error]}]
+              (if error
+                (println "Failed, exception is " error)
+                (println "Async HTTP GET: " status)))))
 
 ;; Synchronous
-(let [{:keys [status headers body] :as resp} @(http/get "http://host.com/path")]
-  (if status
-    (println "HTTP GET success: " status)
-    (println "Failed, exception: " resp)))
+(let [{:keys [status headers body error] :as resp} @(http/get "http://host.com/path")]
+  (if error
+    (println "Failed, exception: " error)
+    (println "HTTP GET success: " status)))
 
 ;; Concurrent HTTP requests，handle responses in a sync style
 (let [resp1 (http/get "http://host.com/path1")
@@ -123,12 +125,11 @@ run it:
   (println "Response 2's status " {:status @resp2}))
 
 ;; Form params
-(let [form-parms {:name "http-kit" :features ["async" "client" "server"]}
-      {:keys [status headers body] :as resp} (http/post "http://host.com/path1"
-                                                        {:form-parmas form-parms})]
-  (if status
-    (println "Async HTTP POST: " status)
-    (println "Failed, exception is " resp)))
+(let [options {:form-parmas {:name "http-kit" :features ["async" "client" "server"]}}
+      {:keys [status error]} @(http/post "http://host.com/path1" options)]
+  (if error
+    (println "Failed, exception is " error)
+    (println "Async HTTP POST: " status)))
 
 ```
 

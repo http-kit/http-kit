@@ -131,18 +131,20 @@ http-kit使用了和Nginx相似的并发模型，具有和Nginx相似的并发�
 ;; 异步调用，异步处理
 (let [options {:timeout 200             ; ms
                :basic-auth ["user" "pass"]
+               :query-params {:param "value"}
                :user-agent "User-Agent-string"
                :headers {"X-Header" "Value"}}]
-  (http/get "http://host.com/path" options {:keys [status headers body] :as resp}
-            (if status
-              (println "Async HTTP GET: " status)
-              (println "Failed, exception is " resp))))
+  (http/get "http://host.com/path" options
+            (fn [{:keys [status headers body error]}]
+              (if error
+                (println "Failed, exception is " error)
+                (println "Async HTTP GET: " status)))))
 
 ;; 同步调用
-(let [{:keys [status headers body] :as resp} @(http/get "http://host.com/path")]
-  (if status
-    (println "HTTP GET success: " status)
-    (println "Failed, exception: " resp)))
+(let [{:keys [status headers body error] :as resp} @(http/get "http://host.com/path")]
+  (if error
+    (println "Failed, exception: " error)
+    (println "HTTP GET success: " status)))
 
 ;; 并发调用，同步处理
 (let [resp1 (http/get "http://host.com/path1")
@@ -151,11 +153,10 @@ http-kit使用了和Nginx相似的并发模型，具有和Nginx相似的并发�
   (println "Response 2's status " {:status @resp2}))
 
 ;; Form提交
-(let [form-parms {:name "http-kit" :features ["async" "client" "server"]}
-      {:keys [status headers body] :as resp} (http/post "http://host.com/path1"
-                                                        {:form-parmas form-parms})]
-  (if status
-    (println "Async HTTP POST: " status)
-    (println "Failed, exception is " resp)))
+(let [options {:form-parmas {:name "http-kit" :features ["async" "client" "server"]}}
+      {:keys [status error]} @(http/post "http://host.com/path1" options)]
+  (if error
+    (println "Failed, exception is " error)
+    (println "Async HTTP POST: " status)))
 
 ```
