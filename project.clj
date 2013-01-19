@@ -17,11 +17,11 @@
                                   [org.slf4j/slf4j-api "1.6.4"]
                                   [ch.qos.logback/logback-classic "1.0.1"]
                                   [clj-http "0.6.0"]
+                                  [io.netty/netty "3.6.2.Final"]
                                   [org.clojure/data.json "0.1.2"]
                                   [org.jsoup/jsoup "1.7.1"]
                                   [org.clojure/tools.logging "0.2.3"]
                                   [compojure "1.0.2"]
-                                  [me.shenfeng/async-ring-adapter "1.0.1"]
                                   [org.clojure/tools.cli "0.2.1"]
                                   [ring/ring-jetty-adapter "1.1.6"]
                                   [ring/ring-core "1.1.6"]]}})

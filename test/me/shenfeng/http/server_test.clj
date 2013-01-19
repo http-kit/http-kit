@@ -9,7 +9,18 @@
         me.shenfeng.http.server)
   (:require [clj-http.client :as http]
             [clj-http.util :as u])
-  (:import [java.io File FileOutputStream FileInputStream]))
+  (:import [java.io File FileOutputStream FileInputStream]
+           me.shenfeng.http.ws.WebSocketClient))
+
+(defn- string-80k []
+  (apply str (map char
+                  (take (* 8 1024)                ; 80k
+                        (apply concat (repeat (range (int \a) (int \z))))))))
+
+;; [a..z]+
+(def const-string                       ; 8M string
+  (let [tmp (string-80k)]
+    (apply str (repeat 1024 tmp))))
 
 (defn ^File gen-tempfile
   "generate a tempfile, the file will be deleted before jvm shutdown"
@@ -18,10 +29,7 @@
                    (File/createTempFile "tmp_" extension)
                  (.deleteOnExit))]
        (with-open [w (FileOutputStream. tmp)]
-         (.write w ^bytes (byte-array size
-                                      (map (fn [i]
-                                             (byte (+ (int \a) (rem i 26))))
-                                           (range size)))))
+         (.write w ^bytes (.getBytes (subs const-string 0 size))))
        tmp)))
 
 (defn to-int [int-str] (Integer/valueOf int-str))
@@ -36,8 +44,12 @@
                   (future (respond
                            {:status 200 :body "hello async"}))))
 
-(defwshandler ws-handler [req] con
-  (on-mesg con (fn [msg] (send-mesg con msg))))
+(defn ws-handler [req]
+  (when-ws-request req con
+                   (on-mesg con (fn [msg]
+                                  (let [{:keys [length times]} (read-string msg)]
+                                    (doseq [_ (range 0 times)]
+                                      (send-mesg con (subs const-string 0 length))))))))
 
 (defn file-handler [req]
   {:status 200
@@ -116,7 +128,7 @@
     (is (= (:body resp) "Hello World"))))
 
 (deftest test-body-file
-  (doseq [length (range 1 (* 1024 1024 5) 739987)]
+  (doseq [length (range 1 (* 1024 1024 5) 1439987)]
     (let [resp (http/get "http://localhost:4347/file?l=" length)]
       (is (= (:status resp) 200))
       (is (= (get-in resp [:headers "content-type"]) "text/plain"))
@@ -129,7 +141,7 @@
     (is (:body resp))))
 
 (deftest test-body-inputstream
-  (doseq [length (range 1 (* 1024 1024 5) 739987)] ; max 5m, many files
+  (doseq [length (range 1 (* 1024 1024 5) 1439987)] ; max 5m, many files
     (let [uri (str "http://localhost:4347/inputstream?l=" length)
           resp (http/get uri)]
       (is (= (:status resp) 200))
@@ -185,6 +197,20 @@
     (is (= 200 (:status resp)))
     (is (= (str size) (:body resp)))))
 
+(deftest test-websocket
+  (let [client (WebSocketClient. "ws://localhost:4347/ws")]
+    (doseq [length (range 1 (* 1024 1024 4) 839987)]
+      (let [times (rand-int 10)]
+        ;; ask for a given length, make sure server understand it
+        (.sendMessage client (pr-str {:length length :times times}))
+        (doseq [_ (range 0 times)]
+          (is (= length (count (.getMessage client)))))))
+    (let [d (subs const-string 0 120)]
+      ;; should return pong with the same data
+      (= d (.ping client d)))
+    (.close client))) ;; server's closeFrame response is checked
+
+
 (defonce tmp-server (atom nil))
 (defn -main [& args]
   (when-let [server @tmp-server]
@@ -192,12 +218,3 @@
   (reset! tmp-server (run-server (site test-routes) {:port 4348
                                                      :queue-size 102400}))
   (println "server started at 0.0.0.0:4348"))
-
-;; (deftest test-ws
-;;   (let [resp (http/get "http://localhost:4347/ws"
-;;                        {:headers {"Sec-WebSocket-Key" "x3JJHMbDL1EzLkh9GBhXDw=="
-;;                                   "Upgrade" "websocket"
-;;                                   "Connection" "Upgrade"}})]
-;;     (is (= (:status resp) 101))
-;;     (is (:headers resp))
-;;     (is (= (:body resp) nil))))

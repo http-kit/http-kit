@@ -5,7 +5,7 @@ import me.shenfeng.http.server.ServerAtta;
 public class WsServerAtta extends ServerAtta {
 
     final public WSDecoder decoder;
-    // may write from another thread
+    // may write from another thread: app close the connection
     public volatile boolean closeOnfinish = false;
     final public WsCon con;
 

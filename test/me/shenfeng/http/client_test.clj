@@ -92,15 +92,15 @@
                                :name "jetty server"}
                               {:url "http://127.0.0.1:4347/get"
                                :name "http-kit server"}]]
-    (println (str "\nWarm up " name " by 10000 requests. "
+    (println (str "\nWarm up " name " by 4000 requests. "
                   "It may take some time\n"))
-    (doseq [_ (range 0 10000)] (clj-http/get url) (http/get url))
-    (bench "clj-http, concurrency 1, 4000 requests: "
-           (doseq [_ (range 0 4000)] (clj-http/get url)))
-    (bench "http-kit, concurrency 1, 4000 requests: "
-           (doseq [_ (range 0 4000)] @(http/get url)))
-    (bench "http-kit, concurrency 10, 4000 requests: "
-           (doseq [_ (range 0 400)]
+    (doseq [_ (range 0 4000)] (clj-http/get url) (http/get url))
+    (bench "clj-http, concurrency 1, 2000 requests: "
+           (doseq [_ (range 0 2000)] (clj-http/get url)))
+    (bench "http-kit, concurrency 1, 2000 requests: "
+           (doseq [_ (range 0 2000)] @(http/get url)))
+    (bench "http-kit, concurrency 10, 2000 requests: "
+           (doseq [_ (range 0 200)]
              (let [requests (doall (map (fn [u] (http/get u))
                                         (repeat 10 url)))]
                (doseq [r requests] @r)))))) ; wait

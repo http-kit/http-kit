@@ -2,7 +2,7 @@ task :default => :test
 
 desc "Run unit test"
 task :test do
-  sh 'rm -rf target classes && lein javac && lein test'
+  sh './scripts/javac with-test && lein test'
 end
 
 desc "Install in local repository"
@@ -20,7 +20,7 @@ end
 
 desc "Start swank server for emacs"
 task :swank do
-  sh "rm -rf classes target && lein javac && lein swank"
+  sh "./scripts/javac with-test && lein swank"
 end
 
 desc "Benchmark to an idea how fast it can run"

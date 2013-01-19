@@ -4,8 +4,7 @@
         (compojure [core :only [defroutes GET POST HEAD DELETE ANY context]]
                    [handler :only [site]]
                    [route :only [not-found]])
-        [clojure.tools.cli :only [cli]]
-        ring.adapter.netty))
+        [clojure.tools.cli :only [cli]]))
 
 (defn handler [req]
   {:status 200
@@ -21,8 +20,6 @@
 (defn start-server [{:keys [server]}]
   (let [handler (-> api-routes site)]
     (case server
-      :netty
-      (run-netty handler {:port 9091 :worder 6}) ; 4 worker; threads
       :home
       (run-server handler {:port 9091 :thread 6})
       :jetty
