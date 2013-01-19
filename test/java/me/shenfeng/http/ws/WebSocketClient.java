@@ -66,7 +66,7 @@ public class WebSocketClient {
     }
 
     public Object getMessage() throws InterruptedException {
-        WebSocketFrame frame = queue.poll(200, TimeUnit.MILLISECONDS);
+        WebSocketFrame frame = queue.poll(5, TimeUnit.SECONDS);
         if (frame instanceof TextWebSocketFrame) {
             return ((TextWebSocketFrame) frame).getText();
         }
@@ -76,7 +76,7 @@ public class WebSocketClient {
     public String ping(String data) throws Exception {
         byte[] bytes = data.getBytes();
         ch.write(new PingWebSocketFrame(ChannelBuffers.copiedBuffer(bytes)));
-        WebSocketFrame frame = queue.poll(200, TimeUnit.MILLISECONDS);
+        WebSocketFrame frame = queue.poll(5, TimeUnit.SECONDS);
         if (frame instanceof PongWebSocketFrame) {
             ChannelBuffer d = frame.getBinaryData();
             return new String(d.array(), 0, d.readableBytes());
@@ -87,7 +87,7 @@ public class WebSocketClient {
 
     public void close() throws Exception {
         ch.write(new CloseWebSocketFrame());
-        WebSocketFrame frame = queue.poll(200, TimeUnit.MILLISECONDS);
+        WebSocketFrame frame = queue.poll(5, TimeUnit.SECONDS);
         if (frame instanceof CloseWebSocketFrame) {
             ch.close();
             ch.getCloseFuture().awaitUninterruptibly();
