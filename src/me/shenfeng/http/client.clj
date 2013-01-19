@@ -7,44 +7,10 @@
            (java.net URI URLEncoder)
            me.shenfeng.http.HttpMethod))
 
-;;from clojure/contrib/strint.clj: author Chas Emerick. with minor modification
-(defn- silent-read [s]
-  (try
-    (let [r (-> s java.io.StringReader. java.io.PushbackReader.)]
-      [(read r) (slurp r)])
-    ;; this indicates an invalid form -- the head of s is just string data
-    (catch Exception e )))
+;;;; Utils
 
-(defn- interpolate
-  ([s atom?]
-     (if-let [[form rest] (silent-read (subs s (if atom? 2 1)))]
-       (cons form (interpolate (if atom? (subs rest 1) rest)))
-       (cons (subs s 0 2) (interpolate (subs s 2)))))
-  ([^String s]
-     (if-let [start (->> ["~{" "~("]
-                         (map #(.indexOf s ^String %))
-                         (remove #(== -1 %))
-                         sort
-                         first)]
-       (let [f (subs s 0 start)
-             rst (interpolate (subs s start) (= \{ (.charAt s (inc start))))]
-         (if (> (count f) 0)
-           (cons f rst)
-           rst))
-       (if (> (count s) 0) [s] []))))
-
-(defmacro << [string] `(str ~@(interpolate string)))
-
-(defn- normalize-headers [headers keywordize-headers?]
-  (reduce (fn [m [k v]]
-            (assoc m (if keywordize-headers? (keyword k) ; is lowercased
-                         k) v))
-          {} headers))
-
-(defn- url-encode [unencoded] (URLEncoder/encode unencoded "utf8"))
-
-(defn- utf8-bytes [#^String s] (.getBytes s "utf8"))
-
+(defn- utf8-bytes [s] (.getBytes         (str s) "utf8"))
+(defn- url-encode [s] (URLEncoder/encode (str s) "utf8"))
 (defn- base64-encode [bytes] (DatatypeConverter/printBase64Binary bytes))
 
 (defn- basic-auth-value [basic-auth]
@@ -53,182 +19,121 @@
                      (str (first basic-auth) ":" (second basic-auth)))]
     (str "Basic " (base64-encode (utf8-bytes basic-auth)))))
 
-(defn- query-string [params]
-  (str/join "&" (mapcat (fn [[k v]]
-                          (if (sequential? v)
-                            (map #(str (url-encode (name %1))
-                                       "="
-                                       (url-encode (str %2)))
-                                 (repeat k) v)
-                            [(str (url-encode (name k))
-                                  "="
-                                  (url-encode (str v)))]))
-                        params)))
+(defn- prepare-request-headers
+  [{:keys [headers form-params basic-auth user-agent] :as req}]
+  (merge headers
+    (when form-params {"Content-Type"  "application/x-www-form-urlencoded"})
+    (when basic-auth  {"Authorization" (basic-auth-value basic-auth)})
+    (when user-agent  {"User-Agent"    user-agent})))
 
-(defonce default-client (atom nil))
+(defn- prepare-response-headers [headers]
+  (reduce (fn [m [k v]] (assoc m (keyword k) v)) {} headers))
+
+(defn- query-string
+  "Returns URL-encoded query string for given params map."
+  [m]
+  (let [param (fn [k v]  (str (url-encode (name k)) "=" (url-encode v)))
+        join  (fn [strs] (str/join "&" strs))]
+    (join (for [[k v] m] (if (sequential? v)
+                           (join (map (partial param k) (or (seq v) [""])))
+                           (param k v))))))
+
+(comment (query-string {:k1 "v1" :k2 "v2" :k3 nil :k4 ["v4a" "v4b"] :k5 []}))
+
+(defn- coerce-req
+  [url method {:keys [body query-params form-params] :as req}]
+  (assoc req
+    :url (if query-params
+           (if (neg? (.indexOf (str url) (int \?)))
+             (str url "?" (query-string query-params))
+             (str url "&" (query-string query-params)))
+           url)
+
+    :method (case (or method :get)
+              :get     HttpMethod/GET
+              :head    HttpMethod/HEAD
+              :options HttpMethod/OPTIONS
+              :delete  HttpMethod/DELETE
+              :post    HttpMethod/POST
+              :put     HttpMethod/PUT)
+
+    :headers  (prepare-request-headers req)
+    :body     (if form-params (utf8-bytes (query-string form-params)) body)))
+
+;;;; Public API
 
 (defn init-client "Initializes and returns a new HTTP client."
-  [& {:keys [timeout user-agent keep-alive]
-      :or {timeout 40000 user-agent "http-kit/1.3" keep-alive 120000}}]
-  (HttpClient. (HttpClientConfig. timeout user-agent keep-alive)))
+   [& {:keys [timeout user-agent keep-alive]
+       :or {timeout 40000 user-agent "http-kit/2.0" keep-alive 120000}}]
+   (HttpClient. (HttpClientConfig. timeout user-agent keep-alive)))
 
-(let [lock (Object.)]
-  (defn get-default-client "Returns default HTTP client, initializing as neccesary."
-    [] (locking lock
-         (if-let [c @default-client] c (reset! default-client (init-client))))))
-
-(defn- coerce-req [{:keys [headers client method body query-params url
-                           form-params basic-auth user-agent]
-                    :as req}]
-  (merge req  ;; TODO cookie
-         {:headers (merge headers
-                          (when form-params
-                            {"Content-Type" "application/x-www-form-urlencoded"})
-                          (when basic-auth
-                            {"Authorization" (basic-auth-value basic-auth)})
-                          (when user-agent
-                            {"User-Agent" user-agent}))}
-         {:url (if query-params
-                 (let [idx (.indexOf ^String url (int \?))]
-                   (if (== -1 idx)
-                     (str url "?" (query-string query-params))
-                     (str url "&" (query-string query-params))))
-                 url)}
-         {:body (or (when form-params
-                      (utf8-bytes (query-string form-params))) body)}
-         {:client (or client (get-default-client))
-          :method (or method :get)}))
+(defonce default-client (delay (init-client)))
 
 (defn request
-  "Issues an async HTTP request and returns a promise object to which
-   <http-response> or <exception> will be delivered
-  `(callback <http-response>)` or `((or error-callback callback) <exception>)`
-   See also `request`."
-  [req & [callback error-callback]]
-  (let [{:keys [client url method headers body timeout]} (coerce-req req)
-        method (case method
-                 :get  HttpMethod/GET
-                 :head HttpMethod/HEAD
-                 :options HttpMethod/OPTIONS
-                 :delete HttpMethod/DELETE
-                 :post HttpMethod/POST
-                 :put  HttpMethod/PUT)
-        response (promise)]
+  "Issues an async HTTP request and returns a promise object to which the value
+  of `(callback {:request _ :status _ :headers _ :body _})` or
+     `(callback {:request _ :error _})` will be delivered.
+
+  When unspecified, `callback` is the identity fn.
+
+      ;; Asynchronous GET request (returns a promise)
+      (request \"http://www.cnn.com\")
+
+      ;; Asynchronous GET request with callback
+      (request \"http://www.cnn.com\" :get {}
+        (fn [{:keys [request status body headers error] :as resp}]
+          (if error
+            (do (println \"Error on\" request) error)
+            (do (println \"Success on\" request) body))))
+
+      ;; Synchronous requests
+      @(request ...) or (deref (request ...) timeout-ms timeout-val)
+
+      ;; Issue 2 concurrent requests, then wait for results
+      (let [resp1 (request ...)
+            resp2 (request ...)]
+        (println \"resp1's status: \" (:status @resp1))
+        (println \"resp2's status: \" (:status @resp2)))
+
+  Request options: :client, :timeout, :headers, :body, :query-params,
+    :form-params, :basic-auth, :user-agent"
+  [url & [method {:keys [client timeout] :as opts
+                  :or   {client @default-client}}
+          callback]]
+  (let [{:keys [url method headers body] :as req} (coerce-req url method opts)
+        response     (promise)
+        try-callback (fn [resp] (try ((or callback identity) resp)
+                                    (catch Exception e {:request req
+                                                        :error   e})))]
     (.exec ^HttpClient client url method headers body
            (or timeout -1) ; -1 for client default
            (RespListener.
             (reify IResponseHandler
               (onSuccess [this status headers body]
-                (let [resp {:body body
-                            :request req
-                            :headers (normalize-headers headers true)
-                            :status status}]
-                  (try (when callback (callback resp))
-                       (finally
-                        (deliver response resp)))))
+                (deliver response
+                         (try-callback {:request req
+                                        :body    body
+                                        :headers (prepare-response-headers
+                                                  headers)
+                                        :status  status})))
               (onThrowable [this t]
-                (let [resp {:error t :request req}]
-                  (try (when-let [cb (or error-callback (:error-handler req) callback)]
-                         (cb resp))
-                       (finally
-                        (deliver response resp))))))))
+                (deliver response (try-callback {:request req
+                                                 :error   t}))))))
     response))
 
-(defmacro ^{:private true} gen-method [method]
-  (let [key (keyword method)
-        m (str method)
-        doc (<< "Issues an asynchronous HTTP ~(str/upper-case m) request.
-  Returns a promise object to which the HTTP response or exception will be delivered
-  Optional callback and error-callback: `(callback <http-response>)` or `((or error-callback callback) <exception>)`
+(defmacro ^:private defreq [method]
+  `(defn ~method
+     ~(str "Issues an async HTTP " (str/upper-case method) " request. "
+           "See `request` for details.")
+     ~'{:arglists '([url & [opts callback]] [url & [callback]])}
+     ~'[url & [s1 s2]]
+     (if (fn? ~'s1)
+       (request ~'url ~(keyword method) {} ~'s1)
+       (request ~'url ~(keyword method) ~'s1 ~'s2))))
 
-    ;; Asynchronous
-    (~{m} url)
-
-    ;; Synchronous
-    (let [{:keys [status body headers] :as esp} @(~{m} ...)]) or
-    (deref (~{m} ...) timeout-ms timeout-val)
-
-     ;; Issue 2 concurrent ~{m} requests, then wait for results
-    (let [resp1 (~{m} ...)
-          resp2 (~{m} ...)]
-      (println \"resp1's status: \" (:status @resp1))
-      (println \"resp2's status: \" (:status @resp2)))")]
-    `(defn ~method ~doc
-       [~'url & [~'req ~'callback ~'error-callback]]    ;; ~': better names for tootls
-       (if (fn? ~'req)                        ; req is callback, shift params
-         (request {:method ~key :url ~'url} ~'req ~'callback)
-         (request (assoc ~'req :method ~key :url ~'url) ~'callback ~'error-callback)))))
-
-(gen-method get)
-(gen-method delete)
-(gen-method head)
-(gen-method post)
-(gen-method put)
-(gen-method options)
-
-(comment
-  (defn get
-    "Issues an asynchronous HTTP GET request. See `request` for more debail."
-    [url & [req callback error-callback]]
-    (if (fn? req)                        ; req is callback, shift params
-      (request {:method :get :url url} req callback)
-      (request (assoc req :method :get :url url) callback error-callback))))
-
-(comment
-  (defmacro request*
-    "Issues an asynchronous HTTP request, binds the HTTP response or exception to
-  `resp`, then executes the given handler body in the context of that binding.
-  Returns a promise object to which the HTTP response or exception will be delivered:
-
-     ;; Asynchronous
-     (request {:url \"http://www.cnn.com/\"}
-              {:keys [status body headers] :as resp}
-              (if status ; nil on exceptions
-                (do (println \"Body: \" body) body)
-                (do (println \"Exception: \" resp) resp)))
-
-     ;; Synchronous
-     (let [{:keys [status body headers] :as esp} @(request ...)]) or
-     (deref (request ...) timeout-ms timeout-val)
-
-     ;; Issue 2 concurrent requests, then wait for results
-    (let [resp1 (request ...)
-          resp2 (request ...)]
-      (println \"resp1's status: \" (:status @resp1))
-      (println \"resp2's status: \" (:status @resp2)))
-
-  See lower-level `request*` for options."
-    [options resp & handler]
-    `(request ~options (fn [~resp] ~@handler)))
-
-
-  (defmacro ^{:private true} gen-method [method]
-    (let [key (keyword method)
-          url 'url req 'req resp 'resp forms 'forms]
-      `(defmacro ~method
-         "Issues an asynchronous HTTP request. See `request` for more debail."
-         ([~url]
-            `(request {:method ~~key :url ~~url} ~'resp# nil))
-         ([~url ~req]
-            `(let [~'req# (merge {:method ~~key :url ~~url} ~~req)]
-               (request ~'req# ~'resp# nil)))
-         ([~url ~req ~resp & ~forms]
-            `(let [~'req# (merge {:method ~~key :url ~~url} ~~req)]
-               (request ~'req# ~~resp ~@~forms))))))
-
-  (gen-method get)
-  (gen-method delete)
-  (gen-method head)
-  (gen-method post)
-  (gen-method put)
-  (gen-method options)
-
-  (defmacro get
-    "Issues an asynchronous HTTP GET request. See `Request` for more debail."
-    ([url]
-       `(request {:method :get :url ~url} resp# nil))
-    ([url req]
-       `(get ~url ~req resp# nil))
-    ([url req resp & forms]
-       `(let [req# (assoc ~req :method :get :url ~url)]
-          (request req#  ~resp ~@forms)))))
+(defreq get)
+(defreq delete)
+(defreq head)
+(defreq post)
+(defreq put)
+(defreq options)
