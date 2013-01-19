@@ -15,6 +15,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Set;
@@ -145,7 +146,8 @@ public class HttpServer implements Runnable {
                 }
             } while (buffer.hasRemaining()); // consume all
         } catch (ProtocolException e) {
-            // TODO error msg
+            System.err.printf("%s [%s] WARN - %s\n", new Date(), Thread.currentThread()
+                    .getName(), e.getMessage());
             closeKey(key, CloseFrame.MESG_BIG);
         }
     }

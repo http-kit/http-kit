@@ -1,6 +1,7 @@
 package me.shenfeng.http.ws;
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 import me.shenfeng.http.ProtocolException;
 
@@ -19,11 +20,13 @@ public class WSDecoder {
 
     private State state = State.FRAME_START;
     private byte[] content;
+    private int idx = 0;
+
     private int payloadLength;
     private int payloadRead;
     private int maskingKey;
     private boolean finalFlag;
-    private int opcode;
+    private int opcode = -1;
 
     public WSFrame decode(ByteBuffer buffer) throws ProtocolException {
         while (buffer.hasRemaining()) {
@@ -31,11 +34,14 @@ public class WSDecoder {
             case FRAME_START:
                 byte b = buffer.get(); // FIN, RSV, OPCODE
                 finalFlag = (b & 0x80) != 0;
-                if (!finalFlag) {
-                    // TODO support it
-                    throw new ProtocolException("fragment frame is not supported now");
+
+                int tmpOp = b & 0x0F;
+                if (opcode != -1 && tmpOp != opcode) {
+                    // TODO ping frame in fragmented text frame
+                    throw new ProtocolException("opcode mismatch: pre: " + opcode + ", now: "
+                            + tmpOp);
                 }
-                opcode = b & 0x0F;
+                opcode = tmpOp;
                 b = buffer.get(); // MASK, PAYLOAD LEN 1
                 boolean masked = (b & 0x80) != 0;
                 payloadLength = b & 0x7F;
@@ -53,17 +59,17 @@ public class WSDecoder {
                         throw new ProtocolException(
                                 "invalid data frame length (not using minimal length encoding)");
                     }
-
-                    // TODO configurable
-                    if (length > 4194304) { // 4M, drop if message is too big
-                        // TODO report
-                        throw new ProtocolException("exceed max payload length 4M");
-                    }
-
+                    abortIfTooLarge(length);
                     payloadLength = (int) length;
                 }
 
-                content = new byte[payloadLength];
+                if (content == null) {
+                    content = new byte[payloadLength];
+                } else if (payloadLength > 0) {
+                    abortIfTooLarge(content.length + payloadLength);
+                    content = Arrays.copyOf(content, content.length + payloadLength);
+                }
+
                 if (!masked) {
                     throw new ProtocolException("unmasked client to server frame");
                 }
@@ -74,23 +80,34 @@ public class WSDecoder {
                 state = State.PAYLOAD;
                 // No break. yes
             case PAYLOAD:
-                int toRead = Math.min(buffer.remaining(), payloadLength - payloadRead);
-                buffer.get(content, payloadRead, toRead);
-                payloadRead += toRead;
-                if (payloadRead == payloadLength) {
+                int read = Math.min(buffer.remaining(), payloadLength - payloadRead);
+                if (read > 0) {
+                    buffer.get(content, idx, read);
+
                     byte[] mask = ByteBuffer.allocate(4).putInt(maskingKey).array();
-                    for (int i = 0; i < content.length; i++) {
-                        content[i] = (byte) (content[i] ^ mask[i % 4]);
+                    for (int i = 0; i < read; i++) {
+                        content[i + idx] = (byte) (content[i + idx] ^ mask[i % 4]);
                     }
-                    switch (opcode) {
-                    case OPCODE_TEXT:
-                        return new TextFrame(finalFlag, content);
-                    case OPCODE_PING:
-                        return new PingFrame(finalFlag, content);
-                    case OPCODE_CLOSE:
-                        return new CloseFrame(finalFlag, content);
-                    default:
-                        throw new ProtocolException("not impl for opcode: " + opcode);
+
+                    payloadRead += read;
+                    idx += read;
+                }
+
+                if (payloadRead == payloadLength) {
+                    if (finalFlag) {
+                        switch (opcode) {
+                        case OPCODE_TEXT:
+                            return new TextFrame(content);
+                        case OPCODE_PING:
+                            return new PingFrame(content);
+                        case OPCODE_CLOSE:
+                            return new CloseFrame(content);
+                        default:
+                            throw new ProtocolException("not impl for opcode: " + opcode);
+                        }
+                    } else {
+                        state = State.FRAME_START;
+                        payloadRead = 0;
                     }
                 }
                 break;
@@ -99,8 +116,19 @@ public class WSDecoder {
         return null;
     }
 
+    public void abortIfTooLarge(long length) throws ProtocolException {
+        // TODO configurable
+        if (length > 4194304) { // 4M, drop if message is too big
+            throw new ProtocolException("Max payload length 4m, get: " + length);
+        }
+
+    }
+
     public void reset() {
         state = State.FRAME_START;
         payloadRead = 0;
+        idx = 0;
+        opcode = -1;
+        content = null;
     }
 }

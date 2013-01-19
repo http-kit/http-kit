@@ -1,11 +1,9 @@
 package me.shenfeng.http.ws;
 
 public abstract class WSFrame {
-    public final boolean finalFrame;
     public final byte[] data;
 
-    public WSFrame(boolean finalFrame, byte data[]) {
-        this.finalFrame = finalFrame;
+    public WSFrame(byte data[]) {
         this.data = data;
     }
 }

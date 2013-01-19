@@ -45,7 +45,8 @@ public class WebSocketClientHandler extends SimpleChannelUpstreamHandler {
         }
 
         WebSocketFrame frame = (WebSocketFrame) e.getMessage();
-        queue.offer(frame);
+        if (frame != null)
+            queue.offer(frame);
     }
 
     @Override

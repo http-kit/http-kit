@@ -75,13 +75,13 @@
                               :headers {"Content-Type" "text/plain"}
                               :body "Hello World"}))
   (GET "/iseq" [] (fn [req] {:status 200
-                            :headers {"Content-Type" "text/plain"}
-                            :body (range 1 10)}))
+                             :headers {"Content-Type" "text/plain"}
+                             :body (range 1 10)}))
   (GET "/file" [] (wrap-file-info file-handler))
   (GET "/inputstream" [] inputstream-handler)
   (POST "/multipart" [] multipart-handler)
   (POST "/chunked" [] (fn [req] {:status 200
-                                :body (str (:content-length req))}))
+                                 :body (str (:content-length req))}))
   (GET "/null" [] (fn [req] {:status 200 :body nil}))
   (GET "/async" [] async-handler)
   (GET "/async-response" [] async-response-handler)
@@ -190,7 +190,7 @@
     (is (= (str title ": " size) (:body resp)))))
 
 (deftest test-client-sent-one-byte-a-time
-  (doseq [_ (range 0 5)]
+  (doseq [_ (range 0 4)]
     (let [resp (SlowHttpClient/get "http://localhost:4347/")]
       (is (re-find #"200" resp))
       (is (re-find #"hello world" resp)))))
@@ -206,17 +206,28 @@
 
 (deftest test-websocket
   (let [client (WebSocketClient. "ws://localhost:4347/ws")]
-    (doseq [length (range 1 (* 1024 1024 4) 839987)]
-      (let [times (rand-int 10)]
+    (doseq [_ (range 0 5)]
+      (let [length (rand-int (* 4 1024 1024))
+            times (rand-int 10)]
         ;; ask for a given length, make sure server understand it
         (.sendMessage client (pr-str {:length length :times times}))
         (doseq [_ (range 0 times)]
           (is (= length (count (.getMessage client)))))))
-    (let [d (subs const-string 0 120)]
-      ;; should return pong with the same data
-      (= d (.ping client d)))
     (.close client))) ;; server's closeFrame response is checked
 
+(deftest test-websocket-fragmented
+  (let [client (WebSocketClient. "ws://localhost:4347/ws")]
+    (doseq [_ (range 0 5)]
+      (let [length (rand-int 10024)]
+        ;; ask for a given length, make sure server understand it
+        (.sendFragmentedMesg client (pr-str {:length length
+                                             :times 2
+                                             :text (subs const-string 0 length)}))
+        (doseq [_ (range 0 2)]
+          (is (= length (count (.getMessage client)))))
+        (let [d (subs const-string 0 120)]
+          (= d (.ping client d)))))
+    (.close client)))
 
 (defonce tmp-server (atom nil))
 (defn -main [& args]

@@ -20,13 +20,13 @@ public class CloseFrame extends WSFrame {
         return ByteBuffer.allocate(2).putShort(code).array();
     }
 
-    public static final CloseFrame NORMAL = new CloseFrame(true, bytes(CLOSE_NORMAL));
-    public static final CloseFrame AWAY = new CloseFrame(true, bytes(CLOSE_AWAY));
-    public static final CloseFrame MESG_BIG = new CloseFrame(true, bytes(CLOSE_MESG_BIG));
-    public static final CloseFrame SERVER_ERROR = new CloseFrame(true, bytes(CLOSE_MESG_BIG));
+    public static final CloseFrame NORMAL = new CloseFrame(bytes(CLOSE_NORMAL));
+    public static final CloseFrame AWAY = new CloseFrame(bytes(CLOSE_AWAY));
+    public static final CloseFrame MESG_BIG = new CloseFrame(bytes(CLOSE_MESG_BIG));
+    public static final CloseFrame SERVER_ERROR = new CloseFrame(bytes(CLOSE_MESG_BIG));
 
-    public CloseFrame(boolean finalFrame, byte[] data) {
-        super(finalFrame, data);
+    public CloseFrame(byte[] data) {
+        super(data);
     }
 
     public int getStatus() {

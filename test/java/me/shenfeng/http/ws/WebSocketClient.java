@@ -65,6 +65,16 @@ public class WebSocketClient {
         ch.write(new TextWebSocketFrame(message));
     }
 
+    public void sendFragmentedMesg(String message) {
+        int l = message.length();
+        int i;
+        int f = 1001;
+        for (i = 0; i < l - f; i += f) {
+            ch.write(new TextWebSocketFrame(false, 0, message.substring(i, i + f)));
+        }
+        ch.write(new TextWebSocketFrame(message.substring(i)));
+    }
+
     public Object getMessage() throws InterruptedException {
         WebSocketFrame frame = queue.poll(5, TimeUnit.SECONDS);
         if (frame instanceof TextWebSocketFrame) {
@@ -81,7 +91,7 @@ public class WebSocketClient {
             ChannelBuffer d = frame.getBinaryData();
             return new String(d.array(), 0, d.readableBytes());
         } else {
-            throw new Exception("socket pong frame is expected");
+            throw new Exception("pong frame expected, instead of " + frame);
         }
     }
 
@@ -91,6 +101,7 @@ public class WebSocketClient {
         if (frame instanceof CloseWebSocketFrame) {
             ch.close();
             ch.getCloseFuture().awaitUninterruptibly();
+            bootstrap.releaseExternalResources();
         } else {
             throw new Exception("CloseWebSocketFrame excepted");
         }
