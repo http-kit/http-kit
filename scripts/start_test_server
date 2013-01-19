@@ -1,12 +1,13 @@
 #!/bin/bash
-rm -rf classes target
-mkdir classes
-mkdir target
+rm -rf target && mkdir -p target/classes
 
-CP="classes:$(lein classpath)"
+CP=`lein classpath`
+find src/java -name "*.java" | xargs javac -Xlint:unchecked -target 1.6 -source 1.6 -encoding utf8 -cp $CP -d target/classes -sourcepath src/java/
 
-find src/java -name "*.java" | xargs javac -g -Xlint:unchecked -encoding utf8 -cp "$CP" -d classes -sourcepath src/java/
+echo "compile java test code"
+find test/java -name "*.java" | xargs javac -g -Xlint:unchecked -target 1.6 -source 1.6 -encoding utf8 -cp $CP -d target/classes -sourcepath test/java
 
-java -cp "$CP" clojure.main -m me.shenfeng.http.server-test
+java -cp "$CP" \
+    clojure.main -m me.shenfeng.http.server-test
 
     # -Xdebug -Xrunjdwp:transport=dt_socket,address=9092,server=y,suspend=n \

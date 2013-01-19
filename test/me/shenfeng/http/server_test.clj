@@ -10,6 +10,7 @@
   (:require [clj-http.client :as http]
             [clj-http.util :as u])
   (:import [java.io File FileOutputStream FileInputStream]
+           me.shenfeng.http.SlowHttpClient
            me.shenfeng.http.ws.WebSocketClient))
 
 (defn- string-80k []
@@ -187,6 +188,12 @@
                                      {:name "file" :content (gen-tempfile size ".jpg")}]})]
     (is (= (:status resp) 200))
     (is (= (str title ": " size) (:body resp)))))
+
+(deftest test-client-sent-one-byte-a-time
+  (doseq [_ (range 0 5)]
+    (let [resp (SlowHttpClient/get "http://localhost:4347/")]
+      (is (re-find #"200" resp))
+      (is (re-find #"hello world" resp)))))
 
 (deftest test-chunked-encoding
   (let [size 4194304

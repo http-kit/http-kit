@@ -34,9 +34,9 @@ public class HttpUtils {
     // Colon ':'
     public static final byte COLON = 58;
 
-    public static final byte CR = 13;
+    public static final byte CR = 13; // \r
 
-    public static final byte LF = 10;
+    public static final byte LF = 10;  // \n
 
     public static final int MAX_LINE = 4096;
 

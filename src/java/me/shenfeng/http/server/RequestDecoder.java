@@ -199,9 +199,8 @@ public class RequestDecoder {
         while (buffer.hasRemaining() && more) {
             b = buffer.get();
             if (b == CR) {
-                more = false;
-                if (buffer.hasRemaining()) {
-                    buffer.get(); // LF
+                if (buffer.hasRemaining() && buffer.get() == LF) {
+                    more = false;
                 }
             } else if (b == LF) {
                 more = false;
