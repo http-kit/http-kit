@@ -41,7 +41,7 @@
 (comment (query-string {:k1 "v1" :k2 "v2" :k3 nil :k4 ["v4a" "v4b"] :k5 []}))
 
 (defn- coerce-req
-  [url method {:keys [body query-params form-params] :as req}]
+  [{:keys [url method body query-params form-params] :as req}]
   (assoc req
     :url (if query-params
            (if (neg? (.indexOf (str url) (int \?)))
@@ -77,10 +77,10 @@
   When unspecified, `callback` is the identity fn.
 
       ;; Asynchronous GET request (returns a promise)
-      (request \"http://www.cnn.com\")
+      (request {:url \"http://www.cnn.com\"})
 
       ;; Asynchronous GET request with callback
-      (request \"http://www.cnn.com\" :get {}
+      (request {:method \"http://www.cnn.com\" :get}
         (fn [{:keys [request status body headers error] :as resp}]
           (if error
             (do (println \"Error on\" request) error)
@@ -97,10 +97,8 @@
 
   Request options: :client, :timeout, :headers, :body, :query-params,
     :form-params, :basic-auth, :user-agent"
-  [url & [method {:keys [client timeout] :as opts
-                  :or   {client @default-client}}
-          callback]]
-  (let [{:keys [url method headers body] :as req} (coerce-req url method opts)
+  [{:keys [client timeout] :or {client @default-client} :as opts} callback]
+  (let [{:keys [url method headers body] :as req} (coerce-req opts)
         response     (promise)
         try-callback (fn [resp] (try ((or callback identity) resp)
                                     (catch Exception e {:request req
@@ -128,8 +126,8 @@
      ~'{:arglists '([url & [opts callback]] [url & [callback]])}
      ~'[url & [s1 s2]]
      (if (fn? ~'s1)
-       (request ~'url ~(keyword method) {} ~'s1)
-       (request ~'url ~(keyword method) ~'s1 ~'s2))))
+       (request {:url ~'url :method ~(keyword method)} ~'s1)
+       (request (merge ~'s1 {:url ~'url :method ~(keyword method)}) ~'s2))))
 
 (defreq get)
 (defreq delete)

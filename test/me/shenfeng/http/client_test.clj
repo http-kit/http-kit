@@ -39,10 +39,12 @@
 (deftest test-http-client
   (doseq [host ["http://127.0.0.1:4347" "http://127.0.0.1:14347"]]
     (is (= 200 (:status @(http/get (str host "/get") (fn [resp]
-                                                       (is (= 200 (:status resp))))))))
+                                                       (is (= 200 (:status resp)))
+                                                       resp)))))
     (is (= 404 (:status @(http/get (str host "/404")))))
     (is (= 200 (:status @(http/post (str host "/post") (fn [resp]
-                                                         (is (= 200 (:status resp))))))))
+                                                         (is (= 200 (:status resp)))
+                                                         resp)))))
     (is (= 200 (:status @(http/delete (str host "/delete")))))
     (is (= 200 (:status @(http/head (str host "/get")))))
     (is (= 200 (:status @(http/post (str host "/post")))))
@@ -81,8 +83,9 @@
     (doseq [ids (partition 10 (range 0 300))]
       (let [requests (doall (map (fn [id]
                                    (http/get (str url id)
-                                             (fn [{:keys [body]}]
-                                               (is (= (str id) body)))))
+                                             (fn [{:keys [body] :as resp}]
+                                               (is (= (str id) body))
+                                               resp)))
                                  ids))]
         (doseq [r requests]
           (is (= 200 (:status @r))))))))
