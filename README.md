@@ -28,7 +28,7 @@ High performance, low resources usage, designed with server side use in mind
 
 ### HTTP Server
 ```clj
-[me.shenfeng/http-kit "2.0-SNAPSHOT"]
+[me.shenfeng/http-kit "2.0-rc1"]
 
 (:use me.shenfeng.http.server)          ; export run-server and defasync
 
@@ -184,16 +184,16 @@ I write it for the HTTP server and HTTP client of [Rssminer](http://rssminer.net
 * 1.2   Fix content-type for multipart/form-data
 
 
-#### 2.0 (not released yet, comming soon)
+#### 2.0-rc1 (2013/1/20)
 
 HTTP Server:
   1. Support HTTP/1.0 keep-alive
   2. Better error reporting
   3. Better serving larget file(mmap),
   4. `:queue-size` option to protect high traffic web server
-  5. API redisign: `async-response` and `if-ws-request` for better flexibility. Thanks [Peter Taoussanis](https://github.com/ptaoussanis)
+  5. API redisign: `async-response` and `if-ws-request` for better flexibility
 
 HTTP Client:
-  1. API redesign: by using promise, support both sync and async call. Thanks [Peter Taoussanis](https://github.com/ptaoussanis)
+  1. API redesign: by using promise and callback, support both sync and async call
   2. Timeout per request
   3. Support keep-alive

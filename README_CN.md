@@ -29,7 +29,7 @@ http-kit使用了和Nginx相似的并发模型，具有和Nginx相似的并发�
 
 ```clj
 ;; 在project.clj中添加依赖
-[me.shenfeng/http-kit "2.0-SNAPSHOT"]
+[me.shenfeng/http-kit "2.0-rc1"]
 [compojure "1.1.1"]
 
 ;;; 引入依赖
