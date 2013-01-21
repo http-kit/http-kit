@@ -51,7 +51,7 @@ High performance, low resources usage, designed with server side use in mind
 (:use me.shenfeng.http.server)
 
 (defn chat-handler [req]
-  (if-ws-request con
+  (if-ws-request req con
                  (on-mesg con (fn [msg]
                                 ;; echo back
                                 (send-mesg con msg)))))
@@ -74,8 +74,9 @@ run it:
 (:use me.shenfeng.http.server)
 
 (defn async-handler [req]
-  (async-response respond!
-                  (future (respond! "hello world async"))))
+  ; respond is a function, can be called on any thread to send the response to client
+  (async-response respond
+                  (future (respond "hello world async"))))
 
 (run-server async-handler {:port 8080})
 ```
@@ -186,14 +187,20 @@ I write it for the HTTP server and HTTP client of [Rssminer](http://rssminer.net
 
 #### 2.0-rc1 (2013/1/20)
 
-HTTP Server:
+HTTP server:
   1. Support HTTP/1.0 keep-alive
   2. Better error reporting
   3. Better serving larget file(mmap),
   4. `:queue-size` option to protect high traffic web server
   5. API redisign: `async-response` and `if-ws-request` for better flexibility
 
-HTTP Client:
+HTTP client:
   1. API redesign: by using promise and callback, support both sync and async call
   2. Timeout per request
   3. Support keep-alive
+
+### 2.0(not released yet)
+
+HTTP client:
+   1. :filter option
+   2. async request with callback, in callback, a async request is issued

@@ -2,10 +2,11 @@
   (:refer-clojure :exclude [get])
   (:require [clojure.string :as str])
   (:import [me.shenfeng.http.client HttpClientConfig HttpClient
-            IResponseHandler RespListener RespListener$IFilter]
-           javax.xml.bind.DatatypeConverter
-           (java.net URI URLEncoder)
-           me.shenfeng.http.HttpMethod))
+            IResponseHandler RespListener IFilter]
+           [java.net URI URLEncoder]
+           [me.shenfeng.http HttpMethod PrefixThreafFactory]
+           [java.util.concurrent ThreadPoolExecutor LinkedBlockingQueue TimeUnit]
+           javax.xml.bind.DatatypeConverter))
 
 ;;;; Utils
 
@@ -44,11 +45,10 @@
   [{:keys [url method body query-params form-params] :as req}]
   (assoc req
     :url (if query-params
-           (if (neg? (.indexOf (str url) (int \?)))
+           (if (neg? (.indexOf ^String url (int \?)))
              (str url "?" (query-string query-params))
              (str url "&" (query-string query-params)))
            url)
-
     :method (case (or method :get)
               :get     HttpMethod/GET
               :head    HttpMethod/HEAD
@@ -60,11 +60,18 @@
     :headers  (prepare-request-headers req)
     :body     (if form-params (utf8-bytes (query-string form-params)) body)))
 
+;; issue blocking request in callback will deadlock. detach callback from
+;; epoll thread fix it.
+(def default-pool (let [max (.availableProcessors (Runtime/getRuntime))
+                        queue (LinkedBlockingQueue.)
+                        factory (PrefixThreafFactory. "client-worker-")]
+                    (ThreadPoolExecutor. 0 max 60 TimeUnit/SECONDS queue factory)))
+
 ;;;; Public API
 
 (defn init-client "Initializes and returns a new HTTP client."
    [& {:keys [timeout user-agent keep-alive]
-       :or {timeout 40000 user-agent "http-kit/2.0" keep-alive 120000}}]
+       :or {timeout 60000 user-agent "http-kit/2.0" keep-alive 120000}}]
    (HttpClient. (HttpClientConfig. timeout user-agent keep-alive)))
 
 (defonce default-client (delay (init-client)))
@@ -96,27 +103,23 @@
         (println \"resp2's status: \" (:status @resp2)))
 
   Request options: :client, :timeout, :headers, :body, :query-params,
-    :form-params, :basic-auth, :user-agent"
-  [{:keys [client timeout] :or {client @default-client} :as opts} callback]
-  (let [{:keys [url method headers body] :as req} (coerce-req opts)
-        response     (promise)
-        try-callback (fn [resp] (try ((or callback identity) resp)
-                                    (catch Exception e {:request req
-                                                        :error   e})))]
-    (.exec ^HttpClient client url method headers body
-           (or timeout -1) ; -1 for client default
-           (RespListener.
-            (reify IResponseHandler
-              (onSuccess [this status headers body]
-                (deliver response
-                         (try-callback {:request req
-                                        :body    body
-                                        :headers (prepare-response-headers
-                                                  headers)
-                                        :status  status})))
-              (onThrowable [this t]
-                (deliver response (try-callback {:request req
-                                                 :error   t}))))))
+    :form-params, :basic-auth, :user-agent :filter :worker-pool"
+  [{:keys [client timeout filter worker-pool] :as opts
+    :or {client @default-client timeout -1 filter IFilter/ACCEPT_ALL worker-pool default-pool}}
+   callback]
+  (let [callback (or callback identity)
+        {:keys [url method headers body] :as req} (coerce-req opts)
+        response (promise)
+        handler (reify IResponseHandler
+                  (onSuccess [this status headers body]
+                    (deliver response (callback {:request req
+                                                 :body    body
+                                                 :headers (prepare-response-headers headers)
+                                                 :status  status})))
+                  (onThrowable [this t]
+                    (deliver response (callback {:request req :error t}))))
+        listener (RespListener. handler filter worker-pool)]
+    (.exec ^HttpClient client url method headers body timeout listener)
     response))
 
 (defmacro ^:private defreq [method]

@@ -10,6 +10,7 @@ import java.net.UnknownHostException;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import junit.framework.Assert;
@@ -70,7 +71,8 @@ public class HttpClientTest {
     public void setup() throws IOException {
         emptyHeader = new TreeMap<String, String>();
         cd = new CountDownLatch(1);
-        listener = new RespListener(new ResponseHandler(cd));
+        listener = new RespListener(new ResponseHandler(cd), IFilter.ACCEPT_ALL,
+                Executors.newCachedThreadPool());
     }
 
     @After

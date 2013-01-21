@@ -6,6 +6,8 @@ import java.net.UnknownHostException;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import me.shenfeng.http.HttpMethod;
 
@@ -44,20 +46,22 @@ public class TextClientTest {
     private void runIt(String[] urls) throws URISyntaxException, UnknownHostException,
             InterruptedException {
         CountDownLatch latch = new CountDownLatch(urls.length);
+        ExecutorService pool = Executors.newCachedThreadPool();
         for (String url : urls) {
             TreeMap<String, String> header = new TreeMap<String, String>();
-            client.exec(url, HttpMethod.GET, header, null, -1, new RespListener(
-                    new IResponseHandler() {
 
-                        public void onThrowable(Throwable t) {
-                            t.printStackTrace();
-                        }
+            IResponseHandler handler = new IResponseHandler() {
 
-                        public void onSuccess(int status, Map<String, String> headers,
-                                Object body) {
-                            System.out.println(body);
-                        }
-                    }));
+                public void onThrowable(Throwable t) {
+                    t.printStackTrace();
+                }
+
+                public void onSuccess(int status, Map<String, String> headers, Object body) {
+                    System.out.println(body);
+                }
+            };
+            client.exec(url, HttpMethod.GET, header, null, -1, new RespListener(handler,
+                    IFilter.ACCEPT_ALL, pool));
         }
 
         latch.await();

@@ -13,6 +13,7 @@ import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.ExecutorService;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.DeflaterInputStream;
@@ -24,6 +25,45 @@ import me.shenfeng.http.HttpStatus;
 import me.shenfeng.http.HttpUtils;
 import me.shenfeng.http.HttpVersion;
 import me.shenfeng.http.ProtocolException;
+
+class Handler implements Runnable {
+
+    private final int status;
+    private final Map<String, String> headers;
+    private final Object body;
+    private final Throwable e;
+    private final IResponseHandler handler;
+
+    public Handler(IResponseHandler handler, int status, Map<String, String> headers,
+            Object body, Throwable e) {
+        this.status = status;
+        this.headers = headers;
+        this.body = body;
+        this.e = e;
+        this.handler = handler;
+    }
+
+    public Handler(IResponseHandler handler, Throwable e) {
+        this(handler, 0, null, null, e);
+    }
+
+    public Handler(IResponseHandler handler, int status, Map<String, String> headers,
+            Object body) {
+        this(handler, status, headers, body, null);
+    }
+
+    public void run() {
+        try {
+            if (e != null) {
+                handler.onThrowable(e);
+            } else {
+                handler.onSuccess(status, headers, body);
+            }
+        } catch (Exception e) {
+            HttpUtils.printError("handle response, please catch it", e);
+        }
+    }
+}
 
 /**
  * Accumulate all the response, call upper logic at once, for easy use
@@ -122,26 +162,6 @@ public class RespListener implements IRespListener {
         return result == null ? UTF_8 : result;
     }
 
-    public static interface IFilter {
-        public final static IFilter ACCEPT_ALL = new IFilter() {
-            public boolean accept(DynamicBytes partialBody) {
-                return true;
-            }
-
-            public boolean accept(Map<String, String> headers) {
-                return true;
-            }
-
-            public String toString() {
-                return "Response Filter: ACCEPT all response";
-            };
-        };
-
-        public boolean accept(Map<String, String> headers);
-
-        public boolean accept(DynamicBytes partialBody);
-    }
-
     private final DynamicBytes body;
 
     // can be empty
@@ -149,15 +169,13 @@ public class RespListener implements IRespListener {
     private HttpStatus status;
     private final IResponseHandler handler;
     private final IFilter filter;
+    private final ExecutorService pool;
 
-    public RespListener(IResponseHandler handler, IFilter filter) {
+    public RespListener(IResponseHandler handler, IFilter filter, ExecutorService pool) {
         body = new DynamicBytes(1024 * 16);
         this.filter = filter;
         this.handler = handler;
-    }
-
-    public RespListener(IResponseHandler handler) {
-        this(handler, IFilter.ACCEPT_ALL);
+        this.pool = pool;
     }
 
     public void onBodyReceived(byte[] buf, int length) throws AbortException {
@@ -169,7 +187,8 @@ public class RespListener implements IRespListener {
 
     public void onCompleted() {
         if (status == null) {
-            handler.onThrowable(new ProtocolException("No status"));
+            // if blocking request in callback, will deadlock
+            pool.submit(new Handler(handler, new ProtocolException("No status")));
             return;
         }
         try {
@@ -177,10 +196,10 @@ public class RespListener implements IRespListener {
             if (isText()) {
                 Charset charset = detectCharset(headers, body);
                 String html = new String(bytes.get(), 0, bytes.length(), charset);
-                handler.onSuccess(status.getCode(), headers, html);
+                pool.submit(new Handler(handler, status.getCode(), headers, html));
             } else {
                 BytesInputStream is = new BytesInputStream(bytes.get(), 0, bytes.length());
-                handler.onSuccess(status.getCode(), headers, is);
+                pool.submit(new Handler(handler, status.getCode(), headers, is));
             }
         } catch (IOException e) {
             handler.onThrowable(e);
@@ -188,7 +207,7 @@ public class RespListener implements IRespListener {
     }
 
     public void onThrowable(Throwable t) {
-        handler.onThrowable(t);
+        pool.submit(new Handler(handler, t));
     }
 
     public void onHeadersReceived(Map<String, String> headers) throws AbortException {

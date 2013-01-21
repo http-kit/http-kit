@@ -145,7 +145,7 @@
   (let [e (- (System/currentTimeMillis) (:request-start-time request))
         url (request :url)]
     (if error
-      (info error url)
+      (info url error)
       (if (instance? java.io.InputStream body)
         (info status "=====binary=====" url body)
         (info status url "time" (str e "ms") "length: " (count body))))))
