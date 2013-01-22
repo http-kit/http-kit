@@ -255,7 +255,7 @@ public class HttpServer implements Runnable {
 
     public void start() throws IOException {
         bind();
-        serverThread = new Thread(this, "http-server");
+        serverThread = new Thread(this, "server-loop");
         serverThread.start();
     }
 

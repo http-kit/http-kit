@@ -48,7 +48,7 @@ public final class HttpClient implements Runnable {
     public HttpClient(HttpClientConfig config) throws IOException {
         this.config = config;
         int id = ID.incrementAndGet();
-        String name = "http-client";
+        String name = "client-loop";
         if (id > 1) {
             name = name + "#" + id;
         }

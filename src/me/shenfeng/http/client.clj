@@ -60,8 +60,8 @@
     :headers  (prepare-request-headers req)
     :body     (if form-params (utf8-bytes (query-string form-params)) body)))
 
-;; issue blocking request in callback will deadlock. detach callback from
-;; epoll thread fix it.
+;; thread pool for executing callbacks, since they may take a long time to execute.
+;; protect the IO loop thread: no starvation
 (def default-pool (let [max (.availableProcessors (Runtime/getRuntime))
                         queue (LinkedBlockingQueue.)
                         factory (PrefixThreafFactory. "client-worker-")]
