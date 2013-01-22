@@ -58,7 +58,6 @@
         (is (= 200 (:status @(http/get url))))))))
 
 
-
 (deftest test-unicode-encoding
   (let [u "高性能HTTPServer和Client"
         url "http://127.0.0.1:4347/unicode"

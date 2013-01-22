@@ -4,7 +4,7 @@
   (:import [me.shenfeng.http.client HttpClientConfig HttpClient
             IResponseHandler RespListener IFilter]
            [java.net URI URLEncoder]
-           [me.shenfeng.http HttpMethod PrefixThreafFactory]
+           [me.shenfeng.http HttpMethod PrefixThreafFactory HttpUtils]
            [java.util.concurrent ThreadPoolExecutor LinkedBlockingQueue TimeUnit]
            javax.xml.bind.DatatypeConverter))
 
@@ -107,17 +107,23 @@
   [{:keys [client timeout filter worker-pool] :as opts
     :or {client @default-client timeout -1 filter IFilter/ACCEPT_ALL worker-pool default-pool}}
    callback]
-  (let [callback (or callback identity)
-        {:keys [url method headers body] :as req} (coerce-req opts)
+  (let [{:keys [url method headers body] :as req} (coerce-req opts)
         response (promise)
+        deliver-resp #(deliver response ;; deliver the result
+                               (try ((or callback identity) %1)
+                                    (catch Exception e
+                                      ;; dump stacktrace to stderr
+                                      (HttpUtils/printError (str method " " url "'s callback") e)
+                                      ;; return the error
+                                      {:request opts :error e})))
         handler (reify IResponseHandler
                   (onSuccess [this status headers body]
-                    (deliver response (callback {:request req
-                                                 :body    body
-                                                 :headers (prepare-response-headers headers)
-                                                 :status  status})))
+                    (deliver-resp {:request opts
+                                   :body    body
+                                   :headers (prepare-response-headers headers)
+                                   :status  status}))
                   (onThrowable [this t]
-                    (deliver response (callback {:request req :error t}))))
+                    (deliver-resp {:request opts :error t})))
         listener (RespListener. handler filter worker-pool)]
     (.exec ^HttpClient client url method headers body timeout listener)
     response))

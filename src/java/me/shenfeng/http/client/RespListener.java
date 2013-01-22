@@ -53,14 +53,10 @@ class Handler implements Runnable {
     }
 
     public void run() {
-        try {
-            if (e != null) {
-                handler.onThrowable(e);
-            } else {
-                handler.onSuccess(status, headers, body);
-            }
-        } catch (Exception e) {
-            HttpUtils.printError("handle response, please catch it", e);
+        if (e != null) {
+            handler.onThrowable(e);
+        } else {
+            handler.onSuccess(status, headers, body);
         }
     }
 }
