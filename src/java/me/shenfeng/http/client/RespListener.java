@@ -175,10 +175,10 @@ public class RespListener implements IRespListener {
     }
 
     public void onBodyReceived(byte[] buf, int length) throws AbortException {
+        body.append(buf, 0, length);
         if (filter != null && !filter.accept(body)) {
             throw new AbortException("Regected when reading body, length: " + body.length());
         }
-        body.append(buf, 0, length);
     }
 
     public void onCompleted() {

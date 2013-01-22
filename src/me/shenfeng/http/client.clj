@@ -2,10 +2,10 @@
   (:refer-clojure :exclude [get])
   (:require [clojure.string :as str])
   (:import [me.shenfeng.http.client HttpClientConfig HttpClient
-            IResponseHandler RespListener IFilter]
-           [java.net URI URLEncoder]
+            IResponseHandler RespListener IFilter MaxBodyFilter]
            [me.shenfeng.http HttpMethod PrefixThreafFactory HttpUtils]
            [java.util.concurrent ThreadPoolExecutor LinkedBlockingQueue TimeUnit]
+           [java.net URI URLEncoder]
            javax.xml.bind.DatatypeConverter))
 
 ;;;; Utils
@@ -68,6 +68,9 @@
                     (ThreadPoolExecutor. 0 max 60 TimeUnit/SECONDS queue factory)))
 
 ;;;; Public API
+
+(defn max-body-filter "reject the connection if response's body exceeds size"
+  [size] (MaxBodyFilter. (int size)))
 
 (defn init-client "Initializes and returns a new HTTP client."
    [& {:keys [timeout user-agent keep-alive]

@@ -134,6 +134,13 @@
                        (is (= "value" body))))]
     @p)) ;; wait
 
+(deftest test-max-body-filter
+  (is (:error @(http/get "http://127.0.0.1:4347/get"
+                         ;; only accept response's length < 3
+                         {:filter (http/max-body-filter 3)})))
+  (is (:status @(http/get "http://127.0.0.1:4347/get" ; should ok
+                          {:filter (http/max-body-filter 30000)}))))
+
 ;; @(http/get "http://127.0.0.1:4348" {:headers {"Connection" "Close"}})
 
 ;; run many HTTP request to detect any error
