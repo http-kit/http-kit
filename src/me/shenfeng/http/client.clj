@@ -78,10 +78,8 @@
 
 (defn request
   "Issues an async HTTP request and returns a promise object to which the value
-  of `(callback {:request _ :status _ :headers _ :body _})` or
-     `(callback {:request _ :error _})` will be delivered.
-
-  When unspecified, `callback` is the identity fn.
+  of `{:request _ :cb-result _ :status _ :headers _ :body _}` or
+     `{:request _ :cb-result _ :error _ }` will be delivered.
 
       ;; Asynchronous GET request (returns a promise)
       (request {:url \"http://www.cnn.com\"})
@@ -90,8 +88,8 @@
       (request {:method \"http://www.cnn.com\" :get}
         (fn [{:keys [request status body headers error] :as resp}]
           (if error
-            (do (println \"Error on\" request) error)
-            (do (println \"Success on\" request) body))))
+            (println \"Error on\" request)
+            (println \"Success on\" request))))
 
       ;; Synchronous requests
       @(request ...) or (deref (request ...) timeout-ms timeout-val)
@@ -107,17 +105,22 @@
   [{:keys [client timeout filter worker-pool] :as opts
     :or {client @default-client timeout -1 filter IFilter/ACCEPT_ALL worker-pool default-pool}}
    callback]
-  (let [callback (or callback identity)
-        {:keys [url method headers body] :as req} (coerce-req opts)
+  (let [{:keys [url method headers body] :as req} (coerce-req opts)
         response (promise)
+        respond! (fn [http-response]
+                   (deliver response
+                            (assoc http-response
+                              :request   req
+                              :cb-result (when callback
+                                           (try (callback http-response)
+                                                (catch Exception e e))))))
+
         handler (reify IResponseHandler
                   (onSuccess [this status headers body]
-                    (deliver response (callback {:request req
-                                                 :body    body
-                                                 :headers (prepare-response-headers headers)
-                                                 :status  status})))
-                  (onThrowable [this t]
-                    (deliver response (callback {:request req :error t}))))
+                    (respond! {:body    body
+                               :headers (prepare-response-headers headers)
+                               :status  status}))
+                  (onThrowable [this t] (respond! {:error t})))
         listener (RespListener. handler filter worker-pool)]
     (.exec ^HttpClient client url method headers body timeout listener)
     response))
