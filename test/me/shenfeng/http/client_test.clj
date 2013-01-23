@@ -147,9 +147,9 @@
 ;; RUN it: scripts/run_http_requests
 (def chrome "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.40 Safari/537.11")
 
-(defn- callback [{:keys [status body error request]}]
-  (let [e (- (System/currentTimeMillis) (:request-start-time request))
-        url (request :url)]
+(defn- callback [{:keys [status body error opts]}]
+  (let [e (- (System/currentTimeMillis) (:request-start-time opts))
+        url (opts :url)]
     (if error
       (info url error)
       (if (instance? java.io.InputStream body)

@@ -91,10 +91,10 @@
 
       ;; Asynchronous GET request with callback
       (request {:method \"http://www.cnn.com\" :get}
-        (fn [{:keys [request status body headers error] :as resp}]
+        (fn [{:keys [opts status body headers error] :as resp}]
           (if error
-            (do (println \"Error on\" request) error)
-            (do (println \"Success on\" request) body))))
+            (do (println \"Error on\" opts) error)
+            (do (println \"Success on\" opts) body))))
 
       ;; Synchronous requests
       @(request ...) or (deref (request ...) timeout-ms timeout-val)
@@ -110,7 +110,7 @@
   [{:keys [client timeout filter worker-pool] :as opts
     :or {client @default-client timeout -1 filter IFilter/ACCEPT_ALL worker-pool default-pool}}
    callback]
-  (let [{:keys [url method headers body] :as req} (coerce-req opts)
+  (let [{:keys [url method headers body]} (coerce-req opts)
         response (promise)
         deliver-resp #(deliver response ;; deliver the result
                                (try ((or callback identity) %1)
@@ -118,15 +118,15 @@
                                       ;; dump stacktrace to stderr
                                       (HttpUtils/printError (str method " " url "'s callback") e)
                                       ;; return the error
-                                      {:request opts :error e})))
+                                      {:opts opts :error e})))
         handler (reify IResponseHandler
                   (onSuccess [this status headers body]
-                    (deliver-resp {:request opts
+                    (deliver-resp {:opts    opts
                                    :body    body
                                    :headers (prepare-response-headers headers)
                                    :status  status}))
                   (onThrowable [this t]
-                    (deliver-resp {:request opts :error t})))
+                    (deliver-resp {:opts opts :error t})))
         listener (RespListener. handler filter worker-pool)]
     (.exec ^HttpClient client url method headers body timeout listener)
     response))
