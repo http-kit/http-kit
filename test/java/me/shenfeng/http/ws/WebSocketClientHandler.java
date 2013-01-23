@@ -9,6 +9,7 @@ import org.jboss.netty.channel.ExceptionEvent;
 import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
 import org.jboss.netty.handler.codec.http.HttpResponse;
+import org.jboss.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import org.jboss.netty.handler.codec.http.websocketx.WebSocketClientHandshaker;
 import org.jboss.netty.handler.codec.http.websocketx.WebSocketFrame;
 import org.jboss.netty.util.CharsetUtil;
@@ -26,7 +27,6 @@ public class WebSocketClientHandler extends SimpleChannelUpstreamHandler {
 
     @Override
     public void channelClosed(ChannelHandlerContext ctx, ChannelStateEvent e) throws Exception {
-        System.out.println("WebSocket Client disconnected!");
     }
 
     @Override
@@ -34,7 +34,8 @@ public class WebSocketClientHandler extends SimpleChannelUpstreamHandler {
         Channel ch = ctx.getChannel();
         if (!handshaker.isHandshakeComplete()) {
             handshaker.finishHandshake(ch, (HttpResponse) e.getMessage());
-            System.out.println("WebSocket Client connected!");
+            // handle shake complete
+            queue.offer(new TextWebSocketFrame("onnected"));
             return;
         }
 

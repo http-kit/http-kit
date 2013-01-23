@@ -8,10 +8,10 @@
                    [route :only [not-found]])
         me.shenfeng.http.server)
   (:require [clj-http.client :as http]
+            [me.shenfeng.http.client :as client]
             [clj-http.util :as u])
   (:import [java.io File FileOutputStream FileInputStream]
-           me.shenfeng.http.SlowHttpClient
-           me.shenfeng.http.ws.WebSocketClient))
+           me.shenfeng.http.SlowHttpClient))
 
 (defn- string-80k []
   (apply str (map char
@@ -45,13 +45,6 @@
                   (future (respond
                            {:status 200 :body "hello async"}))))
 
-(defn ws-handler [req]
-  (when-ws-request req con
-                   (on-mesg con (fn [msg]
-                                  (let [{:keys [length times]} (read-string msg)]
-                                    (doseq [_ (range 0 times)]
-                                      (send-mesg con (subs const-string 0 length))))))))
-
 (defn file-handler [req]
   {:status 200
    :body (let [l (to-int (or (-> req :params :l) "5024000"))]
@@ -75,18 +68,18 @@
                               :headers {"Content-Type" "text/plain"}
                               :body "Hello World"}))
   (GET "/iseq" [] (fn [req] {:status 200
-                             :headers {"Content-Type" "text/plain"}
-                             :body (range 1 10)}))
+                            :headers {"Content-Type" "text/plain"}
+                            :body (range 1 10)}))
   (GET "/file" [] (wrap-file-info file-handler))
   (GET "/inputstream" [] inputstream-handler)
   (POST "/multipart" [] multipart-handler)
   (POST "/chunked" [] (fn [req] {:status 200
-                                 :body (str (:content-length req))}))
+                                :body (str (:content-length req))}))
   (GET "/null" [] (fn [req] {:status 200 :body nil}))
   (GET "/async" [] async-handler)
   (GET "/async-response" [] async-response-handler)
   (GET "/async-just-body" [] async-just-body)
-  (GET "/ws" [] ws-handler))
+  (ANY "*" [] (fn [req] (pr-str req))))
 
 (use-fixtures :once (fn [f]
                       (let [server (run-server
@@ -189,6 +182,17 @@
     (is (= (:status resp) 200))
     (is (= (str title ": " size) (:body resp)))))
 
+(deftest test-uri-len
+  (doseq [_ (range 0 50)]
+    (let [path (str "/abc" (subs const-string 0 (rand-int 4000)))
+          resp @(client/get (str "http://localhost:4347" path))]
+      (is (= 200 (:status resp)))
+      (is (= path (-> resp :body read-string :uri)))))
+  (doseq [_ (range 0 20)]
+    (let [path (str "/abc" (subs const-string 0 (+ (rand-int 4000) 4096)))
+          resp @(client/get (str "http://localhost:4347" path))]
+      (is (= 414 (:status resp))))))
+
 (deftest test-client-sent-one-byte-a-time
   (doseq [_ (range 0 4)]
     (let [resp (SlowHttpClient/get "http://localhost:4347/")]
@@ -203,31 +207,6 @@
                         {:body (input-stream (gen-tempfile size ".jpg"))})]
     (is (= 200 (:status resp)))
     (is (= (str size) (:body resp)))))
-
-(deftest test-websocket
-  (let [client (WebSocketClient. "ws://localhost:4347/ws")]
-    (doseq [_ (range 0 5)]
-      (let [length (rand-int (* 4 1024 1024))
-            times (rand-int 10)]
-        ;; ask for a given length, make sure server understand it
-        (.sendMessage client (pr-str {:length length :times times}))
-        (doseq [_ (range 0 times)]
-          (is (= length (count (.getMessage client)))))))
-    (.close client))) ;; server's closeFrame response is checked
-
-(deftest test-websocket-fragmented
-  (let [client (WebSocketClient. "ws://localhost:4347/ws")]
-    (doseq [_ (range 0 5)]
-      (let [length (rand-int 10024)]
-        ;; ask for a given length, make sure server understand it
-        (.sendFragmentedMesg client (pr-str {:length length
-                                             :times 2
-                                             :text (subs const-string 0 length)}))
-        (doseq [_ (range 0 2)]
-          (is (= length (count (.getMessage client)))))
-        (let [d (subs const-string 0 120)]
-          (= d (.ping client d)))))
-    (.close client)))
 
 (defonce tmp-server (atom nil))
 (defn -main [& args]

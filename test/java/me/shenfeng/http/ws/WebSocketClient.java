@@ -3,6 +3,7 @@ package me.shenfeng.http.ws;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.util.HashMap;
+import java.util.Random;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Executors;
@@ -37,7 +38,7 @@ public class WebSocketClient {
 
     public WebSocketClient(String url) throws Exception {
         bootstrap = new ClientBootstrap(new NioClientSocketChannelFactory(
-                Executors.newCachedThreadPool(), Executors.newCachedThreadPool()));
+                Executors.newFixedThreadPool(1), Executors.newFixedThreadPool(1)));
         this.uri = new URI(url);
         HashMap<String, String> customHeaders = new HashMap<String, String>();
         final WebSocketClientHandshaker handshaker = new WebSocketClientHandshakerFactory()
@@ -59,6 +60,7 @@ public class WebSocketClient {
 
         ch = future.getChannel();
         handshaker.handshake(ch).syncUninterruptibly();
+        queue.take();// wait for handshake
     }
 
     public void sendMessage(String message) {
@@ -66,11 +68,11 @@ public class WebSocketClient {
     }
 
     public void sendFragmentedMesg(String message) {
-        int l = message.length();
+        int length = message.length();
+        int frame = Math.min(4000, new Random().nextInt(length / 2) + 40);
         int i;
-        int f = 1001;
-        for (i = 0; i < l - f; i += f) {
-            ch.write(new TextWebSocketFrame(false, 0, message.substring(i, i + f)));
+        for (i = 0; i < length - frame; i += frame) {
+            ch.write(new TextWebSocketFrame(false, 0, message.substring(i, i + frame)));
         }
         ch.write(new TextWebSocketFrame(message.substring(i)));
     }
