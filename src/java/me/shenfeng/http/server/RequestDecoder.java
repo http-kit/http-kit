@@ -22,20 +22,24 @@ public class RequestDecoder {
         ALL_READ, READ_INITIAL, READ_HEADER, READ_FIXED_LENGTH_CONTENT, READ_CHUNK_SIZE, READ_CHUNKED_CONTENT, READ_CHUNK_FOOTER, READ_CHUNK_DELIMITER,
     }
 
-    HttpRequest request;
-    int readRemaining = 0;
-    byte[] content;
-    int readCount = 0;
-    private Map<String, String> headers = new TreeMap<String, String>();
-    private final int maxBody;
     private State state = State.READ_INITIAL;
+    private int readRemaining = 0; // bytes need read
+    private int readCount = 0; // already read bytes count
+
+    HttpRequest request;
+    private Map<String, String> headers = new TreeMap<String, String>();
+    byte[] content;
 
     int lineBufferIdx = 0;
-    private final byte[] lineBuffer;
+    // 1k buffer, increase as necessary;
+    private byte[] lineBuffer = new byte[1024];
+
+    private final int maxBody;
+    private final int maxLine;
 
     public RequestDecoder(int maxBody, int maxLine) {
         this.maxBody = maxBody;
-        this.lineBuffer = new byte[maxLine];
+        this.maxLine = maxLine;
     }
 
     private void createRequest(String sb) throws ProtocolException {
@@ -102,9 +106,10 @@ public class RequestDecoder {
                         throwIfBodyIsTooLarge();
                         if (content == null) {
                             content = new byte[readRemaining];
-                        } else if (content.length - readCount < readRemaining) {
-                            // expand
-                            content = Arrays.copyOf(content, readRemaining + readCount);
+                        } else if (content.length < readCount + readRemaining) {
+                            // *1.3 to protect slow client
+                            int newLength = (int) ((readRemaining + readCount) * 1.3);
+                            content = Arrays.copyOf(content, newLength);
                         }
                         state = State.READ_CHUNKED_CONTENT;
                     }
@@ -145,7 +150,6 @@ public class RequestDecoder {
         if (b == CR && buffer.hasRemaining()) {
             buffer.get(); // should be LF
         }
-        // else if (b == LF)
     }
 
     void readFixedLength(ByteBuffer buffer) {
@@ -205,8 +209,11 @@ public class RequestDecoder {
             } else if (b == LF) {
                 more = false;
             } else {
-                if (lineBufferIdx == lineBuffer.length - 2) {
+                if (lineBufferIdx == maxLine - 2) {
                     throw new LineTooLargeException("line length exceed " + lineBuffer.length);
+                }
+                if (lineBufferIdx == lineBuffer.length) {
+                    lineBuffer = Arrays.copyOf(lineBuffer, lineBuffer.length * 2);
                 }
                 lineBuffer[lineBufferIdx] = b;
                 ++lineBufferIdx;
@@ -225,6 +232,7 @@ public class RequestDecoder {
         headers = new TreeMap<String, String>();
         readCount = 0;
         content = null;
+        lineBufferIdx = 0;
     }
 
     private void throwIfBodyIsTooLarge() throws RequestTooLargeException {
