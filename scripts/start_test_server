@@ -9,4 +9,4 @@ find test/java -name "*.java" | xargs javac -g -Xlint:unchecked -target 1.6 -sou
 
 java -cp "$CP" \
     -Xdebug -Xrunjdwp:transport=dt_socket,address=9093,server=y,suspend=n \
-    clojure.main -m me.shenfeng.http.server-test
+    clojure.main -m org.httpkit.server-test

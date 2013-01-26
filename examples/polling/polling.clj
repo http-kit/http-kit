@@ -1,6 +1,6 @@
 ;;; run it: ./scripts/polling
 (ns polling
-  (:use me.shenfeng.http.server
+  (:use org.httpkit.server
         [ring.middleware.file-info :only [wrap-file-info]]
         [clojure.tools.logging :only [info]]
         [clojure.data.json :only [json-str]]

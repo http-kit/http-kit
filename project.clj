@@ -1,10 +1,10 @@
-(defproject me.shenfeng/http-kit "2.0-rc1"
+(defproject http-kit "2.0-rc1"
   :description "High-performance event-driven Clojure HTTP client/server"
   :dependencies [[org.clojure/clojure "1.4.0"]
                  [org.clojure/tools.macro "0.1.1"]]
   :warn-on-reflection true
   :min-lein-version "2.0.0"
-  :url "https://github.com/shenfeng/http-kit"
+  :url "https://github.com/http-kit/http-kit"
   :javac-options ["-source" "1.6" "-target" "1.6" "-g"]
   :java-source-paths ["src/java"]
   :test-paths ["test"]

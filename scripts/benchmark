@@ -11,7 +11,7 @@ start_server () {
         -server \
         -cp "lib/*:lib/dev/*:src:test:classes:target/classes" \
         clojure.main \
-        -m me.shenfeng.http.server.benchmark \
+        -m org.httpkit.server.benchmark \
         /dev/null $@ &
 }
 

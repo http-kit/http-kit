@@ -29,11 +29,11 @@ http-kit使用了和Nginx相似的并发模型，具有和Nginx相似的并发�
 
 ```clj
 ;; 在project.clj中添加依赖
-[me.shenfeng/http-kit "2.0-rc1"]
+[http-kit "2.0-rc1"]
 [compojure "1.1.1"]
 
 ;;; 引入依赖
-(:use me.shenfeng.http.server           ;; 引入 http-kit Server
+(:use org.httpkit.http.server           ;; 引入 http-kit Server
       compojure.core)                   ;; Router， 方便定义handler
 ```
 
@@ -119,7 +119,7 @@ http-kit使用了和Nginx相似的并发模型，具有和Nginx相似的并发�
 ## HTTP Client 用法
 
 ```clj
-(:require [me.shenfeng.http.client :as http])
+(:require [org.httpkit.client :as http])
 ; 包括 `http/get`, `http/post`, `http/put` `http/delete` `http/put`
 ```
 

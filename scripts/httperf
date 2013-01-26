@@ -12,7 +12,7 @@ CP=`lein classpath`
 find src/java -name "*.java" | xargs javac -Xlint:unchecked -encoding utf8 -cp $CP -d $TARGET -sourcepath src/java/
 find test/java -name "*.java" | xargs javac -g -Xlint:unchecked -encoding utf8 -cp $CP  -d $TARGET -sourcepath test/java
 
-java -cp "$CP:$TARGET" me.shenfeng.http.server.MultiThreadHttpServerTest &
+java -cp "$CP:$TARGET" org.httpkit.server.MultiThreadHttpServerTest &
 
 pid=$!
 

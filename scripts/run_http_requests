@@ -9,4 +9,4 @@ find src/java -name "*.java" | xargs javac -g -Xlint:unchecked -encoding utf8 -c
 
 java -cp "$CP" \
     -Xdebug -Xrunjdwp:transport=dt_socket,address=9092,server=y,suspend=n \
-    clojure.main -m me.shenfeng.http.client-test
+    clojure.main -m org.httpkit.client-test
