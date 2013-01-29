@@ -36,7 +36,7 @@ public class HttpUtils {
 
     public static final byte CR = 13; // \r
 
-    public static final byte LF = 10;  // \n
+    public static final byte LF = 10; // \n
 
     public static final int MAX_LINE = 4096;
 
@@ -123,7 +123,7 @@ public class HttpUtils {
 
     // like javascript's encodeURI
     // https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Global_Objects/encodeURI
-    public static DynamicBytes encodeURI(String url) {
+    public static String encodeURI(String url) {
         byte[] bytes = url.getBytes(UTF_8);
         DynamicBytes buffer = new DynamicBytes(bytes.length * 2);
         boolean e = true;
@@ -157,7 +157,7 @@ public class HttpUtils {
                 buffer.append(b);
             }
         }
-        return buffer;
+        return new String(buffer.get(), 0, buffer.length(), UTF_8);
     }
 
     public static int findEndOfString(String sb) {
@@ -222,7 +222,7 @@ public class HttpUtils {
     }
 
     public static String getPath(URI uri) {
-        String path = uri.getPath();
+        String path = encodeURI(uri.getPath());
         String query = uri.getRawQuery();
         if ("".equals(path))
             path = "/";

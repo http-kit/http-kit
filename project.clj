@@ -1,4 +1,4 @@
-(defproject http-kit "2.0-rc1"
+(defproject http-kit "2.0-SNAPSHOT"
   :description "High-performance event-driven Clojure HTTP client/server"
   :dependencies [[org.clojure/clojure "1.4.0"]
                  [org.clojure/tools.macro "0.1.1"]]

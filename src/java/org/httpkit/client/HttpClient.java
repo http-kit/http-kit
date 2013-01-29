@@ -31,7 +31,6 @@ import org.httpkit.HttpMethod;
 import org.httpkit.HttpUtils;
 import org.httpkit.ProtocolException;
 
-
 public final class HttpClient implements Runnable {
     private static final AtomicInteger ID = new AtomicInteger(0);
 
@@ -182,10 +181,9 @@ public final class HttpClient implements Runnable {
             headers.put("Content-Length", Integer.toString(body.length));
             length += body.length;
         }
-        DynamicBytes path = HttpUtils.encodeURI(getPath(uri));
         DynamicBytes bytes = new DynamicBytes(length);
 
-        bytes.append(method.toString()).append(SP).append(path.get(), 0, path.length());
+        bytes.append(method.toString()).append(SP).append(HttpUtils.getPath(uri));
         bytes.append(" HTTP/1.1\r\n");
         Iterator<Map.Entry<String, String>> ite = headers.entrySet().iterator();
         while (ite.hasNext()) {

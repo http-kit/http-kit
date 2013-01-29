@@ -26,4 +26,6 @@ HTTP client:
 
 HTTP client:
    1. :filter option
-   2. async request with callback, in callback, a async request is issued
+   2. fix potential deadlock: async request with callback, in callback, a async request is issued
+   3. fix url double percent encoding issue
+

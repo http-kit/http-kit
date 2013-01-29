@@ -11,7 +11,7 @@
 ;;;; Utils
 
 (defn- utf8-bytes [s] (.getBytes         (str s) "utf8"))
-(defn- url-encode [s] (URLEncoder/encode (str s) "utf8"))
+(defn url-encode [s] (URLEncoder/encode (str s) "utf8"))
 (defn- base64-encode [bytes] (DatatypeConverter/printBase64Binary bytes))
 
 (defn- basic-auth-value [basic-auth]

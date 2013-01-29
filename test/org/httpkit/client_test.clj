@@ -17,13 +17,16 @@
   (DELETE "/delete" [] "deleted")
   (ANY "/ua" [] (fn [req] ((-> req :headers) "user-agent")))
   (GET "/keep-alive" [] (fn [req] (-> req :params :id)))
+  (GET "/p" [] (fn [req] (pr-str (:params req))))
   (ANY "/params" [] (fn [req] (-> req :params :param1))))
 
 (use-fixtures :once (fn [f]
-                      (let [server (run-server (site test-routes) {:port 4347})]
-                        ;; start http-kit server & jetty server
-                        (run-jetty (site test-routes) {:port 14347 :join? false})
-                        (try (f) (finally (server))))))
+                      (let [server (run-server (site test-routes) {:port 4347})
+                            jetty (run-jetty (site test-routes) {:port 14347
+                                                                 :join? false})]
+                        (try (f) (finally
+                                  (server)
+                                  (.stop jetty))))))
 
 (comment
   (defonce server1 (run-server (site test-routes) {:port 4347})))
@@ -61,8 +64,8 @@
 (deftest test-unicode-encoding
   (let [u "高性能HTTPServer和Client"
         url "http://127.0.0.1:4347/unicode"
-        url1 (str url "?str=" u)
-        url2 (str "http://127.0.0.1:4347/unicode?str=" u)]
+        url1 (str url "?str=" (http/url-encode u))
+        url2 (str "http://127.0.0.1:4347/unicode?str=" (http/url-encode u))]
     (is (= u (:body @(http/get url1))))
     (is (= u (:body (clj-http/get url1))))
     (is (= u (:body @(http/post url {:form-params {:str u}}))))
@@ -103,7 +106,6 @@
                                         (repeat 10 url)))]
                (doseq [r requests] @r))))))
 
-
 (deftest test-http-client-user-agent
   (let [ua "test-ua"
         url "http://127.0.0.1:4347/ua"]
@@ -137,6 +139,15 @@
                          {:filter (http/max-body-filter 3)})))
   (is (:status @(http/get "http://127.0.0.1:4347/get" ; should ok
                           {:filter (http/max-body-filter 30000)}))))
+
+
+(deftest test-params
+  (let [url "http://a.com/biti?wvr=5&topnav=1&wvr=5&mod=logo#ccc"
+        params (-> @(http/get "http://127.0.0.1:4347/p"
+                              {:query-params {:try false :rt "url" :to 1 :u url}})
+                   :body read-string)]
+    (is (= url (:u params)))
+    (is (= "false" (:try params)))))
 
 ;; @(http/get "http://127.0.0.1:4348" {:headers {"Connection" "Close"}})
 

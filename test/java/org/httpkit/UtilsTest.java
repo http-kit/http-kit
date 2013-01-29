@@ -1,7 +1,5 @@
 package org.httpkit;
 
-import org.httpkit.DynamicBytes;
-import org.httpkit.HttpUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -19,19 +17,18 @@ public class UtilsTest {
         Assert.assertEquals("If-Modified-Since", HttpUtils.camelCase("if-Modified-Since"));
         Assert.assertEquals("If-Modified-Since", HttpUtils.camelCase("If-modified-Since"));
     }
-    
+
     private String encodeURI(String str) {
-        DynamicBytes db = HttpUtils.encodeURI(str);
-        return new String(db.get(), 0, db.length());
+        return HttpUtils.encodeURI(str);
     }
-    
+
     @Test
     public void testEncodeURL() {
         Assert.assertEquals("%E6%B2%88%E9%94%8B0", encodeURI("沈锋0"));
-        
+
         String all = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
         String expected = "%20!%22#$%25&'()*+,-./0123456789:;%3C=%3E?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[%5C]%5E_%60abcdefghijklmnopqrstuvwxyz%7B%7C%7D~";
-        
+
         Assert.assertEquals(expected, encodeURI(all));
     }
 }
