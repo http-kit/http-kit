@@ -11,13 +11,13 @@
   "Starts Ring-compatible HTTP server and returns a nullary function that stops
   the server."
   [handler {:keys [port thread ip max-body max-line worker-name-prefix queue-size]
-            :or   {ip "0.0.0.0"         ; which ip (if has many ips) to bind
-                   port 8090            ; which port listen incomming request
-                   thread 4             ; http worker thread count
-                   queue-size 20480     ; max job queued before reject to project self
+            :or   {ip "0.0.0.0"                 ; which ip (if has many ips) to bind
+                   port 8090                    ; which port listen incomming request
+                   thread 4                     ; http worker thread count
+                   queue-size 20480             ; max job queued before reject to project self
                    worker-name-prefix "worker-" ; woker thread name prefix
-                   max-body 8388608 ; max http body: 8m
-                   max-line 4096}}] ; max http inital line length: 4K
+                   max-body 8388608             ; max http body: 8m
+                   max-line 4096}}]             ; max http inital line length: 4K
   (let [h (RingHandler. thread handler worker-name-prefix queue-size)
         s (HttpServer. ip port h max-body max-line)]
     (.start s)
@@ -27,16 +27,18 @@
 
 (defmacro async-response
   "Wraps body so that a standard Ring response will be returned to caller when
-  `(callback-name ring-response)` is executed in any thread:
+  `(callback-name ring-response|body)` is executed in any thread:
 
-     (defn my-async-handler! [request]
-       (async-response respond
-         (future (respond {:status  200
-                            :headers {\"Content-Type\" \"text/html\"}
-                            :body    \"This is an async response!\"}))))
+    (defn my-async-handler [request]
+      (async-response respond
+        (future (respond {:status  200
+                          :headers {\"Content-Type\" \"text/html\"}
+                          :body    \"This is an async response!\"}))))
 
   The caller's request will block while waiting for a response (see
-  Ajax long polling example as one common use case)."
+  Ajax long polling example as one common use case).
+
+  Notice: The response is directly sent to client,  middlewares are not applied"
   [callback-name & body]
   `(let [data# (atom {})
          ~callback-name (fn [response#]
@@ -72,22 +74,22 @@
      (.digest md (.getBytes (str key websocket-13-guid))))))
 
 (defn on-mesg
-  "Register a function to be called when there is message from client.
-  (on-mesg ws-connection
-           (fn [message]
-             (println \"on-mesg\" message)))"
+  "Register a fn to be called when there is message from client:
+
+  (on-mesg ws-conn
+     (fn [message] (println \"on-mesg\" message)))"
   [^WsCon conn fn]  (.addRecieveListener conn fn))
 
-
 (defn on-close
-  "Register a function to be called when the connecton is closed.
-  (on-close ws-connection
-            (fn [status]
-              (println \"websocket connection closed\")))"
+  "Register a fn to be called when the connecton is closed:
+
+  (on-close ws-conn
+    (fn [status] (println \"websocket connection closed\")))"
   [^WsCon conn fn]  (.addOnCloseListener conn fn))
 
 (defn send-mesg
-  "Send message to client. Can be called on any thread.
+  "Send message to client
+
   (send-mesg ws-connection \"Message from server\")"
   [^WsCon conn msg] (.send conn msg))
 
@@ -99,15 +101,15 @@
 (defmacro if-ws-request
   "If request is a WebSocket handshake request, evaluates `then` form with
   `conn-name` binding and returns a WebSocket Upgrade response. Otherwise
-  evaluates `else` form and returns a standard Ring response.
+  evaluates `else` form and returns a standard Ring response:
 
-      (defn my-chatroom-handler [request]
-        (if-ws-request request ws-conn
-          (do (println \"New WebSocket connection:\" ws-conn)
-              (on-mesg   ws-conn (fn [message] (println \"on-mesg:\"  message)))
-              (on-close  ws-conn (fn [status]  (println \"on-close:\" status)))
-              (send-mesg ws-conn \"Welcome to the chatroom!\"))
-          (render-chatroom-view)))"
+   (defn my-chatroom-handler [request]
+     (if-ws-request request ws-conn
+       (do (println \"New WebSocket connection:\" ws-conn)
+           (on-mesg   ws-conn (fn [message] (println \"on-mesg:\"  message)))
+           (on-close  ws-conn (fn [status]  (println \"on-close:\" status)))
+           (send-mesg ws-conn \"Welcome to the chatroom!\"))
+       (deal-with-not-websocket-handshake-request)))"
   [request conn-name then else]
   `(if-let [~conn-name (:websocket ~request)]
      (if-let [key# (get-in ~request [:headers "sec-websocket-key"])]

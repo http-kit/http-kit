@@ -5,7 +5,7 @@
         (compojure [core :only [defroutes GET POST HEAD DELETE ANY context]]
                    [handler :only [site]]
                    [route :only [not-found]])
-        (clojure.tools [logging :only [info]]))
+        (clojure.tools [logging :only [info warn]]))
   (:require [org.httpkit.client :as http]
             [clojure.java.io :as io]
             [clj-http.client :as clj-http]))
@@ -155,19 +155,23 @@
 ;; RUN it: scripts/run_http_requests
 (def chrome "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.40 Safari/537.11")
 
-(defn- callback [{:keys [status body error opts]}]
+(defn- callback [{:keys [status body headers error opts]}]
   (let [e (- (System/currentTimeMillis) (:request-start-time opts))
         url (opts :url)]
-    (if error
-      (info url error)
-      (if (instance? java.io.InputStream body)
-        (info status "=====binary=====" url body)
-        (info status url "time" (str e "ms") "length: " (count body))))))
+    (when (= "deflate" (:content-encoding headers))
+      (warn status url " deflate; time" (str e "ms") "length: " (count body)))
+    (when (instance? java.io.InputStream body)
+      (warn status "=====binary=====" url body))
+    (when (string? body)
+      (info status url " time" (str e "ms") "length: " (count body)))
+    (when error
+      (warn url error))))
 
 (defn- get-url [url]
   (let [s (System/currentTimeMillis)
         options {:request-start-time (System/currentTimeMillis)
                  :timeout 1000
+                 :filter (http/max-body-filter 4194304)
                  :user-agent chrome}]
     (http/get url options callback)))
 

@@ -1,6 +1,7 @@
 package org.httpkit;
 
 import static java.lang.Character.isWhitespace;
+import static java.lang.Math.min;
 import static java.net.InetAddress.getByName;
 
 import java.io.File;
@@ -21,6 +22,8 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import clojure.lang.ISeq;
 import clojure.lang.Seqable;
@@ -340,5 +343,63 @@ public class HttpUtils {
             String value = sb.substring(valueStart, valueEnd);
             headers.put(key.toLowerCase(), value);
         }
+    }
+
+    /*----------------charset--------------------*/
+
+    public static Charset parseCharset(String type) {
+        if (type != null) {
+            try {
+                type = type.toLowerCase();
+                int i = type.indexOf(CHARSET);
+                if (i != -1) {
+                    String charset = type.substring(i + CHARSET.length()).trim();
+                    return Charset.forName(charset);
+                }
+            } catch (Exception ignore) {
+            }
+        }
+        return null;
+    }
+
+    // <?xml version='1.0' encoding='GBK'?>
+    // <?xml version="1.0" encoding="UTF-8"?>
+    static final Pattern ENCODING = Pattern.compile("encoding=('|\")([\\w|-]+)('|\")",
+            Pattern.CASE_INSENSITIVE);
+
+    private static Charset guess(String html, String patten) {
+        int idx = html.indexOf(patten);
+        if (idx != -1) {
+            int start = idx + patten.length();
+            int end = html.indexOf('"', start);
+            if (end != -1) {
+                try {
+                    return Charset.forName(html.substring(start, end));
+                } catch (Exception ignore) {
+                }
+            }
+        }
+        return null;
+    }
+
+    // unit test in utils-test.clj
+    public static Charset detectCharset(Map<String, String> headers, DynamicBytes body) {
+        Charset result = parseCharset(headers.get(CONTENT_TYPE));
+        if (result == null) {
+            // decode a little the find charset=???
+            String s = new String(body.get(), 0, min(512, body.length()), ASCII);
+            // content="text/html;charset=gb2312"
+            result = guess(s, CHARSET);
+            if (result == null) {
+                Matcher matcher = ENCODING.matcher(s); // for xml
+                if (matcher.find()) {
+                    try {
+                        result = Charset.forName(matcher.group(2));
+                    } catch (Exception ignore) {
+                    }
+                }
+            }
+        }
+        return result == null ? UTF_8 : result;
     }
 }

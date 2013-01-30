@@ -77,7 +77,7 @@ public class ClojureRing {
         }
         return status;
     }
-    
+
     public static final String CL = "Content-Length";
 
     public static ByteBuffer[] encode(int status, Map<String, Object> headers, Object body) {

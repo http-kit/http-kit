@@ -1,23 +1,16 @@
 package org.httpkit.client;
 
-import static java.lang.Math.min;
-import static org.httpkit.HttpUtils.ASCII;
-import static org.httpkit.HttpUtils.CHARSET;
 import static org.httpkit.HttpUtils.CONTENT_ENCODING;
-import static org.httpkit.HttpUtils.CONTENT_TYPE;
-import static org.httpkit.HttpUtils.UTF_8;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.zip.DeflaterInputStream;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.Inflater;
+import java.util.zip.InflaterInputStream;
 
 import org.httpkit.BytesInputStream;
 import org.httpkit.DynamicBytes;
@@ -25,7 +18,6 @@ import org.httpkit.HttpStatus;
 import org.httpkit.HttpUtils;
 import org.httpkit.HttpVersion;
 import org.httpkit.ProtocolException;
-
 
 class Handler implements Runnable {
 
@@ -66,40 +58,6 @@ class Handler implements Runnable {
  * Accumulate all the response, call upper logic at once, for easy use
  */
 public class RespListener implements IRespListener {
-    // <?xml version='1.0' encoding='GBK'?>
-    // <?xml version="1.0" encoding="UTF-8"?>
-    static final Pattern ENCODING = Pattern.compile("encoding=('|\")([\\w|-]+)('|\")",
-            Pattern.CASE_INSENSITIVE);
-
-    public static Charset parseCharset(String type) {
-        if (type != null) {
-            try {
-                type = type.toLowerCase();
-                int i = type.indexOf(CHARSET);
-                if (i != -1) {
-                    String charset = type.substring(i + CHARSET.length()).trim();
-                    return Charset.forName(charset);
-                }
-            } catch (Exception ignore) {
-            }
-        }
-        return null;
-    }
-
-    private static Charset guess(String html, String patten) {
-        int idx = html.indexOf(patten);
-        if (idx != -1) {
-            int start = idx + patten.length();
-            int end = html.indexOf('"', start);
-            if (end != -1) {
-                try {
-                    return Charset.forName(html.substring(start, end));
-                } catch (Exception ignore) {
-                }
-            }
-        }
-        return null;
-    }
 
     private boolean isText() {
         if (status == HttpStatus.OK) {
@@ -118,45 +76,31 @@ public class RespListener implements IRespListener {
 
     private DynamicBytes unzipBody() throws IOException {
         String encoding = headers.get(CONTENT_ENCODING);
-        if (encoding != null && body.length() > 0) {
-            encoding = encoding.toLowerCase();
-            ByteArrayInputStream bis = new ByteArrayInputStream(body.get(), 0, body.length());
-            DynamicBytes unzipped = new DynamicBytes(body.length() * 6);
-            boolean zipped = ("gzip".equals(encoding) || "x-gzip".equals(encoding));
-            if (zipped) {
-                headers.remove(CONTENT_ENCODING);
-            }
-            // deflate || x-deflate
-            InputStream is = zipped ? new GZIPInputStream(bis) : new DeflaterInputStream(bis);
-            byte[] buffer = new byte[4096];
-            int read;
-            while ((read = is.read(buffer)) != -1) {
-                unzipped.append(buffer, 0, read);
-            }
-            return unzipped;
+        if (encoding == null || body.length() == 0) {
+            return body;
         }
-        return body;
 
-    }
+        encoding = encoding.toLowerCase();
+        BytesInputStream bis = new BytesInputStream(body.get(), 0, body.length());
+        InputStream is;
 
-    public static Charset detectCharset(Map<String, String> headers, DynamicBytes body) {
-        Charset result = parseCharset(headers.get(CONTENT_TYPE));
-        if (result == null) {
-            // decode a little the find charset=???
-            String s = new String(body.get(), 0, min(512, body.length()), ASCII);
-            // content="text/html;charset=gb2312"
-            result = guess(s, CHARSET);
-            if (result == null) {
-                Matcher matcher = ENCODING.matcher(s);
-                if (matcher.find()) {
-                    try {
-                        result = Charset.forName(matcher.group(2));
-                    } catch (Exception ignore) {
-                    }
-                }
-            }
+        if ("gzip".equals(encoding) || "x-gzip".equals(encoding)) {
+            is = new GZIPInputStream(bis);
+        } else if ("deflate".equals(encoding) || "x-deflate".equals(encoding)) {
+            // http://stackoverflow.com/questions/3932117/handling-http-contentencoding-deflate
+            is = new InflaterInputStream(bis, new Inflater(true));
+        } else {
+            return body; // not compressed
         }
-        return result == null ? UTF_8 : result;
+
+        DynamicBytes unzipped = new DynamicBytes(body.length() * 5);
+        byte[] buffer = new byte[4096];
+        int read;
+        while ((read = is.read(buffer)) != -1) {
+            unzipped.append(buffer, 0, read);
+        }
+        is.close();
+        return unzipped;
     }
 
     private final DynamicBytes body;
@@ -191,7 +135,7 @@ public class RespListener implements IRespListener {
         try {
             DynamicBytes bytes = unzipBody();
             if (isText()) {
-                Charset charset = detectCharset(headers, body);
+                Charset charset = HttpUtils.detectCharset(headers, bytes);
                 String html = new String(bytes.get(), 0, bytes.length(), charset);
                 pool.submit(new Handler(handler, status.getCode(), headers, html));
             } else {

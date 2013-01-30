@@ -37,7 +37,7 @@ public class DynamicBytes {
 
     @Override
     public String toString() {
-        return "DynamicBytes[len=" + idx + ", cap=[" + data.length + ']';
+        return "DynamicBytes[len=" + idx + ", cap=" + data.length + ']';
     }
 
     public DynamicBytes append(byte[] d, int offset, int length) {

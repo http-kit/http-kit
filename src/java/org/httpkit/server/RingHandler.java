@@ -46,23 +46,32 @@ class HttpHandler implements Runnable {
         } else {
             headers = new TreeMap<String, Object>(headers);
         }
-        if (req.version == HttpVersion.HTTP_1_0 && req.isKeepAlive()
-                && !headers.containsKey("Connection")) {
+        if (req.version == HttpVersion.HTTP_1_0 && req.isKeepAlive()) {
             headers.put("Connection", "Keep-Alive");
         }
         return headers;
     }
 
-    private void asyncHandle(final ResponseCallback cb, final Map resp,
-            final IListenableFuture future) {
+    private boolean isBody(Object o) {
+        if (o instanceof Map && ((Map) o).containsKey(ClojureRing.STATUS)) {
+            return false;
+        }
+        return true;
+    }
+
+    private void asyncHandle(final ResponseCallback cb, final IListenableFuture future) {
         future.addListener(new Runnable() {
             public void run() {
                 Object r = future.get();
-                if (r instanceof Map) {
-                    Map resp2 = (Map) r;
-                    cb.run(encode(getStatus(resp2), getHeaders(resp2), resp2.get(BODY)));
+                if (isBody(r)) {
+                    TreeMap<String, Object> h = new TreeMap<String, Object>();
+                    // just :body, add some default value
+                    h.put("Content-Type", "text/html; charset=utf8");
+                    cb.run(encode(200, h, r));
                 } else {
-                    cb.run(encode(getStatus(resp), getHeaders(resp), r));
+                    // standard ring response, :status :header :body
+                    Map resp = (Map) r;
+                    cb.run(encode(getStatus(resp), getHeaders(resp), resp.get(BODY)));
                 }
             }
         });
@@ -74,7 +83,7 @@ class HttpHandler implements Runnable {
             if (resp != null) {
                 Object body = resp.get(BODY);
                 if (body instanceof IListenableFuture) {
-                    asyncHandle(cb, resp, (IListenableFuture) body);
+                    asyncHandle(cb, (IListenableFuture) body);
                 } else {
                     cb.run(encode(getStatus(resp), getHeaders(resp), body));
                 }
@@ -84,7 +93,7 @@ class HttpHandler implements Runnable {
             }
         } catch (Throwable e) {
             cb.run(encode(500, new TreeMap<String, Object>(), e.getMessage()));
-            HttpUtils.printError("ring handler: " + e.getMessage(), e);
+            HttpUtils.printError(req.method + " " + req.uri, e);
         }
     }
 }
@@ -93,10 +102,8 @@ public class RingHandler implements IHandler {
 
     final ExecutorService execs;
     final IFn handler;
-    final int queueSize;
 
     public RingHandler(int thread, IFn handler, String prefix, int queueSize) {
-        this.queueSize = queueSize;
         PrefixThreafFactory factory = new PrefixThreafFactory(prefix);
         BlockingQueue<Runnable> queue = new ArrayBlockingQueue<Runnable>(queueSize);
         execs = new ThreadPoolExecutor(thread, thread, 0, TimeUnit.MILLISECONDS, queue, factory);
@@ -107,8 +114,7 @@ public class RingHandler implements IHandler {
         try {
             execs.submit(new HttpHandler(req, cb, handler));
         } catch (RejectedExecutionException e) {
-            HttpUtils.printError("queue size exceeds the limit " + queueSize
-                    + ", please increase :queue-size when run-server if this happens often", e);
+            HttpUtils.printError("increase :queue-size if this happens often", e);
             cb.run(encode(503, new TreeMap<String, Object>(),
                     "Server is overloaded, please try later"));
         }
@@ -119,19 +125,23 @@ public class RingHandler implements IHandler {
     }
 
     public void handle(final WsCon con, final WSFrame frame) {
-        // TODO notify client if server is overloaded
-        execs.submit(new Runnable() {
-            public void run() {
-                try {
-                    if (frame instanceof TextFrame) {
-                        con.messageRecieved(((TextFrame) frame).getText());
-                    } else if (frame instanceof CloseFrame) {
-                        con.clientClosed(((CloseFrame) frame).getStatus());
+        try {
+            execs.submit(new Runnable() {
+                public void run() {
+                    try {
+                        if (frame instanceof TextFrame) {
+                            con.messageRecieved(((TextFrame) frame).getText());
+                        } else if (frame instanceof CloseFrame) {
+                            con.clientClosed(((CloseFrame) frame).getStatus());
+                        }
+                    } catch (Throwable e) {
+                        HttpUtils.printError("handle websocket frame " + frame, e);
                     }
-                } catch (Throwable e) {
-                    HttpUtils.printError("handle websocket frame " + frame, e);
                 }
-            }
-        });
+            });
+        } catch (RejectedExecutionException e) {
+            // TODO notify client if server is overloaded
+            HttpUtils.printError("increase :queue-size if this happens often", e);
+        }
     }
 }

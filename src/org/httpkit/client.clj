@@ -69,10 +69,10 @@
 
 ;;;; Public API
 
-(defn max-body-filter "reject the connection if response's body exceeds size"
+(defn max-body-filter "reject if response's body exceeds size in bytes"
   [size] (MaxBodyFilter. (int size)))
 
-(defn init-client "Initializes and returns a new HTTP client."
+(defn init-client "Initializes and returns a new HTTP client. Timeout: 1 minute, keep-alive: 2 minutes"
    [& {:keys [timeout user-agent keep-alive]
        :or {timeout 60000 user-agent "http-kit/2.0" keep-alive 120000}}]
    (HttpClient. (HttpClientConfig. timeout user-agent keep-alive)))
@@ -81,32 +81,33 @@
 
 (defn request
   "Issues an async HTTP request and returns a promise object to which the value
-  of `(callback {:request _ :status _ :headers _ :body _})` or
-     `(callback {:request _ :error _})` will be delivered.
+  of `(callback {:opts _ :status _ :headers _ :body _})` or
+     `(callback {:opts _ :error _})` will be delivered.
 
-  When unspecified, `callback` is the identity fn.
+  When unspecified, `callback` is the identity
 
-      ;; Asynchronous GET request (returns a promise)
-      (request {:url \"http://www.cnn.com\"})
+  ;; Asynchronous GET request (returns a promise)
+  (request {:url \"http://www.cnn.com\"})
 
-      ;; Asynchronous GET request with callback
-      (request {:method \"http://www.cnn.com\" :get}
-        (fn [{:keys [opts status body headers error] :as resp}]
-          (if error
-            (do (println \"Error on\" opts) error)
-            (do (println \"Success on\" opts) body))))
+  ;; Asynchronous GET request with callback
+  (request {:method \"http://www.cnn.com\" :get}
+    (fn [{:keys [opts status body headers error] :as resp}]
+      (if error
+        (println \"Error on\" opts)
+        (println \"Success on\" opts))))
 
-      ;; Synchronous requests
-      @(request ...) or (deref (request ...) timeout-ms timeout-val)
+  ;; Synchronous requests
+  @(request ...) or (deref (request ...) timeout-ms timeout-val)
 
-      ;; Issue 2 concurrent requests, then wait for results
-      (let [resp1 (request ...)
-            resp2 (request ...)]
-        (println \"resp1's status: \" (:status @resp1))
-        (println \"resp2's status: \" (:status @resp2)))
+  ;; Issue 2 concurrent requests, then wait for results
+  (let [resp1 (request ...)
+        resp2 (request ...)]
+    (println \"resp1's status: \" (:status @resp1))
+    (println \"resp2's status: \" (:status @resp2)))
 
-  Request options: :client, :timeout, :headers, :body, :query-params,
-    :form-params, :basic-auth, :user-agent :filter :worker-pool"
+ Request options:
+    :url :method :headers :timeout :query-params :form-params
+    :client :body :basic-auth :user-agent :filter :worker-pool"
   [{:keys [client timeout filter worker-pool] :as opts
     :or {client @default-client timeout -1 filter IFilter/ACCEPT_ALL worker-pool default-pool}}
    callback]

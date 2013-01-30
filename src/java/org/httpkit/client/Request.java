@@ -6,20 +6,19 @@ import java.nio.channels.SelectionKey;
 
 import org.httpkit.HttpMethod;
 
-
 public class Request implements Comparable<Request> {
 
     final InetSocketAddress addr;
     final Decoder decoder;
     final ByteBuffer request; // HTTP request
-    private final PriorityQueue<Request> clients;
+    private final PriorityQueue<Request> clients; // update timeout
     public final int timeOutMs;
 
-    private boolean isDone = false; // for only call once
+    private boolean isDone = false; // ensure only call once
 
-    SelectionKey key; // for timeout
+    SelectionKey key; // for timeout, close connection
 
-    private long timeoutTs;
+    private long timeoutTs; // future time this request timeout, ms
     private boolean connected = false;
 
     public Request(InetSocketAddress addr, ByteBuffer request, IRespListener handler,
@@ -33,6 +32,7 @@ public class Request implements Comparable<Request> {
     }
 
     public void onProgress(long now) {
+        // update time
         clients.remove(this);
         timeoutTs = this.timeOutMs + now;
         clients.offer(this);

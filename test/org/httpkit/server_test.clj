@@ -2,10 +2,8 @@
   (:use clojure.test
         ring.middleware.file-info
         [clojure.java.io :only [input-stream]]
-
-        (compojure [core :only [defroutes GET POST HEAD DELETE ANY context]]
-                   [handler :only [site]]
-                   [route :only [not-found]])
+        (compojure [core :only [defroutes GET POST HEAD DELETE ANY]]
+                   [handler :only [site]])
         org.httpkit.server)
   (:require [clj-http.client :as http]
             [org.httpkit.client :as client]
