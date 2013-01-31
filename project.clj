@@ -1,10 +1,10 @@
-(defproject http-kit "2.0-SNAPSHOT"
-  :description "High-performance event-driven Clojure HTTP client/server"
+(defproject http-kit "2.0.0-SNAPSHOT"
+  :description "High-performance event-driven HTTP client/server for Clojure"
   :dependencies [[org.clojure/clojure "1.4.0"]
                  [org.clojure/tools.macro "0.1.1"]]
   :warn-on-reflection true
   :min-lein-version "2.0.0"
-  :url "https://github.com/http-kit/http-kit"
+  :url "http://http-kit.org/"
   :javac-options ["-source" "1.6" "-target" "1.6" "-g"]
   :java-source-paths ["src/java"]
   :test-paths ["test"]
