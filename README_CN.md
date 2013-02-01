@@ -11,7 +11,7 @@
 
 * **性能** 第三方独立测评结果: [clojure-web-server-benchmarks](https://github.com/ptaoussanis/clojure-web-server-benchmarks)
 * 并发支持：仅需几K内存来保持一个HTTP连接，空闲连接几乎不影响latency。
-* 支持Async [HTTP长连](http://en.wikipedia.org/wiki/Comet_(programming)，实时push 更新给客户端
+* 支持Async [HTTP长连](http://en.wikipedia.org/wiki/Comet_\(programming\))，实时push 更新给客户端
 * 支持 [WebSocket](http://tools.ietf.org/html/rfc6455)，实时双向通讯
 
 ### HTTP Client
