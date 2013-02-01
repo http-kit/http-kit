@@ -17,8 +17,4 @@ public class WsServerAtta extends ServerAtta {
     public boolean isKeepAlive() {
         return !closeOnfinish;
     }
-
-    public void reset() {
-        decoder.reset();
-    }
 }

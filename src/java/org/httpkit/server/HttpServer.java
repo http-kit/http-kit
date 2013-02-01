@@ -92,7 +92,7 @@ public class HttpServer implements Runnable {
                     }
                     request.setRemoteAddr(ch.socket().getRemoteSocketAddress());
                     handler.handle(request, new ResponseCallback(key, this));
-                    atta.reset(); // support HTTP Pipelining
+                    atta.decoder.reset(); // support HTTP Pipelining
                 }
             } while (buffer.hasRemaining()); // consume all
         } catch (ProtocolException e) {
@@ -114,10 +114,10 @@ public class HttpServer implements Runnable {
                 WSFrame frame = atta.decoder.decode(buffer);
                 if (frame instanceof TextFrame) {
                     handler.handle(atta.con, frame);
-                    atta.reset();
+                    atta.decoder.reset();
                 } else if (frame instanceof PingFrame) {
                     atta.addBuffer(WSEncoder.encode(WSDecoder.OPCODE_PONG, frame.data));
-                    atta.reset();
+                    atta.decoder.reset();
                     key.interestOps(OP_WRITE);
                 } else if (frame instanceof CloseFrame) {
                     handler.handle(atta.con, frame);
@@ -165,6 +165,7 @@ public class HttpServer implements Runnable {
                 toWrites.toArray(buffers);
                 ch.write(buffers);
                 if (!buffers[buffers.length - 1].hasRemaining()) {
+                    toWrites.clear();
                     if (atta.isKeepAlive()) {
                         key.interestOps(OP_READ);
                     } else {
