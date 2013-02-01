@@ -4,31 +4,22 @@ import static java.lang.System.currentTimeMillis;
 import static java.nio.channels.SelectionKey.OP_CONNECT;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
-import static org.httpkit.HttpUtils.*;
+import static org.httpkit.HttpUtils.BUFFER_SIZE;
+import static org.httpkit.HttpUtils.SP;
+import static org.httpkit.HttpUtils.getServerAddr;
 import static org.httpkit.client.State.ALL_READ;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.UnknownHostException;
+import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Queue;
-import java.util.Set;
-import java.util.TreeMap;
+import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.httpkit.DynamicBytes;
-import org.httpkit.HTTPException;
-import org.httpkit.HttpMethod;
-import org.httpkit.HttpUtils;
+import org.httpkit.*;
 import org.httpkit.ProtocolException;
 
 public final class HttpClient implements Runnable {
@@ -135,9 +126,9 @@ public final class HttpClient implements Runnable {
         Request req = (Request) key.attachment();
         SocketChannel ch = (SocketChannel) key.channel();
         try {
-            ByteBuffer request = req.request;
+            ByteBuffer[] request = req.request;
             ch.write(request);
-            if (!request.hasRemaining()) {
+            if (!request[request.length - 1].hasRemaining()) {
                 key.interestOps(OP_READ);
             }
         } catch (IOException e) {
@@ -146,9 +137,9 @@ public final class HttpClient implements Runnable {
         }
     }
 
-    public void exec(String url, HttpMethod method, Map<String, String> headers, byte[] body,
+    public void exec(String url, HttpMethod method, Map<String, Object> headers, Object body,
             int timeoutMs, IRespListener cb) {
-        URI uri = null;
+        URI uri;
         try {
             uri = new URI(url);
         } catch (URISyntaxException e) {
@@ -160,14 +151,16 @@ public final class HttpClient implements Runnable {
             return;
         }
 
-        // copy to modify, normalize header
-        TreeMap<String, String> tmp = new TreeMap<String, String>();
-        if (headers != null) {
-            for (Entry<String, String> e : headers.entrySet()) {
-                tmp.put(HttpUtils.camelCase(e.getKey()), e.getValue());
-            }
+        InetSocketAddress addr;
+        try {
+            addr = getServerAddr(uri);
+        } catch (UnknownHostException e) {
+            cb.onThrowable(e);
+            return;
         }
-        headers = tmp;
+
+        // copy to modify, normalize header
+        headers = HttpUtils.camelCase(headers);
         headers.put("Host", HttpUtils.getHost(uri));
         headers.put("Accept", "*/*");
 
@@ -176,38 +169,40 @@ public final class HttpClient implements Runnable {
         if (!headers.containsKey("Accept-Encoding"))
             headers.put("Accept-Encoding", "gzip, deflate");
 
-        int length = 64 + headers.size() * 48;
-        if (body != null) {
-            headers.put("Content-Length", Integer.toString(body.length));
-            length += body.length;
+        ByteBuffer request[];
+        try {
+            request = encode(method, headers, body, uri);
+        } catch (IOException e) {
+            cb.onThrowable(e);
+            return;
         }
-        DynamicBytes bytes = new DynamicBytes(length);
-
-        bytes.append(method.toString()).append(SP).append(HttpUtils.getPath(uri));
-        bytes.append(" HTTP/1.1\r\n");
-        Iterator<Map.Entry<String, String>> ite = headers.entrySet().iterator();
-        while (ite.hasNext()) {
-            Map.Entry<String, String> e = ite.next();
-            if (e.getValue() != null) {
-                bytes.append(e.getKey()).append(COLON).append(SP).append(e.getValue());
-                bytes.append(CR).append(LF);
-            }
-        }
-        bytes.append(CR).append(LF);
-        if (body != null) {
-            bytes.append(body, 0, body.length);
-        }
-
-        ByteBuffer request = ByteBuffer.wrap(bytes.get(), 0, bytes.length());
         if (timeoutMs == -1) {
             timeoutMs = config.timeOutMs;
         }
-        try {
-            InetSocketAddress addr = getServerAddr(uri); // Maybe slow
-            pendings.offer(new Request(addr, request, cb, requests, timeoutMs, method));
-            selector.wakeup();
-        } catch (UnknownHostException e) {
-            cb.onThrowable(e);
+
+        pendings.offer(new Request(addr, request, cb, requests, timeoutMs, method));
+        selector.wakeup();
+    }
+
+    private ByteBuffer[] encode(HttpMethod method, Map<String, Object> headers, Object body,
+            URI uri) throws IOException {
+        ByteBuffer bodyBuffer = HttpUtils.bodyBuffer(body);
+
+        if (body != null) {
+            headers.put("Content-Length", Integer.toString(bodyBuffer.remaining()));
+        } else {
+            headers.put("Content-Length", "0");
+        }
+        DynamicBytes bytes = new DynamicBytes(196);
+        bytes.append(method.toString()).append(SP).append(HttpUtils.getPath(uri));
+        bytes.append(" HTTP/1.1\r\n");
+        HttpUtils.encodeHeaders(bytes, headers);
+        ByteBuffer headBuffer = ByteBuffer.wrap(bytes.get(), 0, bytes.length());
+
+        if (bodyBuffer == null) {
+            return new ByteBuffer[] { headBuffer };
+        } else {
+            return new ByteBuffer[] { headBuffer, bodyBuffer };
         }
     }
 

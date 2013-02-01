@@ -2,13 +2,9 @@ package org.httpkit.client;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.Proxy;
+import java.net.*;
 import java.net.Proxy.Type;
-import java.net.URISyntaxException;
-import java.net.UnknownHostException;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -17,11 +13,6 @@ import junit.framework.Assert;
 
 import org.apache.commons.io.IOUtils;
 import org.httpkit.HttpMethod;
-import org.httpkit.client.HttpClient;
-import org.httpkit.client.HttpClientConfig;
-import org.httpkit.client.IFilter;
-import org.httpkit.client.IResponseHandler;
-import org.httpkit.client.RespListener;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -67,14 +58,13 @@ public class HttpClientTest {
     }
 
     HttpClient client;
-    Map<String, String> emptyHeader;
+    Map<String, Object> emptyHeader;
     CountDownLatch cd;
     Proxy socksProxy = new Proxy(Type.SOCKS, new InetSocketAddress("127.0.0.1", 3128));
     private RespListener listener;
 
     @Before
     public void setup() throws IOException {
-        emptyHeader = new TreeMap<String, String>();
         cd = new CountDownLatch(1);
         listener = new RespListener(new ResponseHandler(cd), IFilter.ACCEPT_ALL,
                 Executors.newCachedThreadPool());

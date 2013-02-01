@@ -1,27 +1,15 @@
 package org.httpkit.server;
 
-import static org.httpkit.server.ClojureRing.BODY;
-import static org.httpkit.server.ClojureRing.HEADERS;
-import static org.httpkit.server.ClojureRing.buildRequestMap;
-import static org.httpkit.server.ClojureRing.encode;
-import static org.httpkit.server.ClojureRing.getStatus;
+import static org.httpkit.server.ClojureRing.*;
 
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 import org.httpkit.HttpUtils;
 import org.httpkit.HttpVersion;
 import org.httpkit.PrefixThreafFactory;
-import org.httpkit.ws.CloseFrame;
-import org.httpkit.ws.TextFrame;
-import org.httpkit.ws.WSFrame;
-import org.httpkit.ws.WsCon;
+import org.httpkit.ws.*;
 
 import clojure.lang.IFn;
 
@@ -89,7 +77,7 @@ class HttpHandler implements Runnable {
                 }
             } else {
                 // when handler return null: 404
-                cb.run(encode(404, new TreeMap<String, Object>(), null));
+                cb.run(encode(404, null, null));
             }
         } catch (Throwable e) {
             cb.run(encode(500, new TreeMap<String, Object>(), e.getMessage()));
@@ -115,8 +103,7 @@ public class RingHandler implements IHandler {
             execs.submit(new HttpHandler(req, cb, handler));
         } catch (RejectedExecutionException e) {
             HttpUtils.printError("increase :queue-size if this happens often", e);
-            cb.run(encode(503, new TreeMap<String, Object>(),
-                    "Server is overloaded, please try later"));
+            cb.run(encode(503, null, "Server is overloaded, please try later"));
         }
     }
 

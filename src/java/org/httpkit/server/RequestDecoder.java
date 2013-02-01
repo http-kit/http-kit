@@ -9,13 +9,7 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.TreeMap;
 
-import org.httpkit.HttpMethod;
-import org.httpkit.HttpUtils;
-import org.httpkit.HttpVersion;
-import org.httpkit.LineTooLargeException;
-import org.httpkit.ProtocolException;
-import org.httpkit.RequestTooLargeException;
-
+import org.httpkit.*;
 
 public class RequestDecoder {
 
@@ -61,22 +55,17 @@ public class RequestDecoder {
         cEnd = findEndOfString(sb);
 
         if (cStart < cEnd) {
-            HttpMethod method = HttpMethod.GET;
-            String m = sb.substring(aStart, aEnd).toUpperCase();
-            if (m.equals("GET")) {
-                method = HttpMethod.GET;
-            } else if (m.equals("POST")) {
-                method = HttpMethod.POST;
-            } else if (m.equals("PUT")) {
-                method = HttpMethod.PUT;
-            } else if (m.equals("DELETE")) {
-                method = HttpMethod.DELETE;
+            try {
+                HttpMethod method = HttpMethod
+                        .valueOf(sb.substring(aStart, aEnd).toUpperCase());
+                HttpVersion version = HTTP_1_1;
+                if ("HTTP/1.0".equals(sb.substring(cStart, cEnd))) {
+                    version = HTTP_1_0;
+                }
+                request = new HttpRequest(method, sb.substring(bStart, bEnd), version);
+            } catch (Exception e) {
+                throw new ProtocolException("method not understand");
             }
-            HttpVersion version = HTTP_1_1;
-            if ("HTTP/1.0".equals(sb.substring(cStart, cEnd))) {
-                version = HTTP_1_0;
-            }
-            request = new HttpRequest(method, sb.substring(bStart, bEnd), version);
         } else {
             throw new ProtocolException("not http?");
         }

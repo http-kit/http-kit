@@ -10,7 +10,7 @@ public class Request implements Comparable<Request> {
 
     final InetSocketAddress addr;
     final Decoder decoder;
-    final ByteBuffer request; // HTTP request
+    final ByteBuffer[] request; // HTTP request
     private final PriorityQueue<Request> clients; // update timeout
     public final int timeOutMs;
 
@@ -21,7 +21,7 @@ public class Request implements Comparable<Request> {
     private long timeoutTs; // future time this request timeout, ms
     private boolean connected = false;
 
-    public Request(InetSocketAddress addr, ByteBuffer request, IRespListener handler,
+    public Request(InetSocketAddress addr, ByteBuffer[] request, IRespListener handler,
             PriorityQueue<Request> clients, int timeOutMs, HttpMethod method) {
         this.decoder = new Decoder(handler, method);
         this.timeOutMs = timeOutMs;

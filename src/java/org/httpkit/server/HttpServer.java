@@ -9,33 +9,13 @@ import static org.httpkit.server.ClojureRing.encode;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.nio.channels.ClosedSelectorException;
-import java.nio.channels.SelectableChannel;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
-import java.util.Date;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.Set;
-import java.util.TreeMap;
+import java.nio.channels.*;
+import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-import org.httpkit.HttpUtils;
-import org.httpkit.LineTooLargeException;
-import org.httpkit.ProtocolException;
-import org.httpkit.RequestTooLargeException;
+import org.httpkit.*;
 import org.httpkit.server.RequestDecoder.State;
-import org.httpkit.ws.CloseFrame;
-import org.httpkit.ws.PingFrame;
-import org.httpkit.ws.TextFrame;
-import org.httpkit.ws.WSDecoder;
-import org.httpkit.ws.WSEncoder;
-import org.httpkit.ws.WSFrame;
-import org.httpkit.ws.WsCon;
-import org.httpkit.ws.WsServerAtta;
-
+import org.httpkit.ws.*;
 
 public class HttpServer implements Runnable {
 
@@ -118,11 +98,11 @@ public class HttpServer implements Runnable {
         } catch (ProtocolException e) {
             closeKey(key, CloseFrame.NORMAL);
         } catch (RequestTooLargeException e) {
-            ByteBuffer[] buffers = encode(413, new TreeMap<String, Object>(), e.getMessage());
+            ByteBuffer[] buffers = encode(413, null, e.getMessage());
             atta.addBuffer(buffers);
             key.interestOps(OP_WRITE);
         } catch (LineTooLargeException e) {
-            ByteBuffer[] buffers = encode(414, new TreeMap<String, Object>(), e.getMessage());
+            ByteBuffer[] buffers = encode(414, null, e.getMessage());
             atta.addBuffer(buffers);
             key.interestOps(OP_WRITE);
         }
@@ -181,21 +161,10 @@ public class HttpServer implements Runnable {
         try {
             LinkedList<ByteBuffer> toWrites = atta.toWrites;
             synchronized (toWrites) {
-                if (toWrites.size() == 1) {
-                    ch.write(toWrites.get(0));
-                } else {
-                    ByteBuffer buffers[] = new ByteBuffer[toWrites.size()];
-                    toWrites.toArray(buffers);
-                    ch.write(buffers);
-                }
-                Iterator<ByteBuffer> ite = toWrites.iterator();
-                while (ite.hasNext()) {
-                    if (!ite.next().hasRemaining()) {
-                        ite.remove();
-                    }
-                }
-                // all done
-                if (toWrites.size() == 0) {
+                ByteBuffer buffers[] = new ByteBuffer[toWrites.size()];
+                toWrites.toArray(buffers);
+                ch.write(buffers);
+                if (!buffers[buffers.length - 1].hasRemaining()) {
                     if (atta.isKeepAlive()) {
                         key.interestOps(OP_READ);
                     } else {

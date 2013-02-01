@@ -4,23 +4,13 @@ import static java.lang.Character.isWhitespace;
 import static java.lang.Math.min;
 import static java.net.InetAddress.getByName;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.URI;
-import java.net.UnknownHostException;
+import java.io.*;
+import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel.MapMode;
 import java.nio.charset.Charset;
-import java.util.Date;
-import java.util.Iterator;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -86,10 +76,7 @@ public class HttpUtils {
     // space ' '
     public static final byte SP = 32;
 
-    public static DynamicBytes encodeResponseHeader(int status, Map<String, Object> headers) {
-        DynamicBytes bytes = new DynamicBytes(196);
-        byte[] bs = HttpStatus.valueOf(status).getResponseIntialLineBytes();
-        bytes.append(bs, 0, bs.length);
+    public static void encodeHeaders(DynamicBytes bytes, Map<String, Object> headers) {
         Iterator<Entry<String, Object>> ite = headers.entrySet().iterator();
         while (ite.hasNext()) {
             Entry<String, Object> e = ite.next();
@@ -119,7 +106,31 @@ public class HttpUtils {
 
         bytes.append(CR);
         bytes.append(LF);
-        return bytes;
+    }
+
+    public static ByteBuffer bodyBuffer(Object body) throws IOException {
+        if (body == null) {
+            return null;
+        } else if (body instanceof String) {
+            byte[] b = ((String) body).getBytes(UTF_8);
+            return ByteBuffer.wrap(b);
+        } else if (body instanceof InputStream) {
+            DynamicBytes b = readAll((InputStream) body);
+            return ByteBuffer.wrap(b.get(), 0, b.length());
+        } else if (body instanceof File) {
+            // serving file is better be done by Nginx
+            return readAll((File) body);
+        } else if (body instanceof Seqable) {
+            ISeq seq = ((Seqable) body).seq();
+            DynamicBytes b = new DynamicBytes(seq.count() * 512);
+            while (seq != null) {
+                b.append(seq.first().toString(), UTF_8);
+                seq = seq.next();
+            }
+            return ByteBuffer.wrap(b.get(), 0, b.length());
+        } else {
+            throw new RuntimeException(body.getClass() + " is not understandable");
+        }
     }
 
     private static final byte[] ALPHAS = "0123456789ABCDEF".getBytes();
@@ -209,6 +220,17 @@ public class HttpUtils {
         }
     }
 
+    public static Map<String, Object> camelCase(Map<String, Object> headers) {
+        TreeMap<String, Object> tmp = new TreeMap<String, Object>();
+
+        if (headers != null) {
+            for (Entry<String, Object> e : headers.entrySet()) {
+                tmp.put(HttpUtils.camelCase(e.getKey()), e.getValue());
+            }
+        }
+        return tmp;
+    }
+
     public static String camelCase(String key) {
         StringBuilder sb = new StringBuilder(key.length());
         boolean upper = true;
@@ -261,6 +283,26 @@ public class HttpUtils {
         return new InetSocketAddress(host, getPort(uri));
     }
 
+    public static byte[] readContent(File f, int length) throws IOException {
+        byte[] bytes = new byte[length];
+        FileInputStream fs = null;
+        try {
+            fs = new FileInputStream(f);
+            int offset = 0;
+            while (offset < length) {
+                offset += fs.read(bytes, offset, length - offset);
+            }
+        } finally {
+            if (fs != null) {
+                try {
+                    fs.close();
+                } catch (Exception ignore) {
+                }
+            }
+        }
+        return bytes;
+    }
+
     public static ByteBuffer readAll(File f) throws IOException {
         int length = (int) f.length();
         if (length >= 1024 * 1024 * 2) { // 2M
@@ -269,23 +311,7 @@ public class HttpUtils {
             fs.close();
             return buffer;
         } else {
-            byte[] bytes = new byte[length];
-            FileInputStream fs = null;
-            try {
-                fs = new FileInputStream(f);
-                int offset = 0;
-                while (offset < length) {
-                    offset += fs.read(bytes, offset, length - offset);
-                }
-            } finally {
-                if (fs != null) {
-                    try {
-                        fs.close();
-                    } catch (Exception ignore) {
-                    }
-                }
-            }
-            return ByteBuffer.wrap(bytes);
+            return ByteBuffer.wrap(readContent(f, length));
         }
     }
 

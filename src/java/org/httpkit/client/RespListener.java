@@ -12,12 +12,7 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.Inflater;
 import java.util.zip.InflaterInputStream;
 
-import org.httpkit.BytesInputStream;
-import org.httpkit.DynamicBytes;
-import org.httpkit.HttpStatus;
-import org.httpkit.HttpUtils;
-import org.httpkit.HttpVersion;
-import org.httpkit.ProtocolException;
+import org.httpkit.*;
 
 class Handler implements Runnable {
 

@@ -49,16 +49,10 @@
              (str url "?" (query-string query-params))
              (str url "&" (query-string query-params)))
            url)
-    :method (case (or method :get)
-              :get     HttpMethod/GET
-              :head    HttpMethod/HEAD
-              :options HttpMethod/OPTIONS
-              :delete  HttpMethod/DELETE
-              :post    HttpMethod/POST
-              :put     HttpMethod/PUT)
-
+    :method (HttpMethod/fromKeyword (or method :get))
     :headers  (prepare-request-headers req)
-    :body     (if form-params (utf8-bytes (query-string form-params)) body)))
+    ;; :body  ring body: null, String, seq, InputStream, File
+    :body     (if form-params (query-string form-params) body)))
 
 ;; thread pool for executing callbacks, since they may take a long time to execute.
 ;; protect the IO loop thread: no starvation

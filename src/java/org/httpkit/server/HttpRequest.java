@@ -10,10 +10,7 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.Map;
 
-import org.httpkit.BytesInputStream;
-import org.httpkit.HttpMethod;
-import org.httpkit.HttpUtils;
-import org.httpkit.HttpVersion;
+import org.httpkit.*;
 import org.httpkit.ws.WsCon;
 
 

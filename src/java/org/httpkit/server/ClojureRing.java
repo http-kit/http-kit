@@ -1,29 +1,19 @@
 package org.httpkit.server;
 
 import static clojure.lang.Keyword.intern;
-import static org.httpkit.HttpUtils.ASCII;
-import static org.httpkit.HttpUtils.UTF_8;
-import static org.httpkit.HttpUtils.encodeResponseHeader;
-import static org.httpkit.HttpUtils.readAll;
+import static org.httpkit.HttpUtils.*;
 
-import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Locale;
-import java.util.Map;
-import java.util.TimeZone;
-import java.util.TreeMap;
+import java.util.*;
 
 import org.httpkit.DynamicBytes;
+import org.httpkit.HttpStatus;
 
 import clojure.lang.IPersistentMap;
-import clojure.lang.ISeq;
 import clojure.lang.Keyword;
 import clojure.lang.PersistentArrayMap;
-import clojure.lang.Seqable;
 
 //  SimpleDateFormat is not threadsafe
 class DateFormater extends ThreadLocal<SimpleDateFormat> {
@@ -59,9 +49,14 @@ public class ClojureRing {
     public static final Keyword WEBSOCKET = intern("websocket");
 
     public static final Keyword M_GET = intern("get");
+    public static final Keyword M_HEAD = intern("head");
     public static final Keyword M_POST = intern("post");
-    public static final Keyword M_DELETE = intern("delete");
     public static final Keyword M_PUT = intern("put");
+    public static final Keyword M_DELETE = intern("delete");
+    public static final Keyword M_TRACE = intern("trace");
+    public static final Keyword M_OPTIONS = intern("options");
+    public static final Keyword M_CONNECT = intern("connect");
+    public static final Keyword M_PATCH = intern("patch");
 
     public static final Keyword HTTP = intern("http");
 
@@ -81,36 +76,17 @@ public class ClojureRing {
     public static final String CL = "Content-Length";
 
     public static ByteBuffer[] encode(int status, Map<String, Object> headers, Object body) {
-        // headers can be modified
-        ByteBuffer bodyBuffer = null, headBuffer = null;
+        headers = camelCase(headers);
         headers.put("Server", "http-kit");
         headers.put("Date", DateFormater.getDate());
+        ByteBuffer bodyBuffer;
+
         try {
-            if (body == null) {
-                headers.put(CL, "0");
-            } else if (body instanceof String) {
-                byte[] b = ((String) body).getBytes(UTF_8);
-                bodyBuffer = ByteBuffer.wrap(b);
-                headers.put(CL, Integer.toString(b.length));
-            } else if (body instanceof InputStream) {
-                DynamicBytes b = readAll((InputStream) body);
-                bodyBuffer = ByteBuffer.wrap(b.get(), 0, b.length());
-                headers.put(CL, Integer.toString(b.length()));
-            } else if (body instanceof File) {
-                // length header is set by upper logic
-                // serving file is better be done by Nginx
-                bodyBuffer = readAll((File) body);
-            } else if (body instanceof Seqable) {
-                ISeq seq = ((Seqable) body).seq();
-                DynamicBytes b = new DynamicBytes(seq.count() * 512);
-                while (seq != null) {
-                    b.append(seq.first().toString(), UTF_8);
-                    seq = seq.next();
-                }
-                bodyBuffer = ByteBuffer.wrap(b.get(), 0, b.length());
-                headers.put(CL, Integer.toString(b.length()));
+            bodyBuffer = bodyBuffer(body);
+            if (bodyBuffer != null) {
+                headers.put(CL, Integer.toString(bodyBuffer.remaining()));
             } else {
-                throw new RuntimeException(body.getClass() + " is not understandable");
+                headers.put(CL, "0");
             }
         } catch (IOException e) {
             byte[] b = e.getMessage().getBytes(ASCII);
@@ -119,8 +95,12 @@ public class ClojureRing {
             headers.put(CL, Integer.toString(b.length));
             bodyBuffer = ByteBuffer.wrap(b);
         }
-        DynamicBytes bytes = encodeResponseHeader(status, headers);
-        headBuffer = ByteBuffer.wrap(bytes.get(), 0, bytes.length());
+
+        DynamicBytes bytes = new DynamicBytes(196);
+        byte[] bs = HttpStatus.valueOf(status).getResponseIntialLineBytes();
+        bytes.append(bs, 0, bs.length);
+        encodeHeaders(bytes, headers);
+        ByteBuffer headBuffer = ByteBuffer.wrap(bytes.get(), 0, bytes.length());
 
         return new ByteBuffer[] { headBuffer, bodyBuffer };
     }
@@ -138,20 +118,7 @@ public class ClojureRing {
             m.put(WEBSOCKET, req.getWebSocketCon());
         }
 
-        switch (req.method) {
-        case DELETE:
-            m.put(REQUEST_METHOD, M_DELETE);
-            break;
-        case GET:
-            m.put(REQUEST_METHOD, M_GET);
-            break;
-        case POST:
-            m.put(REQUEST_METHOD, M_POST);
-            break;
-        case PUT:
-            m.put(REQUEST_METHOD, M_PUT);
-            break;
-        }
+        m.put(REQUEST_METHOD, req.method.KEY);
 
         // key is already downcased, required by ring spec
         m.put(HEADERS, PersistentArrayMap.create(req.getHeaders()));

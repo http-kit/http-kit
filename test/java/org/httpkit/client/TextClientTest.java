@@ -4,18 +4,11 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-
 import org.httpkit.HttpMethod;
-import org.httpkit.client.HttpClient;
-import org.httpkit.client.HttpClientConfig;
-import org.httpkit.client.IFilter;
-import org.httpkit.client.IResponseHandler;
-import org.httpkit.client.RespListener;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -48,13 +41,15 @@ public class TextClientTest {
 
     }
 
+    public static void main(String[] args) {
+        System.out.println(HttpMethod.valueOf("GET1"));
+    }
+
     private void runIt(String[] urls) throws URISyntaxException, UnknownHostException,
             InterruptedException {
         CountDownLatch latch = new CountDownLatch(urls.length);
         ExecutorService pool = Executors.newCachedThreadPool();
         for (String url : urls) {
-            TreeMap<String, String> header = new TreeMap<String, String>();
-
             IResponseHandler handler = new IResponseHandler() {
 
                 public void onThrowable(Throwable t) {
@@ -65,7 +60,7 @@ public class TextClientTest {
                     System.out.println(body);
                 }
             };
-            client.exec(url, HttpMethod.GET, header, null, -1, new RespListener(handler,
+            client.exec(url, HttpMethod.GET, null, null, -1, new RespListener(handler,
                     IFilter.ACCEPT_ALL, pool));
         }
 
