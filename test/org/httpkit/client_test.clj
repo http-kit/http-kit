@@ -74,8 +74,7 @@
     (is (= u (:body (clj-http/get url2))))))
 
 (defn- rand-keep-alive []
-  ;; TODO has issue in linux
-  {:headers {"Connection" (cond  (> (rand-int 10) 8) "Close"
+  {:headers {"Connection" (cond  (> (rand-int 10) 5) "Close"
                                  :else "keep-alive")}})
 
 (deftest test-keep-alive-does-not-messup
@@ -84,9 +83,9 @@
       (is (= (str id) (:body @(http/get (str url id))))))
     (doseq [ids (partition 10 (range 0 300))]
       (let [requests (doall (map (fn [id]
-                                   (http/get (str url id)
-                                             (fn [{:keys [body] :as resp}]
-                                               (is (= (str id) body))
+                                   (http/get (str url id) (rand-keep-alive)
+                                             (fn [resp]
+                                               (is (= (str id) (:body resp)))
                                                resp)))
                                  ids))]
         (doseq [r requests]

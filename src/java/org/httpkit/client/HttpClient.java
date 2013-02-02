@@ -8,6 +8,7 @@ import static org.httpkit.HttpUtils.BUFFER_SIZE;
 import static org.httpkit.HttpUtils.SP;
 import static org.httpkit.HttpUtils.getServerAddr;
 import static org.httpkit.client.State.ALL_READ;
+import static org.httpkit.client.State.READ_INITIAL;
 
 import java.io.IOException;
 import java.net.*;
@@ -54,7 +55,7 @@ public final class HttpClient implements Runnable {
         while ((r = requests.peek()) != null) {
             if (r.isTimeout(now)) {
                 String msg;
-                if (r.connected()) {
+                if (r.isConnected) {
                     msg = "read timeout: ";
                 } else {
                     msg = "connect timeout: ";
@@ -80,6 +81,23 @@ public final class HttpClient implements Runnable {
         }
     }
 
+    private boolean cleanAndRetryIfStealed(SelectionKey key, Request req) {
+        closeQuitely(key);
+        keepalives.remove(key);
+        // keep-alived connection, remote server close it without sending byte
+        if (req.isKeepAlived && req.decoder.state == READ_INITIAL) {
+            for (ByteBuffer b : req.request) {
+                b.position(0); // reset for retry
+            }
+            req.isKeepAlived = false;
+            requests.remove(req); // remove from timeout queue
+            pendings.offer(req); // queue for retry
+            selector.wakeup();
+            return true;
+        }
+        return false;
+    }
+
     private void doRead(SelectionKey key, long now) {
         Request req = (Request) key.attachment();
         SocketChannel ch = (SocketChannel) key.channel();
@@ -88,14 +106,16 @@ public final class HttpClient implements Runnable {
         try {
             read = ch.read(buffer);
         } catch (IOException e) { // The remote forcibly closed the connection
-            closeQuitely(key);
-            req.finish(e);
+            if (!cleanAndRetryIfStealed(key, req)) {
+                // os X get Connection reset by peer error,
+                req.finish(e);
+            }
         }
 
         if (read == -1) { // read all, remote closed it cleanly
-            keepalives.remove(key);// opps, just added
-            closeQuitely(key);
-            req.finish();
+            if (!cleanAndRetryIfStealed(key, req)) {
+                req.finish();
+            }
         } else if (read > 0) {
             req.onProgress(now);
             buffer.flip();
@@ -109,7 +129,7 @@ public final class HttpClient implements Runnable {
                 req.finish(e);
             } catch (Exception e) {
                 closeQuitely(key);
-                req.finish();
+                req.finish(e);
                 HttpUtils.printError("Should not happend!!", e); // decoding
             }
         }
@@ -132,8 +152,9 @@ public final class HttpClient implements Runnable {
                 key.interestOps(OP_READ);
             }
         } catch (IOException e) {
-            closeQuitely(key);
-            req.finish(e);
+            if (!cleanAndRetryIfStealed(key, req)) {
+                req.finish(e);
+            }
         }
     }
 
@@ -211,7 +232,7 @@ public final class HttpClient implements Runnable {
         Request req = (Request) key.attachment();
         try {
             if (ch.finishConnect()) {
-                req.setConnected();
+                req.isConnected = true;
                 req.onProgress(now);
                 key.interestOps(OP_WRITE);
             }
@@ -221,13 +242,14 @@ public final class HttpClient implements Runnable {
         }
     }
 
-    private void processPendings(long currentTime) {
+    private void processPendings() {
         Request job = null;
         while ((job = pendings.poll()) != null) {
             PersistentConn con = keepalives.remove(job.addr);
             if (con != null) { // keep alive
                 SelectionKey key = con.key;
                 if (key.isValid()) {
+                    job.isKeepAlived = true;
                     key.attach(job);
                     key.interestOps(OP_WRITE);
                     requests.offer(job);
@@ -264,26 +286,18 @@ public final class HttpClient implements Runnable {
                         if (!key.isValid()) {
                             continue;
                         }
-                        try {
-                            if (key.isConnectable()) {
-                                finishConnect(key, now);
-                            } else if (key.isWritable()) {
-                                doWrite(key);
-                            } else if (key.isReadable()) {
-                                doRead(key, now);
-                            }
-                        } catch (Exception e) {
-                            // error in user's response handler
-                            ((Request) key.attachment()).finish(e);
-                            closeQuitely(key);
-                            HttpUtils.printError("Please catch this exception", e);
-                        } finally {
-                            ite.remove();
+                        if (key.isConnectable()) {
+                            finishConnect(key, now);
+                        } else if (key.isReadable()) {
+                            doRead(key, now);
+                        } else if (key.isWritable()) {
+                            doWrite(key);
                         }
+                        ite.remove();
                     }
                 }
                 clearTimeouted(now);
-                processPendings(now);
+                processPendings();
             } catch (IOException e) {
                 HttpUtils.printError("select exception", e);
             }

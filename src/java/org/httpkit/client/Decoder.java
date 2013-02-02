@@ -199,9 +199,4 @@ public class Decoder {
         }
         return line;
     }
-
-    public void reset() {
-        headers.clear();
-        state = State.READ_INITIAL;
-    }
 }

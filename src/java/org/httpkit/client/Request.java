@@ -16,10 +16,12 @@ public class Request implements Comparable<Request> {
 
     private boolean isDone = false; // ensure only call once
 
+    public boolean isKeepAlived = false;
+    public boolean isConnected = false;
+
     SelectionKey key; // for timeout, close connection
 
     private long timeoutTs; // future time this request timeout, ms
-    private boolean connected = false;
 
     public Request(InetSocketAddress addr, ByteBuffer[] request, IRespListener handler,
             PriorityQueue<Request> clients, int timeOutMs, HttpMethod method) {
@@ -44,14 +46,6 @@ public class Request implements Comparable<Request> {
             return;
         isDone = true;
         decoder.listener.onCompleted();
-    }
-
-    public boolean connected() {
-        return connected;
-    }
-
-    public void setConnected() {
-        connected = true;
     }
 
     public boolean isTimeout(long now) {

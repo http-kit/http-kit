@@ -123,7 +123,6 @@ public class RespListener implements IRespListener {
 
     public void onCompleted() {
         if (status == null) {
-            // if blocking request in callback, will deadlock
             pool.submit(new Handler(handler, new ProtocolException("No status")));
             return;
         }
