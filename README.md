@@ -4,7 +4,7 @@
 
 See **[http-kit.org](http://http-kit.org)** for documentation, examples, benchmarks, etc.
 
-Current [semantic](http://semver.org/) version: `[http-kit "2.0.0-RC1"]`.
+Current [semantic](http://semver.org/) version: `[http-kit "2.0.0-RC2"]`.
 
 ### Contact & Contribution
 

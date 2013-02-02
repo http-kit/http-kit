@@ -22,10 +22,20 @@ HTTP client:
   2. Timeout per request
   3. Support keep-alive
 
-### 2.0(not released yet)
+### 2.0-rc2 (2013/2/2)
+
+   1. package rename me.shenfeng.http => org.httpkit
+   2. using semantic version
+   3. more unit test
 
 HTTP client:
-   1. :filter option
-   2. fix potential deadlock: async request with callback, in callback, a async request is issued
+   1. :filter option and max-body-filter
+   2. fix potential deadlock: in async request's callback, a sync request is issued
    3. fix url double percent encoding issue
+   5. fix deflated body is not properly decompressed
+   6. fix keep-alive issue, add unit test to make sure it always works as expected
+   7. :body can be nil, string, file, inputstream, iseq, just as ring response's body
 
+HTTP server:
+   1. properly pass :head and other method for :request-method
+   2. save memory when decoding request by using a reasonable buffer size, increase as necessary
