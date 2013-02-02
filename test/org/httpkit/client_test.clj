@@ -2,7 +2,8 @@
   (:use clojure.test
         [ring.adapter.jetty :only [run-jetty]]
         [org.httpkit.server :only [run-server]]
-        (compojure [core :only [defroutes GET POST HEAD DELETE ANY context]]
+        org.httpkit.test-util
+        (compojure [core :only [defroutes GET PUT DELETE POST HEAD DELETE ANY context]]
                    [handler :only [site]]
                    [route :only [not-found]])
         (clojure.tools [logging :only [info warn]]))
@@ -13,20 +14,26 @@
 (defroutes test-routes
   (GET "/get" [] "hello world")
   (POST "/post" [] "hello world")
+  (ANY "/method" [] (fn [req]
+                      (let [m (:request-method req)]
+                        {:status 200
+                         :headers {"x-method" (pr-str m)}})))
   (ANY "/unicode" [] (fn [req] (-> req :params :str)))
   (DELETE "/delete" [] "deleted")
   (ANY "/ua" [] (fn [req] ((-> req :headers) "user-agent")))
   (GET "/keep-alive" [] (fn [req] (-> req :params :id)))
   (GET "/p" [] (fn [req] (pr-str (:params req))))
-  (ANY "/params" [] (fn [req] (-> req :params :param1))))
+  (ANY "/params" [] (fn [req] (-> req :params :param1)))
+  (PUT "/body" [] (fn [req] {:body (:body req)
+                            :status 200
+                            :headers {"content-type" "text/plain"}})))
 
-(use-fixtures :once (fn [f]
-                      (let [server (run-server (site test-routes) {:port 4347})
-                            jetty (run-jetty (site test-routes) {:port 14347
-                                                                 :join? false})]
-                        (try (f) (finally
-                                  (server)
-                                  (.stop jetty))))))
+(use-fixtures :once
+              (fn [f]
+                (let [server (run-server (site test-routes) {:port 4347})
+                      jetty (run-jetty (site test-routes) {:port 14347
+                                                           :join? false})]
+                  (try (f) (finally (server) (.stop jetty))))))
 
 (comment
   (defonce server1 (run-server (site test-routes) {:port 4347})))
@@ -139,6 +146,21 @@
   (is (:status @(http/get "http://127.0.0.1:4347/get" ; should ok
                           {:filter (http/max-body-filter 30000)}))))
 
+(deftest test-http-method
+  (doseq [m [:get :post :put :delete :head]]
+    (is (= m (-> @(http/request {:method m
+                                 :url "http://127.0.0.1:4347/method"}
+                                identity)
+                 :headers :x-method read-string)))))
+
+(deftest test-string-file-inputstream-body []
+  (let [length (+ (rand-int (* 1024 1024 5)) 100)
+        file (gen-tempfile length ".txt")
+        bodys [(subs const-string 0 length) file (java.io.FileInputStream. file)
+               [(subs const-string 0 100) (subs const-string 100 length)]]]
+    (doseq [body bodys]
+      (is (= length (count (:body @(http/put "http://127.0.0.1:4347/body"
+                                             {:body body}))))))))
 
 (deftest test-params
   (let [url "http://a.com/biti?wvr=5&topnav=1&wvr=5&mod=logo#ccc"
