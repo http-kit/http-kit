@@ -17,7 +17,7 @@ public interface IFilter {
 
         public String toString() {
             return "Response Filter: ACCEPT all response";
-        };
+        }
     };
 
     public boolean accept(Map<String, String> headers);
