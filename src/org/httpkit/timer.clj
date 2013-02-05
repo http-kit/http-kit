@@ -1,26 +1,52 @@
 (ns org.httpkit.timer
+  "TimerService wrapper:
+     * Can schedule many tasks at once.
+     * When scheduled for 1000ms, may run in 1000ms, 10001ms, etc.
+     * Cancel returns true => future task guaranteed cancelled;
+             returns false => already cancelled || already run.
+     * Scheduling a new task is O(log(N)) where N is # active tasks.
+     * Cancelling a task is O(N).
+     * Timer-service thread will kill itself automatically when no task is
+       scheduled for 4 minutes, and will restart automatically when a new task
+       is added."
   (:import [org.httpkit TimerService CancelableFutureTask]))
 
-;; TimerService
-;; 1. can schedule many many timeout tasks at once
-;; 2. schedule in 1000ms, maybe run in 1000ms, 10001ms, etc.
-;; 3. cancel return true => future task guaranteed canceled; return false => already cancelled || already runned
-;; 4. schedule a new timeout task O(log(N))  : N is active task
-;; 5. cancel O(N)
-;; 6. not used, not pay => timer-service thread will kill itself when no task to schedule for 4 minites, restart the thread automatically if new task get added
+(defn cancel [^CancelableFutureTask task]
+  (.cancel task))
 
-(defmacro set-timeout [ms & forms]
-  `(.timeout TimerService/SERVICE ~ms (fn [] ~@forms)))
+(defmacro schedule-task
+  "Schedules body for invocation after given time and returns a
+  CancelableFutureTask. `(cancel task)` will cancel the task if possible and
+  return true iff cancellation was successful.
 
-(defn cancel [^CancelableFutureTask timer]
-  (.cancel timer))
+    (let [task (schedule-task 800 (println \"Task triggered\"))]
+      (Thread/sleep (rand-nth [900 700]))
+      (when (cancel task) ; Returns true iff task successfully cancelled
+        (println \"Task was cancelled\")))"
+  [ms & body]
+  `(.timeout TimerService/SERVICE ~ms (fn [] ~@body)))
 
-(comment
-  (let [timers (doall
-                (map (fn [idx]
-                       (let [time (+ (rand-int 10000) 1000)]
-                         (set-timeout time
-                                      (println (str "#" idx ", with timeout " time)))))
-                     (range 10)))]
-    (if (cancel (nth timers 3))
-      (println "3 get canceled"))))
+(comment (let [task (schedule-task 800 (println "Task triggered"))]
+           (Thread/sleep (rand-nth [900 700]))
+           (when (cancel task)
+             (println "Task was cancelled"))))
+
+(defmacro with-timeout
+  "Schedules timeout-form for invocation after given timeout and wraps named
+  fn so that calling it with any arguments also cancels the timeout if possible.
+  If the timeout has already been invoked, the fn will not run and will
+  immediately return nil.
+
+    (with-timeout println 800 (println \"Timeout task triggered\")
+      (Thread/sleep (rand-nth [900 700]))
+      (println \"Timeout task was cancelled\"))"
+  [f ms timeout-form & body]
+  `(let [timeout-task# (schedule-task ~ms ~timeout-form)
+         ~f (fn [& args#]
+              (when (cancel timeout-task#)
+                (apply ~f args#)))]
+     ~@body))
+
+(comment (with-timeout println 800 (println "Timeout task triggered")
+           (Thread/sleep (rand-nth [900 700]))
+           (println "Timeout task was cancelled")))
