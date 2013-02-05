@@ -38,7 +38,10 @@
   The caller's request will block while waiting for a response (see
   Ajax long polling example as one common use case).
 
-  Notice: The response is directly sent to client,  middlewares are not applied"
+  NB: The response is sent directly to the client, no Ring middleware is
+  applied.
+
+  See org.httpkit.timer ns for optional timeout facilities."
   [callback-name & body]
   `(let [data# (atom {})
          ~callback-name (fn [response#]
