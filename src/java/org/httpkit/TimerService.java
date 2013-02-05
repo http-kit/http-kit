@@ -11,7 +11,7 @@ public class TimerService implements Runnable {
     private final PriorityQueue<CancelableFutureTask> queue = new PriorityQueue<CancelableFutureTask>();
     private AtomicBoolean started = new AtomicBoolean(false);
 
-    public CancelableFutureTask timeout(int timeout, IFn task) {
+    public CancelableFutureTask scheduleTask(int timeout, IFn task) {
         if (started.compareAndSet(false, true)) {
             // start the timer thread, if not started
             Thread t = new Thread(this, "timer-service");
@@ -45,7 +45,7 @@ public class TimerService implements Runnable {
                 synchronized (queue) {
                     try {
                         // wait 2 minute before kill self
-                        queue.wait(1000 * 60);
+                        queue.wait(1000 * 120);
                         if (emptyQueueWaited == true) {
                             started.compareAndSet(true, false);
                             break; // die, will start

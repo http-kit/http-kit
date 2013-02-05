@@ -24,7 +24,7 @@
       (when (cancel task) ; Returns true iff task successfully cancelled
         (println \"Task was cancelled\")))"
   [ms & body]
-  `(.timeout TimerService/SERVICE ~ms (fn [] ~@body)))
+  `(.scheduleTask TimerService/SERVICE ~ms (fn [] ~@body)))
 
 (comment (let [task (schedule-task 800 (println "Task triggered"))]
            (Thread/sleep (rand-nth [900 700]))

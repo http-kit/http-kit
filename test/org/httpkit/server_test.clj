@@ -5,7 +5,8 @@
         [clojure.java.io :only [input-stream]]
         (compojure [core :only [defroutes GET POST HEAD DELETE ANY]]
                    [handler :only [site]])
-        org.httpkit.server)
+        org.httpkit.server
+        org.httpkit.timer)
   (:require [clj-http.client :as http]
             [org.httpkit.client :as client]
             [clj-http.util :as u])
@@ -38,8 +39,20 @@
     {:status 200
      :body (str title ": " (:size file))}))
 
+(defn async-with-timeout [req]
+  (let [time (to-int (-> req :params :time))
+        cancel (-> req :params :cancel)]
+    (async-response respond
+                    (with-timeout respond time
+                      (respond {:status 200
+                                :body (str time "ms")})
+                      (when cancel
+                        (respond {:status 200 ; should return ok
+                                  :body "canceled"}))))))
+
 (defroutes test-routes
   (GET "/" [] "hello world")
+  (GET "/timeout" [] async-with-timeout)
   (ANY "/spec" [] (fn [req] (pr-str (dissoc req :body))))
   (GET "/string" [] (fn [req] {:status 200
                               :headers {"Content-Type" "text/plain"}
@@ -91,6 +104,14 @@
     (is (= :post (:request-method  req)))
     (is (= "application/x-www-form-urlencoded" (:content-type req)))
     (is (= "utf8" (:character-encoding req)))))
+
+(deftest test-timer
+  (let [resp (http/get "http://localhost:4347/timeout?time=100&cancel=true")]
+    (is (= (:status resp) 200))
+    (is (= (:body resp) "canceled")))
+  (let [resp (http/get "http://localhost:4347/timeout?time=100")]
+    (is (= (:status resp) 200))
+    (is (= (:body resp) "100ms"))))
 
 (deftest test-body-string
   (let [resp (http/get "http://localhost:4347/string")]
