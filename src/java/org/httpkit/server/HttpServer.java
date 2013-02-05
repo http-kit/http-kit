@@ -161,11 +161,24 @@ public class HttpServer implements Runnable {
         try {
             LinkedList<ByteBuffer> toWrites = atta.toWrites;
             synchronized (toWrites) {
-                ByteBuffer buffers[] = new ByteBuffer[toWrites.size()];
-                toWrites.toArray(buffers);
-                ch.write(buffers);
-                if (!buffers[buffers.length - 1].hasRemaining()) {
-                    toWrites.clear();
+                int size = toWrites.size();
+                if (size == 1) {
+                    ch.write(toWrites.get(0));
+                    // TODO investigate why needed.
+                    // ws request for write, but has no data?
+                } else if (size > 0) {
+                    ByteBuffer buffers[] = new ByteBuffer[size];
+                    toWrites.toArray(buffers);
+                    ch.write(buffers);
+                }
+                Iterator<ByteBuffer> ite = toWrites.iterator();
+                while (ite.hasNext()) {
+                    if (!ite.next().hasRemaining()) {
+                        ite.remove();
+                    }
+                }
+                // all done
+                if (toWrites.size() == 0) {
                     if (atta.isKeepAlive()) {
                         key.interestOps(OP_READ);
                     } else {
