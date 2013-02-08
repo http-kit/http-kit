@@ -39,3 +39,8 @@ HTTP client:
 HTTP server:
    1. properly pass :head and other method for :request-method
    2. save memory when decoding request by using a reasonable buffer size, increase as necessary
+
+### 2.0-rc2 (2013/2/8)
+
+   1. cancelable timer service to allow efficient schedule job for the future
+   2. fix a possible IndexOutOfBoundsException when writing websocket response
