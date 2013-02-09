@@ -44,3 +44,6 @@ HTTP server:
 
    1. cancelable timer service to allow efficient schedule job for the future
    2. fix a possible IndexOutOfBoundsException when writing websocket response
+
+### 2.0-rc2 (2013/2/9)
+   1. fix a possible CPU 100% usage
