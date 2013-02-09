@@ -74,10 +74,8 @@ public class RequestDecoder {
     public State decode(ByteBuffer buffer) throws LineTooLargeException, ProtocolException,
             RequestTooLargeException {
         String line;
-        while (buffer.hasRemaining()) {
+        while (buffer.hasRemaining() && state != State.ALL_READ) {
             switch (state) {
-            case ALL_READ:
-                break;
             case READ_INITIAL:
                 line = readLine(buffer);
                 if (line != null) {

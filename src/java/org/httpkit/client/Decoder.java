@@ -74,10 +74,8 @@ public class Decoder {
         int toRead;
         // fine, JVM is very fast for short lived var
         byte[] bodyBuffer = new byte[BUFFER_SIZE];
-        while (buffer.hasRemaining()) {
+        while (buffer.hasRemaining() && state != State.ALL_READ) {
             switch (state) {
-            case ALL_READ:
-                break;
             case READ_INITIAL:
                 line = readLine(buffer);
                 if (line != null) {
