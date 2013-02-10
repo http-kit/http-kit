@@ -92,7 +92,9 @@ public class HttpServer implements Runnable {
                     }
                     request.setRemoteAddr(ch.socket().getRemoteSocketAddress());
                     handler.handle(request, new ResponseCallback(key, this));
-                    atta.decoder.reset(); // support HTTP Pipelining
+                    // will not support pipelining: need queue to ensure order
+                    // possible result: request1, request2 => response2, response1
+                    atta.decoder.reset();
                 }
             } while (buffer.hasRemaining()); // consume all
         } catch (ProtocolException e) {

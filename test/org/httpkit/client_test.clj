@@ -87,7 +87,7 @@
 (deftest test-keep-alive-does-not-messup
   (let [url "http://127.0.0.1:4347/keep-alive?id="]
     (doseq [id (range 0 100)]
-      (is (= (str id) (:body @(http/get (str url id))))))
+      (is (= (str id) (:body @(http/get (str url id) (rand-keep-alive))))))
     (doseq [ids (partition 10 (range 0 300))]
       (let [requests (doall (map (fn [id]
                                    (http/get (str url id) (rand-keep-alive)
