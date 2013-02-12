@@ -30,7 +30,16 @@
                                       (println e)
                                       (send-mesg con msg)))))))
 
-(defroutes test-routes (GET "/ws" [] ws-handler))
+(defn ws-handler2 [req]
+  (when-ws-request req con
+                   (send-mesg con "hello")
+                   (send-mesg con "world")
+                   (on-mesg con (fn [mesg]
+                                  (send-mesg con mesg))))) ; echo back
+
+(defroutes test-routes
+  (GET "/ws" [] ws-handler)
+  (GET "/ws2" [] ws-handler2))
 
 (use-fixtures :once (fn [f]
                       (let [server (run-server
@@ -66,6 +75,15 @@
         (let [d (subs const-string 0 120)]
           (= d (.ping client d)))))
     (.close client)))
+
+(deftest test-sent-message-in-body      ; issue #14
+  (let [client (WebSocketClient. "ws://localhost:4348/ws2")]
+    (is (= "hello" (.getMessage client)))
+    (is (= "world" (.getMessage client)))
+    (doseq [idx (range 0 5)]
+      (let [mesg (str "message#" idx)]
+        (.sendMessage client mesg)
+        (is (= mesg (.getMessage client))))))) ;; echo expected
 
 ;; test many times, and connect result
 ;; rm /tmp/test_results&& ./scripts/javac with-test && for i in {1..100}; do lein test org.httpkit.ws-test >> /tmp/test_results; done

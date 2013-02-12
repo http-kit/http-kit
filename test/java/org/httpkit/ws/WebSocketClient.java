@@ -4,10 +4,7 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.Random;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 import org.jboss.netty.bootstrap.ClientBootstrap;
 import org.jboss.netty.buffer.ChannelBuffer;
@@ -44,13 +41,16 @@ public class WebSocketClient {
         final WebSocketClientHandshaker handshaker = new WebSocketClientHandshakerFactory()
                 .newHandshaker(uri, WebSocketVersion.V13, null, false, customHeaders);
 
+        final CountDownLatch latch = new CountDownLatch(1);
+
         bootstrap.setPipelineFactory(new ChannelPipelineFactory() {
             public ChannelPipeline getPipeline() throws Exception {
                 ChannelPipeline pipeline = Channels.pipeline();
 
                 pipeline.addLast("decoder", new HttpResponseDecoder());
                 pipeline.addLast("encoder", new HttpRequestEncoder());
-                pipeline.addLast("ws-handler", new WebSocketClientHandler(handshaker, queue));
+                pipeline.addLast("ws-handler", new WebSocketClientHandler(handshaker, queue,
+                        latch));
                 return pipeline;
             }
         });
@@ -60,7 +60,7 @@ public class WebSocketClient {
 
         ch = future.getChannel();
         handshaker.handshake(ch).syncUninterruptibly();
-        queue.take();// wait for handshake
+        latch.await(); // wait for handleshake complete
     }
 
     public void sendMessage(String message) {

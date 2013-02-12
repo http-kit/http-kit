@@ -117,6 +117,7 @@
   `(if-let [~conn-name (:websocket ~request)]
      (if-let [key# (get-in ~request [:headers "sec-websocket-key"])]
        (do ~then
+           (set! (. ^WsCon ~conn-name handleShakeSent) true)
            {:status  101
             :headers {"Upgrade"    "websocket"
                       "Connection" "Upgrade"

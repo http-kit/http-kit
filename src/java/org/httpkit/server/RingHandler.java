@@ -74,6 +74,9 @@ class HttpHandler implements Runnable {
                     asyncHandle(cb, (IListenableFuture) body);
                 } else {
                     cb.run(encode(getStatus(resp), getHeaders(resp), body));
+                    if (req.isWs()) {
+                        req.getWebSocketCon().flushQueuedMesgs();
+                    }
                 }
             } else {
                 // when handler return null: 404
