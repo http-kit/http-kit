@@ -20,6 +20,7 @@
                                   [io.netty/netty "3.6.2.Final"]
                                   [org.clojure/data.json "0.1.2"]
                                   [org.jsoup/jsoup "1.7.1"]
+                                  [http.async.client "0.5.2"]
                                   [org.clojure/tools.logging "0.2.3"]
                                   [compojure "1.0.2"]
                                   [org.clojure/tools.cli "0.2.1"]

@@ -6,6 +6,7 @@
         org.httpkit.server)
   (:require [clj-http.client :as http]
             [org.httpkit.client :as client]
+            [http.async.client :as h]
             [clj-http.util :as u])
   (:import org.httpkit.ws.WebSocketClient))
 
@@ -37,9 +38,15 @@
                    (on-mesg con (fn [mesg]
                                   (send-mesg con mesg))))) ; echo back
 
+(defn ws-handler3 [req]
+  (when-ws-request req con
+                   (on-mesg con (fn [mesg]
+                                  (send-mesg con mesg)))))
+
 (defroutes test-routes
   (GET "/ws" [] ws-handler)
-  (GET "/ws2" [] ws-handler2))
+  (GET "/ws2" [] ws-handler2)
+  (GET "/ws3" [] ws-handler3))
 
 (use-fixtures :once (fn [f]
                       (let [server (run-server
@@ -84,6 +91,27 @@
       (let [mesg (str "message#" idx)]
         (.sendMessage client mesg)
         (is (= mesg (.getMessage client))))))) ;; echo expected
+
+(deftest test-with-http.async.client
+  (with-open [client (h/create-client)]
+    (let [latch (promise)
+          received-msg (atom nil)
+          ws (h/websocket client "ws://localhost:4348/ws3"
+                          :text (fn [con mesg]
+                                  (reset! received-msg mesg)
+                                  (deliver latch true))
+                          :close (fn [con status]
+                                   ;; (println "close:" con status)
+                                   )
+                          :open (fn [con]
+                                  ;; (println "opened:" con)
+                                  ))]
+      ;; (h/send ws :byte (byte-array 10)) not implemented yet
+      (let [msg "testing12"]
+        (h/send ws :text msg)
+        @latch
+        (is (= msg @received-msg)))
+      (h/close ws))))
 
 ;; test many times, and connect result
 ;; rm /tmp/test_results&& ./scripts/javac with-test && for i in {1..100}; do lein test org.httpkit.ws-test >> /tmp/test_results; done
