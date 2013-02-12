@@ -153,7 +153,7 @@ public class HttpRequest {
         }
 
         isKeepAlive = (version == HTTP_1_1 && !"close".equals(con)) || "keep-alive".equals(con);
-        isWebSocket = "websocket".equals(headers.get("upgrade"));
+        isWebSocket = "websocket".equalsIgnoreCase(headers.get("upgrade"));
         this.headers = headers;
     }
 }
