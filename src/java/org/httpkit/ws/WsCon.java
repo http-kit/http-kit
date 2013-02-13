@@ -4,10 +4,9 @@ import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 
+import org.httpkit.server.ClojureRing;
 import org.httpkit.server.HttpServer;
 
 import clojure.lang.IFn;
@@ -19,10 +18,6 @@ public class WsCon {
     private volatile boolean isClosedRuned = false;
 
     final private HttpServer server;
-
-    // message sent before handle shake should be queued
-    public volatile boolean handleShakeSent = false;
-    private List<ByteBuffer> queueMessages = new LinkedList<ByteBuffer>();
 
     public WsCon(SelectionKey key, HttpServer server) {
         this.key = key;
@@ -72,28 +67,9 @@ public class WsCon {
 
     public void send(final String mesg) {
         ByteBuffer buffer = WSEncoder.encode(mesg);
-        if (handleShakeSent) {
-            WsServerAtta atta = (WsServerAtta) key.attachment();
-            atta.addBuffer(buffer);
-            server.queueWrite(key);
-        } else {
-            synchronized (queueMessages) {
-                queueMessages.add(buffer);
-            }
-        }
-    }
-
-    public void flushQueuedMesgs() { // only called once
-        synchronized (queueMessages) {
-            if (queueMessages.size() > 0) {
-                WsServerAtta atta = (WsServerAtta) key.attachment();
-                for (ByteBuffer bb : queueMessages) {
-                    atta.addBuffer(bb);
-                }
-                server.queueWrite(key);
-            }
-            queueMessages = null; // for GC
-        }
+        WsServerAtta atta = (WsServerAtta) key.attachment();
+        atta.addBuffer(buffer);
+        server.queueWrite(key);
     }
 
     public void serverClose() {
@@ -112,5 +88,12 @@ public class WsCon {
     public String toString() {
         Socket s = ((SocketChannel) key.channel()).socket();
         return "WsCon[" + s.getLocalSocketAddress() + "<->" + s.getRemoteSocketAddress() + "]";
+    }
+
+    public void sendHandshake(Map<String, Object> headers) {
+        ByteBuffer[] buffers = ClojureRing.encode(101, headers, null);
+        WsServerAtta atta = (WsServerAtta) key.attachment();
+        atta.addBuffer(buffers);
+        server.queueWrite(key);
     }
 }

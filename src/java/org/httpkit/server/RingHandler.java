@@ -30,11 +30,8 @@ class HttpHandler implements Runnable {
             Map resp = (Map) handler.invoke(buildRequestMap(req));
             if (resp != null) {
                 Object body = resp.get(BODY);
-                if (!(body instanceof AsycChannel)) {
+                if (!(body instanceof AsycChannel)) { // hijacked
                     cb.run(encode(getStatus(resp), getHeaders(resp, req), body));
-                    if (req.isWs()) {
-                        req.webSocketCon.flushQueuedMesgs();
-                    }
                 }
             } else {
                 // when handler return null: 404

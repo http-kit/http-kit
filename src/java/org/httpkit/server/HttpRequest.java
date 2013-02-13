@@ -131,10 +131,6 @@ public class HttpRequest {
                 this.serverName = h;
             }
         }
-        String con = headers.get(CONNECTION);
-        if (con != null) {
-            con = con.toLowerCase();
-        }
 
         String ct = headers.get(CONTENT_TYPE);
         if (ct != null) {
@@ -150,6 +146,11 @@ public class HttpRequest {
             } else {
                 contentType = ct;
             }
+        }
+
+        String con = headers.get(CONNECTION);
+        if (con != null) {
+            con = con.toLowerCase();
         }
 
         isKeepAlive = (version == HTTP_1_1 && !"close".equals(con)) || "keep-alive".equals(con);

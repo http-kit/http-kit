@@ -44,12 +44,11 @@
   See org.httpkit.timer ns for optional timeout facilities."
   [request callback-name & body]
   `(let [channel# ^AsycChannel (:async-channel ~request)
-         ~callback-name (fn [response#]
-                          (.write channel# response# (not (= false (:final response#)))))]
+         ~callback-name (fn [data#]
+                          (.writeChunk channel# data#
+                                       (not (= false (:final data#)))))]
      (do ~@body)
-     {:status  200
-      :headers {}
-      :body    channel#}))
+     {:status 200 :body channel#}))
 
 (comment (.get (:body (async-response respond! (future (respond! "boo"))))))
 
@@ -99,16 +98,16 @@
            (send-mesg ws-conn \"Welcome to the chatroom!\"))
        (deal-with-not-websocket-handshake-request)))"
   [request conn-name then else]
-  `(if-let [~conn-name (:websocket ~request)]
+  `(if-let [~conn-name ^WsCon (:websocket ~request)]
      (if-let [key# (get-in ~request [:headers "sec-websocket-key"])]
-       (do ~then
-           (set! (. ^WsCon ~conn-name handleShakeSent) true)
-           {:status  101
-            :headers {"Upgrade"    "websocket"
-                      "Connection" "Upgrade"
-                      "Sec-WebSocket-Accept" (accept key#)
-                      ;; "Sec-WebSocket-Protocol" "13"
-                      }})
+       (do
+         (.sendHandshake ~conn-name {"Upgrade"    "websocket"
+                                     "Connection" "Upgrade"
+                                     "Sec-WebSocket-Accept" (accept key#)
+                                     ;; "Sec-WebSocket-Protocol" "13"
+                                     })
+         ~then
+         {:status 200 :body (:async-channel ~request)})
        {:status 400 :headers {} :body "Sec-WebSocket-Key header expected"})
      ~else))
 

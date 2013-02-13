@@ -38,7 +38,7 @@ public class AsycChannel {
     private static byte[] finalChunkBytes2 = "\r\n0\r\n\r\n".getBytes();
     private static byte[] newLineBytes = "\r\n".getBytes();
 
-    public void write(Object data, boolean isFinal) throws IOException {
+    public void writeChunk(Object data, boolean isFinal) throws IOException {
 
         if (finalWritted == true) {
             throw new IllegalStateException("final chunked has already been write");
