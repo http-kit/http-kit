@@ -7,7 +7,6 @@ import java.util.TreeMap;
 import java.util.concurrent.*;
 
 import org.httpkit.HttpUtils;
-import org.httpkit.HttpVersion;
 import org.httpkit.PrefixThreafFactory;
 import org.httpkit.ws.*;
 
@@ -26,56 +25,15 @@ class HttpHandler implements Runnable {
         this.handler = handler;
     }
 
-    private Map<String, Object> getHeaders(final Map resp) {
-        Map<String, Object> headers = (Map) resp.get(HEADERS);
-        // copy to modify
-        if (headers == null) {
-            headers = new TreeMap<String, Object>();
-        } else {
-            headers = new TreeMap<String, Object>(headers);
-        }
-        if (req.version == HttpVersion.HTTP_1_0 && req.isKeepAlive()) {
-            headers.put("Connection", "Keep-Alive");
-        }
-        return headers;
-    }
-
-    private boolean isBody(Object o) {
-        if (o instanceof Map && ((Map) o).containsKey(ClojureRing.STATUS)) {
-            return false;
-        }
-        return true;
-    }
-
-    private void asyncHandle(final ResponseCallback cb, final IListenableFuture future) {
-        future.addListener(new Runnable() {
-            public void run() {
-                Object r = future.get();
-                if (isBody(r)) {
-                    TreeMap<String, Object> h = new TreeMap<String, Object>();
-                    // just :body, add some default value
-                    h.put("Content-Type", "text/html; charset=utf8");
-                    cb.run(encode(200, h, r));
-                } else {
-                    // standard ring response, :status :header :body
-                    Map resp = (Map) r;
-                    cb.run(encode(getStatus(resp), getHeaders(resp), resp.get(BODY)));
-                }
-            }
-        });
-    }
-
     public void run() {
         try {
             Map resp = (Map) handler.invoke(buildRequestMap(req));
             if (resp != null) {
                 Object body = resp.get(BODY);
-                if (body instanceof IListenableFuture) {
-                    asyncHandle(cb, (IListenableFuture) body);
-                } else {
-                    cb.run(encode(getStatus(resp), getHeaders(resp), body));
+                if (!(body instanceof AsycChannel)) {
+                    cb.run(encode(getStatus(resp), getHeaders(resp, req), body));
                     if (req.isWs()) {
-                        req.getWebSocketCon().flushQueuedMesgs();
+                        req.webSocketCon.flushQueuedMesgs();
                     }
                 }
             } else {

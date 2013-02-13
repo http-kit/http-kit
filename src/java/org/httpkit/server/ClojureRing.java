@@ -10,6 +10,7 @@ import java.util.*;
 
 import org.httpkit.DynamicBytes;
 import org.httpkit.HttpStatus;
+import org.httpkit.HttpVersion;
 
 import clojure.lang.IPersistentMap;
 import clojure.lang.Keyword;
@@ -31,6 +32,7 @@ class DateFormater extends ThreadLocal<SimpleDateFormat> {
     }
 }
 
+@SuppressWarnings({ "rawtypes", "unchecked" })
 public class ClojureRing {
 
     public static final Keyword SERVER_PORT = intern("server-port");
@@ -47,6 +49,7 @@ public class ClojureRing {
     public static final Keyword BODY = intern("body");
     public static final Keyword KEEP_ALIVE = intern("keep_alive");
     public static final Keyword WEBSOCKET = intern("websocket");
+    public static final Keyword ASYC_CHANNEL = intern("async-channel");
 
     public static final Keyword M_GET = intern("get");
     public static final Keyword M_HEAD = intern("head");
@@ -73,6 +76,27 @@ public class ClojureRing {
         return status;
     }
 
+    public static Map<String, Object> getHeaders(final Map resp, final HttpRequest req) {
+        Map<String, Object> headers = (Map) resp.get(HEADERS);
+        // copy to modify
+        if (headers == null) {
+            headers = new TreeMap<String, Object>();
+        } else {
+            headers = new TreeMap<String, Object>(headers);
+        }
+        if (req.version == HttpVersion.HTTP_1_0 && req.isKeepAlive()) {
+            headers.put("Connection", "Keep-Alive");
+        }
+        return headers;
+    }
+
+    public static boolean isJustBody(Object o) {
+        if (o instanceof Map) {
+            return false;
+        }
+        return true;
+    }
+
     public static final String CL = "Content-Length";
 
     public static ByteBuffer[] encode(int status, Map<String, Object> headers, Object body) {
@@ -83,10 +107,13 @@ public class ClojureRing {
 
         try {
             bodyBuffer = bodyBuffer(body);
-            if (bodyBuffer != null) {
-                headers.put(CL, Integer.toString(bodyBuffer.remaining()));
-            } else {
-                headers.put(CL, "0");
+            // only write lengh if not chunked
+            if (!CHUNKED.equals(headers.get("Transfer-Encoding"))) {
+                if (bodyBuffer != null) {
+                    headers.put(CL, Integer.toString(bodyBuffer.remaining()));
+                } else {
+                    headers.put(CL, "0");
+                }
             }
         } catch (IOException e) {
             byte[] b = e.getMessage().getBytes(ASCII);
@@ -114,8 +141,9 @@ public class ClojureRing {
         m.put(URI, req.uri);
         m.put(QUERY_STRING, req.queryString);
         m.put(SCHEME, HTTP); // only http is supported
+        m.put(ASYC_CHANNEL, req.asycChannel);
         if (req.isWs()) {
-            m.put(WEBSOCKET, req.getWebSocketCon());
+            m.put(WEBSOCKET, req.webSocketCon);
         }
 
         m.put(REQUEST_METHOD, req.method.KEY);

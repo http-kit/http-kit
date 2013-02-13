@@ -13,13 +13,16 @@
   (:import [java.io File FileOutputStream FileInputStream]
            org.httpkit.SlowHttpClient))
 
-(defasync async-handler [req] cb
-  (cb {:status 200 :body "hello async"}))
+(defn async-handler [req]
+  (async-response req cb
+                  (cb {:status 200 :body "hello async"})))
 
-(defasync async-just-body [req] cb (cb "just-body"))
+(defn async-just-body [req]
+  (async-response req cb
+                  (cb "just-body")))
 
 (defn async-response-handler [req]
-  (async-response respond
+  (async-response req respond
                   (future (respond
                            {:status 200 :body "hello async"}))))
 
@@ -39,10 +42,20 @@
     {:status 200
      :body (str title ": " (:size file))}))
 
+(defn streaming-handler [req]
+  (let [s (-> req :params :s)
+        n (+ (rand-int 128) 10)
+        seqs (partition n n '() s)]     ; padding with empty
+    (async-response req cb
+                    (cb {:body (first seqs) :final false})
+                    (doseq [p (rest seqs)]
+                      (cb {:body p :final false}))
+                    (cb nil))))
+
 (defn async-with-timeout [req]
   (let [time (to-int (-> req :params :time))
         cancel (-> req :params :cancel)]
-    (async-response respond
+    (async-response req respond
                     (with-timeout respond time
                       (respond {:status 200
                                 :body (str time "ms")})
@@ -53,7 +66,7 @@
 (defroutes test-routes
   (GET "/" [] "hello world")
   (GET "/timeout" [] async-with-timeout)
-  (ANY "/spec" [] (fn [req] (pr-str (dissoc req :body))))
+  (ANY "/spec" [] (fn [req] (pr-str (dissoc req :body :async-channel))))
   (GET "/string" [] (fn [req] {:status 200
                               :headers {"Content-Type" "text/plain"}
                               :body "Hello World"}))
@@ -67,9 +80,10 @@
                                 :body (str (:content-length req))}))
   (GET "/null" [] (fn [req] {:status 200 :body nil}))
   (GET "/async" [] async-handler)
+  (GET "/streaming" [] streaming-handler)
   (GET "/async-response" [] async-response-handler)
   (GET "/async-just-body" [] async-just-body)
-  (ANY "*" [] (fn [req] (pr-str req))))
+  (ANY "*" [] (fn [req] (pr-str (dissoc req :async-channel)))))
 
 (use-fixtures :once (fn [f]
                       (let [server (run-server
@@ -104,14 +118,6 @@
     (is (= :post (:request-method  req)))
     (is (= "application/x-www-form-urlencoded" (:content-type req)))
     (is (= "utf8" (:character-encoding req)))))
-
-(deftest test-timer
-  (let [resp (http/get "http://localhost:4347/timeout?time=100&cancel=true")]
-    (is (= (:status resp) 200))
-    (is (= (:body resp) "canceled")))
-  (let [resp (http/get "http://localhost:4347/timeout?time=100")]
-    (is (= (:status resp) 200))
-    (is (= (:body resp) "100ms"))))
 
 (deftest test-body-string
   (let [resp (http/get "http://localhost:4347/string")]
@@ -150,10 +156,15 @@
     (is (= (:status resp) 200))
     (is (= "" (:body resp)))))
 
-(deftest test-async
-  (let [resp (http/get "http://localhost:4347/async")]
+;;;;; async
+
+(deftest test-timer
+  (let [resp (http/get "http://localhost:4347/timeout?time=100&cancel=true")]
     (is (= (:status resp) 200))
-    (is (= (:body resp) "hello async"))))
+    (is (= (:body resp) "canceled")))
+  (let [resp (http/get "http://localhost:4347/timeout?time=100")]
+    (is (= (:status resp) 200))
+    (is (= (:body resp) "100ms"))))
 
 (deftest test-async
   (let [resp (http/get "http://localhost:4347/async")]
@@ -170,6 +181,14 @@
     (is (= (:status resp) 200))
     (is (:headers resp))
     (is (= (:body resp) "just-body"))))
+
+(deftest test-streaming-body
+  (doseq [_ (range 1 100)]
+    (let [s (subs const-string 0 (+ (rand-int 1024) 256))
+          resp @(client/get (str "http://localhost:4347/streaming?s=" s))]
+      (is (= (:status resp) 200))
+      (is (:headers resp))
+      (is (= (:body resp) s)))))
 
 (deftest test-multipart
   (let [title "This is a pic"

@@ -1,6 +1,6 @@
 (ns org.httpkit.server
   (:require [clojure.tools.macro :as macro])
-  (:import  [org.httpkit.server HttpServer IListenableFuture RingHandler]
+  (:import  [org.httpkit.server AsycChannel HttpServer RingHandler]
             org.httpkit.ws.WsCon
             javax.xml.bind.DatatypeConverter
             java.security.MessageDigest))
@@ -11,13 +11,13 @@
   "Starts Ring-compatible HTTP server and returns a nullary function that stops
   the server."
   [handler {:keys [port thread ip max-body max-line worker-name-prefix queue-size]
-            :or   {ip "0.0.0.0"                 ; which ip (if has many ips) to bind
-                   port 8090                    ; which port listen incomming request
-                   thread 4                     ; http worker thread count
-                   queue-size 20480             ; max job queued before reject to project self
+            :or   {ip "0.0.0.0"  ; which ip (if has many ips) to bind
+                   port 8090     ; which port listen incomming request
+                   thread 4      ; http worker thread count
+                   queue-size 20480 ; max job queued before reject to project self
                    worker-name-prefix "worker-" ; woker thread name prefix
                    max-body 8388608             ; max http body: 8m
-                   max-line 4096}}]             ; max http inital line length: 4K
+                   max-line 4096}}]  ; max http inital line length: 4K
   (let [h (RingHandler. thread handler worker-name-prefix queue-size)
         s (HttpServer. ip port h max-body max-line)]
     (.start s)
@@ -30,7 +30,7 @@
   `(callback-name ring-response|body)` is executed in any thread:
 
     (defn my-async-handler [request]
-      (async-response respond
+      (async-response request respond
         (future (respond {:status  200
                           :headers {\"Content-Type\" \"text/html\"}
                           :body    \"This is an async response!\"}))))
@@ -42,31 +42,16 @@
   applied.
 
   See org.httpkit.timer ns for optional timeout facilities."
-  [callback-name & body]
-  `(let [data# (atom {})
+  [request callback-name & body]
+  `(let [channel# ^AsycChannel (:async-channel ~request)
          ~callback-name (fn [response#]
-                          (swap! data# assoc :response response#)
-                          (when-let [listener# (:listener @data#)]
-                            (.run ^Runnable listener#)))]
+                          (.write channel# response# (not (= false (:final response#)))))]
      (do ~@body)
      {:status  200
       :headers {}
-      :body    (reify IListenableFuture
-                 (addListener [this# listener#]
-                   (if (:response @data#)
-                     (.run ^Runnable listener#)
-                     (swap! data# assoc :listener listener#)))
-                 (get [this#] (:response @data#)))}))
+      :body    channel#}))
 
 (comment (.get (:body (async-response respond! (future (respond! "boo"))))))
-
-(defmacro defasync
-  "(defn name [request] (async-response callback-name body))"
-  {:arglists '(name [request] callback-name & body)}
-  [name & sigs]
-  (let [[name [[request] callback-name & body]]
-        (macro/name-with-attributes name sigs)]
-    `(defn ~name [~request] (async-response ~callback-name ~@body))))
 
 ;;;; WebSockets
 
@@ -129,11 +114,3 @@
 
 (defmacro when-ws-request [request conn-name & body]
   `(if-ws-request ~request ~conn-name (do ~@body) nil))
-
-(defmacro defwshandler
-  "(defn name [request] (when-ws-request request conn-name body))"
-  {:arglists '([name [request] conn-name & body])}
-  [name & sigs]
-  (let [[name [[request] conn-name & body]]
-        (macro/name-with-attributes name sigs)]
-    `(defn ~name [~request] (when-ws-request ~request ~conn-name ~@body))))

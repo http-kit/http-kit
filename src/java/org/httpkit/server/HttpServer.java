@@ -91,6 +91,7 @@ public class HttpServer implements Runnable {
                         key.attach(new WsServerAtta(con));
                     }
                     request.setRemoteAddr(ch.socket().getRemoteSocketAddress());
+                    request.setAsyncChannel(new AsycChannel(key, request, this));
                     handler.handle(request, new ResponseCallback(key, this));
                     // will not support pipelining: need queue to ensure order
                     // possible result: request1, request2 => response2, response1

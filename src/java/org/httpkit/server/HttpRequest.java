@@ -13,7 +13,6 @@ import java.util.Map;
 import org.httpkit.*;
 import org.httpkit.ws.WsCon;
 
-
 public class HttpRequest {
     private int serverPort = 80;
     private String serverName;
@@ -29,7 +28,8 @@ public class HttpRequest {
     private String charset = "utf8";
     private boolean isKeepAlive = false;
     private boolean isWebSocket = false;
-    private WsCon webSocketCon;
+    public WsCon webSocketCon;
+    public AsycChannel asycChannel;
 
     public HttpRequest(HttpMethod method, String url, HttpVersion version) {
         this.method = method;
@@ -112,8 +112,8 @@ public class HttpRequest {
         this.webSocketCon = con;
     }
 
-    public WsCon getWebSocketCon() {
-        return webSocketCon;
+    public void setAsyncChannel(AsycChannel ch) {
+        this.asycChannel = ch;
     }
 
     public boolean isWs() {

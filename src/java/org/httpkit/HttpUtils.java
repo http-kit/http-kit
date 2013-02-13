@@ -219,7 +219,7 @@ public class HttpUtils {
             throw new ProtocolException("Expect chunk size to be a number: " + hex);
         }
     }
-
+    
     public static Map<String, Object> camelCase(Map<String, Object> headers) {
         TreeMap<String, Object> tmp = new TreeMap<String, Object>();
 

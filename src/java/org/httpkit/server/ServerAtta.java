@@ -15,6 +15,6 @@ public abstract class ServerAtta {
             }
         }
     }
-
+    
     public abstract boolean isKeepAlive();
 }
