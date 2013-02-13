@@ -21,7 +21,7 @@ public class RequestDecoder {
     private int readRemaining = 0; // bytes need read
     private int readCount = 0; // already read bytes count
 
-    HttpRequest request;
+    HttpRequest request; // package visible
     private Map<String, String> headers = new TreeMap<String, String>();
     byte[] content;
 

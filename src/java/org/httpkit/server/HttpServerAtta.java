@@ -8,6 +8,6 @@ public class HttpServerAtta extends ServerAtta {
     public final RequestDecoder decoder;
 
     public boolean isKeepAlive() {
-        return decoder.request != null && decoder.request.isKeepAlive();
+        return decoder.request != null && decoder.request.isKeepAlive;
     }
 }

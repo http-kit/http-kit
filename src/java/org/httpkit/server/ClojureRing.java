@@ -84,7 +84,7 @@ public class ClojureRing {
         } else {
             headers = new TreeMap<String, Object>(headers);
         }
-        if (req.version == HttpVersion.HTTP_1_0 && req.isKeepAlive()) {
+        if (req.version == HttpVersion.HTTP_1_0 && req.isKeepAlive) {
             headers.put("Connection", "Keep-Alive");
         }
         return headers;
@@ -135,24 +135,24 @@ public class ClojureRing {
     public static IPersistentMap buildRequestMap(HttpRequest req) {
 
         Map<Object, Object> m = new TreeMap<Object, Object>();
-        m.put(SERVER_PORT, req.getServerPort());
-        m.put(SERVER_NAME, req.getServerName());
+        m.put(SERVER_PORT, req.serverPort);
+        m.put(SERVER_NAME, req.serverName);
         m.put(REMOTE_ADDR, req.getRemoteAddr());
         m.put(URI, req.uri);
         m.put(QUERY_STRING, req.queryString);
         m.put(SCHEME, HTTP); // only http is supported
         m.put(ASYC_CHANNEL, req.asycChannel);
-        if (req.isWs()) {
+        if (req.isWebSocket) {
             m.put(WEBSOCKET, req.webSocketCon);
         }
 
         m.put(REQUEST_METHOD, req.method.KEY);
 
         // key is already downcased, required by ring spec
-        m.put(HEADERS, PersistentArrayMap.create(req.getHeaders()));
-        m.put(CONTENT_TYPE, req.getContentType());
-        m.put(CONTENT_LENGTH, req.getContentLength());
-        m.put(CHARACTER_ENCODING, req.getCharactorEncoding());
+        m.put(HEADERS, PersistentArrayMap.create(req.headers));
+        m.put(CONTENT_TYPE, req.contentType);
+        m.put(CONTENT_LENGTH, req.contentLength);
+        m.put(CHARACTER_ENCODING, req.charset);
         m.put(BODY, req.getBody());
         return PersistentArrayMap.create(m);
     }

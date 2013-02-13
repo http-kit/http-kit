@@ -7,29 +7,31 @@ import static org.httpkit.HttpVersion.HTTP_1_1;
 
 import java.io.InputStream;
 import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 import java.util.Map;
 
 import org.httpkit.*;
 import org.httpkit.ws.WsCon;
 
 public class HttpRequest {
-    private int serverPort = 80;
-    private String serverName;
-    private InetSocketAddress remoteAddr;
     public final String queryString;
     public final String uri;
     public final HttpMethod method;
-    private Map<String, String> headers;
     public final HttpVersion version;
-    private int contentLength = 0;
+
     private byte[] body;
-    private String contentType;
-    private String charset = "utf8";
-    private boolean isKeepAlive = false;
-    private boolean isWebSocket = false;
-    public WsCon webSocketCon;
-    public AsycChannel asycChannel;
+
+    // package visible
+    InetSocketAddress remoteAddr;
+    int serverPort = 80;
+    String serverName;
+    Map<String, String> headers;
+    int contentLength = 0;
+    String contentType;
+    String charset = "utf8";
+    boolean isKeepAlive = false;
+    boolean isWebSocket = false;
+    WsCon webSocketCon;
+    AsycChannel asycChannel;
 
     public HttpRequest(HttpMethod method, String url, HttpVersion version) {
         this.method = method;
@@ -51,26 +53,6 @@ public class HttpRequest {
         return null;
     }
 
-    public String getCharactorEncoding() {
-        return charset;
-    }
-
-    public int getContentLength() {
-        return contentLength;
-    }
-
-    public String getContentType() {
-        return contentType;
-    }
-
-    public Map<String, String> getHeaders() {
-        return headers;
-    }
-
-    public String getServerName() {
-        return serverName;
-    }
-
     public String getRemoteAddr() {
         String h = headers.get(HttpUtils.X_FORWARDED_FOR);
         if (null != h) {
@@ -86,38 +68,9 @@ public class HttpRequest {
         }
     }
 
-    public String getScheme() {
-        return "http";
-    }
-
-    public int getServerPort() {
-        return serverPort;
-    }
-
-    public boolean isKeepAlive() {
-        // header keys are all lowercased
-        return isKeepAlive;
-    }
-
     public void setBody(byte[] body, int count) {
         this.body = body;
         this.contentLength = count;
-    }
-
-    public void setRemoteAddr(SocketAddress addr) {
-        this.remoteAddr = (InetSocketAddress) addr;
-    }
-
-    public void setWebSocketCon(WsCon con) {
-        this.webSocketCon = con;
-    }
-
-    public void setAsyncChannel(AsycChannel ch) {
-        this.asycChannel = ch;
-    }
-
-    public boolean isWs() {
-        return isWebSocket;
     }
 
     public void setHeaders(Map<String, String> headers) {
