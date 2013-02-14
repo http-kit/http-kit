@@ -51,7 +51,7 @@ public class HttpServer implements Runnable {
             }
         } catch (Exception e) {
             // like too many open files. do not quit
-            HttpUtils.printError("accept incomming request error", e);
+            HttpUtils.printError("accept incomming request", e);
         }
     }
 
@@ -75,7 +75,7 @@ public class HttpServer implements Runnable {
 
         Object att = key.attachment();
         if (att instanceof WsServerAtta) { // tell app connection closed
-            handler.handle(((WsServerAtta) att).con, close);
+            handler.handle(((WsServerAtta) att).asycChannel, close);
         }
     }
 
@@ -85,13 +85,13 @@ public class HttpServer implements Runnable {
             do {
                 if (decoder.decode(buffer) == State.ALL_READ) {
                     HttpRequest request = decoder.request;
-                    AsycChannel async = new AsycChannel(key, request, this);
+                    AsyncChannel channel = new AsyncChannel(key, this);
                     if (request.isWebSocket) {
-                        WsCon con = new WsCon(key, this);
-                        request.webSocketCon = con;
-                        key.attach(new WsServerAtta(con));
+                        key.attach(new WsServerAtta(channel));
+                    } else {
+                        ((ServerAtta) key.attachment()).asycChannel = channel;
                     }
-                    request.asycChannel = async;
+                    request.asycChannel = channel;
                     request.remoteAddr = (InetSocketAddress) ch.socket()
                             .getRemoteSocketAddress();
                     handler.handle(request, new ResponseCallback(key, this));
@@ -119,14 +119,14 @@ public class HttpServer implements Runnable {
             do {
                 WSFrame frame = atta.decoder.decode(buffer);
                 if (frame instanceof TextFrame) {
-                    handler.handle(atta.con, frame);
+                    handler.handle(atta.asycChannel, frame);
                     atta.decoder.reset();
                 } else if (frame instanceof PingFrame) {
                     atta.addBuffer(WSEncoder.encode(WSDecoder.OPCODE_PONG, frame.data));
                     atta.decoder.reset();
                     key.interestOps(OP_WRITE);
                 } else if (frame instanceof CloseFrame) {
-                    handler.handle(atta.con, frame);
+                    handler.handle(atta.asycChannel, frame);
                     atta.closeOnfinish = true;
                     atta.addBuffer(WSEncoder.encode(WSDecoder.OPCODE_CLOSE, frame.data));
                     key.interestOps(OP_WRITE);

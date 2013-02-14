@@ -10,7 +10,6 @@ import java.util.*;
 
 import org.httpkit.DynamicBytes;
 import org.httpkit.HttpStatus;
-import org.httpkit.HttpVersion;
 
 import clojure.lang.IPersistentMap;
 import clojure.lang.Keyword;
@@ -76,7 +75,7 @@ public class ClojureRing {
         return status;
     }
 
-    public static Map<String, Object> getHeaders(final Map resp, final HttpRequest req) {
+    public static Map<String, Object> getHeaders(final Map resp, final boolean addKeepalive) {
         Map<String, Object> headers = (Map) resp.get(HEADERS);
         // copy to modify
         if (headers == null) {
@@ -84,7 +83,7 @@ public class ClojureRing {
         } else {
             headers = new TreeMap<String, Object>(headers);
         }
-        if (req.version == HttpVersion.HTTP_1_0 && req.isKeepAlive) {
+        if (addKeepalive) {
             headers.put("Connection", "Keep-Alive");
         }
         return headers;
@@ -135,10 +134,7 @@ public class ClojureRing {
         m.put(QUERY_STRING, req.queryString);
         m.put(SCHEME, HTTP); // only http is supported
         m.put(ASYC_CHANNEL, req.asycChannel);
-        if (req.isWebSocket) {
-            m.put(WEBSOCKET, req.webSocketCon);
-        }
-
+        m.put(WEBSOCKET, req.isWebSocket);
         m.put(REQUEST_METHOD, req.method.KEY);
 
         // key is already lower cased, required by ring spec

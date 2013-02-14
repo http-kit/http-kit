@@ -43,7 +43,7 @@
      :body (str title ": " (:size file))}))
 
 (defn streaming-handler [req]
-  (let [s (-> req :params :s)
+  (let [s (or (-> req :params :s) (subs const-string 0 1024))
         n (+ (rand-int 128) 10)
         seqs (partition n n '() s)]     ; padding with empty
     (async-response req cb

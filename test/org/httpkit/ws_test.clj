@@ -3,22 +3,13 @@
         (compojure [core :only [defroutes GET POST HEAD DELETE ANY context]]
                    [handler :only [site]]
                    [route :only [not-found]])
+        org.httpkit.test-util
         org.httpkit.server)
   (:require [clj-http.client :as http]
             [org.httpkit.client :as client]
             [http.async.client :as h]
             [clj-http.util :as u])
   (:import org.httpkit.ws.WebSocketClient))
-
-(defn- string-80k []
-  (apply str (map char
-                  (take (* 8 1024)                ; 80k
-                        (apply concat (repeat (range (int \a) (int \z))))))))
-
-;; [a..z]+
-(def const-string                       ; 8M string
-  (let [tmp (string-80k)]
-    (apply str (repeat 1024 tmp))))
 
 (defn ws-handler [req]
   (when-ws-request req con

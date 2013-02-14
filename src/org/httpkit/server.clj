@@ -1,7 +1,6 @@
 (ns org.httpkit.server
   (:require [clojure.tools.macro :as macro])
-  (:import  [org.httpkit.server AsycChannel HttpServer RingHandler]
-            org.httpkit.ws.WsCon
+  (:import  [org.httpkit.server AsyncChannel HttpServer RingHandler]
             javax.xml.bind.DatatypeConverter
             java.security.MessageDigest))
 
@@ -43,7 +42,7 @@
 
   See org.httpkit.timer ns for optional timeout facilities."
   [request callback-name & body]
-  `(let [channel# ^AsycChannel (:async-channel ~request)
+  `(let [channel# ^AsyncChannel (:async-channel ~request)
          ~callback-name (fn [data#]
                           (.writeChunk channel# data#
                                        (not (= false (:final data#)))))]
@@ -65,25 +64,25 @@
 
   (on-mesg ws-conn
      (fn [message] (println \"on-mesg\" message)))"
-  [^WsCon conn fn]  (.addReceiveListener conn fn))
+  [^AsyncChannel conn fn]  (.addReceiveListener conn fn))
 
 (defn on-close
   "Register a fn to be called when the connecton is closed:
 
   (on-close ws-conn
     (fn [status] (println \"websocket connection closed\")))"
-  [^WsCon conn fn]  (.addOnCloseListener conn fn))
+  [^AsyncChannel conn fn]  (.addOnCloseListener conn fn))
 
 (defn send-mesg
   "Send message to client
 
   (send-mesg ws-connection \"Message from server\")"
-  [^WsCon conn msg] (.send conn msg))
+  [^AsyncChannel conn msg] (.send conn msg))
 
 (defn close-conn
   "Close the websocket connection."
-  ([^WsCon conn]        (.serverClose conn))
-  ([^WsCon conn status] (.serverClose conn status)))
+  ([^AsyncChannel conn]        (.serverClose conn))
+  ([^AsyncChannel conn status] (.serverClose conn status)))
 
 (defmacro if-ws-request
   "If request is a WebSocket handshake request, evaluates `then` form with
@@ -98,9 +97,9 @@
            (send-mesg ws-conn \"Welcome to the chatroom!\"))
        (deal-with-not-websocket-handshake-request)))"
   [request conn-name then else]
-  `(if-let [~conn-name ^WsCon (:websocket ~request)]
+  `(if (:websocket ~request)
      (if-let [key# (get-in ~request [:headers "sec-websocket-key"])]
-       (do
+       (let [~conn-name ^AsyncChannel (:async-channel ~request)]
          (.sendHandshake ~conn-name {"Upgrade"    "websocket"
                                      "Connection" "Upgrade"
                                      "Sec-WebSocket-Accept" (accept key#)

@@ -4,8 +4,10 @@ import java.nio.ByteBuffer;
 import java.util.LinkedList;
 
 public abstract class ServerAtta {
-    public final LinkedList<ByteBuffer> toWrites = new LinkedList<ByteBuffer>();
-
+    final LinkedList<ByteBuffer> toWrites = new LinkedList<ByteBuffer>();
+    
+    protected AsyncChannel asycChannel;
+    
     public void addBuffer(ByteBuffer... buffer) {
         synchronized (toWrites) {
             for (ByteBuffer b : buffer) {

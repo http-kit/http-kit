@@ -10,7 +10,6 @@ import java.net.InetSocketAddress;
 import java.util.Map;
 
 import org.httpkit.*;
-import org.httpkit.ws.WsCon;
 
 public class HttpRequest {
     public final String queryString;
@@ -30,8 +29,7 @@ public class HttpRequest {
     String charset = "utf8";
     boolean isKeepAlive = false;
     boolean isWebSocket = false;
-    WsCon webSocketCon;
-    AsycChannel asycChannel;
+    AsyncChannel asycChannel;
 
     public HttpRequest(HttpMethod method, String url, HttpVersion version) {
         this.method = method;

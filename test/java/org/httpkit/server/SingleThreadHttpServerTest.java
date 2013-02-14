@@ -5,14 +5,7 @@ import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.TreeMap;
 
-import org.httpkit.server.ClojureRing;
-import org.httpkit.server.HttpRequest;
-import org.httpkit.server.HttpServer;
-import org.httpkit.server.IHandler;
-import org.httpkit.server.ResponseCallback;
 import org.httpkit.ws.WSFrame;
-import org.httpkit.ws.WsCon;
-
 
 class SingleThreadHandler implements IHandler {
 
@@ -29,7 +22,7 @@ class SingleThreadHandler implements IHandler {
 
     }
 
-    public void handle(WsCon con, WSFrame frame) {
+    public void handle(AsyncChannel con, WSFrame frame) {
 
     }
 }

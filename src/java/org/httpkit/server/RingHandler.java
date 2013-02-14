@@ -1,5 +1,6 @@
 package org.httpkit.server;
 
+import static org.httpkit.HttpVersion.HTTP_1_0;
 import static org.httpkit.server.ClojureRing.*;
 
 import java.util.Map;
@@ -8,7 +9,9 @@ import java.util.concurrent.*;
 
 import org.httpkit.HttpUtils;
 import org.httpkit.PrefixThreadFactory;
-import org.httpkit.ws.*;
+import org.httpkit.ws.CloseFrame;
+import org.httpkit.ws.TextFrame;
+import org.httpkit.ws.WSFrame;
 
 import clojure.lang.IFn;
 
@@ -28,14 +31,14 @@ class HttpHandler implements Runnable {
     public void run() {
         try {
             Map resp = (Map) handler.invoke(buildRequestMap(req));
-            if (resp != null) {
-                Object body = resp.get(BODY);
-                if (!(body instanceof AsycChannel)) { // hijacked
-                    cb.run(encode(getStatus(resp), getHeaders(resp, req), body));
-                }
-            } else {
-                // when handler return null: 404
+            if (resp == null) { // handler return null
                 cb.run(encode(404, null, null));
+            } else {
+                Object body = resp.get(BODY);
+                if (!(body instanceof AsyncChannel)) { // hijacked
+                    boolean addKeepalive = req.version == HTTP_1_0 && req.isKeepAlive;
+                    cb.run(encode(getStatus(resp), getHeaders(resp, addKeepalive), body));
+                }
             }
         } catch (Throwable e) {
             cb.run(encode(500, new TreeMap<String, Object>(), e.getMessage()));
@@ -69,15 +72,15 @@ public class RingHandler implements IHandler {
         execs.shutdownNow();
     }
 
-    public void handle(final WsCon con, final WSFrame frame) {
+    public void handle(final AsyncChannel channel, final WSFrame frame) {
         try {
             execs.submit(new Runnable() {
                 public void run() {
                     try {
                         if (frame instanceof TextFrame) {
-                            con.messageReceived(((TextFrame) frame).getText());
+                            channel.messageReceived(((TextFrame) frame).getText());
                         } else if (frame instanceof CloseFrame) {
-                            con.clientClosed(((CloseFrame) frame).getStatus());
+                            channel.clientClosed(((CloseFrame) frame).getStatus());
                         }
                     } catch (Throwable e) {
                         HttpUtils.printError("handle websocket frame " + frame, e);
