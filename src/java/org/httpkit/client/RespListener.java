@@ -76,7 +76,7 @@ public class RespListener implements IRespListener {
         }
 
         encoding = encoding.toLowerCase();
-        BytesInputStream bis = new BytesInputStream(body.get(), 0, body.length());
+        BytesInputStream bis = new BytesInputStream(body.get(), body.length());
         InputStream is;
 
         if ("gzip".equals(encoding) || "x-gzip".equals(encoding)) {
@@ -92,7 +92,7 @@ public class RespListener implements IRespListener {
         byte[] buffer = new byte[4096];
         int read;
         while ((read = is.read(buffer)) != -1) {
-            unzipped.append(buffer, 0, read);
+            unzipped.append(buffer, read);
         }
         is.close();
         return unzipped;
@@ -115,9 +115,9 @@ public class RespListener implements IRespListener {
     }
 
     public void onBodyReceived(byte[] buf, int length) throws AbortException {
-        body.append(buf, 0, length);
+        body.append(buf, length);
         if (filter != null && !filter.accept(body)) {
-            throw new AbortException("Regected when reading body, length: " + body.length());
+            throw new AbortException("Rejected when reading body, length: " + body.length());
         }
     }
 
@@ -133,7 +133,7 @@ public class RespListener implements IRespListener {
                 String html = new String(bytes.get(), 0, bytes.length(), charset);
                 pool.submit(new Handler(handler, status.getCode(), headers, html));
             } else {
-                BytesInputStream is = new BytesInputStream(bytes.get(), 0, bytes.length());
+                BytesInputStream is = new BytesInputStream(bytes.get(), bytes.length());
                 pool.submit(new Handler(handler, status.getCode(), headers, is));
             }
         } catch (IOException e) {

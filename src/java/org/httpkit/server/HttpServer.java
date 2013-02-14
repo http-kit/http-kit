@@ -114,7 +114,7 @@ public class HttpServer implements Runnable {
         }
     }
 
-    private void decodeWs(WsServerAtta atta, SelectionKey key, SocketChannel ch) {
+    private void decodeWs(WsServerAtta atta, SelectionKey key) {
         try {
             do {
                 WSFrame frame = atta.decoder.decode(buffer);
@@ -153,7 +153,7 @@ public class HttpServer implements Runnable {
                 if (atta instanceof HttpServerAtta) {
                     decodeHttp((HttpServerAtta) atta, key, ch);
                 } else {
-                    decodeWs((WsServerAtta) atta, key, ch);
+                    decodeWs((WsServerAtta) atta, key);
                 }
             }
         } catch (IOException e) { // the remote forcibly closed the connection
@@ -166,7 +166,7 @@ public class HttpServer implements Runnable {
         SocketChannel ch = (SocketChannel) key.channel();
         try {
             LinkedList<ByteBuffer> toWrites = atta.toWrites;
-            synchronized (toWrites) {
+            synchronized (atta.toWrites) {
                 int size = toWrites.size();
                 if (size == 1) {
                     ch.write(toWrites.get(0));
@@ -238,7 +238,7 @@ public class HttpServer implements Runnable {
                 if (key != null) {
                     closeKey(key, CloseFrame.SERVER_ERROR);
                 }
-                HttpUtils.printError("http server loop error, should not happend", e);
+                HttpUtils.printError("http server loop error, should not happen", e);
             }
         }
     }

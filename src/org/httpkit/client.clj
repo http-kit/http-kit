@@ -3,7 +3,7 @@
   (:require [clojure.string :as str])
   (:import [org.httpkit.client HttpClientConfig HttpClient
             IResponseHandler RespListener IFilter MaxBodyFilter]
-           [org.httpkit HttpMethod PrefixThreafFactory HttpUtils]
+           [org.httpkit HttpMethod PrefixThreadFactory HttpUtils]
            [java.util.concurrent ThreadPoolExecutor LinkedBlockingQueue TimeUnit]
            [java.net URI URLEncoder]
            javax.xml.bind.DatatypeConverter))
@@ -58,7 +58,7 @@
 ;; protect the IO loop thread: no starvation
 (def default-pool (let [max (.availableProcessors (Runtime/getRuntime))
                         queue (LinkedBlockingQueue.)
-                        factory (PrefixThreafFactory. "client-worker-")]
+                        factory (PrefixThreadFactory. "client-worker-")]
                     (ThreadPoolExecutor. 0 max 60 TimeUnit/SECONDS queue factory)))
 
 ;;;; Public API

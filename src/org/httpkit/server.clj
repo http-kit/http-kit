@@ -65,7 +65,7 @@
 
   (on-mesg ws-conn
      (fn [message] (println \"on-mesg\" message)))"
-  [^WsCon conn fn]  (.addRecieveListener conn fn))
+  [^WsCon conn fn]  (.addReceiveListener conn fn))
 
 (defn on-close
   "Register a fn to be called when the connecton is closed:

@@ -6,7 +6,7 @@ public class HttpStatus {
 
     private final int code;
     private final String reasonPhrase;
-    private byte[] bytes;
+    private final byte[] bytes;
 
     /**
      * 100 Continue
@@ -415,7 +415,7 @@ public class HttpStatus {
         return reasonPhrase;
     }
 
-    public byte[] getResponseIntialLineBytes() {
+    public byte[] getInitialLineBytes() {
         return bytes;
     }
 }

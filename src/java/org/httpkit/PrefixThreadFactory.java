@@ -3,11 +3,11 @@ package org.httpkit;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class PrefixThreafFactory implements ThreadFactory {
+public class PrefixThreadFactory implements ThreadFactory {
     final AtomicInteger id = new AtomicInteger(0);
-    private String prefix;
+    private final String prefix;
 
-    public PrefixThreafFactory(String prefix) {
+    public PrefixThreadFactory(String prefix) {
         this.prefix = prefix;
     }
 

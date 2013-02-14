@@ -7,7 +7,7 @@ import java.util.TreeMap;
 import java.util.concurrent.*;
 
 import org.httpkit.HttpUtils;
-import org.httpkit.PrefixThreafFactory;
+import org.httpkit.PrefixThreadFactory;
 import org.httpkit.ws.*;
 
 import clojure.lang.IFn;
@@ -50,7 +50,7 @@ public class RingHandler implements IHandler {
     final IFn handler;
 
     public RingHandler(int thread, IFn handler, String prefix, int queueSize) {
-        PrefixThreafFactory factory = new PrefixThreafFactory(prefix);
+        PrefixThreadFactory factory = new PrefixThreadFactory(prefix);
         BlockingQueue<Runnable> queue = new ArrayBlockingQueue<Runnable>(queueSize);
         execs = new ThreadPoolExecutor(thread, thread, 0, TimeUnit.MILLISECONDS, queue, factory);
         this.handler = handler;
@@ -75,7 +75,7 @@ public class RingHandler implements IHandler {
                 public void run() {
                     try {
                         if (frame instanceof TextFrame) {
-                            con.messageRecieved(((TextFrame) frame).getText());
+                            con.messageReceived(((TextFrame) frame).getText());
                         } else if (frame instanceof CloseFrame) {
                             con.clientClosed(((CloseFrame) frame).getStatus());
                         }

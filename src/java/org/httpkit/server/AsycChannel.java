@@ -15,12 +15,12 @@ import clojure.lang.Keyword;
 @SuppressWarnings({ "rawtypes", "unchecked" })
 public class AsycChannel {
 
-    final SelectionKey key;
+    private final SelectionKey key;
     final private HttpServer server;
-    final HttpRequest req;
+    private final HttpRequest req;
 
-    private volatile boolean initalWrite = true;
-    private volatile boolean finalWritted = false;
+    private volatile boolean initialWrite = true;
+    private volatile boolean finalWritten = false;
 
     public AsycChannel(SelectionKey key, HttpRequest req, HttpServer server) {
         this.key = key;
@@ -34,24 +34,24 @@ public class AsycChannel {
         return ByteBuffer.wrap(bytes);
     }
 
-    private static byte[] finalChunkBytes = "0\r\n\r\n".getBytes();
-    private static byte[] finalChunkBytes2 = "\r\n0\r\n\r\n".getBytes();
-    private static byte[] newLineBytes = "\r\n".getBytes();
+    private static final byte[] finalChunkBytes = "0\r\n\r\n".getBytes();
+    private static final byte[] finalChunkBytes2 = "\r\n0\r\n\r\n".getBytes();
+    private static final byte[] newLineBytes = "\r\n".getBytes();
 
     public void writeChunk(Object data, boolean isFinal) throws IOException {
 
-        if (finalWritted == true) {
-            throw new IllegalStateException("final chunked has already been write");
+        if (finalWritten) {
+            throw new IllegalStateException("final chunk has already been written");
         }
 
-        if (isFinal == true) {
-            finalWritted = true;
+        if (isFinal) {
+            finalWritten = true;
         }
 
         ByteBuffer buffers[];
         boolean isMap = (data instanceof Map);
 
-        if (initalWrite) {
+        if (initialWrite) {
             int status = 200;
             Object body = data;
             Map<String, Object> headers = new TreeMap<String, Object>();
@@ -103,6 +103,6 @@ public class AsycChannel {
         att.addBuffer(buffers);
         server.queueWrite(key);
 
-        initalWrite = false;
+        initialWrite = false;
     }
 }

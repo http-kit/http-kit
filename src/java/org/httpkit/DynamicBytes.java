@@ -11,7 +11,7 @@ public class DynamicBytes {
         data = new byte[size];
     }
 
-    private void expandIfNessarry(int more) {
+    private void expandIfNeeded(int more) {
         if (idx + more > data.length) {
             int after = (int) ((idx + more) * 1.33);
             // String msg = "expand memory, from " + data.length + " to " +
@@ -30,7 +30,7 @@ public class DynamicBytes {
     }
 
     public DynamicBytes append(byte b) {
-        expandIfNessarry(1);
+        expandIfNeeded(1);
         data[idx++] = b;
         return this;
     }
@@ -40,9 +40,9 @@ public class DynamicBytes {
         return "DynamicBytes[len=" + idx + ", cap=" + data.length + ']';
     }
 
-    public DynamicBytes append(byte[] d, int offset, int length) {
-        expandIfNessarry(length);
-        System.arraycopy(d, offset, data, idx, length);
+    public DynamicBytes append(byte[] d, int length) {
+        expandIfNeeded(length);
+        System.arraycopy(d, 0, data, idx, length);
         idx += length;
         return this;
     }
@@ -53,6 +53,6 @@ public class DynamicBytes {
 
     public DynamicBytes append(String str, Charset c) {
         byte[] bs = str.getBytes(c);
-        return append(bs, 0, bs.length);
+        return append(bs, bs.length);
     }
 }

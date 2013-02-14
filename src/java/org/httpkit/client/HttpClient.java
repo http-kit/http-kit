@@ -26,7 +26,7 @@ import org.httpkit.ProtocolException;
 public final class HttpClient implements Runnable {
     private static final AtomicInteger ID = new AtomicInteger(0);
 
-    private final Queue<Request> pendings = new ConcurrentLinkedQueue<Request>();
+    private final Queue<Request> pending = new ConcurrentLinkedQueue<Request>();
     private final PriorityQueue<Request> requests = new PriorityQueue<Request>();
     private final PriorityQueue<PersistentConn> keepalives = new PriorityQueue<PersistentConn>();
 
@@ -50,7 +50,7 @@ public final class HttpClient implements Runnable {
         t.start();
     }
 
-    private void clearTimeouted(long now) {
+    private void clearTimeout(long now) {
         Request r;
         while ((r = requests.peek()) != null) {
             if (r.isTimeout(now)) {
@@ -63,7 +63,7 @@ public final class HttpClient implements Runnable {
                 // will remove it
                 r.finish(new TimeoutException(msg + r.timeOutMs + "ms"));
                 if (r.key != null) {
-                    closeQuitely(r.key);
+                    closeQuietly(r.key);
                 }
             } else {
                 break;
@@ -73,7 +73,7 @@ public final class HttpClient implements Runnable {
         PersistentConn pc;
         while ((pc = keepalives.peek()) != null) {
             if (pc.isTimeout(now)) {
-                closeQuitely(pc.key);
+                closeQuietly(pc.key);
                 keepalives.poll();
             } else {
                 break;
@@ -81,8 +81,8 @@ public final class HttpClient implements Runnable {
         }
     }
 
-    private boolean cleanAndRetryIfStealed(SelectionKey key, Request req) {
-        closeQuitely(key);
+    private boolean cleanAndRetryIfBroken(SelectionKey key, Request req) {
+        closeQuietly(key);
         keepalives.remove(key);
         // keep-alived connection, remote server close it without sending byte
         if (req.isKeepAlived && req.decoder.state == READ_INITIAL) {
@@ -91,7 +91,7 @@ public final class HttpClient implements Runnable {
             }
             req.isKeepAlived = false;
             requests.remove(req); // remove from timeout queue
-            pendings.offer(req); // queue for retry
+            pending.offer(req); // queue for retry
             selector.wakeup();
             return true;
         }
@@ -106,14 +106,14 @@ public final class HttpClient implements Runnable {
         try {
             read = ch.read(buffer);
         } catch (IOException e) { // The remote forcibly closed the connection
-            if (!cleanAndRetryIfStealed(key, req)) {
+            if (!cleanAndRetryIfBroken(key, req)) {
                 // os X get Connection reset by peer error,
                 req.finish(e);
             }
         }
 
         if (read == -1) { // read all, remote closed it cleanly
-            if (!cleanAndRetryIfStealed(key, req)) {
+            if (!cleanAndRetryIfBroken(key, req)) {
                 req.finish();
             }
         } else if (read > 0) {
@@ -125,17 +125,17 @@ public final class HttpClient implements Runnable {
                     keepalives.offer(new PersistentConn(now + config.keepalive, req.addr, key));
                 }
             } catch (HTTPException e) {
-                closeQuitely(key);
+                closeQuietly(key);
                 req.finish(e);
             } catch (Exception e) {
-                closeQuitely(key);
+                closeQuietly(key);
                 req.finish(e);
-                HttpUtils.printError("Should not happend!!", e); // decoding
+                HttpUtils.printError("Should not happen!!", e); // decoding
             }
         }
     }
 
-    private void closeQuitely(SelectionKey key) {
+    private void closeQuietly(SelectionKey key) {
         try {
             key.channel().close();
         } catch (Exception ignore) {
@@ -152,7 +152,7 @@ public final class HttpClient implements Runnable {
                 key.interestOps(OP_READ);
             }
         } catch (IOException e) {
-            if (!cleanAndRetryIfStealed(key, req)) {
+            if (!cleanAndRetryIfBroken(key, req)) {
                 req.finish(e);
             }
         }
@@ -201,7 +201,7 @@ public final class HttpClient implements Runnable {
             timeoutMs = config.timeOutMs;
         }
 
-        pendings.offer(new Request(addr, request, cb, requests, timeoutMs, method));
+        pending.offer(new Request(addr, request, cb, requests, timeoutMs, method));
         selector.wakeup();
     }
 
@@ -237,14 +237,14 @@ public final class HttpClient implements Runnable {
                 key.interestOps(OP_WRITE);
             }
         } catch (IOException e) {
-            closeQuitely(key); // not added to kee-alive yet;
+            closeQuietly(key); // not added to kee-alive yet;
             req.finish(e);
         }
     }
 
-    private void processPendings() {
+    private void processPending() {
         Request job = null;
-        while ((job = pendings.poll()) != null) {
+        while ((job = pending.poll()) != null) {
             PersistentConn con = keepalives.remove(job.addr);
             if (con != null) { // keep alive
                 SelectionKey key = con.key;
@@ -256,7 +256,7 @@ public final class HttpClient implements Runnable {
                     continue;
                 } else {
                     // this should not happen often
-                    closeQuitely(key);
+                    closeQuietly(key);
                 }
             }
             try {
@@ -296,8 +296,8 @@ public final class HttpClient implements Runnable {
                         ite.remove();
                     }
                 }
-                clearTimeouted(now);
-                processPendings();
+                clearTimeout(now);
+                processPending();
             } catch (IOException e) {
                 HttpUtils.printError("select exception", e);
             }

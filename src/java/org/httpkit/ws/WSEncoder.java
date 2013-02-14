@@ -6,7 +6,7 @@ import org.httpkit.HttpUtils;
 
 
 public class WSEncoder {
-    public static final ByteBuffer encode(byte opcode, byte[] data) {
+    public static ByteBuffer encode(byte opcode, byte[] data) {
         byte b0 = 0;
         b0 |= 1 << 7; // FIN
         b0 |= opcode;
@@ -28,7 +28,7 @@ public class WSEncoder {
     }
 
     // clear text
-    public static final ByteBuffer encode(String text) {
+    public static ByteBuffer encode(String text) {
         byte[] data = text.getBytes(HttpUtils.UTF_8);
         return encode(WSDecoder.OPCODE_TEXT, data);
     }

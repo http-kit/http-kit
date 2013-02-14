@@ -61,10 +61,10 @@ public class Decoder {
                 listener.onInitialLineReceived(version, s);
                 state = READ_HEADER;
             } catch (NumberFormatException e) {
-                throw new ProtocolException("not http prototol? " + sb);
+                throw new ProtocolException("not http protocol? " + sb);
             }
         } else {
-            throw new ProtocolException("not http prototol? " + sb);
+            throw new ProtocolException("not http protocol? " + sb);
         }
     }
 

@@ -9,7 +9,7 @@ import clojure.lang.IFn;
 public class TimerService implements Runnable {
 
     private final PriorityQueue<CancelableFutureTask> queue = new PriorityQueue<CancelableFutureTask>();
-    private AtomicBoolean started = new AtomicBoolean(false);
+    private final AtomicBoolean started = new AtomicBoolean(false);
 
     public CancelableFutureTask scheduleTask(int timeout, IFn task) {
         if (started.compareAndSet(false, true)) {
@@ -46,7 +46,7 @@ public class TimerService implements Runnable {
                     try {
                         // wait 2 minute before kill self
                         queue.wait(1000 * 120);
-                        if (emptyQueueWaited == true) {
+                        if (emptyQueueWaited) {
                             started.compareAndSet(true, false);
                             break; // die, will start
                         } else {

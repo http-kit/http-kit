@@ -13,9 +13,9 @@ import clojure.lang.IFn;
 
 public class WsCon {
     final SelectionKey key;
-    final List<IFn> onRecieveListeners = new ArrayList<IFn>(1);
-    final List<IFn> onCloseListeners = new ArrayList<IFn>(1);
-    private volatile boolean isClosedRuned = false;
+    final List<IFn> receiveListeners = new ArrayList<IFn>(1);
+    final List<IFn> closeListeners = new ArrayList<IFn>(1);
+    private volatile boolean isClosedRan = false;
 
     final private HttpServer server;
 
@@ -25,14 +25,14 @@ public class WsCon {
     }
 
     public void addOnCloseListener(IFn fn) {
-        synchronized (onCloseListeners) {
-            onCloseListeners.add(fn);
+        synchronized (closeListeners) {
+            closeListeners.add(fn);
         }
     }
 
-    public void addRecieveListener(IFn fn) {
-        synchronized (onRecieveListeners) {
-            onRecieveListeners.add(fn);
+    public void addReceiveListener(IFn fn) {
+        synchronized (receiveListeners) {
+            receiveListeners.add(fn);
         }
     }
 
@@ -41,12 +41,12 @@ public class WsCon {
     }
 
     private void onClose(int status) {
-        if (!isClosedRuned) {
-            isClosedRuned = true;
+        if (!isClosedRan) {
+            isClosedRan = true;
             IFn[] listeners;
-            synchronized (onCloseListeners) {
-                listeners = new IFn[onCloseListeners.size()];
-                listeners = onCloseListeners.toArray(listeners);
+            synchronized (closeListeners) {
+                listeners = new IFn[closeListeners.size()];
+                listeners = closeListeners.toArray(listeners);
             }
             for (IFn l : listeners) {
                 l.invoke(status);
@@ -54,11 +54,11 @@ public class WsCon {
         }
     }
 
-    public void messageRecieved(final String mesg) {
+    public void messageReceived(final String mesg) {
         IFn[] listeners;
-        synchronized (onRecieveListeners) {
-            listeners = new IFn[onRecieveListeners.size()];
-            listeners = onRecieveListeners.toArray(listeners);
+        synchronized (receiveListeners) {
+            listeners = new IFn[receiveListeners.size()];
+            listeners = receiveListeners.toArray(listeners);
         }
         for (IFn l : listeners) {
             l.invoke(mesg);

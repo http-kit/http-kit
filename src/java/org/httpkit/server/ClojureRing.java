@@ -16,8 +16,8 @@ import clojure.lang.IPersistentMap;
 import clojure.lang.Keyword;
 import clojure.lang.PersistentArrayMap;
 
-//  SimpleDateFormat is not threadsafe
-class DateFormater extends ThreadLocal<SimpleDateFormat> {
+//  SimpleDateFormat is not thread safe
+class DateFormatter extends ThreadLocal<SimpleDateFormat> {
     protected SimpleDateFormat initialValue() {
         // Formats into HTTP date format (RFC 822/1123).
         SimpleDateFormat f = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.US);
@@ -25,10 +25,10 @@ class DateFormater extends ThreadLocal<SimpleDateFormat> {
         return f;
     }
 
-    private static final DateFormater FORMATER = new DateFormater();
+    private static final DateFormatter FORMATTER = new DateFormatter();
 
     public static String getDate() {
-        return FORMATER.get().format(new Date());
+        return FORMATTER.get().format(new Date());
     }
 }
 
@@ -65,7 +65,7 @@ public class ClojureRing {
 
     public static final Keyword STATUS = intern("status");
 
-    public static final int getStatus(Map<Keyword, Object> resp) {
+    public static int getStatus(Map<Keyword, Object> resp) {
         int status = 200;
         Object s = resp.get(STATUS);
         if (s instanceof Long) {
@@ -90,24 +90,17 @@ public class ClojureRing {
         return headers;
     }
 
-    public static boolean isJustBody(Object o) {
-        if (o instanceof Map) {
-            return false;
-        }
-        return true;
-    }
-
     public static final String CL = "Content-Length";
 
     public static ByteBuffer[] encode(int status, Map<String, Object> headers, Object body) {
         headers = camelCase(headers);
         headers.put("Server", "http-kit");
-        headers.put("Date", DateFormater.getDate());
+        headers.put("Date", DateFormatter.getDate());
         ByteBuffer bodyBuffer;
 
         try {
             bodyBuffer = bodyBuffer(body);
-            // only write lengh if not chunked
+            // only write length if not chunked
             if (!CHUNKED.equals(headers.get("Transfer-Encoding"))) {
                 if (bodyBuffer != null) {
                     headers.put(CL, Integer.toString(bodyBuffer.remaining()));
@@ -124,8 +117,8 @@ public class ClojureRing {
         }
 
         DynamicBytes bytes = new DynamicBytes(196);
-        byte[] bs = HttpStatus.valueOf(status).getResponseIntialLineBytes();
-        bytes.append(bs, 0, bs.length);
+        byte[] bs = HttpStatus.valueOf(status).getInitialLineBytes();
+        bytes.append(bs, bs.length);
         encodeHeaders(bytes, headers);
         ByteBuffer headBuffer = ByteBuffer.wrap(bytes.get(), 0, bytes.length());
 
@@ -148,7 +141,7 @@ public class ClojureRing {
 
         m.put(REQUEST_METHOD, req.method.KEY);
 
-        // key is already downcased, required by ring spec
+        // key is already lower cased, required by ring spec
         m.put(HEADERS, PersistentArrayMap.create(req.headers));
         m.put(CONTENT_TYPE, req.contentType);
         m.put(CONTENT_LENGTH, req.contentLength);

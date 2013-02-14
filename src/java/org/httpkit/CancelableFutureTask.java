@@ -8,11 +8,11 @@ import clojure.lang.IFn;
 
 public class CancelableFutureTask implements Comparable<CancelableFutureTask> {
 
-    public final int timeout;
-    public final IFn futureTask;
+    private final int timeout;
+    private final IFn futureTask;
     public final long timeoutTs;
 
-    private AtomicBoolean runned = new AtomicBoolean(false);
+    private final AtomicBoolean done = new AtomicBoolean(false);
     private final PriorityQueue<CancelableFutureTask> queue;
 
     public CancelableFutureTask(int timeout, IFn task, PriorityQueue<CancelableFutureTask> queue) {
@@ -24,22 +24,22 @@ public class CancelableFutureTask implements Comparable<CancelableFutureTask> {
 
     public String toString() {
         long now = System.currentTimeMillis();
-        if (runned.get() == true) {
-            return "timeout=" + timeout + "ms, runned or canceled";
+        if (done.get()) {
+            return "timeout=" + timeout + "ms, done or canceled";
         } else {
             return "timeout=" + timeout + "ms, due in " + (timeoutTs - now) + "ms";
         }
     }
 
     public void runTask() {
-        if (runned.compareAndSet(false, true)) {
+        if (done.compareAndSet(false, true)) {
             futureTask.invoke();
         }
     }
 
     public boolean cancel() {
-        boolean b = runned.compareAndSet(false, true);
-        if (b) {// ok, not runned
+        boolean b = done.compareAndSet(false, true);
+        if (b) {// ok, not done
             synchronized (queue) {
                 queue.remove(this);
             }

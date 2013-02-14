@@ -10,14 +10,14 @@ import java.util.Arrays;
 public class BytesInputStream extends InputStream {
     private final byte[] buf;
     private final int count;
-    protected int mark = 0;
+    private int mark = 0;
 
     private int pos;
 
-    public BytesInputStream(byte[] data, int offset, int length) {
+    public BytesInputStream(byte[] data, int length) {
         this.buf = data;
         this.count = length;
-        this.pos = offset;
+        this.pos = 0;
     }
 
     /**

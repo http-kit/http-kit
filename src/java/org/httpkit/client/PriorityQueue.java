@@ -30,26 +30,16 @@ public class PriorityQueue<E> {
     private int size = 0;
 
     /**
-     * Creates a {@code PriorityQueue} with the default initial capacity (11)
-     * that orders its elements according to their {@linkplain Comparable
-     * natural ordering}.
-     */
-    public PriorityQueue() {
-        this(DEFAULT_INITIAL_CAPACITY);
-    }
-
-    /**
      * Creates a {@code PriorityQueue} with the specified initial capacity that
      * orders its elements according to their {@linkplain Comparable natural
      * ordering}.
-     * 
-     * @param initialCapacity
+     *
      *            the initial capacity for this priority queue
      * @throws IllegalArgumentException
      *             if {@code initialCapacity} is less than 1
      */
-    public PriorityQueue(int initialCapacity) {
-        this.queue = new Object[initialCapacity];
+    public PriorityQueue() {
+        this.queue = new Object[DEFAULT_INITIAL_CAPACITY];
     }
 
     /**

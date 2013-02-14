@@ -39,8 +39,6 @@ public class HttpUtils {
 
     // public static final int ABORT_PROCESSING = -1;
 
-    public static final int TIMEOUT_CHECK_INTEVAL = 3000;
-
     // public static final String USER_AGENT = "user-agent";
 
     // public static final String ACCEPT = "Accept";
@@ -320,13 +318,13 @@ public class HttpUtils {
         byte[] buffer = new byte[16384];
         int read;
         while ((read = is.read(buffer)) != -1) {
-            bytes.append(buffer, 0, read);
+            bytes.append(buffer, read);
         }
         is.close();
         return bytes;
     }
 
-    public static final void printError(String msg, Throwable t) {
+    public static void printError(String msg, Throwable t) {
         String error = String.format("%s [%s] ERROR - %s", new Date(), Thread.currentThread()
                 .getName(), msg);
         StringWriter str = new StringWriter();
@@ -363,7 +361,7 @@ public class HttpUtils {
         valueEnd = findEndOfString(sb);
 
         String key = sb.substring(nameStart, nameEnd);
-        if (valueStart > valueEnd) { // ignoreq
+        if (valueStart > valueEnd) { // ignore
             // logger.warn("header error: " + sb);
         } else {
             String value = sb.substring(valueStart, valueEnd);

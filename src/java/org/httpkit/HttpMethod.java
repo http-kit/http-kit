@@ -15,7 +15,7 @@ public enum HttpMethod {
         this.KEY = key;
     }
 
-    public static final HttpMethod fromKeyword(Keyword k) {
+    public static HttpMethod fromKeyword(Keyword k) {
         HttpMethod[] values = HttpMethod.values();
         for (HttpMethod m : values) {
             if (m.KEY.equals(k)) {

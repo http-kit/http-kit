@@ -48,7 +48,7 @@ public class HttpRequest {
 
     public InputStream getBody() {
         if (body != null) {
-            return new BytesInputStream(body, 0, contentLength);
+            return new BytesInputStream(body, contentLength);
         }
         return null;
     }
