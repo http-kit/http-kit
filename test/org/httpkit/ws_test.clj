@@ -11,8 +11,16 @@
             [clj-http.util :as u])
   (:import org.httpkit.ws.WebSocketClient))
 
+(def ws-closed (atom false))
+
+(defn- check-closed []
+  (is @ws-closed)
+  (reset! ws-closed false))
+
 (defn ws-handler [req]
   (when-ws-request req con
+                   (on-close con (fn [status]
+                                   (reset! ws-closed true)))
                    (on-mesg con (fn [msg]
                                   (try
                                     (let [{:keys [length times]} (read-string msg)]
@@ -53,7 +61,8 @@
         (.sendMessage client (pr-str {:length length :times times}))
         (doseq [_ (range 0 times)]
           (is (= length (count (.getMessage client)))))))
-    (.close client))) ;; server's closeFrame response is checked
+    (.close client) ;; server's closeFrame response is checked
+    (check-closed)))
 
 (deftest test-websocket-fragmented
   (let [client (WebSocketClient. "ws://localhost:4348/ws")]
