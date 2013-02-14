@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.TreeMap;
 
+import org.httpkit.ws.TextFrame;
 import org.httpkit.ws.WSFrame;
 
 class SingleThreadHandler implements IHandler {
@@ -24,6 +25,13 @@ class SingleThreadHandler implements IHandler {
 
     public void handle(AsyncChannel con, WSFrame frame) {
 
+    }
+
+    public void handle(AsyncChannel channel, TextFrame frame) {
+
+    }
+
+    public void clientClose(AsyncChannel channel, int status) {
     }
 }
 

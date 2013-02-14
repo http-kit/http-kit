@@ -41,13 +41,10 @@
   applied.
 
   See org.httpkit.timer ns for optional timeout facilities."
-  [request callback-name & body]
-  `(let [channel# ^AsyncChannel (:async-channel ~request)
-         ~callback-name (fn [data#]
-                          (.writeChunk channel# data#
-                                       (not (= false (:final data#)))))]
+  [request channel & body]
+  `(let [~channel (:async-channel ~request)]
      (do ~@body)
-     {:status 200 :body channel#}))
+     {:status 200 :body ~channel}))
 
 (comment (.get (:body (async-response respond! (future (respond! "boo"))))))
 
@@ -64,20 +61,24 @@
 
   (on-mesg ws-conn
      (fn [message] (println \"on-mesg\" message)))"
-  [^AsyncChannel conn fn]  (.addReceiveListener conn fn))
+  [^AsyncChannel conn fn]  (.setReceiveHandler conn fn))
 
 (defn on-close
   "Register a fn to be called when the connecton is closed:
 
   (on-close ws-conn
     (fn [status] (println \"websocket connection closed\")))"
-  [^AsyncChannel conn fn]  (.addOnCloseListener conn fn))
+  [^AsyncChannel conn fn]  (.setCloseHandler conn fn))
 
 (defn send-mesg
   "Send message to client
 
   (send-mesg ws-connection \"Message from server\")"
   [^AsyncChannel conn msg] (.send conn msg))
+
+(defn respond
+  [^AsyncChannel conn data]
+  (.writeChunk conn data (not (= false (:final data)))))
 
 (defn close-conn
   "Close the websocket connection."

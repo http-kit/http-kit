@@ -1,4 +1,5 @@
 (ns org.httpkit.test-util
+  (:use clojure.test)
   (:import [java.io File FileOutputStream FileInputStream]))
 
 (defn- string-80k []
@@ -21,3 +22,25 @@
        tmp)))
 
 (defn to-int [int-str] (Integer/valueOf int-str))
+
+(def channel-closed (atom false))
+
+(defn- sleep [n]
+  (let [end (+ (System/currentTimeMillis) n)]
+    (loop []
+      (let [time (- end (System/currentTimeMillis))]
+        (when (> time 0)
+          (try (Thread/sleep time)
+               (catch Exception e))
+          (recur))))))
+
+(defn check-on-close-called []
+  (loop [i 0]
+    (when (and (not @channel-closed) (< i 5))
+      (sleep 10)                        ; wait most 100ms here
+      (recur (inc i))))
+  (is @channel-closed)
+  (reset! channel-closed false))
+
+(defn close-handler [status]
+  (reset! channel-closed true))

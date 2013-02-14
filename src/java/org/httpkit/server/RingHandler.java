@@ -9,9 +9,7 @@ import java.util.concurrent.*;
 
 import org.httpkit.HttpUtils;
 import org.httpkit.PrefixThreadFactory;
-import org.httpkit.ws.CloseFrame;
 import org.httpkit.ws.TextFrame;
-import org.httpkit.ws.WSFrame;
 
 import clojure.lang.IFn;
 
@@ -72,16 +70,12 @@ public class RingHandler implements IHandler {
         execs.shutdownNow();
     }
 
-    public void handle(final AsyncChannel channel, final WSFrame frame) {
+    public void handle(final AsyncChannel channel, final TextFrame frame) {
         try {
             execs.submit(new Runnable() {
                 public void run() {
                     try {
-                        if (frame instanceof TextFrame) {
-                            channel.messageReceived(((TextFrame) frame).getText());
-                        } else if (frame instanceof CloseFrame) {
-                            channel.clientClosed(((CloseFrame) frame).getStatus());
-                        }
+                        channel.messageReceived(frame.getText());
                     } catch (Throwable e) {
                         HttpUtils.printError("handle websocket frame " + frame, e);
                     }
@@ -91,5 +85,18 @@ public class RingHandler implements IHandler {
             // TODO notify client if server is overloaded
             HttpUtils.printError("increase :queue-size if this happens often", e);
         }
+    }
+
+    public void clientClose(final AsyncChannel channel, final int status) {
+        if (channel.closeHandler.get() != null && !channel.closedRan.get())
+            execs.submit(new Runnable() {
+                public void run() {
+                    try {
+                        channel.onClose(status);
+                    } catch (Exception e) {
+                        HttpUtils.printError("on close handler", e);
+                    }
+                }
+            });
     }
 }

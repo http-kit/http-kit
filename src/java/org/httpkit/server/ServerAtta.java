@@ -15,6 +15,8 @@ public abstract class ServerAtta {
             }
         }
     }
+    
+    protected AsyncChannel asycChannel;
 
     public abstract boolean isKeepAlive();
 }

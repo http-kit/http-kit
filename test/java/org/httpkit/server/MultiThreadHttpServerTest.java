@@ -7,8 +7,7 @@ import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import org.httpkit.ws.WSFrame;
-
+import org.httpkit.ws.TextFrame;
 
 class MultiThreadHandler implements IHandler {
     private ExecutorService exec;
@@ -33,7 +32,10 @@ class MultiThreadHandler implements IHandler {
         });
     }
 
-    public void handle(AsyncChannel con, WSFrame frame) {
+    public void handle(AsyncChannel channel, TextFrame frame) {
+    }
+
+    public void clientClose(AsyncChannel channel, int status) {
     }
 }
 

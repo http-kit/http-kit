@@ -11,16 +11,10 @@
             [clj-http.util :as u])
   (:import org.httpkit.ws.WebSocketClient))
 
-(def ws-closed (atom false))
-
-(defn- check-closed []
-  (is @ws-closed)
-  (reset! ws-closed false))
-
 (defn ws-handler [req]
   (when-ws-request req con
-                   (on-close con (fn [status]
-                                   (reset! ws-closed true)))
+                   ;; close-handler in test_util.clj
+                   (on-close con close-handler)
                    (on-mesg con (fn [msg]
                                   (try
                                     (let [{:keys [length times]} (read-string msg)]
@@ -56,16 +50,18 @@
          (def client1 (WebSocketClient. "ws://localhost:4348/ws")))
 
 (deftest test-websocket
-  (let [client (WebSocketClient. "ws://localhost:4348/ws")]
-    (doseq [_ (range 0 10)]
-      (let [length (rand-int (* 4 1024 1024))
-            times (rand-int 10)]
-        ;; ask for a given length, make sure server understand it
-        (.sendMessage client (pr-str {:length length :times times}))
-        (doseq [_ (range 0 times)]
-          (is (= length (count (.getMessage client)))))))
-    (.close client) ;; server's closeFrame response is checked
-    (check-closed)))
+  (doseq [_ (range 1 4)]
+    (let [client (WebSocketClient. "ws://localhost:4348/ws")]
+      (doseq [_ (range 0 10)]
+        (let [length (rand-int (* 4 1024 1024))
+              times (rand-int 10)]
+          ;; ask for a given length, make sure server understand it
+          (.sendMessage client (pr-str {:length length :times times}))
+          (doseq [_ (range 0 times)]
+            (is (= length (count (.getMessage client)))))))
+      (.close client) ;; server's closeFrame response is checked
+      ;; see test_util.clj
+      (check-on-close-called))))
 
 (deftest test-websocket-fragmented
   (let [client (WebSocketClient. "ws://localhost:4348/ws")]
@@ -116,5 +112,5 @@
         (is (= msg @received-msg)))
       (h/close ws))))
 
-;; test many times, and connect result
-;; rm /tmp/test_results&& ./scripts/javac with-test && for i in {1..100}; do lein test org.httpkit.ws-test >> /tmp/test_results; done
+;; ;; test many times, and connect result
+;; ;; rm /tmp/test_results&& ./scripts/javac with-test && for i in {1..100}; do lein test org.httpkit.ws-test >> /tmp/test_results; done

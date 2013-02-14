@@ -11,20 +11,7 @@
             [org.httpkit.client :as client]
             [clj-http.util :as u])
   (:import [java.io File FileOutputStream FileInputStream]
-           org.httpkit.SlowHttpClient))
-
-(defn async-handler [req]
-  (async-response req cb
-                  (cb {:status 200 :body "hello async"})))
-
-(defn async-just-body [req]
-  (async-response req cb
-                  (cb "just-body")))
-
-(defn async-response-handler [req]
-  (async-response req respond
-                  (future (respond
-                           {:status 200 :body "hello async"}))))
+           org.httpkit.SpecialHttpClient))
 
 (defn file-handler [req]
   {:status 200
@@ -42,26 +29,50 @@
     {:status 200
      :body (str title ": " (:size file))}))
 
+(defn async-handler [req]
+  (async-response req channel
+                  ;; close-handler in test_util.clj
+                  (on-close channel close-handler)
+                  (respond channel {:status 200 :body "hello async"})))
+
+(defn async-just-body [req]
+  (async-response req channel
+                  (respond channel "just-body")))
+
+(defn async-response-handler [req]
+  (async-response req channel
+                  (future (respond channel {:status 200 :body "hello async"}))))
+
 (defn streaming-handler [req]
   (let [s (or (-> req :params :s) (subs const-string 0 1024))
         n (+ (rand-int 128) 10)
         seqs (partition n n '() s)]     ; padding with empty
-    (async-response req cb
-                    (cb {:body (first seqs) :final false})
+    (async-response req channel
+                    (on-close channel close-handler)
+                    (respond channel {:body (first seqs) :final false})
                     (doseq [p (rest seqs)]
-                      (cb {:body p :final false}))
-                    (cb nil))))
+                      (respond channel {:body p :final false}))
+                    (respond channel nil))))
+
+(defn slow-server-handler [req]
+  (async-response req channel
+                  (on-close channel close-handler)
+                  (respond channel {:body "hello world" :final false})
+                  (schedule-task 10     ; 10ms
+                                 (respond channel {:body "hello world 2" :final false}))
+                  (schedule-task 20
+                                 (respond channel {:body "finish"}))))
 
 (defn async-with-timeout [req]
   (let [time (to-int (-> req :params :time))
         cancel (-> req :params :cancel)]
-    (async-response req respond
+    (async-response req channel
                     (with-timeout respond time
-                      (respond {:status 200
-                                :body (str time "ms")})
+                      (respond channel {:status 200
+                                        :body (str time "ms")})
                       (when cancel
-                        (respond {:status 200 ; should return ok
-                                  :body "canceled"}))))))
+                        (respond channel {:status 200 ; should return ok
+                                          :body "canceled"}))))))
 
 (defroutes test-routes
   (GET "/" [] "hello world")
@@ -76,10 +87,12 @@
   (GET "/file" [] (wrap-file-info file-handler))
   (GET "/inputstream" [] inputstream-handler)
   (POST "/multipart" [] multipart-handler)
-  (POST "/chunked" [] (fn [req] {:status 200
-                                :body (str (:content-length req))}))
+  (POST "/chunked-input" [] (fn [req] {:status 200
+                                      :body (str (:content-length req))}))
   (GET "/null" [] (fn [req] {:status 200 :body nil}))
+
   (GET "/async" [] async-handler)
+  (GET "/slow" [] slow-server-handler)
   (GET "/streaming" [] streaming-handler)
   (GET "/async-response" [] async-response-handler)
   (GET "/async-just-body" [] async-just-body)
@@ -89,6 +102,7 @@
                       (let [server (run-server
                                     (site test-routes) {:port 4347})]
                         (try (f) (finally (server))))))
+
 
 (deftest test-ring-spec
   (let [req (-> (http/get "http://localhost:4347/spec?c=d"
@@ -169,7 +183,8 @@
 (deftest test-async
   (let [resp (http/get "http://localhost:4347/async")]
     (is (= (:status resp) 200))
-    (is (= (:body resp) "hello async"))))
+    (is (= (:body resp) "hello async"))
+    (check-on-close-called)))
 
 (deftest test-async-response
   (let [resp (http/get "http://localhost:4347/async-response")]
@@ -188,7 +203,15 @@
           resp @(client/get (str "http://localhost:4347/streaming?s=" s))]
       (is (= (:status resp) 200))
       (is (:headers resp))
-      (is (= (:body resp) s)))))
+      (is (= (:body resp) s))
+      (check-on-close-called))))
+
+(deftest test-client-abort-server-receive-on-close
+  (doseq [i (range 0 2)]
+    (SpecialHttpClient/getPartial "http://localhost:4347/slow")
+    (check-on-close-called))
+  (let [resp @(client/get (str "http://localhost:4347/slow"))] ; blocking wait
+    (is (= 200 (:status resp)))))
 
 (deftest test-multipart
   (let [title "This is a pic"
@@ -212,19 +235,19 @@
 
 (deftest test-client-sent-one-byte-a-time
   (doseq [_ (range 0 4)]
-    (let [resp (SlowHttpClient/get "http://localhost:4347/")]
+    (let [resp (SpecialHttpClient/slowGet "http://localhost:4347/")]
       (is (re-find #"200" resp))
       (is (re-find #"hello world" resp)))))
 
 (deftest test-decoding-100cpu           ; regression
   ;; request + request sent to server, wait for 2 server responses
-  (let [resp (SlowHttpClient/get2 "http://localhost:4347/")]
+  (let [resp (SpecialHttpClient/get2 "http://localhost:4347/")]
     (= 2 (count (re-seq #"hello world" resp)))
     (= 2 (count (re-seq #"200" resp)))))
 
 (deftest test-chunked-encoding
   (let [size 4194304
-        resp (http/post "http://localhost:4347/chunked"
+        resp (http/post "http://localhost:4347/chunked-input"
                         ;; no :length, HttpClient will split body as 2k chunk
                         ;; server need to decode the chunked encoding
                         {:body (input-stream (gen-tempfile size ".jpg"))})]
@@ -235,6 +258,6 @@
 (defn -main [& args]
   (when-let [server @tmp-server]
     (server))
-  (reset! tmp-server (run-server (site test-routes) {:port 4348
+  (reset! tmp-server (run-server (site test-routes) {:port 9090
                                                      :queue-size 102400}))
-  (println "server started at 0.0.0.0:4348"))
+  (println "server started at 0.0.0.0:9090"))

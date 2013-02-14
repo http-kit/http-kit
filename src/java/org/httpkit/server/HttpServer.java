@@ -5,6 +5,8 @@ import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
 import static org.httpkit.HttpUtils.SELECT_TIMEOUT;
 import static org.httpkit.server.ClojureRing.encode;
+import static org.httpkit.ws.CloseFrame.CLOSE_AWAY;
+import static org.httpkit.ws.CloseFrame.CLOSE_NORMAL;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -67,7 +69,7 @@ public class HttpServer implements Runnable {
         serverChannel.register(selector, OP_ACCEPT);
     }
 
-    private void closeKey(final SelectionKey key, CloseFrame close) {
+    private void closeKey(final SelectionKey key, int status) {
         SelectableChannel ch = key.channel();
         try {
             if (ch != null) {
@@ -76,16 +78,18 @@ public class HttpServer implements Runnable {
         } catch (Exception ignore) {
         }
 
-        Object att = key.attachment();
-        if (att instanceof WsServerAtta) { // tell app connection closed
-            handler.handle(((WsServerAtta) att).asycChannel, close);
+        ServerAtta att = (ServerAtta) key.attachment();
+        if (att instanceof HttpServerAtta) {
+            handler.clientClose(att.asycChannel, -1);
+        } else {
+            handler.clientClose(att.asycChannel, status);
         }
     }
 
     private void decodeHttp(HttpServerAtta atta, SelectionKey key, SocketChannel ch) {
         try {
             do {
-                atta.asycChannel.reset(); // need to reset here. reuse for performance
+                atta.asycChannel.reset(); // reuse for performance
                 HttpRequest request = atta.decoder.decode(buffer);
                 if (request != null) {
                     if (request.isWebSocket) {
@@ -103,7 +107,7 @@ public class HttpServer implements Runnable {
                 }
             } while (buffer.hasRemaining()); // consume all
         } catch (ProtocolException e) {
-            closeKey(key, CloseFrame.NORMAL);
+            closeKey(key, -1);
         } catch (RequestTooLargeException e) {
             ByteBuffer[] buffers = encode(413, null, e.getMessage());
             atta.addBuffer(buffers);
@@ -122,21 +126,22 @@ public class HttpServer implements Runnable {
             do {
                 WSFrame frame = atta.decoder.decode(buffer);
                 if (frame instanceof TextFrame) {
-                    handler.handle(atta.asycChannel, frame);
+                    handler.handle(atta.asycChannel, (TextFrame) frame);
                     atta.decoder.reset();
                 } else if (frame instanceof PingFrame) {
                     atta.addBuffer(WSEncoder.encode(WSDecoder.OPCODE_PONG, frame.data));
                     atta.decoder.reset();
                     key.interestOps(OP_WRITE);
                 } else if (frame instanceof CloseFrame) {
-                    handler.handle(atta.asycChannel, frame);
+                    handler.clientClose(atta.asycChannel, ((CloseFrame) frame).getStatus());
                     atta.addBuffer(WSEncoder.encode(WSDecoder.OPCODE_CLOSE, frame.data));
                     key.interestOps(OP_WRITE);
                 }
             } while (buffer.hasRemaining()); // consume all
         } catch (ProtocolException e) {
             System.err.printf("%s [%s] WARN - %s\n", new Date(), THREAD_NAME, e.getMessage());
-            closeKey(key, CloseFrame.MESG_BIG); // TODO more specific error
+            closeKey(key, CloseFrame.CLOSE_MESG_BIG); // TODO more specific
+                                                      // error
         }
     }
 
@@ -147,7 +152,7 @@ public class HttpServer implements Runnable {
             int read = ch.read(buffer);
             if (read == -1) {
                 // remote entity shut the socket down cleanly.
-                closeKey(key, CloseFrame.AWAY);
+                closeKey(key, CLOSE_AWAY);
             } else if (read > 0) {
                 final ServerAtta atta = (ServerAtta) key.attachment();
                 buffer.flip(); // flip for read
@@ -158,7 +163,7 @@ public class HttpServer implements Runnable {
                 }
             }
         } catch (IOException e) { // the remote forcibly closed the connection
-            closeKey(key, CloseFrame.AWAY);
+            closeKey(key, CLOSE_AWAY);
         }
     }
 
@@ -189,12 +194,12 @@ public class HttpServer implements Runnable {
                     if (atta.isKeepAlive()) {
                         key.interestOps(OP_READ);
                     } else {
-                        closeKey(key, CloseFrame.NORMAL);
+                        closeKey(key, CLOSE_NORMAL);
                     }
                 }
             }
         } catch (IOException e) { // the remote forcibly closed the connection
-            closeKey(key, CloseFrame.AWAY);
+            closeKey(key, CLOSE_AWAY);
         }
     }
 
@@ -236,9 +241,6 @@ public class HttpServer implements Runnable {
                 selector = null;
                 return;
             } catch (Exception e) { // catch any exception, print it
-                if (key != null) {
-                    closeKey(key, CloseFrame.SERVER_ERROR);
-                }
                 HttpUtils.printError("http server loop error, should not happen", e);
             }
         }

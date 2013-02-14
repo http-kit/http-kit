@@ -65,7 +65,13 @@ public class TimerService implements Runnable {
                     } catch (Exception e) {
                         HttpUtils.printError("In timer: " + task, e);
                     }
-                    queue.poll(); // remove
+                    synchronized (queue) { // remove
+                        if (task == queue.peek()) {
+                            queue.poll(); // much faster
+                        } else {
+                            queue.remove(task);
+                        }
+                    }
                 } else {
                     synchronized (queue) {
                         try {

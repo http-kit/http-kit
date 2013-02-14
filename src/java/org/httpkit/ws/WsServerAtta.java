@@ -6,7 +6,6 @@ import org.httpkit.server.ServerAtta;
 public class WsServerAtta extends ServerAtta {
 
     final public WSDecoder decoder;
-    final public AsyncChannel asycChannel;
 
     public WsServerAtta(AsyncChannel channel) {
         this.decoder = new WSDecoder();

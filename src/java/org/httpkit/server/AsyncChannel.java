@@ -11,7 +11,9 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.httpkit.HttpUtils;
-import org.httpkit.ws.*;
+import org.httpkit.ws.CloseFrame;
+import org.httpkit.ws.WSDecoder;
+import org.httpkit.ws.WSEncoder;
 
 import clojure.lang.IFn;
 import clojure.lang.Keyword;
@@ -22,15 +24,15 @@ public class AsyncChannel {
     private final SelectionKey key;
     private final HttpServer server;
 
-    private AtomicReference<Boolean> closedRan = new AtomicReference<Boolean>(false);
-    List<IFn> closeListeners = null;
+    final AtomicReference<Boolean> closedRan = new AtomicReference<Boolean>(false);
+    final AtomicReference<IFn> closeHandler = new AtomicReference<IFn>(null);
+
+    // websocket
+    final AtomicReference<IFn> receiveHandler = new AtomicReference<IFn>(null);
 
     // streaming
     private volatile boolean isInitialWrite = true;
     private volatile boolean finalWritten = false;
-
-    // websocket
-    List<IFn> receiveListeners = null;
 
     public AsyncChannel(SelectionKey key, HttpServer server) {
         this.key = key;
@@ -39,10 +41,10 @@ public class AsyncChannel {
 
     public void reset() {
         closedRan.set(false);
+        closeHandler.set(null);
+        receiveHandler.set(null);
         isInitialWrite = true;
         finalWritten = false;
-        closeListeners = null;
-        receiveListeners = null;
     }
 
     // -------------- streaming --------------------
@@ -53,9 +55,6 @@ public class AsyncChannel {
     public void writeChunk(Object data, boolean isFinal) throws IOException {
         if (finalWritten) {
             throw new IllegalStateException("final chunk has already been written");
-        }
-        if (isFinal) {
-            finalWritten = true;
         }
 
         ByteBuffer buffers[];
@@ -109,32 +108,25 @@ public class AsyncChannel {
             }
         }
         write(buffers);
-
+        if (isFinal) {
+            finalWritten = true;
+            onClose(0); // server close
+        }
         isInitialWrite = false;
     }
 
     // ---------------------------websocket-------------------------------------
 
-    public void addReceiveListener(IFn fn) {
-        synchronized (this) {
-            if (receiveListeners == null) {
-                receiveListeners = new ArrayList<IFn>(1);
-            }
-            receiveListeners.add(fn);
+    public void setReceiveHandler(IFn fn) {
+        if (!receiveHandler.compareAndSet(null, fn)) {
+            throw new IllegalStateException("receive handler exist: " + receiveHandler.get());
         }
     }
 
     public void messageReceived(final String mesg) {
-        IFn[] listeners;
-        synchronized (this) {
-            if (receiveListeners == null) {
-                return;
-            }
-            listeners = new IFn[receiveListeners.size()];
-            listeners = receiveListeners.toArray(listeners);
-        }
-        for (IFn l : listeners) {
-            l.invoke(mesg);
+        IFn f = receiveHandler.get();
+        if (f != null) {
+            f.invoke(mesg);
         }
     }
 
@@ -146,9 +138,13 @@ public class AsyncChannel {
     }
 
     public void serverClose() {
-        ByteBuffer s = ByteBuffer.allocate(2).putShort(CloseFrame.CLOSE_NORMAL);
+        serverClose(CloseFrame.CLOSE_NORMAL);
+    }
+
+    public void serverClose(int status) {
+        ByteBuffer s = ByteBuffer.allocate(2).putShort((short) status);
         write(WSEncoder.encode(WSDecoder.OPCODE_CLOSE, s.array()));
-        onClose(CloseFrame.CLOSE_NORMAL);
+        onClose(0); // server close, 0
     }
 
     public void sendHandshake(Map<String, Object> headers) {
@@ -158,34 +154,20 @@ public class AsyncChannel {
     // ----------------------shared--------------------------------------
     private static ByteBuffer chunkSize(int size) {
         String s = Integer.toHexString(size) + "\r\n";
-        byte[] bytes = s.getBytes();
-        return ByteBuffer.wrap(bytes);
+        return ByteBuffer.wrap(s.getBytes());
     }
 
-    public void clientClosed(int status) {
-        onClose(status);
-    }
-
-    public void addOnCloseListener(IFn fn) {
-        synchronized (this) {
-            if (closeListeners == null) {
-                closeListeners = new ArrayList<IFn>();
-            }
-            closeListeners.add(fn);
+    public void setCloseHandler(IFn fn) {
+        if (!closeHandler.compareAndSet(null, fn)) {
+            throw new IllegalStateException("close handler exist: " + closeHandler.get());
         }
     }
 
-    private void onClose(int status) {
-        if (!closedRan.compareAndSet(false, true)) {
-            IFn[] listeners;
-            synchronized (this) {
-                if (closeListeners == null)
-                    return;
-                listeners = new IFn[closeListeners.size()];
-                listeners = closeListeners.toArray(listeners);
-            }
-            for (IFn l : listeners) {
-                l.invoke(status);
+    public void onClose(int status) {
+        if (closedRan.compareAndSet(false, true)) {
+            IFn f = closeHandler.get();
+            if (f != null) {
+                f.invoke(status);
             }
         }
     }
