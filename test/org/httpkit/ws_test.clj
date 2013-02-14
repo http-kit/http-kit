@@ -52,6 +52,9 @@
                                     (site test-routes) {:port 4348})]
                         (try (f) (finally (server))))))
 
+(comment (def server (run-server (site test-routes) {:port 4348}))
+         (def client1 (WebSocketClient. "ws://localhost:4348/ws")))
+
 (deftest test-websocket
   (let [client (WebSocketClient. "ws://localhost:4348/ws")]
     (doseq [_ (range 0 10)]

@@ -6,8 +6,7 @@ import org.httpkit.server.ServerAtta;
 public class WsServerAtta extends ServerAtta {
 
     final public WSDecoder decoder;
-    // may write from another thread: app close the connection
-    public volatile boolean closeOnfinish = false;
+    final public AsyncChannel asycChannel;
 
     public WsServerAtta(AsyncChannel channel) {
         this.decoder = new WSDecoder();
@@ -15,6 +14,6 @@ public class WsServerAtta extends ServerAtta {
     }
 
     public boolean isKeepAlive() {
-        return !closeOnfinish;
+        return true; // always keep-alived, wait other close it
     }
 }

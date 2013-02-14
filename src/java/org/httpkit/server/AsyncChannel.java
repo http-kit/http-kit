@@ -20,12 +20,13 @@ import clojure.lang.Keyword;
 public class AsyncChannel {
 
     private final SelectionKey key;
-    final private HttpServer server;
+    private final HttpServer server;
+
     private AtomicReference<Boolean> closedRan = new AtomicReference<Boolean>(false);
     List<IFn> closeListeners = null;
 
     // streaming
-    private volatile boolean initialWrite = true;
+    private volatile boolean isInitialWrite = true;
     private volatile boolean finalWritten = false;
 
     // websocket
@@ -34,6 +35,14 @@ public class AsyncChannel {
     public AsyncChannel(SelectionKey key, HttpServer server) {
         this.key = key;
         this.server = server;
+    }
+
+    public void reset() {
+        closedRan.set(false);
+        isInitialWrite = true;
+        finalWritten = false;
+        closeListeners = null;
+        receiveListeners = null;
     }
 
     // -------------- streaming --------------------
@@ -52,7 +61,7 @@ public class AsyncChannel {
         ByteBuffer buffers[];
         boolean isMap = (data instanceof Map);
 
-        if (initialWrite) {
+        if (isInitialWrite) {
             int status = 200;
             Object body = data;
             Map<String, Object> headers = new TreeMap<String, Object>();
@@ -99,12 +108,9 @@ public class AsyncChannel {
                 }
             }
         }
+        write(buffers);
 
-        HttpServerAtta att = (HttpServerAtta) key.attachment();
-        att.addBuffer(buffers);
-        server.queueWrite(key);
-
-        initialWrite = false;
+        isInitialWrite = false;
     }
 
     // ---------------------------websocket-------------------------------------
@@ -141,8 +147,6 @@ public class AsyncChannel {
 
     public void serverClose() {
         ByteBuffer s = ByteBuffer.allocate(2).putShort(CloseFrame.CLOSE_NORMAL);
-        WsServerAtta atta = (WsServerAtta) key.attachment();
-        atta.closeOnfinish = true;
         write(WSEncoder.encode(WSDecoder.OPCODE_CLOSE, s.array()));
         onClose(CloseFrame.CLOSE_NORMAL);
     }
@@ -188,12 +192,11 @@ public class AsyncChannel {
 
     public String toString() {
         Socket s = ((SocketChannel) key.channel()).socket();
-        return "AsycChannel[" + s.getLocalSocketAddress() + "<->" + s.getRemoteSocketAddress()
-                + "]";
+        return s.getLocalSocketAddress() + "<->" + s.getRemoteSocketAddress();
     }
 
     private void write(ByteBuffer... buffers) {
-        WsServerAtta atta = (WsServerAtta) key.attachment();
+        ServerAtta atta = (ServerAtta) key.attachment();
         atta.addBuffer(buffers);
         server.queueWrite(key);
     }

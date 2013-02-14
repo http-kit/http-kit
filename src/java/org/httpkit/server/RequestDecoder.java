@@ -71,11 +71,13 @@ public class RequestDecoder {
         }
     }
 
-    public State decode(ByteBuffer buffer) throws LineTooLargeException, ProtocolException,
-            RequestTooLargeException {
+    public HttpRequest decode(ByteBuffer buffer) throws LineTooLargeException,
+            ProtocolException, RequestTooLargeException {
         String line;
-        while (buffer.hasRemaining() && state != State.ALL_READ) {
+        while (buffer.hasRemaining()) {
             switch (state) {
+            case ALL_READ:
+                return request;
             case READ_INITIAL:
                 line = readLine(buffer);
                 if (line != null) {
@@ -127,7 +129,7 @@ public class RequestDecoder {
                 break;
             }
         }
-        return state;
+        return state == State.ALL_READ ? request : null;
     }
 
     private void finish() {
@@ -223,6 +225,7 @@ public class RequestDecoder {
         readCount = 0;
         content = null;
         lineBufferIdx = 0;
+        request = null;
     }
 
     private void throwIfBodyIsTooLarge() throws RequestTooLargeException {

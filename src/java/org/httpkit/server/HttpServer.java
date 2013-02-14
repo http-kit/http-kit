@@ -14,10 +14,11 @@ import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.httpkit.*;
-import org.httpkit.server.RequestDecoder.State;
 import org.httpkit.ws.*;
 
 public class HttpServer implements Runnable {
+
+    static final String THREAD_NAME = "server-loop";
 
     private final IHandler handler;
 
@@ -41,13 +42,15 @@ public class HttpServer implements Runnable {
         this.maxBody = maxBody;
     }
 
-    void accept(SelectionKey key, Selector selector) {
+    void accept(SelectionKey key) {
         ServerSocketChannel ch = (ServerSocketChannel) key.channel();
         SocketChannel s;
         try {
             while ((s = ch.accept()) != null) {
                 s.configureBlocking(false);
-                s.register(selector, OP_READ, new HttpServerAtta(maxBody, maxLine));
+                HttpServerAtta atta = new HttpServerAtta(maxBody, maxLine);
+                SelectionKey k = s.register(selector, OP_READ, atta);
+                atta.asycChannel = new AsyncChannel(k, this);
             }
         } catch (Exception e) {
             // like too many open files. do not quit
@@ -80,24 +83,22 @@ public class HttpServer implements Runnable {
     }
 
     private void decodeHttp(HttpServerAtta atta, SelectionKey key, SocketChannel ch) {
-        RequestDecoder decoder = atta.decoder;
         try {
             do {
-                if (decoder.decode(buffer) == State.ALL_READ) {
-                    HttpRequest request = decoder.request;
-                    AsyncChannel channel = new AsyncChannel(key, this);
+                atta.asycChannel.reset(); // need to reset here. reuse for performance
+                HttpRequest request = atta.decoder.decode(buffer);
+                if (request != null) {
                     if (request.isWebSocket) {
-                        key.attach(new WsServerAtta(channel));
+                        key.attach(new WsServerAtta(atta.asycChannel));
                     } else {
-                        ((ServerAtta) key.attachment()).asycChannel = channel;
+                        atta.keepalive = request.isKeepAlive;
                     }
-                    request.asycChannel = channel;
+                    request.asycChannel = atta.asycChannel;
                     request.remoteAddr = (InetSocketAddress) ch.socket()
                             .getRemoteSocketAddress();
                     handler.handle(request, new ResponseCallback(key, this));
-                    // will not support pipelining: need queue to ensure order
-                    // possible result: request1, request2 => response2,
-                    // response1
+                    // pipelining not supported : need queue to ensure order
+                    // AsyncChannel can't be reseted
                     atta.decoder.reset();
                 }
             } while (buffer.hasRemaining()); // consume all
@@ -106,9 +107,11 @@ public class HttpServer implements Runnable {
         } catch (RequestTooLargeException e) {
             ByteBuffer[] buffers = encode(413, null, e.getMessage());
             atta.addBuffer(buffers);
+            atta.keepalive = false; // close after write
             key.interestOps(OP_WRITE);
         } catch (LineTooLargeException e) {
             ByteBuffer[] buffers = encode(414, null, e.getMessage());
+            atta.keepalive = false; // close after write
             atta.addBuffer(buffers);
             key.interestOps(OP_WRITE);
         }
@@ -127,15 +130,13 @@ public class HttpServer implements Runnable {
                     key.interestOps(OP_WRITE);
                 } else if (frame instanceof CloseFrame) {
                     handler.handle(atta.asycChannel, frame);
-                    atta.closeOnfinish = true;
                     atta.addBuffer(WSEncoder.encode(WSDecoder.OPCODE_CLOSE, frame.data));
                     key.interestOps(OP_WRITE);
                 }
             } while (buffer.hasRemaining()); // consume all
         } catch (ProtocolException e) {
-            System.err.printf("%s [%s] WARN - %s\n", new Date(), Thread.currentThread()
-                    .getName(), e.getMessage());
-            closeKey(key, CloseFrame.MESG_BIG);
+            System.err.printf("%s [%s] WARN - %s\n", new Date(), THREAD_NAME, e.getMessage());
+            closeKey(key, CloseFrame.MESG_BIG); // TODO more specific error
         }
     }
 
@@ -223,7 +224,7 @@ public class HttpServer implements Runnable {
                         continue;
                     }
                     if (key.isAcceptable()) {
-                        accept(key, selector);
+                        accept(key);
                     } else if (key.isReadable()) {
                         doRead(key);
                     } else if (key.isWritable()) {
@@ -245,7 +246,7 @@ public class HttpServer implements Runnable {
 
     public void start() throws IOException {
         bind();
-        serverThread = new Thread(this, "server-loop");
+        serverThread = new Thread(this, THREAD_NAME);
         serverThread.start();
     }
 
