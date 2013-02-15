@@ -3,7 +3,6 @@ package org.httpkit.server;
 import static java.nio.channels.SelectionKey.OP_ACCEPT;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
-import static org.httpkit.HttpUtils.SELECT_TIMEOUT;
 import static org.httpkit.server.ClojureRing.encode;
 import static org.httpkit.ws.CloseFrame.CLOSE_AWAY;
 import static org.httpkit.ws.CloseFrame.CLOSE_NORMAL;
@@ -56,7 +55,7 @@ public class HttpServer implements Runnable {
             }
         } catch (Exception e) {
             // like too many open files. do not quit
-            HttpUtils.printError("accept incomming request", e);
+            HttpUtils.printError("accept incoming request", e);
         }
     }
 
@@ -209,22 +208,19 @@ public class HttpServer implements Runnable {
     }
 
     public void run() {
-        SelectionKey key = null;
         while (true) {
             try {
-                while ((key = pendings.poll()) != null) {
-                    if (key.isValid()) {
-                        key.interestOps(OP_WRITE);
+                SelectionKey k = null;
+                while ((k = pendings.poll()) != null) {
+                    if (k.isValid()) {
+                        k.interestOps(OP_WRITE);
                     }
                 }
-                int select = selector.select(SELECT_TIMEOUT);
-                if (select <= 0) {
+                if (selector.select() <= 0) {
                     continue;
                 }
                 Set<SelectionKey> selectedKeys = selector.selectedKeys();
-                Iterator<SelectionKey> ite = selectedKeys.iterator();
-                while (ite.hasNext()) {
-                    key = ite.next();
+                for (SelectionKey key : selectedKeys) {
                     if (!key.isValid()) {
                         continue;
                     }

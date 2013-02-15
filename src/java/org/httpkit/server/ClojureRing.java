@@ -46,7 +46,6 @@ public class ClojureRing {
     public static final Keyword CONTENT_LENGTH = intern("content-length");
     public static final Keyword CHARACTER_ENCODING = intern("character-encoding");
     public static final Keyword BODY = intern("body");
-    public static final Keyword KEEP_ALIVE = intern("keep_alive");
     public static final Keyword WEBSOCKET = intern("websocket");
     public static final Keyword ASYC_CHANNEL = intern("async-channel");
 

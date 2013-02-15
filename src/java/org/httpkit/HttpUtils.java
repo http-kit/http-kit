@@ -31,11 +31,7 @@ public class HttpUtils {
 
     public static final byte LF = 10; // \n
 
-    public static final int MAX_LINE = 4096;
-
     public static final int BUFFER_SIZE = 1024 * 64;
-
-    public static final int SELECT_TIMEOUT = 3000;
 
     // public static final int ABORT_PROCESSING = -1;
 
@@ -75,9 +71,7 @@ public class HttpUtils {
     public static final byte SP = 32;
 
     public static void encodeHeaders(DynamicBytes bytes, Map<String, Object> headers) {
-        Iterator<Entry<String, Object>> ite = headers.entrySet().iterator();
-        while (ite.hasNext()) {
-            Entry<String, Object> e = ite.next();
+        for (Entry<String, Object> e : headers.entrySet()) {
             String k = e.getKey();
             Object v = e.getValue();
             if (v instanceof String) {
