@@ -3,9 +3,8 @@ package org.httpkit.server;
 import static java.nio.channels.SelectionKey.OP_ACCEPT;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
-import static org.httpkit.HttpUtils.SELECT_TIMEOUT;
-import static org.httpkit.server.ClojureRing.encode;
 import static org.httpkit.ws.CloseFrame.CLOSE_AWAY;
+import static org.httpkit.ws.CloseFrame.CLOSE_MESG_BIG;
 import static org.httpkit.ws.CloseFrame.CLOSE_NORMAL;
 
 import java.io.IOException;
@@ -23,25 +22,29 @@ public class HttpServer implements Runnable {
     static final String THREAD_NAME = "server-loop";
 
     private final IHandler handler;
-
-    private final int port;
-
     private final int maxBody;
     private final int maxLine;
-    private final String ip;
-    private Selector selector;
+
+    private final Selector selector;
+    private final ServerSocketChannel serverChannel;
+
     private Thread serverThread;
-    private ServerSocketChannel serverChannel;
+
     private final ConcurrentLinkedQueue<SelectionKey> pendings = new ConcurrentLinkedQueue<SelectionKey>();
     // shared, single thread
     private final ByteBuffer buffer = ByteBuffer.allocateDirect(1024 * 64);
 
-    public HttpServer(String ip, int port, IHandler handler, int maxBody, int maxLine) {
+    public HttpServer(String ip, int port, IHandler handler, int maxBody, int maxLine)
+            throws IOException {
         this.handler = handler;
-        this.ip = ip;
-        this.port = port;
         this.maxLine = maxLine;
         this.maxBody = maxBody;
+        this.selector = Selector.open();
+        this.serverChannel = ServerSocketChannel.open();
+        serverChannel.configureBlocking(false);
+        InetSocketAddress addr = new InetSocketAddress(ip, port);
+        serverChannel.socket().bind(addr);
+        serverChannel.register(selector, OP_ACCEPT);
     }
 
     void accept(SelectionKey key) {
@@ -55,26 +58,14 @@ public class HttpServer implements Runnable {
                 atta.asycChannel = new AsyncChannel(k, this);
             }
         } catch (Exception e) {
-            // like too many open files. do not quit
-            HttpUtils.printError("accept incomming request", e);
+            // too many open files. do not quit
+            HttpUtils.printError("accept incoming request", e);
         }
     }
 
-    void bind() throws IOException {
-        selector = Selector.open();
-        serverChannel = ServerSocketChannel.open();
-        serverChannel.configureBlocking(false);
-        InetSocketAddress addr = new InetSocketAddress(ip, port);
-        serverChannel.socket().bind(addr);
-        serverChannel.register(selector, OP_ACCEPT);
-    }
-
     private void closeKey(final SelectionKey key, int status) {
-        SelectableChannel ch = key.channel();
         try {
-            if (ch != null) {
-                ch.close();
-            }
+            key.channel().close();
         } catch (Exception ignore) {
         }
 
@@ -102,19 +93,19 @@ public class HttpServer implements Runnable {
                             .getRemoteSocketAddress();
                     handler.handle(request, new ResponseCallback(key, this));
                     // pipelining not supported : need queue to ensure order
-                    // AsyncChannel can't be reseted
+                    // AsyncChannel can't be reseted here
                     atta.decoder.reset();
                 }
             } while (buffer.hasRemaining()); // consume all
         } catch (ProtocolException e) {
             closeKey(key, -1);
         } catch (RequestTooLargeException e) {
-            ByteBuffer[] buffers = encode(413, null, e.getMessage());
+            ByteBuffer[] buffers = ClojureRing.encode(413, null, e.getMessage());
             atta.addBuffer(buffers);
             atta.keepalive = false; // close after write
             key.interestOps(OP_WRITE);
         } catch (LineTooLargeException e) {
-            ByteBuffer[] buffers = encode(414, null, e.getMessage());
+            ByteBuffer[] buffers = ClojureRing.encode(414, null, e.getMessage());
             atta.keepalive = false; // close after write
             atta.addBuffer(buffers);
             key.interestOps(OP_WRITE);
@@ -140,8 +131,7 @@ public class HttpServer implements Runnable {
             } while (buffer.hasRemaining()); // consume all
         } catch (ProtocolException e) {
             System.err.printf("%s [%s] WARN - %s\n", new Date(), THREAD_NAME, e.getMessage());
-            closeKey(key, CloseFrame.CLOSE_MESG_BIG); // TODO more specific
-                                                      // error
+            closeKey(key, CLOSE_MESG_BIG); // TODO more specific error
         }
     }
 
@@ -209,22 +199,19 @@ public class HttpServer implements Runnable {
     }
 
     public void run() {
-        SelectionKey key = null;
         while (true) {
             try {
-                while ((key = pendings.poll()) != null) {
-                    if (key.isValid()) {
-                        key.interestOps(OP_WRITE);
+                SelectionKey k = null;
+                while ((k = pendings.poll()) != null) {
+                    if (k.isValid()) {
+                        k.interestOps(OP_WRITE);
                     }
                 }
-                int select = selector.select(SELECT_TIMEOUT);
-                if (select <= 0) {
+                if (selector.select() <= 0) {
                     continue;
                 }
                 Set<SelectionKey> selectedKeys = selector.selectedKeys();
-                Iterator<SelectionKey> ite = selectedKeys.iterator();
-                while (ite.hasNext()) {
-                    key = ite.next();
+                for (SelectionKey key : selectedKeys) {
                     if (!key.isValid()) {
                         continue;
                     }
@@ -238,7 +225,6 @@ public class HttpServer implements Runnable {
                 }
                 selectedKeys.clear();
             } catch (ClosedSelectorException ignore) {
-                selector = null;
                 return;
             } catch (Exception e) { // catch any exception, print it
                 HttpUtils.printError("http server loop error, should not happen", e);
@@ -247,16 +233,14 @@ public class HttpServer implements Runnable {
     }
 
     public void start() throws IOException {
-        bind();
         serverThread = new Thread(this, THREAD_NAME);
         serverThread.start();
     }
 
     public void stop() {
-        if (selector != null) {
+        if (selector.isOpen()) {
             try {
                 serverChannel.close();
-                serverChannel = null;
                 Set<SelectionKey> keys = selector.keys();
                 for (SelectionKey k : keys) {
                     k.channel().close();

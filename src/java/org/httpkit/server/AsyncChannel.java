@@ -52,6 +52,11 @@ public class AsyncChannel {
     private static final byte[] finalChunkBytes2 = "\r\n0\r\n\r\n".getBytes();
     private static final byte[] newLineBytes = "\r\n".getBytes();
 
+    private static ByteBuffer chunkSize(int size) {
+        String s = Integer.toHexString(size) + "\r\n";
+        return ByteBuffer.wrap(s.getBytes());
+    }
+
     public void writeChunk(Object data, boolean isFinal) throws IOException {
         if (finalWritten) {
             throw new IllegalStateException("final chunk has already been written");
@@ -152,11 +157,6 @@ public class AsyncChannel {
     }
 
     // ----------------------shared--------------------------------------
-    private static ByteBuffer chunkSize(int size) {
-        String s = Integer.toHexString(size) + "\r\n";
-        return ByteBuffer.wrap(s.getBytes());
-    }
-
     public void setCloseHandler(IFn fn) {
         if (!closeHandler.compareAndSet(null, fn)) {
             throw new IllegalStateException("close handler exist: " + closeHandler.get());
@@ -182,5 +182,4 @@ public class AsyncChannel {
         atta.addBuffer(buffers);
         server.queueWrite(key);
     }
-
 }

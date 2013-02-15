@@ -16,6 +16,7 @@ enum State {
 }
 
 public class Decoder {
+    public static final int MAX_LINE = 4096;
 
     private final Map<String, String> headers = new TreeMap<String, String>();
     // package visible

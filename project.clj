@@ -14,14 +14,12 @@
             :url "http://www.apache.org/licenses/LICENSE-2.0.html"}
   :profiles {:1.5 {:dependencies [[org.clojure/clojure "1.5.0-master-SNAPSHOT"]]}
              :dev {:dependencies [[junit/junit "4.8.2"]
-                                  [org.slf4j/slf4j-api "1.6.4"]
+                                  [org.clojure/tools.logging "0.2.3"]
                                   [ch.qos.logback/logback-classic "1.0.1"]
                                   [clj-http "0.6.0"]
                                   [io.netty/netty "3.6.2.Final"]
                                   [org.clojure/data.json "0.1.2"]
-                                  [org.jsoup/jsoup "1.7.1"]
                                   [http.async.client "0.5.2"]
-                                  [org.clojure/tools.logging "0.2.3"]
                                   [compojure "1.0.2"]
                                   [org.clojure/tools.cli "0.2.1"]
                                   [ring/ring-jetty-adapter "1.1.6"]
