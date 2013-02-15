@@ -30,49 +30,62 @@
      :body (str title ": " (:size file))}))
 
 (defn async-handler [req]
-  (async-response req channel
-                  ;; close-handler in test_util.clj
-                  (on-close channel close-handler)
-                  (respond channel {:status 200 :body "hello async"})))
+  (async-response req respond!
+                  (respond! {:status 200 :body "hello async"})))
 
 (defn async-just-body [req]
-  (async-response req channel
-                  (respond channel "just-body")))
+  (async-response req respond!
+                  (respond! "just-body")))
 
 (defn async-response-handler [req]
-  (async-response req channel
-                  (future (respond channel {:status 200 :body "hello async"}))))
+  (async-response req respond!
+                  (future (respond! {:status 200 :body "hello async"}))))
 
 (defn streaming-handler [req]
   (let [s (or (-> req :params :s) (subs const-string 0 1024))
         n (+ (rand-int 128) 10)
         seqs (partition n n '() s)]     ; padding with empty
-    (async-response req channel
-                    (on-close channel close-handler)
-                    (respond channel {:body (first seqs) :final false})
-                    (doseq [p (rest seqs)]
-                      (respond channel {:body p :final false}))
-                    (respond channel nil))))
+    (streaming-response req channel
+                        (on-close channel close-handler)
+                        (send! channel (first seqs))
+                        (doseq [p (rest seqs)]
+                          (send! channel p))
+                        (close channel))))
 
 (defn slow-server-handler [req]
-  (async-response req channel
-                  (on-close channel close-handler)
-                  (respond channel {:body "hello world" :final false})
-                  (schedule-task 10     ; 10ms
-                                 (respond channel {:body "hello world 2" :final false}))
-                  (schedule-task 20
-                                 (respond channel {:body "finish"}))))
+  (streaming-response req channel
+                      (on-close channel close-handler)
+                      (send! channel "hello world")
+                      (schedule-task 10     ; 10ms
+                                     (send! channel "hello world 2"))
+                      (schedule-task 20
+                                     (send! channel "finish")
+                                     (close channel))))
 
 (defn async-with-timeout [req]
   (let [time (to-int (-> req :params :time))
         cancel (-> req :params :cancel)]
-    (async-response req channel
-                    (with-timeout respond time
-                      (respond channel {:status 200
-                                        :body (str time "ms")})
+    (async-response req respond!
+                    (with-timeout respond! time
+                      (respond! {:status 200
+                                 :body (str time "ms")})
                       (when cancel
-                        (respond channel {:status 200 ; should return ok
-                                          :body "canceled"}))))))
+                        (respond! {:status 200 ; should return ok
+                                   :body "canceled"}))))))
+
+(defn streaming-demo [request]
+  (let [time (Integer/valueOf (or (-> request :params :i) 200))]
+    (streaming-response request channel
+                        (on-close channel (fn [status]
+                                            (println channel "closed" status)))
+                        ;; wrap before sent
+                        (on-send channel (fn [message]
+                                           (str "<p>" message ". interval " time "ms</p>")))
+                        (let [id (atom 0)]
+                          ((fn sent-messge []
+                             (send! channel (str "message from server #" (swap! id inc)))
+                             (when (open? channel)
+                               (schedule-task time (sent-messge)))))))))
 
 (defroutes test-routes
   (GET "/" [] "hello world")
@@ -85,11 +98,15 @@
                             :headers {"Content-Type" "text/plain"}
                             :body (range 1 10)}))
   (GET "/file" [] (wrap-file-info file-handler))
+  (GET "/ws" [] (fn [req]
+                  (ws-response req con
+                               (on-receive con (fn [mesg] (send! con mesg))))))
   (GET "/inputstream" [] inputstream-handler)
   (POST "/multipart" [] multipart-handler)
   (POST "/chunked-input" [] (fn [req] {:status 200
                                       :body (str (:content-length req))}))
   (GET "/null" [] (fn [req] {:status 200 :body nil}))
+  (GET "/demo" [] streaming-demo)
 
   (GET "/async" [] async-handler)
   (GET "/slow" [] slow-server-handler)
@@ -183,8 +200,7 @@
 (deftest test-async
   (let [resp (http/get "http://localhost:4347/async")]
     (is (= (:status resp) 200))
-    (is (= (:body resp) "hello async"))
-    (check-on-close-called)))
+    (is (= (:body resp) "hello async"))))
 
 (deftest test-async-response
   (let [resp (http/get "http://localhost:4347/async-response")]
@@ -198,7 +214,7 @@
     (is (= (:body resp) "just-body"))))
 
 (deftest test-streaming-body
-  (doseq [_ (range 1 100)]
+  (doseq [_ (range 1 2)]
     (let [s (subs const-string 0 (+ (rand-int 1024) 256))
           resp @(client/get (str "http://localhost:4347/streaming?s=" s))]
       (is (= (:status resp) 200))

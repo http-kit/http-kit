@@ -12,34 +12,41 @@
   (:import org.httpkit.ws.WebSocketClient))
 
 (defn ws-handler [req]
-  (when-ws-request req con
-                   ;; close-handler in test_util.clj
-                   (on-close con close-handler)
-                   (on-mesg con (fn [msg]
-                                  (try
-                                    (let [{:keys [length times]} (read-string msg)]
-                                      (doseq [_ (range 0 times)]
-                                        (send-mesg con (subs const-string 0 length))))
-                                    (catch Exception e
-                                      (println e)
-                                      (send-mesg con msg)))))))
+  (ws-response req con
+               ;; close-handler in test_util.clj
+               (on-close con close-handler)
+               (on-receive con (fn [msg]
+                                 (try
+                                   (let [{:keys [length times]} (read-string msg)]
+                                     (doseq [_ (range 0 times)]
+                                       (send! con (subs const-string 0 length))))
+                                   (catch Exception e
+                                     (println e)
+                                     (send! con msg)))))))
 
 (defn ws-handler2 [req]
-  (when-ws-request req con
-                   (send-mesg con "hello")
-                   (send-mesg con "world")
-                   (on-mesg con (fn [mesg]
-                                  (send-mesg con mesg))))) ; echo back
+  (ws-response req con
+               (send! con "hello")
+               (send! con "world")
+               (on-receive con (fn [mesg]
+                                 (send! con mesg))))) ; echo back
 
 (defn ws-handler3 [req]
-  (when-ws-request req con
-                   (on-mesg con (fn [mesg]
-                                  (send-mesg con mesg)))))
+  (ws-response req con
+               (on-receive con (fn [mesg]
+                                 (send! con mesg)))))
+
+(defn ws-handler4 [req]
+  (ws-response req con
+               (on-send con pr-str)
+               (on-receive con (fn [mesg]
+                                 (send! con {:message mesg})))))
 
 (defroutes test-routes
   (GET "/ws" [] ws-handler)
   (GET "/ws2" [] ws-handler2)
-  (GET "/ws3" [] ws-handler3))
+  (GET "/ws3" [] ws-handler3)
+  (GET "/ws4" [] ws-handler4))
 
 (use-fixtures :once (fn [f]
                       (let [server (run-server
@@ -90,6 +97,13 @@
       (let [mesg (str "message#" idx)]
         (.sendMessage client mesg)
         (is (= mesg (.getMessage client))))))) ;; echo expected
+
+(deftest test-on-send-properly-applyed      ; issue #14
+  (let [client (WebSocketClient. "ws://localhost:4348/ws4")]
+    (doseq [idx (range 0 5)]
+      (let [mesg (str "message#" idx)]
+        (.sendMessage client mesg)
+        (is (= mesg (:message (read-string (.getMessage client)))))))))
 
 (deftest test-with-http.async.client
   (with-open [client (h/create-client)]

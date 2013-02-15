@@ -12,6 +12,7 @@
   :plugins [[lein-swank "1.4.4"]]
   :license {:name "Apache License, Version 2.0"
             :url "http://www.apache.org/licenses/LICENSE-2.0.html"}
+  :jvm-opts ["-Dclojure.compiler.disable-locals-clearing=true"]
   :profiles {:1.5 {:dependencies [[org.clojure/clojure "1.5.0-master-SNAPSHOT"]]}
              :dev {:dependencies [[junit/junit "4.8.2"]
                                   [org.clojure/tools.logging "0.2.3"]
