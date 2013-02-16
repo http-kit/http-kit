@@ -79,8 +79,9 @@
                         (on-close channel (fn [status]
                                             (println channel "closed" status)))
                         ;; wrap before sent
-                        (on-send channel (fn [message]
-                                           (str "<p>" message ". interval " time "ms</p>")))
+                        (alter-send-hook channel (fn [old]
+                                                   (fn [message]
+                                                     (str "<p>" message ". interval " time "ms</p>"))))
                         (let [id (atom 0)]
                           ((fn sent-messge []
                              (send! channel (str "message from server #" (swap! id inc)))

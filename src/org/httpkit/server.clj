@@ -39,10 +39,10 @@
      1. First call of send!, data expect to be {:headers _ :status _ :body _} or just body.
      2. Any further call, only body(String, File, InputStream, ISeq) is expected.
         The data is encoded as chunk, sent to client")
-  (on-send [ch callback]                ; TODO find a better name, send-hook?
-    "Callback: (fn [data])
+  (alter-send-hook [ch f]
+    "Callback: (fn [old-hook] new-hook)
      Do something with the sending data (like JSON encoding), the return value is sending off")
-  (on-receive [ch callback]
+  (on-receive [ch callback]             ; TODO ordering
     "Only valid for websocket.
      Callback: (fn [message-string])
      Set the handler to get notified when there is message from client.
@@ -67,7 +67,7 @@
   (open? [ch] (not (.isClosed ch)))
   (close [ch] (.serverClose ch 1000))
   (send! [ch data] (.send ch data false))
-  (on-send [ch callback] (.setOnSendFn ch callback))
+  (alter-send-hook [ch f] (.alterSentHook ch f))
   (on-receive [ch callback] (.setReceiveHandler ch callback))
   (on-close [ch callback] (.setCloseHandler ch callback)))
 
@@ -139,7 +139,7 @@
          (send! channel data)
          (close channel))))
 
-  Response middleware can by set by (on-send channel callback)
+  Response middleware can by set by (alter-send-hook channel (fn [old] new))
 
   See org.httpkit.timer ns for optional timeout facilities."
   [request channel & body]

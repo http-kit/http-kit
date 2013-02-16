@@ -38,7 +38,7 @@
 
 (defn ws-handler4 [req]
   (ws-response req con
-               (on-send con pr-str)
+               (alter-send-hook con (fn [old] pr-str))
                (on-receive con (fn [mesg]
                                  (send! con {:message mesg})))))
 

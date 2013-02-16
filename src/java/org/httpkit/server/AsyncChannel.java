@@ -181,8 +181,8 @@ public class AsyncChannel {
         return true;
     }
 
-    public void setOnSendFn(IFn fn) {
-        this.onSend = fn;
+    public void alterSentHook(IFn f) {
+        this.onSend = (IFn)f.invoke(this.onSend);
     }
 
     public String toString() {
