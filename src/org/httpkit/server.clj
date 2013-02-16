@@ -29,31 +29,38 @@
   (open? [ch] "Tells whether or not this channel is still open")
   (close [ch]
     "Closes this channel.
-     If this channel is already closed then invoking this method has no effect.")
+    If this channel is already closed then invoking this method has no effect.
+    For websocket a CloseFrame is sent to client, for streaming, last-chunk is sent.")
   (send! [ch data]
     "Send data to client.
-     If channel is closed, then invoking this method has no effect, and return false
+     If channel is closed, invoking this method has no effect, false is returned.
      For Webocket, a text frame is sent to client.
      For streaming:
      1. First call of send!, data expect to be {:headers _ :status _ :body _} or just body.
      2. Any further call, only body(String, File, InputStream, ISeq) is expected.
         The data is encoded as chunk, sent to client")
-  (on-send [ch callback]
+  (on-send [ch callback]                ; TODO find a better name, send-hook?
     "Callback: (fn [data])
-     Do something with the sending data (like JSON encoding),
-     the return value is sending off")
+     Do something with the sending data (like JSON encoding), the return value is sending off")
   (on-receive [ch callback]
-    "Callback: (fn [message-string])
+    "Only valid for websocket.
+     Callback: (fn [message-string])
      Set the handler to get notified when there is message from client.
-     Only valid for websocket. For streaming,
-     another HTTP connection can be used to emulate the behaviour")
+     For streaming, another HTTP connection can be used to emulate the behaviour")
   (on-close [ch callback]
-    "Callback: (fn [status])
-     Set the handler to get notified when channel get closed, by client, or server call `close`.
-     Callback is called once if server and client both close the channel.
+    "Callback: (fn [close-keyword])
+     Set the handler to get notified when channel closed, by client, or server call `close`.
+     If the channel is ready closed, the callback is invoked immediately.
+     Callback is only invoked once if server and client both close the channel.
      Useful for doing clean up.
-     Status code: 0 if closed by sever;
-     Closed by client: -1 for streaming, websocket: http://tools.ietf.org/html/rfc6455#section-7.4.1"))
+     argument:
+       :server-close   : closed by sever;
+       :client-close   : closed by streaming client client
+       :normal         : websocket, a normal closure by client
+       :away           : websocket, client close, \"going away\"
+       :protocol-error : websocket, client close, due to a protocol error
+       :not-acceptable : websocket, client close, type of data cannot accept
+       :unknow         : websocket, client close"))
 
 (extend-type AsyncChannel
   Channel

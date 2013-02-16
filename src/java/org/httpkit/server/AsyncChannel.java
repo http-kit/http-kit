@@ -21,7 +21,6 @@ import clojure.lang.Keyword;
 
 @SuppressWarnings({ "unchecked" })
 public class AsyncChannel {
-
     private final SelectionKey key;
     private final HttpServer server;
 
@@ -130,18 +129,24 @@ public class AsyncChannel {
         if (!closeHandler.compareAndSet(null, fn)) {
             throw new IllegalStateException("close handler exist: " + closeHandler.get());
         }
+        if (closedRan.get()) { // no handler, but already ran
+            fn.invoke(K_UNKNOW);
+        }
     }
 
     public void onClose(int status) {
         if (closedRan.compareAndSet(false, true)) {
             IFn f = closeHandler.get();
             if (f != null) {
-                f.invoke(status);
+                f.invoke(closeReason(status));
             }
         }
     }
 
     public void serverClose(int status) {
+        if (closedRan.get()) {
+            return;
+        }
         if (key.attachment() instanceof WsServerAtta) {
             ByteBuffer s = ByteBuffer.allocate(2).putShort((short) status);
             write(WSEncoder.encode(WSDecoder.OPCODE_CLOSE, s.array()));
@@ -193,5 +198,42 @@ public class AsyncChannel {
 
     public boolean isClosed() {
         return closedRan.get();
+    }
+
+    // closed by server
+    final static Keyword K_BY_SERVER = Keyword.intern("server-close");
+    // general close status
+    final static Keyword K_CLIENT_CLOSED = Keyword.intern("client-close");
+
+    // 1000 indicates a normal closure
+    final static Keyword K_WS_1000 = Keyword.intern("normal");
+    // 1001 indicates that an endpoint is "going away"
+    final static Keyword K_WS_1001 = Keyword.intern("away");
+    // 1002 indicates that an endpoint is terminating the connection due to a
+    // protocol error
+    final static Keyword K_WS_1002 = Keyword.intern("protocol-error");
+    // 1003 indicates that an endpoint is terminating the connection
+    // because it has received a type of data it cannot accept
+    final static Keyword K_WS_1003 = Keyword.intern("not-acceptable");
+
+    final static Keyword K_UNKNOW = Keyword.intern("unknow");
+
+    final static Keyword closeReason(int status) {
+        switch (status) {
+        case 0:
+            return K_BY_SERVER;
+        case -1:
+            return K_CLIENT_CLOSED;
+        case 1000:
+            return K_WS_1000;
+        case 1001:
+            return K_WS_1001;
+        case 1002:
+            return K_WS_1002;
+        case 1003:
+            return K_WS_1003;
+        default:
+            return K_UNKNOW;
+        }
     }
 }
