@@ -1,11 +1,8 @@
 #!/bin/bash
-rm -rf target && mkdir -p target/classes
+
+./scripts/javac with-test
 
 CP=`lein classpath`
-find src/java -name "*.java" | xargs javac -Xlint:unchecked -target 1.6 -source 1.6 -encoding utf8 -g -cp $CP -d target/classes -sourcepath src/java/
-
-echo "compile java test code"
-find test/java -name "*.java" | xargs javac -g -Xlint:unchecked -target 1.6 -source 1.6 -encoding utf8 -g -cp $CP -d target/classes -sourcepath test/java
 
 java -cp "$CP" \
     -Xdebug -Xrunjdwp:transport=dt_socket,address=9093,server=y,suspend=n \
