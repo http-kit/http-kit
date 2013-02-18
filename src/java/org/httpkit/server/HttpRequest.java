@@ -20,7 +20,6 @@ public class HttpRequest {
     private byte[] body;
 
     // package visible
-    InetSocketAddress remoteAddr;
     int serverPort = 80;
     String serverName;
     Map<String, String> headers;
@@ -29,6 +28,8 @@ public class HttpRequest {
     String charset = "utf8";
     boolean isKeepAlive = false;
     boolean isWebSocket = false;
+    
+    InetSocketAddress remoteAddr;
     AsyncChannel asycChannel;
 
     public HttpRequest(HttpMethod method, String url, HttpVersion version) {

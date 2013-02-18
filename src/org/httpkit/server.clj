@@ -46,6 +46,7 @@
     "Only valid for websocket.
      Callback: (fn [message-string])
      Set the handler to get notified when there is message from client.
+     Messages receided from a client are handled orderly by server.
      For streaming, another HTTP connection can be used to emulate the behaviour")
   (on-close [ch callback]
     "Callback: (fn [close-keyword])

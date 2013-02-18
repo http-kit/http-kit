@@ -34,6 +34,9 @@ public class AsyncChannel {
 
     // streaming
     private volatile boolean isInitialWrite = true;
+    
+    // messages sent from a websocket client should be handled orderly by server
+    LinkingRunnable serialTask;
 
     public AsyncChannel(SelectionKey key, HttpServer server) {
         this.key = key;
@@ -42,6 +45,7 @@ public class AsyncChannel {
 
     public void reset() {
         closedRan.set(false);
+        serialTask = null;
         closeHandler.set(null);
         receiveHandler.set(null);
         isInitialWrite = true;

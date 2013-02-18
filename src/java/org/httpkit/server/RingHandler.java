@@ -6,6 +6,7 @@ import static org.httpkit.server.ClojureRing.*;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.httpkit.HttpUtils;
 import org.httpkit.PrefixThreadFactory;
@@ -45,6 +46,59 @@ class HttpHandler implements Runnable {
     }
 }
 
+class LinkingRunnable implements Runnable {
+    private final Runnable impl;
+    AtomicReference<LinkingRunnable> next = new AtomicReference<LinkingRunnable>(null);
+
+    public LinkingRunnable(Runnable r) {
+        this.impl = r;
+    }
+
+    public void run() {
+        impl.run();
+        if (!next.compareAndSet(null, this)) { // has more job to run
+            next.get().run();
+        }
+    }
+}
+
+class TextFrameHandler implements Runnable {
+    private TextFrame frame;
+    private AsyncChannel channel;
+
+    public TextFrameHandler(AsyncChannel channel, TextFrame frame) {
+        this.channel = channel;
+        this.frame = frame;
+    }
+
+    public void run() {
+        try {
+            channel.messageReceived(frame.getText());
+        } catch (Throwable e) {
+            HttpUtils.printError("handle websocket frame " + frame, e);
+        }
+    }
+
+}
+
+class CloseHandler implements Runnable {
+    final AsyncChannel channel;
+    final int status;
+
+    public CloseHandler(AsyncChannel channel, int status) {
+        this.channel = channel;
+        this.status = status;
+    }
+
+    public void run() {
+        try {
+            channel.onClose(status);
+        } catch (Exception e) {
+            HttpUtils.printError("on close handler", e);
+        }
+    }
+}
+
 public class RingHandler implements IHandler {
 
     final ExecutorService execs;
@@ -57,7 +111,7 @@ public class RingHandler implements IHandler {
         this.handler = handler;
     }
 
-    public void handle(final HttpRequest req, final ResponseCallback cb) {
+    public void handle(HttpRequest req, ResponseCallback cb) {
         try {
             execs.submit(new HttpHandler(req, cb, handler));
         } catch (RejectedExecutionException e) {
@@ -70,33 +124,35 @@ public class RingHandler implements IHandler {
         execs.shutdownNow();
     }
 
-    public void handle(final AsyncChannel channel, final TextFrame frame) {
+    public void handle(AsyncChannel channel, TextFrame frame) {
+        TextFrameHandler task = new TextFrameHandler(channel, frame);
+        serializePerChannel(channel, task);
+    }
+
+    public void clientClose(AsyncChannel channel, int status) {
+        if (channel.closeHandler.get() != null && !channel.closedRan.get())
+            serializePerChannel(channel, new CloseHandler(channel, status));
+    }
+
+    private void serializePerChannel(AsyncChannel channel, Runnable task) {
+        LinkingRunnable job = new LinkingRunnable(task);
+        LinkingRunnable old = channel.serialTask;
         try {
-            execs.submit(new Runnable() {
-                public void run() {
-                    try {
-                        channel.messageReceived(frame.getText());
-                    } catch (Throwable e) {
-                        HttpUtils.printError("handle websocket frame " + frame, e);
-                    }
+            if (old == null) { // No previous job
+                channel.serialTask = job;
+                execs.submit(job);
+            } else {
+                channel.serialTask = job; // keep the reference
+                if (old.next.compareAndSet(null, job)) {
+                    // successfully append to previous task
+                } else {
+                    // previous job finished. ordered executing is guaranteed.
+                    execs.submit(job);
                 }
-            });
+            }
         } catch (RejectedExecutionException e) {
             // TODO notify client if server is overloaded
             HttpUtils.printError("increase :queue-size if this happens often", e);
         }
-    }
-
-    public void clientClose(final AsyncChannel channel, final int status) {
-        if (channel.closeHandler.get() != null && !channel.closedRan.get())
-            execs.submit(new Runnable() {
-                public void run() {
-                    try {
-                        channel.onClose(status);
-                    } catch (Exception e) {
-                        HttpUtils.printError("on close handler", e);
-                    }
-                }
-            });
     }
 }

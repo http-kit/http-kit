@@ -42,11 +42,22 @@
                (on-receive con (fn [mesg]
                                  (send! con {:message mesg})))))
 
+(def mesg-idx (atom 0))
+(defn messg-order-handler [req]
+  (ws-response req con
+               (let [mesg-idx (atom 0)
+                     h (fn [mesg]
+                         (let [id (swap! mesg-idx inc)
+                               i (:id (read-string mesg))]
+                           (send! con (str (= id i)))))]
+                 (on-receive con h))))
+
 (defroutes test-routes
   (GET "/ws" [] ws-handler)
   (GET "/ws2" [] ws-handler2)
   (GET "/ws3" [] ws-handler3)
-  (GET "/ws4" [] ws-handler4))
+  (GET "/ws4" [] ws-handler4)
+  (GET "/order" [] messg-order-handler))
 
 (use-fixtures :once (fn [f]
                       (let [server (run-server
@@ -96,14 +107,24 @@
     (doseq [idx (range 0 5)]
       (let [mesg (str "message#" idx)]
         (.sendMessage client mesg)
-        (is (= mesg (.getMessage client))))))) ;; echo expected
+        (is (= mesg (.getMessage client))))) ;; echo expected
+    (.close client)))
 
 (deftest test-on-send-properly-applyed      ; issue #14
   (let [client (WebSocketClient. "ws://localhost:4348/ws4")]
     (doseq [idx (range 0 5)]
       (let [mesg (str "message#" idx)]
         (.sendMessage client mesg)
-        (is (= mesg (:message (read-string (.getMessage client)))))))))
+        (is (= mesg (:message (read-string (.getMessage client)))))))
+    (.close client)))
+
+(deftest test-message-executed-in-order
+  (doseq [_ (range 1 10)]
+    (let [client (WebSocketClient. "ws://localhost:4348/order")]
+      (doseq [id (range 1 10)]
+        (.sendMessage client (pr-str {:id id}))
+        (is (= "true" (.getMessage client))))
+      (.close client))))
 
 (deftest test-with-http.async.client
   (with-open [client (h/create-client)]
