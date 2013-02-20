@@ -47,8 +47,14 @@ public class DynamicBytes {
         return this;
     }
 
-    public DynamicBytes append(String str) {
-        return append(str, HttpUtils.ASCII);
+    public DynamicBytes append(String str) { // ASCII encoding
+        int length = str.length();
+        expandIfNeeded(length);
+        for (int i = 0; i < length; i++) {
+            char c = str.charAt(i);
+            data[idx++] = c > 128 ? (byte) '?' : (byte) c;
+        }
+        return this;
     }
 
     public DynamicBytes append(String str, Charset c) {

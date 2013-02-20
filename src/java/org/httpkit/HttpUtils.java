@@ -15,13 +15,16 @@ import java.util.Map.Entry;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import sun.nio.cs.Surrogate;
 import clojure.lang.ISeq;
 import clojure.lang.Seqable;
 
 public class HttpUtils {
 
-    public static final Charset ASCII = Charset.forName("US-ASCII");
-    public static final Charset UTF_8 = Charset.forName("utf8");
+    public static final String ASCII = "ISO-8859-1";
+    public static final Charset ASCII_CH = Charset.forName("ISO-8859-1");
+    public static final String UTF_8 = "UTF-8";
+    public static final Charset UTF_8_CH = Charset.forName("UTF-8");
 
     public static final String CHARSET = "charset=";
     // Colon ':'
@@ -78,7 +81,7 @@ public class HttpUtils {
                 bytes.append(k);
                 bytes.append(COLON);
                 bytes.append(SP);
-                bytes.append((String) v, HttpUtils.UTF_8);
+                bytes.append((String) v);
                 bytes.append(CR);
                 bytes.append(LF);
                 // ring spec says it could be a seq
@@ -88,7 +91,7 @@ public class HttpUtils {
                     bytes.append(k);
                     bytes.append(COLON);
                     bytes.append(SP);
-                    bytes.append(seq.first().toString(), HttpUtils.UTF_8);
+                    bytes.append(seq.first().toString());
                     bytes.append(CR);
                     bytes.append(LF);
                     seq = seq.next();
@@ -100,12 +103,66 @@ public class HttpUtils {
         bytes.append(LF);
     }
 
+    public final static String newString(byte[] buffer, int length, String charset) {
+        try {
+            return new String(buffer, 0, length, charset);
+        } catch (UnsupportedEncodingException e) {
+            throw new Error(e);
+        }
+    }
+
+    // http://psy-lob-saw.blogspot.jp/2012/12/encode-utf-8-string-to-bytebuffer-faster.html
+    // https://blogs.oracle.com/xuemingshen/entry/faster_new_string_bytes_cs
+    // http://www.evanjones.ca/software/java-string-encoding.html
+    @SuppressWarnings("restriction")
+    final public static ByteBuffer utf8Encode(String src) {
+        int sl = src.length();
+        char[] sa = new char[sl];
+        src.getChars(0, sl, sa, 0); // copy. TODO Unsafe to get the reference
+        int lastSp = 0;
+        int dp = 0;
+        byte[] da = new byte[sl * 4]; // can't overflow
+
+        // handle ASCII encoded strings in an optimised loop
+        while (lastSp < sl && sa[lastSp] < 128)
+            da[dp++] = (byte) sa[lastSp++];
+
+        Surrogate.Parser sgp = new Surrogate.Parser();
+
+        while (lastSp < sl) {
+            int c = sa[lastSp];
+            if (c < 128) {
+                da[dp++] = (byte) c;
+            } else if (c < 2048) {
+                da[dp++] = (byte) (0xC0 | (c >> 6));
+                da[dp++] = (byte) (0x80 | (c & 0x3F));
+            } else if (Surrogate.is(c)) {
+                int uc = sgp.parse((char) c, sa, lastSp, sl);
+                if (uc < 0) {
+                    return ByteBuffer.wrap(da, 0, dp);
+                }
+                da[(dp++)] = (byte) (0xF0 | uc >> 18);
+                da[(dp++)] = (byte) (0x80 | uc >> 12 & 0x3F);
+                da[(dp++)] = (byte) (0x80 | uc >> 6 & 0x3F);
+                da[(dp++)] = (byte) (0x80 | uc & 0x3F);
+                ++lastSp;
+            } else {
+                da[(dp++)] = (byte) (0xE0 | c >> 12);
+                da[(dp++)] = (byte) (0x80 | c >> 6 & 0x3F);
+                da[(dp++)] = (byte) (0x80 | c & 0x3F);
+            }
+            ++lastSp;
+        }
+        return ByteBuffer.wrap(da, 0, dp);
+    }
+
     public static ByteBuffer bodyBuffer(Object body) throws IOException {
         if (body == null) {
             return null;
         } else if (body instanceof String) {
-            byte[] b = ((String) body).getBytes(UTF_8);
-            return ByteBuffer.wrap(b);
+            return utf8Encode((String) body);
+            // byte[] b = ((String) body).getBytes(UTF_8);
+            // return ByteBuffer.wrap(b);
         } else if (body instanceof InputStream) {
             DynamicBytes b = readAll((InputStream) body);
             return ByteBuffer.wrap(b.get(), 0, b.length());
@@ -116,7 +173,7 @@ public class HttpUtils {
             ISeq seq = ((Seqable) body).seq();
             DynamicBytes b = new DynamicBytes(seq.count() * 512);
             while (seq != null) {
-                b.append(seq.first().toString(), UTF_8);
+                b.append(seq.first().toString(), UTF_8_CH); // TODO optimize it
                 seq = seq.next();
             }
             return ByteBuffer.wrap(b.get(), 0, b.length());
@@ -130,7 +187,7 @@ public class HttpUtils {
     // like javascript's encodeURI
     // https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Global_Objects/encodeURI
     public static String encodeURI(String url) {
-        byte[] bytes = url.getBytes(UTF_8);
+        byte[] bytes = url.getBytes(UTF_8_CH);
         DynamicBytes buffer = new DynamicBytes(bytes.length * 2);
         boolean e = true;
         for (byte b : bytes) {
@@ -163,7 +220,7 @@ public class HttpUtils {
                 buffer.append(b);
             }
         }
-        return new String(buffer.get(), 0, buffer.length(), UTF_8);
+        return newString(buffer.get(), buffer.length(), ASCII);
     }
 
     public static int findEndOfString(String sb) {
@@ -211,7 +268,7 @@ public class HttpUtils {
             throw new ProtocolException("Expect chunk size to be a number: " + hex);
         }
     }
-    
+
     public static Map<String, Object> camelCase(Map<String, Object> headers) {
         TreeMap<String, Object> tmp = new TreeMap<String, Object>();
 
@@ -405,7 +462,7 @@ public class HttpUtils {
         Charset result = parseCharset(headers.get(CONTENT_TYPE));
         if (result == null) {
             // decode a little the find charset=???
-            String s = new String(body.get(), 0, min(512, body.length()), ASCII);
+            String s = newString(body.get(), min(512, body.length()), ASCII);
             // content="text/html;charset=gb2312"
             result = guess(s, CHARSET);
             if (result == null) {
@@ -418,6 +475,6 @@ public class HttpUtils {
                 }
             }
         }
-        return result == null ? UTF_8 : result;
+        return result == null ? UTF_8_CH : result;
     }
 }

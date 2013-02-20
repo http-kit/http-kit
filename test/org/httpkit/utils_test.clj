@@ -1,5 +1,6 @@
 (ns org.httpkit.utils-test
-  (:use clojure.test)
+  (:use clojure.test
+        org.httpkit.test-util)
   (:require [clojure.java.io :as io])
   (:import org.httpkit.HttpUtils
            org.httpkit.DynamicBytes
@@ -53,3 +54,22 @@
 (deftest test-get-host
   (is (= "shenfeng.me" (HttpUtils/getHost (URI. "http://shenfeng.me/what"))))
   (is (= "shenfeng.me:7979" (HttpUtils/getHost (URI. "http://shenfeng.me:7979/what")))))
+
+(deftest test-utf8-encoding
+  (let [s ^String (slurp (io/resource "resources/utf8.txt" )
+                         :encoding "UTF-8")
+        jdk (.getBytes s "UTF-8")
+        b ^java.nio.ByteBuffer (HttpUtils/utf8Encode s)
+        times 20000]
+    (is (= (alength jdk) (.remaining b)))
+    (doseq [i (range 0 (alength jdk))]
+      (is (== (aget jdk i) (.get b))))
+    (doseq [_ (range 0 times)] (.getBytes s "UTF-8"))
+    (doseq [_ (range 0 times)] (HttpUtils/utf8Encode s))
+    (doseq [_ (range 0 times)] (.getBytes s HttpUtils/UTF_8_CH))
+    (bench "String.getByte(csn), 20000 times"
+           (doseq [_ (range 0 times)] (.getBytes s "UTF-8")))
+    (bench "String.getByte(cs), 20000 times"
+           (doseq [_ (range 0 times)] (.getBytes s HttpUtils/UTF_8_CH)))
+    (bench "HttpUtils/utf8Encode s, 20000 times"
+           (doseq [_ (range 0 times)] (HttpUtils/utf8Encode s)))))

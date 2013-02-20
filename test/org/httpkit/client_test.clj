@@ -38,13 +38,6 @@
 (comment
   (defonce server1 (run-server (site test-routes) {:port 4347})))
 
-(defmacro bench
-  [title & forms]
-  `(let [start# (. System (nanoTime))]
-     ~@forms
-     (println (str ~title "Elapsed time: "
-                   (/ (double (- (. System (nanoTime)) start#)) 1000000.0)
-                   " msecs"))))
 
 (deftest test-http-client
   (doseq [host ["http://127.0.0.1:4347" "http://127.0.0.1:14347"]]

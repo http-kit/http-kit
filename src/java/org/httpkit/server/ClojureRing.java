@@ -107,7 +107,7 @@ public class ClojureRing {
                 }
             }
         } catch (IOException e) {
-            byte[] b = e.getMessage().getBytes(ASCII);
+            byte[] b = e.getMessage().getBytes(ASCII_CH);
             status = 500;
             headers.clear();
             headers.put(CL, Integer.toString(b.length));

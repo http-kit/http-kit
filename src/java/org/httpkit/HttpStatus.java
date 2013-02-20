@@ -1,6 +1,7 @@
 package org.httpkit;
 
-import static org.httpkit.HttpUtils.ASCII;
+import static org.httpkit.HttpUtils.ASCII_CH;
+
 
 public class HttpStatus {
 
@@ -404,7 +405,7 @@ public class HttpStatus {
     public HttpStatus(int code, String reasonPhrase) {
         this.code = code;
         this.reasonPhrase = reasonPhrase;
-        bytes = ("HTTP/1.1 " + code + " " + reasonPhrase + "\r\n").getBytes(ASCII);
+        bytes = ("HTTP/1.1 " + code + " " + reasonPhrase + "\r\n").getBytes(ASCII_CH);
     }
 
     public int getCode() {

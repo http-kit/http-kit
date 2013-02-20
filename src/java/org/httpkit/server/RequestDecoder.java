@@ -213,7 +213,7 @@ public class RequestDecoder {
         }
         String line = null;
         if (!more) {
-            line = new String(lineBuffer, 0, lineBufferIdx);
+            line = newString(lineBuffer, lineBufferIdx, ASCII);
             lineBufferIdx = 0;
         }
         return line;

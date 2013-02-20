@@ -4,7 +4,6 @@ import java.nio.ByteBuffer;
 
 import org.httpkit.HttpUtils;
 
-
 public class WSEncoder {
     public static ByteBuffer encode(byte opcode, byte[] data) {
         byte b0 = 0;
@@ -29,7 +28,7 @@ public class WSEncoder {
 
     // clear text
     public static ByteBuffer encode(String text) {
-        byte[] data = text.getBytes(HttpUtils.UTF_8);
+        byte[] data = text.getBytes(HttpUtils.UTF_8_CH);
         return encode(WSDecoder.OPCODE_TEXT, data);
     }
 }

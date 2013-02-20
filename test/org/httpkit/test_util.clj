@@ -44,3 +44,11 @@
 
 (defn close-handler [status]
   (reset! channel-closed true))
+
+(defmacro bench
+  [title & forms]
+  `(let [start# (. System (nanoTime))]
+     ~@forms
+     (println (str ~title "Elapsed time: "
+                   (/ (double (- (. System (nanoTime)) start#)) 1000000.0)
+                   " msecs"))))
