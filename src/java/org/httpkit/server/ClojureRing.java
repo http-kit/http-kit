@@ -49,16 +49,6 @@ public class ClojureRing {
     public static final Keyword WEBSOCKET = intern("websocket?");
     public static final Keyword ASYC_CHANNEL = intern("async-channel");
 
-    public static final Keyword M_GET = intern("get");
-    public static final Keyword M_HEAD = intern("head");
-    public static final Keyword M_POST = intern("post");
-    public static final Keyword M_PUT = intern("put");
-    public static final Keyword M_DELETE = intern("delete");
-    public static final Keyword M_TRACE = intern("trace");
-    public static final Keyword M_OPTIONS = intern("options");
-    public static final Keyword M_CONNECT = intern("connect");
-    public static final Keyword M_PATCH = intern("patch");
-
     public static final Keyword HTTP = intern("http");
 
     public static final Keyword STATUS = intern("status");

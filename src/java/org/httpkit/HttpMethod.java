@@ -1,13 +1,13 @@
 package org.httpkit;
 
-import static org.httpkit.server.ClojureRing.*;
-
+import static clojure.lang.Keyword.intern;
 import clojure.lang.Keyword;
 
 public enum HttpMethod {
 
-    GET(M_GET), HEAD(M_HEAD), POST(M_POST), PUT(M_PUT), DELETE(M_DELETE), TRACE(M_TRACE), OPTIONS(
-            M_OPTIONS), CONNECT(M_CONNECT), PATCH(M_PATCH);
+    GET(intern("get")), HEAD(intern("head")), POST(intern("post")), PUT(intern("put")), DELETE(
+            intern("delete")), TRACE(intern("trace")), OPTIONS(intern("options")), CONNECT(
+            intern("connect")), PATCH(intern("patch"));
 
     public final Keyword KEY;
 
