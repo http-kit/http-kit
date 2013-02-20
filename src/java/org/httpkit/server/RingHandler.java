@@ -81,24 +81,6 @@ class TextFrameHandler implements Runnable {
 
 }
 
-class CloseHandler implements Runnable {
-    final AsyncChannel channel;
-    final int status;
-
-    public CloseHandler(AsyncChannel channel, int status) {
-        this.channel = channel;
-        this.status = status;
-    }
-
-    public void run() {
-        try {
-            channel.onClose(status);
-        } catch (Exception e) {
-            HttpUtils.printError("on close handler", e);
-        }
-    }
-}
-
 public class RingHandler implements IHandler {
 
     final ExecutorService execs;
@@ -126,33 +108,50 @@ public class RingHandler implements IHandler {
 
     public void handle(AsyncChannel channel, TextFrame frame) {
         TextFrameHandler task = new TextFrameHandler(channel, frame);
-        serializePerChannel(channel, task);
-    }
 
-    public void clientClose(AsyncChannel channel, int status) {
-        if (channel.closeHandler.get() != null && !channel.closedRan.get())
-            serializePerChannel(channel, new CloseHandler(channel, status));
-    }
-
-    private void serializePerChannel(AsyncChannel channel, Runnable task) {
+        // messages from the same client are handled orderly
         LinkingRunnable job = new LinkingRunnable(task);
         LinkingRunnable old = channel.serialTask;
+        channel.serialTask = job;
         try {
             if (old == null) { // No previous job
-                channel.serialTask = job;
                 execs.submit(job);
             } else {
-                channel.serialTask = job; // keep the reference
                 if (old.next.compareAndSet(null, job)) {
                     // successfully append to previous task
                 } else {
-                    // previous job finished. ordered executing is guaranteed.
+                    // previous message is handled, order is guaranteed.
                     execs.submit(job);
                 }
             }
         } catch (RejectedExecutionException e) {
             // TODO notify client if server is overloaded
             HttpUtils.printError("increase :queue-size if this happens often", e);
+        }
+    }
+
+    public void clientClose(final AsyncChannel channel, final int status) {
+        if (!channel.closedRan.get()) { // server did not close it first
+            // has close handler, execute it in another thread
+            if (channel.closeHandler.get() != null) {
+                try {
+                    // no need to maintain order
+                    execs.submit(new Runnable() {
+                        public void run() {
+                            try {
+                                channel.onClose(status);
+                            } catch (Exception e) {
+                                HttpUtils.printError("on close handler", e);
+                            }
+                        }
+                    });
+                } catch (RejectedExecutionException e) {
+                    HttpUtils.printError("increase :queue-size if this happens often", e);
+                }
+            } else {
+                // no close handler, just mark the connection as closed
+                channel.closedRan.set(false);
+            }
         }
     }
 }
