@@ -34,7 +34,7 @@ public class AsyncChannel {
 
     // streaming
     private volatile boolean isInitialWrite = true;
-    
+
     // messages sent from a websocket client should be handled orderly by server
     LinkingRunnable serialTask;
 
@@ -44,11 +44,12 @@ public class AsyncChannel {
     }
 
     public void reset() {
-        closedRan.set(false);
-        serialTask = null;
-        closeHandler.set(null);
-        receiveHandler.set(null);
+        closedRan.lazySet(false);
+        closeHandler.lazySet(null);
+        receiveHandler.lazySet(null);
         isInitialWrite = true;
+        onSend = null;
+        serialTask = null;
     }
 
     // -------------- streaming --------------------
@@ -148,16 +149,19 @@ public class AsyncChannel {
     }
 
     public boolean serverClose(int status) {
-        if (closedRan.get()) {
+        if (!closedRan.compareAndSet(false, true)) {
             return false;
         }
-        if (key.attachment() instanceof WsServerAtta) {
-            ByteBuffer s = ByteBuffer.allocate(2).putShort((short) status);
-            write(WSEncoder.encode(WSDecoder.OPCODE_CLOSE, s.array()));
+        if (isWebSocket()) {
+            write(WSEncoder.encode(WSDecoder.OPCODE_CLOSE,
+                    ByteBuffer.allocate(2).putShort((short) status).array()));
         } else {
             write(ByteBuffer.wrap(finalChunkBytes));
         }
-        onClose(0); // server close, 0
+        IFn f = closeHandler.get();
+        if (f != null) {
+            f.invoke(closeReason(0)); // server close is 0
+        }
         return true;
     }
 
@@ -170,8 +174,13 @@ public class AsyncChannel {
             data = onSend.invoke(data);
         }
 
-        if (key.attachment() instanceof WsServerAtta) {
-            sendTextFrame((String) data);// websocket
+        if (isWebSocket()) {
+            if (data instanceof String) {
+                sendTextFrame((String) data);// websocket
+            } else {
+                throw new IllegalArgumentException("websocket only accept string, get" + data);
+            }
+
             if (closeAfterSent) {
                 serverClose(1000);
             }
@@ -187,7 +196,7 @@ public class AsyncChannel {
     }
 
     public void alterSentHook(IFn f) {
-        this.onSend = (IFn)f.invoke(this.onSend);
+        this.onSend = (IFn) f.invoke(this.onSend);
     }
 
     public String toString() {
@@ -201,29 +210,33 @@ public class AsyncChannel {
         server.queueWrite(key);
     }
 
+    public boolean isWebSocket() {
+        return key.attachment() instanceof WsServerAtta;
+    }
+
     public boolean isClosed() {
         return closedRan.get();
     }
 
     // closed by server
-    final static Keyword K_BY_SERVER = Keyword.intern("server-close");
+    static Keyword K_BY_SERVER = Keyword.intern("server-close");
     // general close status
-    final static Keyword K_CLIENT_CLOSED = Keyword.intern("client-close");
+    static Keyword K_CLIENT_CLOSED = Keyword.intern("http-client-close");
 
     // 1000 indicates a normal closure
-    final static Keyword K_WS_1000 = Keyword.intern("normal");
+    static Keyword K_WS_1000 = Keyword.intern("ws-normal");
     // 1001 indicates that an endpoint is "going away"
-    final static Keyword K_WS_1001 = Keyword.intern("away");
+    static Keyword K_WS_1001 = Keyword.intern("ws-away");
     // 1002 indicates that an endpoint is terminating the connection due to a
     // protocol error
-    final static Keyword K_WS_1002 = Keyword.intern("protocol-error");
+    static Keyword K_WS_1002 = Keyword.intern("ws-protocol-error");
     // 1003 indicates that an endpoint is terminating the connection
     // because it has received a type of data it cannot accept
-    final static Keyword K_WS_1003 = Keyword.intern("not-acceptable");
+    static Keyword K_WS_1003 = Keyword.intern("ws-not-acceptable");
 
-    final static Keyword K_UNKNOW = Keyword.intern("unknow");
+    static Keyword K_UNKNOW = Keyword.intern("ws-unknow");
 
-    final static Keyword closeReason(int status) {
+    static Keyword closeReason(int status) {
         switch (status) {
         case 0:
             return K_BY_SERVER;

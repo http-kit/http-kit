@@ -42,7 +42,7 @@
   (alter-send-hook [ch f]
     "Callback: (fn [old-hook] new-hook)
      Do something with the sending data (like JSON encoding), the return value is sending off")
-  (on-receive [ch callback]             ; TODO ordering
+  (on-receive [ch callback]
     "Only valid for websocket.
      Callback: (fn [message-string])
      Set the handler to get notified when there is message from client.
