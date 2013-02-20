@@ -147,9 +147,9 @@ public class AsyncChannel {
         }
     }
 
-    public void serverClose(int status) {
+    public boolean serverClose(int status) {
         if (closedRan.get()) {
-            return;
+            return false;
         }
         if (key.attachment() instanceof WsServerAtta) {
             ByteBuffer s = ByteBuffer.allocate(2).putShort((short) status);
@@ -158,6 +158,7 @@ public class AsyncChannel {
             write(ByteBuffer.wrap(finalChunkBytes));
         }
         onClose(0); // server close, 0
+        return true;
     }
 
     public boolean send(Object data, boolean closeAfterSent) throws IOException {
