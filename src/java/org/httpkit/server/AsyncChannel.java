@@ -27,7 +27,11 @@ public class AsyncChannel {
     final public AtomicReference<Boolean> closedRan = new AtomicReference<Boolean>(false);
     final AtomicReference<IFn> closeHandler = new AtomicReference<IFn>(null);
 
-    private volatile IFn onSend;
+    private volatile IFn onSendHook;
+    private volatile IFn onReceiveHook;
+
+    private static IFn globalSentHook;
+    private static IFn globalReceiveHook;
 
     // websocket
     final AtomicReference<IFn> receiveHandler = new AtomicReference<IFn>(null);
@@ -48,7 +52,8 @@ public class AsyncChannel {
         closeHandler.lazySet(null);
         receiveHandler.lazySet(null);
         isInitialWrite = true;
-        onSend = null;
+        onSendHook = null;
+        onReceiveHook = null;
         serialTask = null;
     }
 
@@ -97,6 +102,9 @@ public class AsyncChannel {
     }
 
     private void writeChunk(Object body) throws IOException {
+        if (body instanceof Map) { // only get body if a map
+            body = ((Map<Keyword, Object>) body).get(BODY);
+        }
         if (body != null) { // null is ignored
             ByteBuffer buffers[];
             ByteBuffer t = HttpUtils.bodyBuffer(body);
@@ -117,7 +125,13 @@ public class AsyncChannel {
     public void messageReceived(final String mesg) {
         IFn f = receiveHandler.get();
         if (f != null) {
-            f.invoke(mesg);
+            IFn hook = onReceiveHook == null ? globalReceiveHook : onReceiveHook;
+            if (hook != null) {
+                // apply hook before call receive handler
+                f.invoke(hook.invoke(mesg));
+            } else {
+                f.invoke(mesg);
+            }
         }
     }
 
@@ -170,8 +184,10 @@ public class AsyncChannel {
             return false;
         }
 
-        if (onSend != null) {
-            data = onSend.invoke(data);
+        IFn hook = onSendHook == null ? globalSentHook : onSendHook;
+
+        if (hook != null) {
+            data = hook.invoke(data, isWebSocket(), isFirstWrite());
         }
 
         if (isWebSocket()) {
@@ -195,8 +211,20 @@ public class AsyncChannel {
         return true;
     }
 
+    // hook is a experiment, maybe removed
+    public static void setGlobalHook(IFn sentHook, IFn receiveHook) {
+        globalSentHook = sentHook;
+        globalReceiveHook = receiveHook;
+    }
+
     public void alterSentHook(IFn f) {
-        this.onSend = (IFn) f.invoke(this.onSend);
+        this.onSendHook = (IFn) f.invoke(onSendHook == null ? globalSentHook : onSendHook);
+    }
+
+    // like alter-var-root
+    public void alterReceiveHook(IFn f) {
+        this.onReceiveHook = (IFn) f.invoke(onReceiveHook == null ? globalReceiveHook
+                : onReceiveHook);
     }
 
     public String toString() {
@@ -214,6 +242,11 @@ public class AsyncChannel {
         return key.attachment() instanceof WsServerAtta;
     }
 
+    // return true if first {:headers :body :status} has not been sent
+    public boolean isFirstWrite() {
+        return !isWebSocket() && isInitialWrite;
+    }
+
     public boolean isClosed() {
         return closedRan.get();
     }
@@ -226,13 +259,13 @@ public class AsyncChannel {
     // 1000 indicates a normal closure
     static Keyword K_WS_1000 = Keyword.intern("ws-normal");
     // 1001 indicates that an endpoint is "going away"
-    static Keyword K_WS_1001 = Keyword.intern("ws-away");
+    static Keyword K_WS_1001 = Keyword.intern("ws-going-away");
     // 1002 indicates that an endpoint is terminating the connection due to a
     // protocol error
     static Keyword K_WS_1002 = Keyword.intern("ws-protocol-error");
     // 1003 indicates that an endpoint is terminating the connection
     // because it has received a type of data it cannot accept
-    static Keyword K_WS_1003 = Keyword.intern("ws-not-acceptable");
+    static Keyword K_WS_1003 = Keyword.intern("ws-unsupported");
 
     static Keyword K_UNKNOW = Keyword.intern("ws-unknow");
 

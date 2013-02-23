@@ -42,7 +42,6 @@
                (on-receive con (fn [mesg]
                                  (send! con {:message mesg})))))
 
-(def mesg-idx (atom 0))
 (defn messg-order-handler [req]
   (ws-response req con
                (let [mesg-idx (atom 0)

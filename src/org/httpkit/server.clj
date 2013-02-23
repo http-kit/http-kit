@@ -27,21 +27,27 @@
 (defprotocol Channel
   "Asynchronous channel for HTTP streaming/long polling & websocekt"
   (open? [ch] "Tells whether or not this channel is still open")
+  (websocket? [ch] "Tells whether or not this channel is websocket")
   (close [ch]
     "Closes this channel.
     If this channel is already closed then invoking this method has no effect.
     For websocket a CloseFrame is sent to client, for streaming, last-chunk is sent.")
-  (send! [ch data]
+  (send! [ch data] [ch data close-after-send?]
     "Send data to client.
      If channel is closed, invoking this method has no effect, false is returned.
      For Webocket, a text frame is sent to client.
      For streaming:
      1. First call of send!, data expect to be {:headers _ :status _ :body _} or just body.
-     2. Any further call, only body(String, File, InputStream, ISeq) is expected.
+     2. Any further call, body(String, File, InputStream, ISeq) or {:body body} are expected.
         The data is encoded as chunk, sent to client")
-  (alter-send-hook [ch f]
+  (alter-send-hook [ch f] ; just experiment, will be removed if not needed
     "Callback: (fn [old-hook] new-hook)
+     hook : (fn [data websocket? first-send?] data-write-to-client)
      Do something with the sending data (like JSON encoding), the return value is sending off")
+  (alter-receive-hook [ch f] ; just experiment, will be removed if not needed
+    "Callback: (fn [old-hook] new-hook)
+     hook: (fn [string] ret), ret is pass to on-receive handler
+     Do something with the receiving data (like JSON decoding), the return value is pass to receive handler")
   (on-receive [ch callback]
     "Only valid for websocket.
      Callback: (fn [message-string])
@@ -67,8 +73,12 @@
   Channel
   (open? [ch] (not (.isClosed ch)))
   (close [ch] (.serverClose ch 1000))
-  (send! [ch data] (.send ch data false))
+  (websocket? [ch] (.isWebSocket ch))
+  (send!
+    ([ch data] (.send ch data false))
+    ([ch data close-after-send?] (.send ch data (true? close-after-send?))))
   (alter-send-hook [ch f] (.alterSentHook ch f))
+  (alter-receive-hook [ch f] (.alterReceiveHook ch f))
   (on-receive [ch callback] (.setReceiveHandler ch callback))
   (on-close [ch callback] (.setCloseHandler ch callback)))
 
@@ -80,6 +90,10 @@
      (.digest md (.getBytes (str key websocket-13-guid))))))
 
 (defn websocket? [request] (:websocket? request))
+
+;;; experiment, will remove if find not need
+(defn set-global-hook [send-hook receive-hook]
+  (AsyncChannel/setGlobalHook send-hook receive-hook))
 
 (defmacro ws-response
   "If request is a WebSocket handshake request, evaluates `then` form with
@@ -147,3 +161,15 @@
   `(let [~channel (:async-channel ~request)]
      (do ~@body)
      {:body ~channel}))
+
+(comment
+  TODO
+  built library on top of the API,
+  with client side JS + server side clojure,
+
+  1. provide a unified interface.
+  2. `group` concept [join a group, leave a group, sent messages to the group]
+  3. can attach data to a group
+
+  MemoryStore, RedisStore
+  )
