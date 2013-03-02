@@ -5,7 +5,8 @@
 
 (defn handler [req]
   {:status 200
-   :headers {"Content-Type" "text/plain"}
+   :headers {"Content-Type" "text/plain"
+             "X-header" "美味书签"}
    :body (subs const-string 0 1024)})
 
 (defn -main [& args]

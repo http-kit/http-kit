@@ -48,7 +48,19 @@ public class DynamicBytes {
     }
 
     public DynamicBytes append(String str) {
-        return append(str, HttpUtils.ASCII);
+        // ISO-8859-1. much faster than String.getBytes("ISO-8859-1")
+        // less copy. 620ms vs 190ms
+        int length = str.length();
+        expandIfNeeded(length);
+        for (int i = 0; i < length; i++) {
+            char c = str.charAt(i);
+            if (c < 128) {
+                data[idx++] = (byte) c;
+            } else {
+                data[idx++] = (byte) '?'; // JDK uses ? to represent non ASCII
+            }
+        }
+        return this;
     }
 
     public DynamicBytes append(String str, Charset c) {

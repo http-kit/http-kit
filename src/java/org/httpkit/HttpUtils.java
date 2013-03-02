@@ -78,6 +78,8 @@ public class HttpUtils {
                 bytes.append(k);
                 bytes.append(COLON);
                 bytes.append(SP);
+                // supposed to be ISO-8859-1, but utf-8 is compatible.
+                // filename in Content-Disposition can be utf8
                 bytes.append((String) v, HttpUtils.UTF_8);
                 bytes.append(CR);
                 bytes.append(LF);
@@ -211,7 +213,7 @@ public class HttpUtils {
             throw new ProtocolException("Expect chunk size to be a number: " + hex);
         }
     }
-    
+
     public static Map<String, Object> camelCase(Map<String, Object> headers) {
         TreeMap<String, Object> tmp = new TreeMap<String, Object>();
 
