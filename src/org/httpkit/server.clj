@@ -1,14 +1,15 @@
 (ns org.httpkit.server
-  (:require [clojure.tools.macro :as macro])
-  (:import  [org.httpkit.server AsyncChannel HttpServer RingHandler]
-            javax.xml.bind.DatatypeConverter
-            java.security.MessageDigest))
+  (:import [org.httpkit.server AsyncChannel HttpServer RingHandler]
+           javax.xml.bind.DatatypeConverter
+           java.security.MessageDigest))
 
 ;;;; Ring server
 
 (defn run-server
-  "Starts Ring-compatible HTTP server and returns a nullary function that stops
-  the server."
+  "Starts (mostly*) Ring-compatible HTTP server and returns a nullary function
+  that stops the server.
+
+  * See http://http-kit.org/migration.html for differences."
   [handler {:keys [port thread ip max-body max-line worker-name-prefix queue-size]
             :or   {ip "0.0.0.0"  ; which ip (if has many ips) to bind
                    port 8090     ; which port listen incomming request
@@ -25,49 +26,49 @@
 ;;;; Asynchronous extension
 
 (defprotocol Channel
-  "Asynchronous channel for HTTP streaming/long polling & websocekt"
-  (open? [ch] "Tells whether or not this channel is still open")
-  (websocket? [ch] "Tells whether or not this channel is websocket")
+  "Unified asynchronous channel interface for HTTP (streaming or long-polling)
+  and WebSockets."
+
+  (open? [ch] "Returns true iff channel is open.")
   (close [ch]
-    "Closes this channel.
-    If this channel is already closed then invoking this method has no effect.
-    For websocket a CloseFrame is sent to client, for streaming, last-chunk is sent.")
+    "Closes the channel. Idempotent: returns true if the channel was actually
+    closed, or false if it was already closed.")
+  (websocket? [ch] "Returns true iff channel is a WebSocket.")
   (send! [ch data] [ch data close-after-send?]
-    "Send data to client.
-     If channel is closed, invoking this method has no effect, false is returned.
-     For Webocket, a text frame is sent to client.
-     For streaming:
-     1. First call of send!, data expect to be {:headers _ :status _ :body _} or just body.
-     2. Any further call, body(String, File, InputStream, ISeq) or {:body body} are expected.
-        The data is encoded as chunk, sent to client")
-  (alter-send-hook [ch f] ; just experiment, will be removed if not needed
+    "Sends data to client and returns true if the data was successfully sent,
+    or false if the channel is closed.
+
+    When unspecified, `close-after-send?` defaults to true for HTTP channels and
+    false for WebSockets.
+
+    Data form: {:headers _ :status _ :body _} or just body. Note that :headers
+    and :status will be stripped for WebSockets and for HTTP streaming responses
+    after the first.")
+  (on-receive [ch callback]
+    "Sets handler (fn [message-string]) for notification of client WebSocket
+    messages. Message ordering is guaranteed by server.")
+  (on-close [ch callback]
+    "Sets handler (fn [status]) for notification of channel being closed by the
+    server or client. Handler will be invoked at most once. Useful for clean-up.
+
+    Callback status argument:
+      :server-close   : Channel closed by sever
+      :client-close   : HTTP channel closed by client
+      :normal         : WebSocket closed by client (CLOSE_NORMAL)
+      :going-away     : WebSocket closed by client (CLOSE_GOING_AWAY)
+      :protocol-error : WebSocket closed by client (CLOSE_PROTOCOL_ERROR)
+      :unsupported    : WebSocket closed by client (CLOSE_UNSUPPORTED)
+      :unknown        : WebSocket closed by client (unknown reason)")
+
+  ;;; just experiment, will be removed if not needed
+  (alter-send-hook [ch f]
     "Callback: (fn [old-hook] new-hook)
      hook : (fn [data websocket? first-send?] data-write-to-client)
      Do something with the sending data (like JSON encoding), the return value is sending off")
-  (alter-receive-hook [ch f] ; just experiment, will be removed if not needed
+  (alter-receive-hook [ch f]
     "Callback: (fn [old-hook] new-hook)
      hook: (fn [string] ret), ret is pass to on-receive handler
-     Do something with the receiving data (like JSON decoding), the return value is pass to receive handler")
-  (on-receive [ch callback]
-    "Only valid for websocket.
-     Callback: (fn [message-string])
-     Set the handler to get notified when there is message from client.
-     Messages receided from a client are handled orderly by server.
-     For streaming, another HTTP connection can be used to emulate the behaviour")
-  (on-close [ch callback]
-    "Callback: (fn [close-keyword])
-     Set the handler to get notified when channel closed, by client, or server call `close`.
-     If the channel is ready closed, the callback is invoked immediately.
-     Callback is only invoked once if server and client both close the channel.
-     Useful for doing clean up.
-     argument:
-       :server-close   : closed by sever;
-       :client-close   : closed by streaming client client
-       :normal         : websocket, a normal closure by client
-       :away           : websocket, client close, \"going away\"
-       :protocol-error : websocket, client close, due to a protocol error
-       :not-acceptable : websocket, client close, type of data cannot accept
-       :unknow         : websocket, client close"))
+     Do something with the receiving data (like JSON decoding), the return value is pass to receive handler"))
 
 (extend-type AsyncChannel
   Channel
@@ -76,7 +77,7 @@
   (websocket? [ch] (.isWebSocket ch))
   (send!
     ([ch data] (.send ch data false))
-    ([ch data close-after-send?] (.send ch data (true? close-after-send?))))
+    ([ch data close-after-send?] (.send ch data (boolean close-after-send?))))
   (alter-send-hook [ch f] (.alterSentHook ch f))
   (alter-receive-hook [ch f] (.alterReceiveHook ch f))
   (on-receive [ch callback] (.setReceiveHandler ch callback))
@@ -88,8 +89,6 @@
         websocket-13-guid "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"]
     (DatatypeConverter/printBase64Binary
      (.digest md (.getBytes (str key websocket-13-guid))))))
-
-(defn websocket? [request] (:websocket? request))
 
 ;;; experiment, will remove if find not need
 (defn set-global-hook [send-hook receive-hook]
