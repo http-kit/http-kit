@@ -77,7 +77,7 @@
   (websocket? [ch] (.isWebSocket ch))
   (send!
     ([ch data] (.send ch data false))
-    ([ch data close-after-send?] (.send ch data (true? close-after-send?))))
+    ([ch data close-after-send?] (.send ch data (boolean close-after-send?))))
   (alter-send-hook [ch f] (.alterSentHook ch f))
   (alter-receive-hook [ch f] (.alterReceiveHook ch f))
   (on-receive [ch callback] (.setReceiveHandler ch callback))
