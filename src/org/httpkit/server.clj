@@ -36,7 +36,8 @@
   (websocket? [ch] "Returns true iff channel is a WebSocket.")
   (send! [ch data] [ch data close-after-send?]
     "Sends data to client and returns true if the data was successfully sent,
-    or false if the channel is closed.
+    or false if the channel is closed. Data is sent directly to the client,
+    NO RING MIDDLEWARE IS APPLIED.
 
     When unspecified, `close-after-send?` defaults to true for HTTP channels and
     false for WebSockets.
@@ -94,72 +95,67 @@
 (defn set-global-hook [send-hook receive-hook]
   (AsyncChannel/setGlobalHook send-hook receive-hook))
 
-(defmacro ws-response
-  "If request is a WebSocket handshake request, evaluates `then` form with
-  `conn-name` binding. and returns a WebSocket Upgrade response. Otherwise
-  evaluates `else` form and returns a standard Ring response:
+(defmacro with-channel
+  "Evaluates body with `ch-name` bound to the request's underlying asynchronous
+  HTTP or WebSocket channel, and returns {:body AsyncChannel} as an
+  implementation detail.
 
-   (defn my-chatroom-handler [request]
-     (ws-response request ws-conn
-       (println \"New WebSocket connection:\" ws-conn)
-           (on-receive ws-conn (fn [message] (println \"on-mesg:\"  message)))
-           (on-close  ws-conn (fn [status]  (println \"on-close:\" status)))
-           (send! ws-conn \"Welcome to the chatroom!\"))))"
-  [request conn-name & then]
-  `(let [key# (get-in ~request [:headers "sec-websocket-key"])
-         ~conn-name ^AsyncChannel (:async-channel ~request)]
-     (if (and key# (:websocket? ~request))
-       (do
-         (.sendHandshake ~conn-name {"Upgrade"    "websocket"
-                                     "Connection" "Upgrade"
-                                     "Sec-WebSocket-Accept" (accept key#)
-                                     ;; "Sec-WebSocket-Protocol" "13"
-                                     })
-         ~@then
-         {:body (:async-channel ~request)})
-       {:status 400 :body "Not websocket or Sec-WebSocket-Key header missing"})))
+  ;; Asynchronous HTTP response (with optional streaming)
+  (defn my-async-handler [request]
+    (with-channel request ch ; Request's channel
+      (future ; Respond from any thread
+        (send! ch {:status  200
+                   :headers {\"Content-Type\" \"text/html\"}
+                   :body    \"This is an async response!\"}
+               ;; false ; Uncomment to use chunk encoding for HTTP streaming
+               ))))
 
-(defmacro async-response
-  "Wraps body so that a standard Ring response will be returned to caller when
-  `(callback-name ring-response|body)` is executed in any thread:
+  ;; WebSocket response
+  (defn my-chatroom-handler [request]
+    (if-not (:websocket? request)
+      {:status 200 :body \"Welcome to the chatroom! JS client connecting...\"}
+      (with-channel request ch
+        (println \"New WebSocket channel:\" ch)
+        (on-receive ch (fn [msg]    (println \"on-receive:\" msg)))
+        (on-close   ch (fn [status] (println \"on-close:\" status)))
+        (send! ch \"First chat message!\"))))
 
-    (defn my-async-handler [request]
-      (async-response request respond!
-        (future (respond! {:status  200
-                          :headers {\"Content-Type\" \"text/html\"}
-                          :body    \"This is an async response!\"}))))
-
-  The caller's request will block while waiting for a response (see
-  Ajax long polling example as one common use case).
-
-  NB: The response is sent directly to the client, no Ring middleware is
-  applied.
+  Channel API (see relevant docstrings for more info):
+    (open? [ch])
+    (close [ch])
+    (websocket? [ch])
+    (send! [ch data] [ch data close-after-send?])
+    (on-receieve [ch callback])
+    (on-close [ch callback])
 
   See org.httpkit.timer ns for optional timeout facilities."
+  [request ch-name & body]
+  `(let [^AsyncChannel ~ch-name (:async-channel ~request)]
+     (if (:websocket? ~request)
+       (if-let [key# (get-in ~request [:headers "sec-websocket-key"])]
+         (do (.sendHandshake ~ch-name {"Upgrade"    "websocket"
+                                       "Connection" "Upgrade"
+                                       "Sec-WebSocket-Accept" (accept key#)})
+             ~@body
+             {:body ~ch-name})
+         {:status 400 :body "Bad Sec-WebSocket-Key header"})
+       (do ~@body
+           {:body ~ch-name}))))
+
+(defmacro async-response "DEPRECATED"
   [request callback-name & body]
-  `(let [channel# ^AsyncChannel (:async-channel ~request)
-         ~callback-name (fn [data#] (.send channel# data# true))]
-     ~@body
-     {:body channel#}))
+  `(let [ch# nil]
+     (with-channel ~request ch#
+       (let [~callback-name (fn [data#] (send! ch# data# true))]
+         ~@body))))
 
-(defmacro streaming-response
-  "Streaming response.
+(defmacro ws-response "DEPRECATED"
+  [request conn-name & then]
+  `(with-channel ~request ~conn-name ~@then))
 
-    (defn my-streaming-handler [request]
-      (streaming-respose request channel
-        (on-close channel (fn [status] (println \"closed\")))
-        (send! channel {:status 200 :headers {}})
-        (on-some-event   ; wait for event or data
-         (send! channel data)
-         (close channel))))
-
-  Response middleware can by set by (alter-send-hook channel (fn [old] new))
-
-  See org.httpkit.timer ns for optional timeout facilities."
-  [request channel & body]
-  `(let [~channel (:async-channel ~request)]
-     (do ~@body)
-     {:body ~channel}))
+(defmacro streaming-response "DEPRECATED"
+  [request ch & body]
+  `(with-channel ~request ~ch ~@body))
 
 (comment
   TODO
