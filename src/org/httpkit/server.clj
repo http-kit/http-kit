@@ -6,8 +6,10 @@
 ;;;; Ring server
 
 (defn run-server
-  "Starts Ring-compatible HTTP server and returns a nullary function that stops
-  the server."
+  "Starts (mostly*) Ring-compatible HTTP server and returns a nullary function
+  that stops the server.
+
+  * See http://http-kit.org/migration.html for differences."
   [handler {:keys [port thread ip max-body max-line worker-name-prefix queue-size]
             :or   {ip "0.0.0.0"  ; which ip (if has many ips) to bind
                    port 8090     ; which port listen incomming request
