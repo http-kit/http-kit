@@ -153,10 +153,6 @@
   [request conn-name & then]
   `(with-channel ~request ~conn-name ~@then))
 
-(defmacro streaming-response "DEPRECATED"
-  [request ch & body]
-  `(with-channel ~request ~ch ~@body))
-
 (comment
   TODO
   built library on top of the API,

@@ -12,44 +12,45 @@
   (:import org.httpkit.ws.WebSocketClient))
 
 (defn ws-handler [req]
-  (ws-response req con
-               ;; close-handler in test_util.clj
-               (on-close con close-handler)
-               (on-receive con (fn [msg]
-                                 (try
-                                   (let [{:keys [length times]} (read-string msg)]
-                                     (doseq [_ (range 0 times)]
-                                       (send! con (subs const-string 0 length))))
-                                   (catch Exception e
-                                     (println e)
-                                     (send! con msg)))))))
+  (with-channel req con
+    ;; close-handler in test_util.clj
+    (on-close con close-handler)
+    (on-receive con (fn [msg]
+                      (try
+                        (let [{:keys [length times]} (read-string msg)]
+                          (doseq [_ (range 0 times)]
+                            (send! con (subs const-string 0 length))))
+                        (catch Exception e
+                          (println e)
+                          (send! con msg)))))))
 
 (defn ws-handler2 [req]
-  (ws-response req con
-               (send! con "hello")
-               (send! con "world")
-               (on-receive con (fn [mesg]
-                                 (send! con mesg))))) ; echo back
+  (with-channel req con
+    (send! con "hello")
+    (send! con "world")
+    (on-receive con (fn [mesg]
+                      ;; only :body is picked
+                      (send! con {:body  mesg}))))) ; echo back
 
 (defn ws-handler3 [req]
-  (ws-response req con
-               (on-receive con (fn [mesg]
-                                 (send! con mesg)))))
+  (with-channel req con
+    (on-receive con (fn [mesg]
+                      (send! con mesg)))))
 
 (defn ws-handler4 [req]
-  (ws-response req con
-               (alter-send-hook con (fn [old] pr-str))
-               (on-receive con (fn [mesg]
-                                 (send! con {:message mesg})))))
+  (with-channel req con
+    (alter-send-hook con (fn [old] pr-str))
+    (on-receive con (fn [mesg]
+                      (send! con {:message mesg})))))
 
 (defn messg-order-handler [req]
-  (ws-response req con
-               (let [mesg-idx (atom 0)
-                     h (fn [mesg]
-                         (let [id (swap! mesg-idx inc)
-                               i (:id (read-string mesg))]
-                           (send! con (str (= id i)))))]
-                 (on-receive con h))))
+  (with-channel req con
+    (let [mesg-idx (atom 0)
+          h (fn [mesg]
+              (let [id (swap! mesg-idx inc)
+                    i (:id (read-string mesg))]
+                (send! con (str (= id i)))))]
+      (on-receive con h))))
 
 (defroutes test-routes
   (GET "/ws" [] ws-handler)

@@ -149,7 +149,7 @@ public class AsyncChannel {
             throw new IllegalStateException("close handler exist: " + closeHandler.get());
         }
         if (closedRan.get()) { // no handler, but already ran
-            fn.invoke(K_UNKNOW);
+            fn.invoke(K_UNKNOWN);
         }
     }
 
@@ -191,7 +191,13 @@ public class AsyncChannel {
         }
 
         if (isWebSocket()) {
-            if (data instanceof String) {
+            if (data instanceof Map) {
+                Object tmp = ((Map<Keyword, Object>) data).get(BODY);
+                if (tmp != null) { // save contains(BODY) && get(BODY)
+                    data = tmp;
+                }
+            }
+            if (data instanceof String) { // null is not allowed
                 sendTextFrame((String) data);// websocket
             } else {
                 throw new IllegalArgumentException("websocket only accept string, get" + data);
@@ -267,7 +273,7 @@ public class AsyncChannel {
     // because it has received a type of data it cannot accept
     static Keyword K_WS_1003 = Keyword.intern("ws-unsupported");
 
-    static Keyword K_UNKNOW = Keyword.intern("ws-unknow");
+    static Keyword K_UNKNOWN = Keyword.intern("ws-unknown");
 
     static Keyword closeReason(int status) {
         switch (status) {
@@ -284,7 +290,7 @@ public class AsyncChannel {
         case 1003:
             return K_WS_1003;
         default:
-            return K_UNKNOW;
+            return K_UNKNOWN;
         }
     }
 }

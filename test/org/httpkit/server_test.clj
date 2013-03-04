@@ -45,24 +45,24 @@
   (let [s (or (-> req :params :s) (subs const-string 0 1024))
         n (+ (rand-int 128) 10)
         seqs (partition n n '() s)]     ; padding with empty
-    (streaming-response req channel
-                        (on-close channel close-handler)
-                        (send! channel (first seqs))
-                        (doseq [p (rest seqs)]
-                          ;; should only pick the body if a map
-                          (send! channel (if (rand-nth [true false]) p
-                                             {:body p})))
-                        (close channel))))
+    (with-channel req channel
+      (on-close channel close-handler)
+      (send! channel (first seqs))
+      (doseq [p (rest seqs)]
+        ;; should only pick the body if a map
+        (send! channel (if (rand-nth [true false]) p
+                           {:body p})))
+      (close channel))))
 
 (defn slow-server-handler [req]
-  (streaming-response req channel
-                      (on-close channel close-handler)
-                      (send! channel "hello world")
-                      (schedule-task 10     ; 10ms
-                                     (send! channel "hello world 2"))
-                      (schedule-task 20
-                                     (send! channel "finish")
-                                     (close channel))))
+  (with-channel req channel
+    (on-close channel close-handler)
+    (send! channel "hello world")
+    (schedule-task 10     ; 10ms
+                   (send! channel "hello world 2"))
+    (schedule-task 20
+                   (send! channel "finish")
+                   (close channel))))
 
 (defn async-with-timeout [req]
   (let [time (to-int (-> req :params :time))
@@ -77,18 +77,18 @@
 
 (defn streaming-demo [request]
   (let [time (Integer/valueOf (or (-> request :params :i) 200))]
-    (streaming-response request channel
-                        (on-close channel (fn [status]
-                                            (println channel "closed" status)))
-                        ;; wrap before sent
-                        (alter-send-hook channel (fn [old]
-                                                   (fn [message]
-                                                     (str "<p>" message ". interval " time "ms</p>"))))
-                        (let [id (atom 0)]
-                          ((fn sent-messge []
-                             (send! channel (str "message from server #" (swap! id inc)))
-                             (when (open? channel)
-                               (schedule-task time (sent-messge)))))))))
+    (with-channel request channel
+      (on-close channel (fn [status]
+                          (println channel "closed" status)))
+      ;; wrap before sent
+      (alter-send-hook channel (fn [old]
+                                 (fn [message]
+                                   (str "<p>" message ". interval " time "ms</p>"))))
+      (let [id (atom 0)]
+        ((fn sent-messge []
+           (send! channel (str "message from server #" (swap! id inc)))
+           (when (open? channel)
+             (schedule-task time (sent-messge)))))))))
 
 (defroutes test-routes
   (GET "/" [] "hello world")
@@ -102,8 +102,8 @@
                             :body (range 1 10)}))
   (GET "/file" [] (wrap-file-info file-handler))
   (GET "/ws" [] (fn [req]
-                  (ws-response req con
-                               (on-receive con (fn [mesg] (send! con mesg))))))
+                  (with-channel req con
+                    (on-receive con (fn [mesg] (send! con mesg))))))
   (GET "/inputstream" [] inputstream-handler)
   (POST "/multipart" [] multipart-handler)
   (POST "/chunked-input" [] (fn [req] {:status 200
