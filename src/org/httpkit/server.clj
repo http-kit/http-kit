@@ -1,8 +1,7 @@
 (ns org.httpkit.server
-  (:require [clojure.tools.macro :as macro])
-  (:import  [org.httpkit.server AsyncChannel HttpServer RingHandler]
-            javax.xml.bind.DatatypeConverter
-            java.security.MessageDigest))
+  (:import [org.httpkit.server AsyncChannel HttpServer RingHandler]
+           javax.xml.bind.DatatypeConverter
+           java.security.MessageDigest))
 
 ;;;; Ring server
 
