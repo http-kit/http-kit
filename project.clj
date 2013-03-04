@@ -1,7 +1,6 @@
 (defproject http-kit "2.0.0-SNAPSHOT"
   :description "High-performance event-driven HTTP client/server for Clojure"
-  :dependencies [[org.clojure/clojure "1.4.0"]
-                 [org.clojure/tools.macro "0.1.1"]]
+  :dependencies [[org.clojure/clojure "1.4.0"]]
   :warn-on-reflection true
   :min-lein-version "2.0.0"
   :url "http://http-kit.org/"
