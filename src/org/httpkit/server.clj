@@ -90,8 +90,6 @@
     (DatatypeConverter/printBase64Binary
      (.digest md (.getBytes (str key websocket-13-guid))))))
 
-(defn websocket? [request] (:websocket? request))
-
 ;;; experiment, will remove if find not need
 (defn set-global-hook [send-hook receive-hook]
   (AsyncChannel/setGlobalHook send-hook receive-hook))
