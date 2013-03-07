@@ -12,15 +12,15 @@
   :license {:name "Apache License, Version 2.0"
             :url "http://www.apache.org/licenses/LICENSE-2.0.html"}
   :jvm-opts ["-Dclojure.compiler.disable-locals-clearing=true"]
-  :profiles {:1.5 {:dependencies [[org.clojure/clojure "1.5.0-master-SNAPSHOT"]]}
+  :profiles {:1.5 {:dependencies [[org.clojure/clojure "1.5.0"]]}
              :dev {:dependencies [[junit/junit "4.8.2"]
-                                  [org.clojure/tools.logging "0.2.3"]
-                                  [ch.qos.logback/logback-classic "1.0.1"]
-                                  [clj-http "0.6.0"]
+                                  [org.clojure/tools.logging "0.2.6"]
+                                  [ch.qos.logback/logback-classic "1.0.9"]
+                                  [clj-http "0.6.5"]
                                   [io.netty/netty "3.6.2.Final"]
-                                  [org.clojure/data.json "0.1.2"]
+                                  [org.clojure/data.json "0.2.1"]
                                   [http.async.client "0.5.2"]
-                                  [compojure "1.0.2"]
-                                  [org.clojure/tools.cli "0.2.1"]
-                                  [ring/ring-jetty-adapter "1.1.6"]
-                                  [ring/ring-core "1.1.6"]]}})
+                                  [compojure "1.1.5"]
+                                  [org.clojure/tools.cli "0.2.2"]
+                                  [ring/ring-jetty-adapter "1.1.8"]
+                                  [ring/ring-core "1.1.8"]]}})
