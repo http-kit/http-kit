@@ -273,6 +273,7 @@
     (is (= 200 (:status resp)))
     (is (= (str size) (:body resp)))))
 
+;;; start a test server, for test or benchmark
 (defonce tmp-server (atom nil))
 (defn -main [& args]
   (when-let [server @tmp-server]

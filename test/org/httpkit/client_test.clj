@@ -172,7 +172,7 @@
 
 ;; @(http/get "http://127.0.0.1:4348" {:headers {"Connection" "Close"}})
 
-;; run many HTTP request to detect any error
+;; run many HTTP request to detect any error. urls are in file /tmp/urls, one per line
 ;; RUN it: scripts/run_http_requests
 (def chrome "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.40 Safari/537.11")
 
