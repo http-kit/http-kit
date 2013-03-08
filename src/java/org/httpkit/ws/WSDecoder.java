@@ -105,6 +105,8 @@ public class WSDecoder {
                         switch (opcode) {
                         case OPCODE_TEXT:
                             return new TextFrame(content);
+                        case OPCODE_BINARY:
+                            return new BinaryFrame(content);
                         case OPCODE_PING:
                             return new PingFrame(content);
                         case OPCODE_CLOSE:

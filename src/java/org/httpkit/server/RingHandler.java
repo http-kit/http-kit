@@ -10,9 +10,11 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.httpkit.HttpUtils;
 import org.httpkit.PrefixThreadFactory;
+import org.httpkit.ws.BinaryFrame;
 import org.httpkit.ws.TextFrame;
 
 import clojure.lang.IFn;
+import org.httpkit.ws.WSFrame;
 
 @SuppressWarnings({ "rawtypes", "unchecked" })
 class HttpHandler implements Runnable {
@@ -62,23 +64,47 @@ class LinkingRunnable implements Runnable {
     }
 }
 
-class TextFrameHandler implements Runnable {
-    private TextFrame frame;
+abstract class WSFrameHandler implements Runnable {
+    private WSFrame frame;
     private AsyncChannel channel;
 
-    public TextFrameHandler(AsyncChannel channel, TextFrame frame) {
+    protected WSFrameHandler(AsyncChannel channel, WSFrame frame) {
         this.channel = channel;
         this.frame = frame;
     }
 
+    @Override
     public void run() {
         try {
-            channel.messageReceived(frame.getText());
+            channel.messageReceived(getFrameData(frame));
         } catch (Throwable e) {
             HttpUtils.printError("handle websocket frame " + frame, e);
         }
     }
 
+    protected abstract Object getFrameData(WSFrame frame);
+}
+
+class TextFrameHandler extends WSFrameHandler {
+    public TextFrameHandler(AsyncChannel channel, TextFrame frame) {
+        super(channel, frame);
+    }
+
+    @Override
+    protected Object getFrameData(WSFrame frame) {
+        return ((TextFrame) frame).getText();
+    }
+}
+
+class BinaryFrameHandler extends WSFrameHandler {
+    public BinaryFrameHandler(AsyncChannel channel, BinaryFrame frame) {
+        super(channel, frame);
+    }
+
+    @Override
+    protected Object getFrameData(WSFrame frame) {
+        return frame.data;
+    }
 }
 
 public class RingHandler implements IHandler {
@@ -105,8 +131,13 @@ public class RingHandler implements IHandler {
         execs.shutdownNow();
     }
 
-    public void handle(AsyncChannel channel, TextFrame frame) {
-        TextFrameHandler task = new TextFrameHandler(channel, frame);
+    public void handle(AsyncChannel channel, WSFrame frame) {
+        WSFrameHandler task;
+        if (frame instanceof TextFrame) {
+            task = new TextFrameHandler(channel, (TextFrame) frame);
+        } else {
+            task = new BinaryFrameHandler(channel, (BinaryFrame) frame);
+        }
 
         // messages from the same client are handled orderly
         LinkingRunnable job = new LinkingRunnable(task);
