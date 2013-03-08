@@ -1,4 +1,4 @@
-package org.httpkit.client;
+package org.httpkit;
 
 import java.util.Arrays;
 import java.util.Queue;
@@ -7,6 +7,7 @@ import java.util.Queue;
  * Copy and modified from java.util.PriorityQueue. Remove unused method. Modify
  * {@code remove} to return the removed element
  * 
+ * used by timer and the client
  * @param <E>
  */
 @SuppressWarnings("unchecked")

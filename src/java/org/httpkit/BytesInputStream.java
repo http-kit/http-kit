@@ -5,7 +5,7 @@ import java.io.InputStream;
 import java.util.Arrays;
 
 /**
- * No synchronization An better to String
+ * No synchronization, better toString
  */
 public class BytesInputStream extends InputStream {
     private final byte[] buf;
@@ -22,6 +22,7 @@ public class BytesInputStream extends InputStream {
 
     /**
      * get the underlying bytes, copied
+     * 
      * @return
      */
     public byte[] bytes() {

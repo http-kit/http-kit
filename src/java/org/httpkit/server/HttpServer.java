@@ -124,6 +124,9 @@ public class HttpServer implements Runnable {
                     atta.decoder.reset();
                     key.interestOps(OP_WRITE);
                 } else if (frame instanceof CloseFrame) {
+                    // even though the logic connection is closed. the socket
+                    // did not, if client willing to reuse it, http-kit is more
+                    // than happy
                     handler.clientClose(atta.asycChannel, ((CloseFrame) frame).getStatus());
                     atta.addBuffer(WSEncoder.encode(WSDecoder.OPCODE_CLOSE, frame.data));
                     key.interestOps(OP_WRITE);
@@ -162,6 +165,8 @@ public class HttpServer implements Runnable {
         SocketChannel ch = (SocketChannel) key.channel();
         try {
             LinkedList<ByteBuffer> toWrites = atta.toWrites;
+            // the sync is per socket (per client). virtually, no contention
+            // 1. keep byte data order, 2. ensure visibility
             synchronized (atta.toWrites) {
                 int size = toWrites.size();
                 if (size == 1) {
@@ -212,6 +217,9 @@ public class HttpServer implements Runnable {
                 }
                 Set<SelectionKey> selectedKeys = selector.selectedKeys();
                 for (SelectionKey key : selectedKeys) {
+                    // TODO I do not know if this is needed
+                    // if !valid, isAcceptable, isReadable.. will Exception
+                    // run hours happily after commented, but not sure.
                     if (!key.isValid()) {
                         continue;
                     }

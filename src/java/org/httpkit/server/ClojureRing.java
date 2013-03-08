@@ -83,6 +83,7 @@ public class ClojureRing {
     public static ByteBuffer[] encode(int status, Map<String, Object> headers, Object body) {
         headers = camelCase(headers);
         headers.put("Server", "http-kit");
+        // rfc says the header is needed
         headers.put("Date", DateFormatter.getDate());
         ByteBuffer bodyBuffer;
 
@@ -114,7 +115,7 @@ public class ClojureRing {
     }
 
     public static IPersistentMap buildRequestMap(HttpRequest req) {
-
+        // ring spec
         Map<Object, Object> m = new TreeMap<Object, Object>();
         m.put(SERVER_PORT, req.serverPort);
         m.put(SERVER_NAME, req.serverName);

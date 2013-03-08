@@ -2,7 +2,6 @@ package org.httpkit;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.httpkit.client.PriorityQueue;
 
 import clojure.lang.IFn;
 
@@ -12,8 +11,10 @@ public class TimerService implements Runnable {
     private final AtomicBoolean started = new AtomicBoolean(false);
 
     public CancelableFutureTask scheduleTask(int timeout, IFn task) {
+        // start the timer thread, if not started
         if (started.compareAndSet(false, true)) {
-            // start the timer thread, if not started
+            // the timer thread will kill itself when no job to schedule for too
+            // much time. restart if new job come it
             Thread t = new Thread(this, "timer-service");
             t.start();
         }
@@ -48,7 +49,7 @@ public class TimerService implements Runnable {
                         queue.wait(1000 * 120);
                         if (emptyQueueWaited) {
                             started.compareAndSet(true, false);
-                            break; // die, will start
+                            break; // die, will restart
                         } else {
                             emptyQueueWaited = true; // queue is empty
                         }

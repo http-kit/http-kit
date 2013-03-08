@@ -5,11 +5,10 @@ import java.util.Map;
 import org.httpkit.HttpStatus;
 import org.httpkit.HttpVersion;
 
-
 /**
  * Interface for response received from server
  * 
- * A low level interface, Can be used for very large file download
+ * A low level interface, can be used for very large file download
  * 
  * @author feng
  * 

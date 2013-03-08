@@ -5,7 +5,6 @@ import java.util.Arrays;
 
 import org.httpkit.ProtocolException;
 
-
 public class WSDecoder {
 
     public static final byte OPCODE_CONT = 0x0;
@@ -58,7 +57,7 @@ public class WSDecoder {
                     // if negative, that too big, drop it.
                     if (length < 65536) {
                         throw new ProtocolException(
-                                "invalid data frame length (not using minimal length encoding)");
+                                "invalid data frame length. max payload length 4M");
                     }
                     abortIfTooLarge(length);
                     payloadLength = (int) length;
@@ -68,6 +67,12 @@ public class WSDecoder {
                     content = new byte[payloadLength];
                 } else if (payloadLength > 0) {
                     abortIfTooLarge(content.length + payloadLength);
+                    /*
+                     * TODO if an attacker sent many fragmented frames, only one
+                     * byte of data per frame, server end up reallocate many
+                     * times. may not be a problem
+                     */
+                    // resize
                     content = Arrays.copyOf(content, content.length + payloadLength);
                 }
 
@@ -79,7 +84,7 @@ public class WSDecoder {
             case MASKING_KEY:
                 maskingKey = buffer.getInt();
                 state = State.PAYLOAD;
-                // No break. yes
+                // No break. since payloadLength can be 0
             case PAYLOAD:
                 int read = Math.min(buffer.remaining(), payloadLength - payloadRead);
                 if (read > 0) {
@@ -94,6 +99,7 @@ public class WSDecoder {
                     idx += read;
                 }
 
+                // all read
                 if (payloadRead == payloadLength) {
                     if (finalFlag) {
                         switch (opcode) {
@@ -114,7 +120,7 @@ public class WSDecoder {
                 break;
             }
         }
-        return null;
+        return null; // wait for more bytes
     }
 
     public void abortIfTooLarge(long length) throws ProtocolException {

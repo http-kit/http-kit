@@ -82,7 +82,6 @@ class TextFrameHandler implements Runnable {
 }
 
 public class RingHandler implements IHandler {
-
     final ExecutorService execs;
     final IFn handler;
 

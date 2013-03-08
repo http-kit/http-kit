@@ -27,9 +27,9 @@ public class AsyncChannel {
     final public AtomicReference<Boolean> closedRan = new AtomicReference<Boolean>(false);
     final AtomicReference<IFn> closeHandler = new AtomicReference<IFn>(null);
 
+    // TODO remove these hooks if not proven to be useful
     private volatile IFn onSendHook;
     private volatile IFn onReceiveHook;
-
     private static IFn globalSentHook;
     private static IFn globalReceiveHook;
 

@@ -4,8 +4,7 @@ import java.util.Map;
 
 import org.httpkit.DynamicBytes;
 
-
-// if the response is too large, protect out of memory
+// if the response is too large, protect OOM
 // For example, HTML expected, but a big mp4 file is returned
 public class MaxBodyFilter implements IFilter {
     private final int length;

@@ -214,6 +214,7 @@ public class HttpUtils {
         }
     }
 
+    // HTTP header's key is Content-Type
     public static Map<String, Object> camelCase(Map<String, Object> headers) {
         TreeMap<String, Object> tmp = new TreeMap<String, Object>();
 
@@ -225,6 +226,7 @@ public class HttpUtils {
         return tmp;
     }
 
+    // content-type => Content-Type
     public static String camelCase(String key) {
         StringBuilder sb = new StringBuilder(key.length());
         boolean upper = true;
@@ -310,7 +312,7 @@ public class HttpUtils {
     }
 
     public static DynamicBytes readAll(InputStream is) throws IOException {
-        DynamicBytes bytes = new DynamicBytes(32768); // init 16k
+        DynamicBytes bytes = new DynamicBytes(32768); // init 32k
         byte[] buffer = new byte[16384];
         int read;
         while ((read = is.read(buffer)) != -1) {
@@ -404,14 +406,16 @@ public class HttpUtils {
 
     // unit test in utils-test.clj
     public static Charset detectCharset(Map<String, String> headers, DynamicBytes body) {
+        // 1. first from http header: Content-Type: text/html; charset=utf8
         Charset result = parseCharset(headers.get(CONTENT_TYPE));
         if (result == null) {
-            // decode a little the find charset=???
+            // 2. decode a little to find charset=???
             String s = new String(body.get(), 0, min(512, body.length()), ASCII);
             // content="text/html;charset=gb2312"
             result = guess(s, CHARSET);
             if (result == null) {
-                Matcher matcher = ENCODING.matcher(s); // for xml
+                // for xml
+                Matcher matcher = ENCODING.matcher(s);
                 if (matcher.find()) {
                     try {
                         result = Charset.forName(matcher.group(2));
@@ -420,6 +424,7 @@ public class HttpUtils {
                 }
             }
         }
+        // default utf8
         return result == null ? UTF_8 : result;
     }
 }

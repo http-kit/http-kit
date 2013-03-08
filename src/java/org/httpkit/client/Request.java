@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 
 import org.httpkit.HttpMethod;
+import org.httpkit.PriorityQueue;
 
 public class Request implements Comparable<Request> {
 
@@ -16,7 +17,7 @@ public class Request implements Comparable<Request> {
 
     private boolean isDone = false; // ensure only call once
 
-    public boolean isKeepAlived = false;
+    public boolean isKeepAlived = false; // a reused socket sent the request
     public boolean isConnected = false;
 
     SelectionKey key; // for timeout, close connection

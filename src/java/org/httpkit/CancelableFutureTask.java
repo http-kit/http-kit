@@ -2,7 +2,6 @@ package org.httpkit;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.httpkit.client.PriorityQueue;
 
 import clojure.lang.IFn;
 

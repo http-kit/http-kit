@@ -21,6 +21,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.httpkit.*;
+import org.httpkit.PriorityQueue;
 import org.httpkit.ProtocolException;
 
 public final class HttpClient implements Runnable {
@@ -81,6 +82,14 @@ public final class HttpClient implements Runnable {
         }
     }
 
+    /**
+     * tricky part
+     * 
+     * http-kit think all connections are keep-alived (since some say it is, but
+     * actually is not). but, some are not, http-kit pick them out **after the
+     * fact** 1. the connection is resued 2. no data received
+     * 
+     */
     private boolean cleanAndRetryIfBroken(SelectionKey key, Request req) {
         closeQuietly(key);
         keepalives.remove(key);
@@ -93,6 +102,7 @@ public final class HttpClient implements Runnable {
             requests.remove(req); // remove from timeout queue
             pending.offer(req); // queue for retry
             selector.wakeup();
+            // retry (re-open a connection to server, sent the request again)
             return true;
         }
         return false;
@@ -122,6 +132,7 @@ public final class HttpClient implements Runnable {
             try {
                 if (req.decoder.decode(buffer) == ALL_READ) {
                     req.finish();
+                    // TODO keepalive configurable per request: disable by <=0
                     keepalives.offer(new PersistentConn(now + config.keepalive, req.addr, key));
                 }
             } catch (HTTPException e) {
