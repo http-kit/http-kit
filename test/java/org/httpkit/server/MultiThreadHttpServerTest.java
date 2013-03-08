@@ -8,6 +8,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import org.httpkit.ws.TextFrame;
+import org.httpkit.ws.WSFrame;
 
 class MultiThreadHandler implements IHandler {
     private ExecutorService exec;
@@ -18,6 +19,11 @@ class MultiThreadHandler implements IHandler {
     }
 
     public void close() {
+
+    }
+
+    @Override
+    public void handle(AsyncChannel channel, WSFrame frame) {
 
     }
 
