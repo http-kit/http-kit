@@ -1,11 +1,13 @@
 package org.httpkit.server;
 
+import org.httpkit.ws.BinaryFrame;
 import org.httpkit.ws.TextFrame;
+import org.httpkit.ws.WSFrame;
 
 public interface IHandler {
     void handle(HttpRequest request, ResponseCallback callback);
 
-    void handle(AsyncChannel channel, TextFrame frame);
+    void handle(AsyncChannel channel, WSFrame frame);
 
     public void clientClose(AsyncChannel channel, int status);
 

@@ -10,9 +10,11 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.httpkit.HttpUtils;
 import org.httpkit.PrefixThreadFactory;
+import org.httpkit.ws.BinaryFrame;
 import org.httpkit.ws.TextFrame;
 
 import clojure.lang.IFn;
+import org.httpkit.ws.WSFrame;
 
 @SuppressWarnings({ "rawtypes", "unchecked" })
 class HttpHandler implements Runnable {
@@ -105,7 +107,7 @@ public class RingHandler implements IHandler {
         execs.shutdownNow();
     }
 
-    public void handle(AsyncChannel channel, TextFrame frame) {
+    public void handle(AsyncChannel channel, WSFrame frame) {
         TextFrameHandler task = new TextFrameHandler(channel, frame);
 
         // messages from the same client are handled orderly
