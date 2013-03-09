@@ -9,7 +9,7 @@
      * Timer-service thread will kill itself automatically when no task is
        scheduled for 4 minutes, and will restart automatically when a new task
        is added."
-  (:import [org.httpkit TimerService CancelableFutureTask]))
+  (:import [org.httpkit.timer TimerService CancelableFutureTask]))
 
 (defn cancel [^CancelableFutureTask task]
   (.cancel task))

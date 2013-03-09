@@ -137,15 +137,3 @@
 (defmacro ws-response "DEPRECATED"
   [request conn-name & then]
   `(with-channel ~request ~conn-name ~@then))
-
-(comment
-  TODO
-  built library on top of the API,
-  with client side JS + server side clojure,
-
-  1. provide a unified interface.
-  2. `group` concept [join a group, leave a group, sent messages to the group]
-  3. can attach data to a group
-
-  MemoryStore, RedisStore
-  )

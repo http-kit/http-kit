@@ -1,6 +1,9 @@
-package org.httpkit;
+package org.httpkit.timer;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import org.httpkit.HttpUtils;
+import org.httpkit.PriorityQueue;
 
 
 import clojure.lang.IFn;
