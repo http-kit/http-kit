@@ -59,17 +59,7 @@
       :going-away     : WebSocket closed by client (CLOSE_GOING_AWAY)
       :protocol-error : WebSocket closed by client (CLOSE_PROTOCOL_ERROR)
       :unsupported    : WebSocket closed by client (CLOSE_UNSUPPORTED)
-      :unknown        : WebSocket closed by client (unknown reason)")
-
-  ;;; just experiment, will be removed if not needed
-  (alter-send-hook [ch f]
-    "Callback: (fn [old-hook] new-hook)
-     hook : (fn [data websocket? first-send?] data-write-to-client)
-     Do something with the sending data (like JSON encoding), the return value is sending off")
-  (alter-receive-hook [ch f]
-    "Callback: (fn [old-hook] new-hook)
-     hook: (fn [string] ret), ret is pass to on-receive handler
-     Do something with the receiving data (like JSON decoding), the return value is pass to receive handler"))
+      :unknown        : WebSocket closed by client (unknown reason)"))
 
 (extend-type AsyncChannel
   Channel
@@ -90,10 +80,6 @@
         websocket-13-guid "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"]
     (DatatypeConverter/printBase64Binary
      (.digest md (.getBytes (str key websocket-13-guid))))))
-
-;;; experiment, will remove if find not need
-(defn set-global-hook [send-hook receive-hook]
-  (AsyncChannel/setGlobalHook send-hook receive-hook))
 
 (defmacro with-channel
   "Evaluates body with `ch-name` bound to the request's underlying asynchronous
