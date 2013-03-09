@@ -144,10 +144,9 @@
 
 (defmacro async-response "DEPRECATED"
   [request callback-name & body]
-  `(let [ch# nil]
-     (with-channel ~request ch#
-       (let [~callback-name (fn [data#] (send! ch# data# true))]
-         ~@body))))
+  `(with-channel ~request ch#
+     (let [~callback-name (fn [data#] (send! ch# data# true))]
+       ~@body)))
 
 (defmacro ws-response "DEPRECATED"
   [request conn-name & then]
