@@ -57,7 +57,7 @@
                                                          (is (= 200 (:status resp)))
                                                          resp)))))
     (is (= 200 (:status @(http/patch (str host "/patch") (fn [resp]
-                                                          (is (= 200 (:status resp)))
+                                                           (is (= 200 (:status resp)))
                                                           resp)))))
     (is (= 200 (:status @(http/delete (str host "/delete")))))
     (is (= 200 (:status @(http/head (str host "/get")))))
