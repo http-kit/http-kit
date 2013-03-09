@@ -13,6 +13,7 @@
             :url "http://www.apache.org/licenses/LICENSE-2.0.html"}
   :jvm-opts ["-Dclojure.compiler.disable-locals-clearing=true"]
   :profiles {:1.5 {:dependencies [[org.clojure/clojure "1.5.0"]]}
+             :test {:java-source-paths ["test/java" "src/java"]}
              :dev {:dependencies [[junit/junit "4.8.2"]
                                   [org.clojure/tools.logging "0.2.6"]
                                   [ch.qos.logback/logback-classic "1.0.9"]

@@ -14,9 +14,9 @@ Hacker fridenly: only ~3k lines of code (including java), clean and tidy.
 git clone git@github.com:http-kit/http-kit.git
 
 # modify as you want, unit tests back you up
-./scripts/javac with-test && lein test
+lein test
 
-# may be useful. more info: server_test.clj
+# may be useful. more info, see the code server_test.clj
 ./scripts/run_http_requests
 
 ```
