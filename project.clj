@@ -5,7 +5,7 @@
   :min-lein-version "2.0.0"
   :url "http://http-kit.org/"
   :javac-options ["-source" "1.6" "-target" "1.6" "-g"]
-  :java-source-paths ["src/java" "test/java"]
+  :java-source-paths ["src/java"]
   :test-paths ["test"]
   :jar-exclusions [#".*java$"]
   :plugins [[lein-swank "1.4.4"]]
@@ -23,4 +23,5 @@
                                   [compojure "1.0.2"]
                                   [org.clojure/tools.cli "0.2.1"]
                                   [ring/ring-jetty-adapter "1.1.6"]
-                                  [ring/ring-core "1.1.6"]]}})
+                                  [ring/ring-core "1.1.6"]]}
+             :test {:java-source-paths ["test/java"]}})
