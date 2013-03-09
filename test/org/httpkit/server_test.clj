@@ -47,11 +47,11 @@
         seqs (partition n n '() s)]     ; padding with empty
     (with-channel req channel
       (on-close channel close-handler)
-      (send! channel (first seqs))
+      (send! channel (first seqs) false)
       (doseq [p (rest seqs)]
         ;; should only pick the body if a map
         (send! channel (if (rand-nth [true false]) p
-                           {:body p})))
+                           {:body p})) false)
       (close channel))))
 
 (defn slow-server-handler [req]
