@@ -5,7 +5,7 @@
   :min-lein-version "2.0.0"
   :url "http://http-kit.org/"
   :javac-options ["-source" "1.6" "-target" "1.6" "-g"]
-  :java-source-paths ["src/java"]
+  :java-source-paths ["src/java" "test/java"]
   :test-paths ["test"]
   :jar-exclusions [#".*java$"]
   :plugins [[lein-swank "1.4.4"]]
