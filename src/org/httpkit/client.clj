@@ -142,3 +142,4 @@
 (defreq post)
 (defreq put)
 (defreq options)
+(defreq patch)
