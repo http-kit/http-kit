@@ -39,9 +39,8 @@
 
 (defn ws-handler4 [req]
   (with-channel req con
-    (alter-send-hook con (fn [old] pr-str))
     (on-receive con (fn [mesg]
-                      (send! con {:message mesg})))))
+                      (send! con (pr-str {:message mesg}))))))
 
 (defn messg-order-handler [req]
   (with-channel req con
