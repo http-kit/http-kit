@@ -12,12 +12,13 @@ public class Request implements Comparable<Request> {
     final InetSocketAddress addr;
     final Decoder decoder;
     final ByteBuffer[] request; // HTTP request
+    final int timeOutMs; // ms
     private final PriorityQueue<Request> clients; // update timeout
-    public final int timeOutMs;
 
-    private boolean isDone = false; // ensure only call once
+    // is modify from the loop thread. ensure only called once
+    private boolean isDone = false;
 
-    public boolean isKeepAlived = false; // a reused socket sent the request
+    public boolean isReuseConn = false; // a reused socket sent the request
     public boolean isConnected = false;
 
     SelectionKey key; // for timeout, close connection
@@ -31,7 +32,7 @@ public class Request implements Comparable<Request> {
         this.request = request;
         this.clients = clients;
         this.addr = addr;
-        timeoutTs = this.timeOutMs + System.currentTimeMillis();
+        this.timeoutTs = this.timeOutMs + System.currentTimeMillis();
     }
 
     public void onProgress(long now) {

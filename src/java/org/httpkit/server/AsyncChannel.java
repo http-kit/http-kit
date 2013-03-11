@@ -31,7 +31,7 @@ public class AsyncChannel {
     final AtomicReference<IFn> receiveHandler = new AtomicReference<IFn>(null);
 
     // streaming
-    private volatile boolean isInitialWrite = true;
+    private volatile boolean isHeaderSent = false;
 
     // messages sent from a websocket client should be handled orderly by server
     LinkingRunnable serialTask;
@@ -45,7 +45,7 @@ public class AsyncChannel {
         closedRan.lazySet(false);
         closeHandler.lazySet(null);
         receiveHandler.lazySet(null);
-        isInitialWrite = true;
+        isHeaderSent = false;
         serialTask = null;
     }
 
@@ -93,16 +93,21 @@ public class AsyncChannel {
         write(buffers);
     }
 
-    private void writeChunk(Object body) throws IOException {
+    private void writeChunk(Object body, boolean closeAfterSent) throws IOException {
         if (body instanceof Map) { // only get body if a map
             body = ((Map<Keyword, Object>) body).get(BODY);
         }
         if (body != null) { // null is ignored
             ByteBuffer buffers[];
             ByteBuffer t = HttpUtils.bodyBuffer(body);
-            ByteBuffer size = chunkSize(t.remaining());
-            buffers = new ByteBuffer[] { size, t, ByteBuffer.wrap(newLineBytes) };
-            write(buffers);
+            if(t.hasRemaining()) {
+                ByteBuffer size = chunkSize(t.remaining());
+                buffers = new ByteBuffer[] { size, t, ByteBuffer.wrap(newLineBytes) };
+                write(buffers);
+            }
+        }
+        if(closeAfterSent) {
+            serverClose(0);
         }
     }
 
@@ -133,12 +138,12 @@ public class AsyncChannel {
         write(encode(101, headers, null));
     }
 
-    // ----------------------shared--------------------------------------
+
     public void setCloseHandler(IFn fn) {
-        if (!closeHandler.compareAndSet(null, fn)) {
+        if (!closeHandler.compareAndSet(null, fn)) { // only once
             throw new IllegalStateException("close handler exist: " + closeHandler.get());
         }
-        if (closedRan.get()) { // no handler, but already ran
+        if (closedRan.get()) { // no handler, but already closed
             fn.invoke(K_UNKNOWN);
         }
     }
@@ -154,7 +159,7 @@ public class AsyncChannel {
 
     public boolean serverClose(int status) {
         if (!closedRan.compareAndSet(false, true)) {
-            return false;
+            return false; // already closed
         }
         if (isWebSocket()) {
             write(WSEncoder.encode(WSDecoder.OPCODE_CLOSE,
@@ -175,7 +180,7 @@ public class AsyncChannel {
         }
 
         if (isWebSocket()) {
-            if (data instanceof Map) {
+            if (data instanceof Map) { // only get the :body if map
                 Object tmp = ((Map<Keyword, Object>) data).get(BODY);
                 if (tmp != null) { // save contains(BODY) && get(BODY)
                     data = tmp;
@@ -186,20 +191,22 @@ public class AsyncChannel {
                 sendTextFrame((String) data);// websocket
             } else if (data instanceof byte[]) {
                 sendBinaryFrame((byte[]) data);
-            } else {
-                throw new IllegalArgumentException(
+            } else {                
+                if (data != null) { // null is ignored
+                    throw new IllegalArgumentException(
                         "websocket only accept string and byte[], get" + data);
+                }
             }
 
             if (closeAfterSent) {
                 serverClose(1000);
             }
         } else {
-            if (isInitialWrite) {
-                firstWrite(data, closeAfterSent);
-                isInitialWrite = false;
+            if (isHeaderSent) {
+                writeChunk(data, closeAfterSent);
             } else {
-                writeChunk(data);
+                firstWrite(data, closeAfterSent);
+                isHeaderSent = true;
             }
         }
         return true;
@@ -211,8 +218,7 @@ public class AsyncChannel {
     }
 
     private void write(ByteBuffer... buffers) {
-        ServerAtta atta = (ServerAtta) key.attachment();
-        atta.addBuffer(buffers);
+        ((ServerAtta) key.attachment()).addBuffer(buffers);
         server.queueWrite(key);
     }
 
