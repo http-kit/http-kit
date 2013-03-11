@@ -50,9 +50,12 @@
       (send! channel (first seqs) false)
       (doseq [p (rest seqs)]
         ;; should only pick the body if a map
-        (send! channel (if (rand-nth [true false]) p
-                           {:body p})) false)
-      (close channel))))
+        (send! channel
+               (if (rand-nth [true false]) p
+                   {:body p})
+               false))        ;; do not close
+      (send! channel "" true) ;; same as (close channel)
+      )))
 
 (defn slow-server-handler [req]
   (with-channel req channel

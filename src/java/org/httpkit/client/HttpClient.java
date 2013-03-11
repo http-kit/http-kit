@@ -55,13 +55,11 @@ public final class HttpClient implements Runnable {
         Request r;
         while ((r = requests.peek()) != null) {
             if (r.isTimeout(now)) {
-                String msg;
+                String msg = "connect timeout: ";
                 if (r.isConnected) {
                     msg = "read timeout: ";
-                } else {
-                    msg = "connect timeout: ";
                 }
-                // will remove it
+                // will remove it from queue
                 r.finish(new TimeoutException(msg + r.timeOutMs + "ms"));
                 if (r.key != null) {
                     closeQuietly(r.key);
@@ -94,11 +92,11 @@ public final class HttpClient implements Runnable {
         closeQuietly(key);
         keepalives.remove(key);
         // keep-alived connection, remote server close it without sending byte
-        if (req.isKeepAlived && req.decoder.state == READ_INITIAL) {
+        if (req.isReuseConn && req.decoder.state == READ_INITIAL) {
             for (ByteBuffer b : req.request) {
                 b.position(0); // reset for retry
             }
-            req.isKeepAlived = false;
+            req.isReuseConn = false;
             requests.remove(req); // remove from timeout queue
             pending.offer(req); // queue for retry
             selector.wakeup();
@@ -260,7 +258,7 @@ public final class HttpClient implements Runnable {
             if (con != null) { // keep alive
                 SelectionKey key = con.key;
                 if (key.isValid()) {
-                    job.isKeepAlived = true;
+                    job.isReuseConn = true;
                     key.attach(job);
                     key.interestOps(OP_WRITE);
                     requests.offer(job);
