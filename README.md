@@ -11,13 +11,11 @@ Current [semantic](http://semver.org/) version: `[http-kit "2.0.0-RC4"]`.
 Hacker fridenly: only ~3k lines of code (including java), clean and tidy.
 
 ```sh
-git clone git@github.com:http-kit/http-kit.git
-
 # modify as you want, unit tests back you up
-./scripts/javac with-test && lein test
+lein test
 
-# may be useful. more info: server_test.clj
-./scripts/run_http_requests
+# may be useful. more info, see the code server_test.clj
+./scripts/start_test_server
 
 ```
 

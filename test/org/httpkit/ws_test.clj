@@ -9,7 +9,7 @@
             [org.httpkit.client :as client]
             [http.async.client :as h]
             [clj-http.util :as u])
-  (:import org.httpkit.ws.WebSocketClient))
+  (:import org.httpkit.ws.WebSocketClient [org.httpkit.ws WebSocketClient]))
 
 (defn ws-handler [req]
   (with-channel req con
@@ -39,9 +39,13 @@
 
 (defn ws-handler4 [req]
   (with-channel req con
-    (alter-send-hook con (fn [old] pr-str))
     (on-receive con (fn [mesg]
-                      (send! con {:message mesg})))))
+                      (send! con (pr-str {:message mesg}))))))
+
+(defn ws-handler5 [req]
+  (with-channel req con
+    (on-receive con (fn [data]
+                      (send! con (byte-array 60 (type 22)))))))
 
 (defn messg-order-handler [req]
   (with-channel req con
@@ -57,6 +61,7 @@
   (GET "/ws2" [] ws-handler2)
   (GET "/ws3" [] ws-handler3)
   (GET "/ws4" [] ws-handler4)
+  (GET "/ws5" [] ws-handler5)
   (GET "/order" [] messg-order-handler))
 
 (use-fixtures :once (fn [f]
@@ -117,6 +122,12 @@
         (.sendMessage client mesg)
         (is (= mesg (:message (read-string (.getMessage client)))))))
     (.close client)))
+
+(deftest test-binary-frame
+  (let [client (WebSocketClient. "ws://localhost:4348/ws5")]
+    ;; TODO: verify the value
+    (.close client)
+    ))
 
 (deftest test-message-executed-in-order
   (doseq [_ (range 1 10)]

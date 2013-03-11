@@ -3,7 +3,7 @@
         [ring.adapter.jetty :only [run-jetty]]
         [org.httpkit.server :only [run-server]]
         org.httpkit.test-util
-        (compojure [core :only [defroutes GET PUT DELETE POST HEAD DELETE ANY context]]
+        (compojure [core :only [defroutes GET PUT PATCH DELETE POST HEAD DELETE ANY context]]
                    [handler :only [site]]
                    [route :only [not-found]])
         (clojure.tools [logging :only [info warn]]))
@@ -14,6 +14,7 @@
 (defroutes test-routes
   (GET "/get" [] "hello world")
   (POST "/post" [] "hello world")
+  (PATCH "/patch" [] "hello world")
   (ANY "/method" [] (fn [req]
                       (let [m (:request-method req)]
                         {:status 200
@@ -55,6 +56,9 @@
     (is (= 200 (:status @(http/post (str host "/post") (fn [resp]
                                                          (is (= 200 (:status resp)))
                                                          resp)))))
+    (is (= 200 (:status @(http/patch (str host "/patch") (fn [resp]
+                                                           (is (= 200 (:status resp)))
+                                                          resp)))))
     (is (= 200 (:status @(http/delete (str host "/delete")))))
     (is (= 200 (:status @(http/head (str host "/get")))))
     (is (= 200 (:status @(http/post (str host "/post")))))

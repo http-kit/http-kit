@@ -59,17 +59,7 @@
       :going-away     : WebSocket closed by client (CLOSE_GOING_AWAY)
       :protocol-error : WebSocket closed by client (CLOSE_PROTOCOL_ERROR)
       :unsupported    : WebSocket closed by client (CLOSE_UNSUPPORTED)
-      :unknown        : WebSocket closed by client (unknown reason)")
-
-  ;;; just experiment, will be removed if not needed
-  (alter-send-hook [ch f]
-    "Callback: (fn [old-hook] new-hook)
-     hook : (fn [data websocket? first-send?] data-write-to-client)
-     Do something with the sending data (like JSON encoding), the return value is sending off")
-  (alter-receive-hook [ch f]
-    "Callback: (fn [old-hook] new-hook)
-     hook: (fn [string] ret), ret is pass to on-receive handler
-     Do something with the receiving data (like JSON decoding), the return value is pass to receive handler"))
+      :unknown        : WebSocket closed by client (unknown reason)"))
 
 (extend-type AsyncChannel
   Channel
@@ -77,10 +67,8 @@
   (close [ch] (.serverClose ch 1000))
   (websocket? [ch] (.isWebSocket ch))
   (send!
-    ([ch data] (.send ch data false))
+    ([ch data] (.send ch data (not (websocket? ch))))
     ([ch data close-after-send?] (.send ch data (boolean close-after-send?))))
-  (alter-send-hook [ch f] (.alterSentHook ch f))
-  (alter-receive-hook [ch f] (.alterReceiveHook ch f))
   (on-receive [ch callback] (.setReceiveHandler ch callback))
   (on-close [ch callback] (.setCloseHandler ch callback)))
 
@@ -90,10 +78,6 @@
         websocket-13-guid "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"]
     (DatatypeConverter/printBase64Binary
      (.digest md (.getBytes (str key websocket-13-guid))))))
-
-;;; experiment, will remove if find not need
-(defn set-global-hook [send-hook receive-hook]
-  (AsyncChannel/setGlobalHook send-hook receive-hook))
 
 (defmacro with-channel
   "Evaluates body with `ch-name` bound to the request's underlying asynchronous
@@ -144,23 +128,10 @@
 
 (defmacro async-response "DEPRECATED"
   [request callback-name & body]
-  `(let [ch# nil]
-     (with-channel ~request ch#
-       (let [~callback-name (fn [data#] (send! ch# data# true))]
-         ~@body))))
+  `(with-channel ~request ch#
+     (let [~callback-name (fn [data#] (send! ch# data# true))]
+       ~@body)))
 
 (defmacro ws-response "DEPRECATED"
   [request conn-name & then]
   `(with-channel ~request ~conn-name ~@then))
-
-(comment
-  TODO
-  built library on top of the API,
-  with client side JS + server side clojure,
-
-  1. provide a unified interface.
-  2. `group` concept [join a group, leave a group, sent messages to the group]
-  3. can attach data to a group
-
-  MemoryStore, RedisStore
-  )

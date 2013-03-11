@@ -27,12 +27,6 @@ public class AsyncChannel {
     final public AtomicReference<Boolean> closedRan = new AtomicReference<Boolean>(false);
     final AtomicReference<IFn> closeHandler = new AtomicReference<IFn>(null);
 
-    // TODO remove these hooks if not proven to be useful
-    private volatile IFn onSendHook;
-    private volatile IFn onReceiveHook;
-    private static IFn globalSentHook;
-    private static IFn globalReceiveHook;
-
     // websocket
     final AtomicReference<IFn> receiveHandler = new AtomicReference<IFn>(null);
 
@@ -52,8 +46,6 @@ public class AsyncChannel {
         closeHandler.lazySet(null);
         receiveHandler.lazySet(null);
         isInitialWrite = true;
-        onSendHook = null;
-        onReceiveHook = null;
         serialTask = null;
     }
 
@@ -125,13 +117,7 @@ public class AsyncChannel {
     public void messageReceived(final Object mesg) {
         IFn f = receiveHandler.get();
         if (f != null) {
-            IFn hook = onReceiveHook == null ? globalReceiveHook : onReceiveHook;
-            if (hook != null) {
-                // apply hook before call receive handler
-                f.invoke(hook.invoke(mesg));
-            } else {
-                f.invoke(mesg);
-            }
+            f.invoke(mesg);
         }
     }
 
@@ -188,12 +174,6 @@ public class AsyncChannel {
             return false;
         }
 
-        IFn hook = onSendHook == null ? globalSentHook : onSendHook;
-
-        if (hook != null) {
-            data = hook.invoke(data, isWebSocket(), isFirstWrite());
-        }
-
         if (isWebSocket()) {
             if (data instanceof Map) {
                 Object tmp = ((Map<Keyword, Object>) data).get(BODY);
@@ -225,22 +205,6 @@ public class AsyncChannel {
         return true;
     }
 
-    // hook is a experiment, maybe removed
-    public static void setGlobalHook(IFn sentHook, IFn receiveHook) {
-        globalSentHook = sentHook;
-        globalReceiveHook = receiveHook;
-    }
-
-    public void alterSentHook(IFn f) {
-        this.onSendHook = (IFn) f.invoke(onSendHook == null ? globalSentHook : onSendHook);
-    }
-
-    // like alter-var-root
-    public void alterReceiveHook(IFn f) {
-        this.onReceiveHook = (IFn) f.invoke(onReceiveHook == null ? globalReceiveHook
-                : onReceiveHook);
-    }
-
     public String toString() {
         Socket s = ((SocketChannel) key.channel()).socket();
         return s.getLocalSocketAddress() + "<->" + s.getRemoteSocketAddress();
@@ -254,11 +218,6 @@ public class AsyncChannel {
 
     public boolean isWebSocket() {
         return key.attachment() instanceof WsServerAtta;
-    }
-
-    // return true if first {:headers :body :status} has not been sent
-    public boolean isFirstWrite() {
-        return !isWebSocket() && isInitialWrite;
     }
 
     public boolean isClosed() {
@@ -283,7 +242,7 @@ public class AsyncChannel {
 
     static Keyword K_UNKNOWN = Keyword.intern("ws-unknown");
 
-    static Keyword closeReason(int status) {
+    private static Keyword closeReason(int status) {
         switch (status) {
         case 0:
             return K_BY_SERVER;
