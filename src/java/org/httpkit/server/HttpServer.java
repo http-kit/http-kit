@@ -116,8 +116,8 @@ public class HttpServer implements Runnable {
         try {
             do {
                 WSFrame frame = atta.decoder.decode(buffer);
-                if (frame instanceof TextFrame) {
-                    handler.handle(atta.asycChannel, (TextFrame) frame);
+                if (frame instanceof TextFrame || frame instanceof BinaryFrame) {
+                    handler.handle(atta.asycChannel, frame);
                     atta.decoder.reset();
                 } else if (frame instanceof PingFrame) {
                     atta.addBuffer(WSEncoder.encode(WSDecoder.OPCODE_PONG, frame.data));

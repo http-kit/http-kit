@@ -119,11 +119,19 @@ public class AsyncChannel {
         }
     }
 
-    public void messageReceived(final String mesg) {
+    public void messageReceived(final Object mesg) {
         IFn f = receiveHandler.get();
         if (f != null) {
             f.invoke(mesg);
         }
+    }
+
+    private void sendTextFrame(final String mesg) {
+        write(WSEncoder.encode(mesg));
+    }
+
+    private void sendBinaryFrame(final byte[] data) {
+        write(WSEncoder.encode(WSDecoder.OPCODE_BINARY, data));
     }
 
     public void sendHandshake(Map<String, Object> headers) {
@@ -178,11 +186,15 @@ public class AsyncChannel {
                     data = tmp;
                 }
             }
+
             if (data instanceof String) { // null is not allowed
-                write(WSEncoder.encode((String) data));
+                sendTextFrame((String) data);// websocket
+            } else if (data instanceof byte[]) {
+                sendBinaryFrame((byte[]) data);
             } else {
                 if (data != null) { // null is ignored
-                    throw new IllegalArgumentException("websocket only accept string, get" + data);
+                    throw new IllegalArgumentException(
+                        "websocket only accept string and byte[], get" + data);
                 }
             }
 

@@ -9,7 +9,7 @@
             [org.httpkit.client :as client]
             [http.async.client :as h]
             [clj-http.util :as u])
-  (:import org.httpkit.ws.WebSocketClient))
+  (:import org.httpkit.ws.WebSocketClient [org.httpkit.ws WebSocketClient]))
 
 (defn ws-handler [req]
   (with-channel req con
@@ -42,6 +42,12 @@
     (on-receive con (fn [mesg]
                       (send! con (pr-str {:message mesg}))))))
 
+(defn ws-handler5 [req]
+  (with-channel req con
+    (on-receive con (fn [data]
+                      (let [retdata (doto (aclone data) (java.util.Arrays/sort))]
+                        (send! con retdata))))))
+
 (defn messg-order-handler [req]
   (with-channel req con
     (let [mesg-idx (atom 0)
@@ -56,6 +62,7 @@
   (GET "/ws2" [] ws-handler2)
   (GET "/ws3" [] ws-handler3)
   (GET "/ws4" [] ws-handler4)
+  (GET "/ws5" [] ws-handler5)
   (GET "/order" [] messg-order-handler))
 
 (use-fixtures :once (fn [f]
@@ -115,6 +122,17 @@
       (let [mesg (str "message#" idx)]
         (.sendMessage client mesg)
         (is (= mesg (:message (read-string (.getMessage client)))))))
+    (.close client)))
+
+(deftest test-binary-frame
+  (let [client (WebSocketClient. "ws://localhost:4348/ws5")]
+    (dotimes [_ 5]
+      (let [length (min 1024 (rand-int 10024))
+            data (byte-array length (take length (repeatedly #(byte (rand-int 126)))))
+            sorted-data (doto (aclone data) (java.util.Arrays/sort))]
+        (.sendBinaryData client data)
+        (let [output (.getMessage client)]
+          (is (java.util.Arrays/equals sorted-data output)))))
     (.close client)))
 
 (deftest test-message-executed-in-order
