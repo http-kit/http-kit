@@ -45,7 +45,8 @@
 (defn ws-handler5 [req]
   (with-channel req con
     (on-receive con (fn [data]
-                      (send! con (byte-array 60 (type 22)))))))
+                      (let [retdata (doto (aclone data) (java.util.Arrays/sort))]
+                        (send! con retdata))))))
 
 (defn messg-order-handler [req]
   (with-channel req con
@@ -125,9 +126,14 @@
 
 (deftest test-binary-frame
   (let [client (WebSocketClient. "ws://localhost:4348/ws5")]
-    ;; TODO: verify the value
-    (.close client)
-    ))
+    (dotimes [_ 5]
+      (let [length (min 1024 (rand-int 10024))
+            data (byte-array length (take length (repeatedly #(byte (rand-int 126)))))
+            sorted-data (doto (aclone data) (java.util.Arrays/sort))]
+        (.sendBinaryData client data)
+        (let [output (.getMessage client)]
+          (is (java.util.Arrays/equals sorted-data output)))))
+    (.close client)))
 
 (deftest test-message-executed-in-order
   (doseq [_ (range 1 10)]
