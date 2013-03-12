@@ -17,14 +17,7 @@ import org.jboss.netty.channel.Channels;
 import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory;
 import org.jboss.netty.handler.codec.http.HttpRequestEncoder;
 import org.jboss.netty.handler.codec.http.HttpResponseDecoder;
-import org.jboss.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
-import org.jboss.netty.handler.codec.http.websocketx.PingWebSocketFrame;
-import org.jboss.netty.handler.codec.http.websocketx.PongWebSocketFrame;
-import org.jboss.netty.handler.codec.http.websocketx.TextWebSocketFrame;
-import org.jboss.netty.handler.codec.http.websocketx.WebSocketClientHandshaker;
-import org.jboss.netty.handler.codec.http.websocketx.WebSocketClientHandshakerFactory;
-import org.jboss.netty.handler.codec.http.websocketx.WebSocketFrame;
-import org.jboss.netty.handler.codec.http.websocketx.WebSocketVersion;
+import org.jboss.netty.handler.codec.http.websocketx.*;
 
 public class WebSocketClient {
 
@@ -77,10 +70,16 @@ public class WebSocketClient {
         ch.write(new TextWebSocketFrame(message.substring(i)));
     }
 
+    public void sendBinaryData(byte[] data) {
+        ch.write(new BinaryWebSocketFrame(ChannelBuffers.wrappedBuffer(data)));
+    }
+
     public Object getMessage() throws InterruptedException {
         WebSocketFrame frame = queue.poll(5, TimeUnit.SECONDS);
         if (frame instanceof TextWebSocketFrame) {
             return ((TextWebSocketFrame) frame).getText();
+        } else if (frame instanceof BinaryWebSocketFrame) {
+            return frame.getBinaryData().array();
         }
         return frame;
     }
