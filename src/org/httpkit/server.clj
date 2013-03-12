@@ -46,8 +46,10 @@
     and :status will be stripped for WebSockets and for HTTP streaming responses
     after the first.")
   (on-receive [ch callback]
-    "Sets handler (fn [message-string]) for notification of client WebSocket
-    messages. Message ordering is guaranteed by server.")
+    "Sets handler (fn [message]) for notification of client WebSocket
+    messages. Message ordering is guaranteed by server.
+
+    The message argument could be a string or a byte[].")
   (on-close [ch callback]
     "Sets handler (fn [status]) for notification of channel being closed by the
     server or client. Handler will be invoked at most once. Useful for clean-up.
