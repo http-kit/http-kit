@@ -1,7 +1,5 @@
 package org.httpkit.server;
 
-import org.httpkit.ws.BinaryFrame;
-import org.httpkit.ws.TextFrame;
 import org.httpkit.ws.WSFrame;
 
 public interface IHandler {

@@ -64,7 +64,7 @@ class LinkingRunnable implements Runnable {
     }
 }
 
-abstract class WSFrameHandler implements Runnable {
+class WSFrameHandler implements Runnable {
     private WSFrame frame;
     private AsyncChannel channel;
 
@@ -76,34 +76,14 @@ abstract class WSFrameHandler implements Runnable {
     @Override
     public void run() {
         try {
-            channel.messageReceived(getFrameData(frame));
+            if(frame instanceof TextFrame) {
+                channel.messageReceived(((TextFrame) frame).getText());
+            } else {
+                channel.messageReceived(frame.data);
+            }
         } catch (Throwable e) {
             HttpUtils.printError("handle websocket frame " + frame, e);
         }
-    }
-
-    protected abstract Object getFrameData(WSFrame frame);
-}
-
-class TextFrameHandler extends WSFrameHandler {
-    public TextFrameHandler(AsyncChannel channel, TextFrame frame) {
-        super(channel, frame);
-    }
-
-    @Override
-    protected Object getFrameData(WSFrame frame) {
-        return ((TextFrame) frame).getText();
-    }
-}
-
-class BinaryFrameHandler extends WSFrameHandler {
-    public BinaryFrameHandler(AsyncChannel channel, BinaryFrame frame) {
-        super(channel, frame);
-    }
-
-    @Override
-    protected Object getFrameData(WSFrame frame) {
-        return frame.data;
     }
 }
 
@@ -132,12 +112,7 @@ public class RingHandler implements IHandler {
     }
 
     public void handle(AsyncChannel channel, WSFrame frame) {
-        WSFrameHandler task;
-        if (frame instanceof TextFrame) {
-            task = new TextFrameHandler(channel, (TextFrame) frame);
-        } else {
-            task = new BinaryFrameHandler(channel, (BinaryFrame) frame);
-        }
+        WSFrameHandler task = new WSFrameHandler(channel, frame);
 
         // messages from the same client are handled orderly
         LinkingRunnable job = new LinkingRunnable(task);

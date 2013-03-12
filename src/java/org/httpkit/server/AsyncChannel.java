@@ -49,8 +49,6 @@ public class AsyncChannel {
         serialTask = null;
     }
 
-    // -------------- streaming --------------------
-
     private static final byte[] finalChunkBytes = "0\r\n\r\n".getBytes();
     private static final byte[] newLineBytes = "\r\n".getBytes();
 
@@ -111,8 +109,6 @@ public class AsyncChannel {
         }
     }
 
-    // ---------------------------websocket-------------------------------------
-
     public void setReceiveHandler(IFn fn) {
         if (!receiveHandler.compareAndSet(null, fn)) {
             throw new IllegalStateException("receive handler exist: " + receiveHandler.get());
@@ -122,16 +118,8 @@ public class AsyncChannel {
     public void messageReceived(final Object mesg) {
         IFn f = receiveHandler.get();
         if (f != null) {
-            f.invoke(mesg);
+            f.invoke(mesg);   // byte[] or String
         }
-    }
-
-    private void sendTextFrame(final String mesg) {
-        write(WSEncoder.encode(mesg));
-    }
-
-    private void sendBinaryFrame(final byte[] data) {
-        write(WSEncoder.encode(WSDecoder.OPCODE_BINARY, data));
     }
 
     public void sendHandshake(Map<String, Object> headers) {
@@ -188,12 +176,12 @@ public class AsyncChannel {
             }
 
             if (data instanceof String) { // null is not allowed
-                sendTextFrame((String) data);// websocket
+                write(WSEncoder.encode((String) data));
             } else if (data instanceof byte[]) {
-                sendBinaryFrame((byte[]) data);
-            } else {
+                write(WSEncoder.encode(WSDecoder.OPCODE_BINARY, (byte[]) data));
+            } else if(data != null) { // ignore null
                 throw new IllegalArgumentException(
-                        "websocket only accept string and byte[], get" + data);
+                        "only accept string or byte[], get" + data);
             }
 
             if (closeAfterSent) {
@@ -228,9 +216,7 @@ public class AsyncChannel {
         return closedRan.get();
     }
 
-    // closed by server
     static Keyword K_BY_SERVER = Keyword.intern("server-close");
-    // general close status
     static Keyword K_CLIENT_CLOSED = Keyword.intern("http-client-close");
 
     // 1000 indicates a normal closure
@@ -246,7 +232,7 @@ public class AsyncChannel {
 
     static Keyword K_UNKNOWN = Keyword.intern("ws-unknown");
 
-    private static Keyword closeReason(int status) {
+    private static Keyword closeReason(int status) { // readable
         switch (status) {
         case 0:
             return K_BY_SERVER;
