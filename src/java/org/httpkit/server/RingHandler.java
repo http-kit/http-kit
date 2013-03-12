@@ -10,11 +10,10 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.httpkit.HttpUtils;
 import org.httpkit.PrefixThreadFactory;
-import org.httpkit.ws.BinaryFrame;
 import org.httpkit.ws.TextFrame;
+import org.httpkit.ws.WSFrame;
 
 import clojure.lang.IFn;
-import org.httpkit.ws.WSFrame;
 
 @SuppressWarnings({ "rawtypes", "unchecked" })
 class HttpHandler implements Runnable {

@@ -1,8 +1,11 @@
 package org.httpkit.server;
 
+import static org.httpkit.HttpUtils.*;
 import static org.httpkit.server.ClojureRing.*;
+import static org.httpkit.ws.WSDecoder.*;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
@@ -11,8 +14,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.httpkit.HttpUtils;
-import org.httpkit.ws.WSDecoder;
+import org.httpkit.DynamicBytes;
 import org.httpkit.ws.WSEncoder;
 import org.httpkit.ws.WsServerAtta;
 
@@ -57,7 +59,7 @@ public class AsyncChannel {
         return ByteBuffer.wrap(s.getBytes());
     }
 
-    private void firstWrite(Object data, boolean isFinal) throws IOException {
+    private void firstWrite(Object data, boolean close) throws IOException {
         ByteBuffer buffers[];
         int status = 200;
         Object body = data;
@@ -73,7 +75,7 @@ public class AsyncChannel {
             headers.put("Content-Type", "text/html; charset=utf-8");
         }
 
-        if (isFinal) { // normal response
+        if (close) { // normal response
             buffers = encode(status, headers, body);
         } else {
             headers.put("Transfer-Encoding", "chunked"); // first chunk
@@ -85,26 +87,26 @@ public class AsyncChannel {
                         ByteBuffer.wrap(newLineBytes) };
             }
         }
-        if (isFinal) {
+        if (close) {
             onClose(0);
         }
         write(buffers);
     }
 
-    private void writeChunk(Object body, boolean closeAfterSent) throws IOException {
+    private void writeChunk(Object body, boolean close) throws IOException {
         if (body instanceof Map) { // only get body if a map
             body = ((Map<Keyword, Object>) body).get(BODY);
         }
         if (body != null) { // null is ignored
             ByteBuffer buffers[];
-            ByteBuffer t = HttpUtils.bodyBuffer(body);
-            if(t.hasRemaining()) {
+            ByteBuffer t = bodyBuffer(body);
+            if (t.hasRemaining()) {
                 ByteBuffer size = chunkSize(t.remaining());
                 buffers = new ByteBuffer[] { size, t, ByteBuffer.wrap(newLineBytes) };
                 write(buffers);
             }
         }
-        if(closeAfterSent) {
+        if (close) {
             serverClose(0);
         }
     }
@@ -118,14 +120,13 @@ public class AsyncChannel {
     public void messageReceived(final Object mesg) {
         IFn f = receiveHandler.get();
         if (f != null) {
-            f.invoke(mesg);   // byte[] or String
+            f.invoke(mesg); // byte[] or String
         }
     }
 
     public void sendHandshake(Map<String, Object> headers) {
         write(encode(101, headers, null));
     }
-
 
     public void setCloseHandler(IFn fn) {
         if (!closeHandler.compareAndSet(null, fn)) { // only once
@@ -140,29 +141,30 @@ public class AsyncChannel {
         if (closedRan.compareAndSet(false, true)) {
             IFn f = closeHandler.get();
             if (f != null) {
-                f.invoke(closeReason(status));
+                f.invoke(readable(status));
             }
         }
     }
 
+    // also sent CloseFrame a final Chunk
     public boolean serverClose(int status) {
         if (!closedRan.compareAndSet(false, true)) {
             return false; // already closed
         }
         if (isWebSocket()) {
-            write(WSEncoder.encode(WSDecoder.OPCODE_CLOSE,
-                    ByteBuffer.allocate(2).putShort((short) status).array()));
+            write(WSEncoder.encode(OPCODE_CLOSE, ByteBuffer.allocate(2)
+                    .putShort((short) status).array()));
         } else {
             write(ByteBuffer.wrap(finalChunkBytes));
         }
         IFn f = closeHandler.get();
         if (f != null) {
-            f.invoke(closeReason(0)); // server close is 0
+            f.invoke(readable(0)); // server close is 0
         }
         return true;
     }
 
-    public boolean send(Object data, boolean closeAfterSent) throws IOException {
+    public boolean send(Object data, boolean close) throws IOException {
         if (closedRan.get()) {
             return false;
         }
@@ -176,22 +178,25 @@ public class AsyncChannel {
             }
 
             if (data instanceof String) { // null is not allowed
-                write(WSEncoder.encode((String) data));
+                write(WSEncoder.encode(OPCODE_TEXT, ((String) data).getBytes(UTF_8)));
             } else if (data instanceof byte[]) {
-                write(WSEncoder.encode(WSDecoder.OPCODE_BINARY, (byte[]) data));
-            } else if(data != null) { // ignore null
+                write(WSEncoder.encode(OPCODE_BINARY, (byte[]) data));
+            } else if (data instanceof InputStream) {
+                DynamicBytes bytes = readAll((InputStream) data);
+                write(WSEncoder.encode(OPCODE_BINARY, bytes.get(), bytes.length()));
+            } else if (data != null) { // ignore null
                 throw new IllegalArgumentException(
-                        "only accept string or byte[], get" + data);
+                        "only accept string, byte[], InputStream, get" + data);
             }
 
-            if (closeAfterSent) {
+            if (close) {
                 serverClose(1000);
             }
         } else {
             if (isHeaderSent) {
-                writeChunk(data, closeAfterSent);
+                writeChunk(data, close);
             } else {
-                firstWrite(data, closeAfterSent);
+                firstWrite(data, close);
                 isHeaderSent = true;
             }
         }
@@ -217,22 +222,17 @@ public class AsyncChannel {
     }
 
     static Keyword K_BY_SERVER = Keyword.intern("server-close");
-    static Keyword K_CLIENT_CLOSED = Keyword.intern("http-client-close");
+    static Keyword K_CLIENT_CLOSED = Keyword.intern("client-close");
 
-    // 1000 indicates a normal closure
-    static Keyword K_WS_1000 = Keyword.intern("ws-normal");
-    // 1001 indicates that an endpoint is "going away"
-    static Keyword K_WS_1001 = Keyword.intern("ws-going-away");
-    // 1002 indicates that an endpoint is terminating the connection due to a
-    // protocol error
-    static Keyword K_WS_1002 = Keyword.intern("ws-protocol-error");
-    // 1003 indicates that an endpoint is terminating the connection
-    // because it has received a type of data it cannot accept
-    static Keyword K_WS_1003 = Keyword.intern("ws-unsupported");
+    // http://datatracker.ietf.org/doc/rfc6455/?include_text=1
+    // 7.4.1. Defined Status Codes
+    static Keyword K_WS_1000 = Keyword.intern("normal");
+    static Keyword K_WS_1001 = Keyword.intern("going-away");
+    static Keyword K_WS_1002 = Keyword.intern("protocol-error");
+    static Keyword K_WS_1003 = Keyword.intern("unsupported");
+    static Keyword K_UNKNOWN = Keyword.intern("unknown");
 
-    static Keyword K_UNKNOWN = Keyword.intern("ws-unknown");
-
-    private static Keyword closeReason(int status) { // readable
+    private static Keyword readable(int status) {
         switch (status) {
         case 0:
             return K_BY_SERVER;

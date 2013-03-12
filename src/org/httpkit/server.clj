@@ -27,7 +27,7 @@
 
 (defprotocol Channel
   "Unified asynchronous channel interface for HTTP (streaming or long-polling)
-  and WebSockets."
+   and WebSocket."
 
   (open? [ch] "Returns true iff channel is open.")
   (close [ch]
@@ -39,12 +39,16 @@
     or false if the channel is closed. Data is sent directly to the client,
     NO RING MIDDLEWARE IS APPLIED.
 
-    When unspecified, `close-after-send?` defaults to true for HTTP channels and
-    false for WebSockets.
+    When unspecified, `close-after-send?` defaults to true for HTTP channels
+    and false for WebSocket.
 
     Data form: {:headers _ :status _ :body _} or just body. Note that :headers
-    and :status will be stripped for WebSockets and for HTTP streaming responses
-    after the first.")
+    and :status will be stripped for WebSocket and for HTTP streaming responses
+    after the first.
+
+    For WebSocket, a text frame is sent to client if data is String,
+    a binary frame when data is byte[] or InputStream. For for HTTP streaming
+    responses, data can be one of the type defined by Ring spec")
   (on-receive [ch callback]
     "Sets handler (fn [message]) for notification of client WebSocket
     messages. Message ordering is guaranteed by server.
@@ -74,7 +78,7 @@
   (on-receive [ch callback] (.setReceiveHandler ch callback))
   (on-close [ch callback] (.setCloseHandler ch callback)))
 
-;;;; WebSockets
+;;;; WebSocket
 (defn accept [key]
   (let [md (MessageDigest/getInstance "SHA1")
         websocket-13-guid "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"]
@@ -133,7 +137,3 @@
   `(with-channel ~request ch#
      (let [~callback-name (fn [data#] (send! ch# data# true))]
        ~@body)))
-
-(defmacro ws-response "DEPRECATED"
-  [request conn-name & then]
-  `(with-channel ~request ~conn-name ~@then))

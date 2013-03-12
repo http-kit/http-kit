@@ -13,7 +13,6 @@
 
 (defn ws-handler [req]
   (with-channel req con
-    ;; close-handler in test_util.clj
     (on-close con close-handler)
     (on-receive con (fn [msg]
                       (try
@@ -26,13 +25,13 @@
 
 (defn ws-handler2 [req]
   (with-channel req con
-    (send! con "hello")
+    (send! con "hello") ;; should sendable when on-connet
     (send! con "world")
     (on-receive con (fn [mesg]
                       ;; only :body is picked
                       (send! con {:body  mesg}))))) ; echo back
 
-(defn ws-handler3 [req]
+(defn ws-handler3 [req] ;; test with http.async.client
   (with-channel req con
     (on-receive con (fn [mesg]
                       (send! con mesg)))))
@@ -42,11 +41,14 @@
     (on-receive con (fn [mesg]
                       (send! con (pr-str {:message mesg}))))))
 
-(defn ws-handler5 [req]
+(defn binary-ws-handler [req]
   (with-channel req con
     (on-receive con (fn [data]
-                      (let [retdata (doto (aclone data) (java.util.Arrays/sort))]
-                        (send! con retdata))))))
+                      (let [retdata (doto (aclone data) (java.util.Arrays/sort))
+                            data (if (rand-nth [true false])
+                                   (java.io.ByteArrayInputStream. retdata)
+                                   retdata)]
+                        (send! con data))))))
 
 (defn messg-order-handler [req]
   (with-channel req con
@@ -62,7 +64,7 @@
   (GET "/ws2" [] ws-handler2)
   (GET "/ws3" [] ws-handler3)
   (GET "/ws4" [] ws-handler4)
-  (GET "/ws5" [] ws-handler5)
+  (GET "/binary" [] binary-ws-handler)
   (GET "/order" [] messg-order-handler))
 
 (use-fixtures :once (fn [f]
@@ -125,7 +127,7 @@
     (.close client)))
 
 (deftest test-binary-frame
-  (let [client (WebSocketClient. "ws://localhost:4348/ws5")]
+  (let [client (WebSocketClient. "ws://localhost:4348/binary")]
     (dotimes [_ 5]
       (let [length (min 1024 (rand-int 10024))
             data (byte-array length (take length (repeatedly #(byte (rand-int 126)))))
@@ -135,11 +137,20 @@
           (is (java.util.Arrays/equals sorted-data output)))))
     (.close client)))
 
+;;; make sure Message ordering is guaranteed
 (deftest test-message-executed-in-order
-  (doseq [_ (range 1 10)]
+  (doseq [_ (range 1 5)]
     (let [client (WebSocketClient. "ws://localhost:4348/order")]
       (doseq [id (range 1 10)]
         (.sendMessage client (pr-str {:id id}))
+        (is (= "true" (.getMessage client))))
+      (.close client)))
+  (doseq [_ (range 1 5)]
+    (let [client (WebSocketClient. "ws://localhost:4348/order")]
+      ;; 10 concurrent message
+      (doseq [id (range 1 10)]
+        (.sendMessage client (pr-str {:id id})))
+      (doseq [_ (range 1 10)]
         (is (= "true" (.getMessage client))))
       (.close client))))
 
