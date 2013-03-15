@@ -8,7 +8,7 @@ Current [semantic](http://semver.org/) version: `[http-kit "2.0.0-RC4"]`.
 
 ### Hack locally
 
-Hacker fridenly: only ~3k lines of code (including java), clean and tidy.
+Hacker friendly: only ~3k lines of code (including java), clean and tidy.
 
 ```sh
 # modify as you want, unit tests back you up
