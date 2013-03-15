@@ -196,8 +196,8 @@ public class AsyncChannel {
             if (isHeaderSent) {
                 writeChunk(data, close);
             } else {
-                firstWrite(data, close);
                 isHeaderSent = true;
+                firstWrite(data, close);
             }
         }
         return true;
