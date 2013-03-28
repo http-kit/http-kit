@@ -131,9 +131,3 @@
          {:status 400 :body "Bad Sec-WebSocket-Key header"})
        (do ~@body
            {:body ~ch-name}))))
-
-(defmacro async-response "DEPRECATED"
-  [request callback-name & body]
-  `(with-channel ~request ch#
-     (let [~callback-name (fn [data#] (send! ch# data# true))]
-       ~@body)))

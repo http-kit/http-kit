@@ -30,16 +30,16 @@
      :body (str title ": " (:size file))}))
 
 (defn async-handler [req]
-  (async-response req respond!
-                  (respond! {:status 200 :body "hello async"})))
+  (with-channel req channel
+    (send! channel {:status 200 :body "hello async"})))
 
 (defn async-just-body [req]
-  (async-response req respond!
-                  (respond! "just-body")))
+  (with-channel req channel
+    (send! channel "just-body")))
 
 (defn async-response-handler [req]
-  (async-response req respond!
-                  (future (respond! {:status 200 :body "hello async"}))))
+  (with-channel req channel
+    (send! channel {:status 200 :body "hello async"})))
 
 (defn streaming-handler [req]
   (let [s (or (-> req :params :s) (subs const-string 0 1024))
@@ -50,9 +50,9 @@
       (send! channel (first seqs) false)
       (doseq [p (rest seqs)]
         ;; should only pick the body if a map
-        (send! channel
-               (if (rand-nth [true false]) p
-                   {:body p})
+        (send! channel (if (rand-nth [true false])
+                         p
+                         {:body p})
                false))        ;; do not close
       (send! channel "" true) ;; same as (close channel)
       )))
@@ -70,13 +70,13 @@
 (defn async-with-timeout [req]
   (let [time (to-int (-> req :params :time))
         cancel (-> req :params :cancel)]
-    (async-response req respond!
-                    (with-timeout respond! time
-                      (respond! {:status 200
-                                 :body (str time "ms")})
-                      (when cancel
-                        (respond! {:status 200 ; should return ok
-                                   :body "canceled"}))))))
+    (with-channel req channel
+      (with-timeout send! time
+        (send! channel {:status 200
+                        :body (str time "ms")})
+        (when cancel
+          (send! channel {:status 200 ; should return ok
+                          :body "canceled"}))))))
 
 (defn streaming-demo [request]
   (let [time (Integer/valueOf (or (-> request :params :i) 200))]

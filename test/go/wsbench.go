@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	origin = "http://localhost:9899/"
-	wsurl  = "ws://localhost:9899/test"
+	origin = "http://localhost:9090/"
+	wsurl  = "ws://localhost:9090/ws"
 )
 
 var concurrency = flag.Int("c", 100, "concurrency")

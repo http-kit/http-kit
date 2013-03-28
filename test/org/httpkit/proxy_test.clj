@@ -1,5 +1,5 @@
 (ns org.httpkit.proxy-test
-  (:use [org.httpkit.server :only [run-server async-response]]
+  (:use [org.httpkit.server :only [run-server with-channel send!]]
         [org.httpkit.client :only [request]]))
 
 (defn- proxy-opts [req]
@@ -14,27 +14,17 @@
    :body (:body req)})
 
 (defn handler [req]
-  (async-response req respond
-                  (request (proxy-opts req)
-                           (fn [{:keys [status headers body error]}]
-                             (if error
-                               (respond {:status 503
-                                         :headers {"Content-Type" "text/plain"}
-                                         :body (str "Cannot access backend\n" error)})
-                               (respond  {:status status
-                                          :headers (zipmap (map name (keys headers)) (vals headers))
-                                          :body body}))))))
+  (with-channel req channel
+    (request (proxy-opts req)
+             (fn [{:keys [status headers body error]}]
+               (if error
+                 (send! channel {:status 503
+                                 :headers {"Content-Type" "text/plain"}
+                                 :body (str "Cannot access backend\n" error)})
+                 (send! channel {:status status
+                                 :headers (zipmap (map name (keys headers)) (vals headers))
+                                 :body body}))))))
 
 (defn -main [& args]
   (run-server handler {:port 8080})
   (println "proxy server started at 0.0.0.0@8080"))
-
-;; (defn handler [req]
-;;   (async-response respond
-;;                   (try
-;;                     (let [result (call-a-service-with-timeout)]
-;;                       (respond {:status 200
-;;                                 :body "processed ok"}))
-;;                     (catch TimeoutException e
-;;                       (respond {:status 200
-;;                                 :body "timeout"})))))
