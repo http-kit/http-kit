@@ -4,11 +4,16 @@
 
 See **[http-kit.org](http://http-kit.org)** for documentation, examples, benchmarks, etc.
 
-Current [semantic](http://semver.org/) version: `[http-kit "2.0.0-RC4"]`.
+Current [semantic](http://semver.org/) version:
+
+```clj
+[http-kit "2.0.0"]  ; WebSocket and async API are not compatible with the RC releases.
+```
+
 
 ### Hack locally
 
-Hacker friendly: Written from ground-up, only ~3k lines of code (including java), clean and tidy.
+Hacker friendly: Zero dependency, written from ground-up with only ~3k lines of code (including java), clean and tidy.
 
 ```sh
 # modify as you want, unit tests back you up
@@ -22,6 +27,10 @@ lein test
 ### Contact & Contribution
 
 Please use the [GitHub issues page](https://github.com/http-kit/http-kit/issues) for feature suggestions, bug reports, or general discussions. Current contributors are listed [here](https://github.com/http-kit/http-kit/graphs/contributors). The http-kit.org website is also on GitHub [here](https://github.com/http-kit/http-kit.github.com).
+
+### Change log
+
+[history.md](https://github.com/http-kit/http-kit/blob/protocol-api/history.md)
 
 ### License
 
