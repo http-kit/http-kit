@@ -84,7 +84,7 @@
   (request {:url \"http://www.cnn.com\"})
 
   ;; Asynchronous GET request with callback
-  (request {:method \"http://www.cnn.com\" :get}
+  (request {:url \"http://www.cnn.com\" :method :get}
     (fn [{:keys [opts status body headers error] :as resp}]
       (if error
         (println \"Error on\" opts)
