@@ -48,8 +48,8 @@ HTTP server:
 ### 2.0-rc2 (2013/2/9)
    1. fix a possible CPU 100% usage
 
-### 2.0-0 (2013/3/28)
+### 2.0-0 (2013/3/29)
    1. Unify WebSocket and HTTP long polling/streaming with Channel protocol and with-channel (API breaks with the RC)
-   2. WebSocket support sending and receiving binary frame
+   2. WebSocket support sending and receiving binary frame with byte[]
    3. Support HTTP streaming
    4. Fix few issues with WebSocket
