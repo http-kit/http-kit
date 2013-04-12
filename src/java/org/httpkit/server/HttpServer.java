@@ -198,6 +198,32 @@ public class HttpServer implements Runnable {
         }
     }
 
+    public void tryWrite(final SelectionKey key, ByteBuffer... buffers) {
+        SocketChannel ch = (SocketChannel) key.channel();
+        try {
+            // TCP buffer most of time is empty, writable(8K ~ 16K)
+            // One IO thread => One thread reading + Many thread writing
+            ch.write(buffers);
+            if (buffers[buffers.length - 1].hasRemaining()) {
+                ServerAtta atta = (ServerAtta) key.attachment();
+                // enqueue
+                for (ByteBuffer b : buffers) {
+                    if (b.hasRemaining()) {
+                        atta.addBuffer(b);
+                    }
+                }
+                pendings.add(key);
+                selector.wakeup();
+            } else {
+                if (!((ServerAtta) key.attachment()).isKeepAlive()) {
+                    closeKey(key, CLOSE_NORMAL);
+                }
+            }
+        } catch (IOException e) {
+            closeKey(key, CLOSE_NORMAL);
+        }
+    }
+
     public void queueWrite(final SelectionKey key) {
         pendings.add(key);
         selector.wakeup(); // JVM is smart enough: only once per loop
