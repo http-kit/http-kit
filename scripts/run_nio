@@ -1,0 +1,46 @@
+#! /bin/bash -x
+
+# simplest NIO server to have a sense of how fast It can be
+
+cd test/java/
+
+if [ $# -gt 0 ]; then
+    javac -g  NIOPerfTest.java  && java -Xdebug -Xrunjdwp:transport=dt_socket,address=9092,server=y,suspend=n NIOPerfTest
+else
+    javac NIOPerfTest.java  && java  NIOPerfTest
+
+fi
+
+
+exit
+
+# benchamark
+# wrk -t2 -c200 -d4 http://192.168.1.101:8000/ && sleep 1 && wrk -t2 -c200 -d10 http://192.168.1.101:8000/
+
+# Fri Apr 12 14:56:27 CST 2013
+# 1.5K body
+# 214166.08 => direct
+# 206244.88 => Non-direct
+# 192207.63 => bulk
+# no-write + direct => 246316.00
+# no-write + Non-direct => 235194.61
+
+# allocate
+# 217905.05, 210781.06
+
+# allocate direct
+# 219000.89
+
+# write[]
+# 192306.09
+
+
+# 180722.28
+
+
+
+# 15k
+
+# bulck => 130214.72
+# non-direct => 120193.54
+# direct => 137388.65
