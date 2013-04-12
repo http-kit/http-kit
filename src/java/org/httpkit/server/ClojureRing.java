@@ -111,7 +111,10 @@ public class ClojureRing {
         encodeHeaders(bytes, headers);
         ByteBuffer headBuffer = ByteBuffer.wrap(bytes.get(), 0, bytes.length());
 
-        return new ByteBuffer[] { headBuffer, bodyBuffer };
+        if (bodyBuffer != null)
+            return new ByteBuffer[] { headBuffer, bodyBuffer };
+        else
+            return new ByteBuffer[] { headBuffer };
     }
 
     public static IPersistentMap buildRequestMap(HttpRequest req) {

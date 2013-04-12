@@ -14,8 +14,6 @@ public class ResponseCallback {
 
     // maybe in another thread :worker thread
     public void run(ByteBuffer... buffers) {
-        ServerAtta atta = (ServerAtta) key.attachment();
-        atta.addBuffer(buffers);
-        server.queueWrite(key);
+        server.tryWrite(key, buffers);
     }
 }
