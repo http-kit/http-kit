@@ -6,16 +6,6 @@ import java.util.LinkedList;
 public abstract class ServerAtta {
     final LinkedList<ByteBuffer> toWrites = new LinkedList<ByteBuffer>();
 
-    public void addBuffer(ByteBuffer... buffer) {
-        synchronized (toWrites) {
-            for (ByteBuffer b : buffer) {
-                if (b != null) {
-                    toWrites.add(b);
-                }
-            }
-        }
-    }
-    
     protected AsyncChannel asycChannel;
 
     public abstract boolean isKeepAlive();

@@ -3,11 +3,12 @@
         ring.middleware.file-info
         org.httpkit.test-util
         [clojure.java.io :only [input-stream]]
-        (compojure [core :only [defroutes GET POST HEAD DELETE ANY]]
+        (compojure [core :only [defroutes GET POST HEAD DELETE ANY context]]
                    [handler :only [site]])
         org.httpkit.server
         org.httpkit.timer)
   (:require [clj-http.client :as http]
+            [org.httpkit.ws-test :as ws]
             [org.httpkit.client :as client]
             [clj-http.util :as u])
   (:import [java.io File FileOutputStream FileInputStream]
@@ -103,6 +104,7 @@
   (GET "/ws" [] (fn [req]
                   (with-channel req con
                     (on-receive con (fn [mesg] (send! con mesg))))))
+  (context "/ws2" [] ws/test-routes)
   (GET "/inputstream" [] inputstream-handler)
   (POST "/multipart" [] multipart-handler)
   (POST "/chunked-input" [] (fn [req] {:status 200
@@ -159,7 +161,7 @@
     (is (= (:body resp) "Hello World"))))
 
 (deftest test-body-file
-  (doseq [length (range 1 (* 1024 1024 5) 1439987)]
+  (doseq [length (range 1 (* 1024 1024 8) 1439987)]
     (let [resp (http/get "http://localhost:4347/file?l=" length)]
       (is (= (:status resp) 200))
       (is (= (get-in resp [:headers "content-type"]) "text/plain"))

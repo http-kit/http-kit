@@ -26,6 +26,17 @@ public class WebSocketClient {
     Channel ch = null;
     private BlockingQueue<WebSocketFrame> queue = new ArrayBlockingQueue<WebSocketFrame>(10);
 
+    public static void main(String[] args) throws Exception {
+        WebSocketClient client = new WebSocketClient("ws://localhost:9090/ws2/ws");
+        client.sendMessage("{:length 3145728, :times 1}");
+        for (int i = 0; i < 1; i++) {
+            Object message = client.getMessage();
+            if(message instanceof String) {
+                System.out.println(((String) message).length());
+            }
+        }
+    }
+
     public WebSocketClient(String url) throws Exception {
         bootstrap = new ClientBootstrap(new NioClientSocketChannelFactory(
                 Executors.newFixedThreadPool(1), Executors.newFixedThreadPool(1)));
