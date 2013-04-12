@@ -53,3 +53,6 @@ HTTP server:
    2. WebSocket support sending and receiving binary frame with byte[]
    3. Support HTTP streaming
    4. WebSocket message ordering is guaranteed by server
+
+### 2.0.1 (2013/4/12)
+   1. Performance improvement. About 50% ~ 90% when benchmark due to IO model change: One IO thread => On thread reading, decoding + many threads writing
