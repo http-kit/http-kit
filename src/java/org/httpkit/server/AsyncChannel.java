@@ -21,7 +21,7 @@ import org.httpkit.ws.WsServerAtta;
 import clojure.lang.IFn;
 import clojure.lang.Keyword;
 
-@SuppressWarnings({ "unchecked" })
+@SuppressWarnings({"unchecked"})
 public class AsyncChannel {
     private final SelectionKey key;
     private final HttpServer server;
@@ -75,7 +75,7 @@ public class AsyncChannel {
             headers.put("Content-Type", "text/html; charset=utf-8");
         }
 
-        if (close) { // normal response
+        if (close) { // normal response, Content-Length. Every http client understand it
             buffers = encode(status, headers, body);
         } else {
             headers.put("Transfer-Encoding", "chunked"); // first chunk
@@ -83,14 +83,14 @@ public class AsyncChannel {
             if (body == null) {
                 buffers = bb;
             } else {
-                buffers = new ByteBuffer[] { bb[0], chunkSize(bb[1].remaining()), bb[1],
-                        ByteBuffer.wrap(newLineBytes) };
+                buffers = new ByteBuffer[]{bb[0], chunkSize(bb[1].remaining()), bb[1],
+                        ByteBuffer.wrap(newLineBytes)};
             }
         }
         if (close) {
             onClose(0);
         }
-        write(buffers);
+        server.tryWrite(key, buffers);
     }
 
     private void writeChunk(Object body, boolean close) throws IOException {
@@ -102,8 +102,8 @@ public class AsyncChannel {
             ByteBuffer t = bodyBuffer(body);
             if (t.hasRemaining()) {
                 ByteBuffer size = chunkSize(t.remaining());
-                buffers = new ByteBuffer[] { size, t, ByteBuffer.wrap(newLineBytes) };
-                write(buffers);
+                buffers = new ByteBuffer[]{size, t, ByteBuffer.wrap(newLineBytes)};
+                server.tryWrite(key, buffers);
             }
         }
         if (close) {
@@ -125,7 +125,7 @@ public class AsyncChannel {
     }
 
     public void sendHandshake(Map<String, Object> headers) {
-        write(encode(101, headers, null));
+        server.tryWrite(key, encode(101, headers, null));
     }
 
     public void setCloseHandler(IFn fn) {
@@ -152,10 +152,10 @@ public class AsyncChannel {
             return false; // already closed
         }
         if (isWebSocket()) {
-            write(WSEncoder.encode(OPCODE_CLOSE, ByteBuffer.allocate(2)
-                    .putShort((short) status).array()));
+            server.tryWrite(key, WSEncoder.encode(OPCODE_CLOSE, ByteBuffer.allocate(2)
+                        .putShort((short) status).array()));
         } else {
-            write(ByteBuffer.wrap(finalChunkBytes));
+            server.tryWrite(key, ByteBuffer.wrap(finalChunkBytes));
         }
         IFn f = closeHandler.get();
         if (f != null) {
@@ -178,12 +178,12 @@ public class AsyncChannel {
             }
 
             if (data instanceof String) { // null is not allowed
-                write(WSEncoder.encode(OPCODE_TEXT, ((String) data).getBytes(UTF_8)));
+                server.tryWrite(key, WSEncoder.encode(OPCODE_TEXT, ((String) data).getBytes(UTF_8)));
             } else if (data instanceof byte[]) {
-                write(WSEncoder.encode(OPCODE_BINARY, (byte[]) data));
+                server.tryWrite(key, WSEncoder.encode(OPCODE_BINARY, (byte[]) data));
             } else if (data instanceof InputStream) {
                 DynamicBytes bytes = readAll((InputStream) data);
-                write(WSEncoder.encode(OPCODE_BINARY, bytes.get(), bytes.length()));
+                server.tryWrite(key, WSEncoder.encode(OPCODE_BINARY, bytes.get(), bytes.length()));
             } else if (data != null) { // ignore null
                 throw new IllegalArgumentException(
                         "only accept string, byte[], InputStream, get" + data);
@@ -193,7 +193,7 @@ public class AsyncChannel {
                 serverClose(1000);
             }
         } else {
-            if (isHeaderSent) {
+            if (isHeaderSent) {  // HTTP Streaming
                 writeChunk(data, close);
             } else {
                 isHeaderSent = true;
@@ -206,11 +206,6 @@ public class AsyncChannel {
     public String toString() {
         Socket s = ((SocketChannel) key.channel()).socket();
         return s.getLocalSocketAddress() + "<->" + s.getRemoteSocketAddress();
-    }
-
-    private void write(ByteBuffer... buffers) {
-        ((ServerAtta) key.attachment()).addBuffer(buffers);
-        server.queueWrite(key);
     }
 
     public boolean isWebSocket() {
@@ -234,20 +229,20 @@ public class AsyncChannel {
 
     private static Keyword readable(int status) {
         switch (status) {
-        case 0:
-            return K_BY_SERVER;
-        case -1:
-            return K_CLIENT_CLOSED;
-        case 1000:
-            return K_WS_1000;
-        case 1001:
-            return K_WS_1001;
-        case 1002:
-            return K_WS_1002;
-        case 1003:
-            return K_WS_1003;
-        default:
-            return K_UNKNOWN;
+            case 0:
+                return K_BY_SERVER;
+            case -1:
+                return K_CLIENT_CLOSED;
+            case 1000:
+                return K_WS_1000;
+            case 1001:
+                return K_WS_1001;
+            case 1002:
+                return K_WS_1002;
+            case 1003:
+                return K_WS_1003;
+            default:
+                return K_UNKNOWN;
         }
     }
 }

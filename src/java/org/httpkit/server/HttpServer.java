@@ -100,15 +100,11 @@ public class HttpServer implements Runnable {
         } catch (ProtocolException e) {
             closeKey(key, -1);
         } catch (RequestTooLargeException e) {
-            ByteBuffer[] buffers = ClojureRing.encode(413, null, e.getMessage());
-            atta.addBuffer(buffers);
-            atta.keepalive = false; // close after write
-            key.interestOps(OP_WRITE);
+            atta.keepalive = false;
+            tryWrite(key, ClojureRing.encode(413, null, e.getMessage()));
         } catch (LineTooLargeException e) {
-            ByteBuffer[] buffers = ClojureRing.encode(414, null, e.getMessage());
             atta.keepalive = false; // close after write
-            atta.addBuffer(buffers);
-            key.interestOps(OP_WRITE);
+            tryWrite(key, ClojureRing.encode(414, null, e.getMessage()));
         }
     }
 
@@ -120,16 +116,14 @@ public class HttpServer implements Runnable {
                     handler.handle(atta.asycChannel, frame);
                     atta.decoder.reset();
                 } else if (frame instanceof PingFrame) {
-                    atta.addBuffer(WSEncoder.encode(WSDecoder.OPCODE_PONG, frame.data));
                     atta.decoder.reset();
-                    key.interestOps(OP_WRITE);
+                    tryWrite(key, WSEncoder.encode(WSDecoder.OPCODE_PONG, frame.data));
                 } else if (frame instanceof CloseFrame) {
                     // even though the logic connection is closed. the socket
                     // did not, if client willing to reuse it, http-kit is more
                     // than happy
                     handler.clientClose(atta.asycChannel, ((CloseFrame) frame).getStatus());
-                    atta.addBuffer(WSEncoder.encode(WSDecoder.OPCODE_CLOSE, frame.data));
-                    key.interestOps(OP_WRITE);
+                    tryWrite(key, WSEncoder.encode(WSDecoder.OPCODE_CLOSE, frame.data));
                 }
             } while (buffer.hasRemaining()); // consume all
         } catch (ProtocolException e) {
@@ -164,10 +158,10 @@ public class HttpServer implements Runnable {
         ServerAtta atta = (ServerAtta) key.attachment();
         SocketChannel ch = (SocketChannel) key.channel();
         try {
-            LinkedList<ByteBuffer> toWrites = atta.toWrites;
             // the sync is per socket (per client). virtually, no contention
             // 1. keep byte data order, 2. ensure visibility
-            synchronized (atta.toWrites) {
+            synchronized (atta) {
+                LinkedList<ByteBuffer> toWrites = atta.toWrites;
                 int size = toWrites.size();
                 if (size == 1) {
                     ch.write(toWrites.get(0));
@@ -176,7 +170,7 @@ public class HttpServer implements Runnable {
                 } else if (size > 0) {
                     ByteBuffer buffers[] = new ByteBuffer[size];
                     toWrites.toArray(buffers);
-                    ch.write(buffers);
+                    ch.write(buffers, 0, buffers.length);
                 }
                 Iterator<ByteBuffer> ite = toWrites.iterator();
                 while (ite.hasNext()) {
@@ -199,34 +193,41 @@ public class HttpServer implements Runnable {
     }
 
     public void tryWrite(final SelectionKey key, ByteBuffer... buffers) {
+        ServerAtta atta = (ServerAtta) key.attachment();
+        synchronized (atta) {
+            // If has pending write, order should be maintained. (WebSocket)
+            if (!atta.toWrites.isEmpty()) {
+                for (ByteBuffer b : buffers) {
+                    atta.toWrites.add(b);
+                }
+                pendings.add(key);
+                selector.wakeup();
+                return;
+            }
+        }
         SocketChannel ch = (SocketChannel) key.channel();
         try {
             // TCP buffer most of time is empty, writable(8K ~ 16K)
             // One IO thread => One thread reading + Many thread writing
-            ch.write(buffers);
+            ch.write(buffers, 0, buffers.length);
             if (buffers[buffers.length - 1].hasRemaining()) {
-                ServerAtta atta = (ServerAtta) key.attachment();
-                // enqueue
-                for (ByteBuffer b : buffers) {
-                    if (b.hasRemaining()) {
-                        atta.addBuffer(b);
+                synchronized (atta) {
+                    for (ByteBuffer b : buffers) {
+                        if (b.hasRemaining()) {
+                            atta.toWrites.add(b);
+                        }
                     }
                 }
                 pendings.add(key);
                 selector.wakeup();
             } else {
-                if (!((ServerAtta) key.attachment()).isKeepAlive()) {
+                if (!atta.isKeepAlive()) {
                     closeKey(key, CLOSE_NORMAL);
                 }
             }
         } catch (IOException e) {
             closeKey(key, CLOSE_NORMAL);
         }
-    }
-
-    public void queueWrite(final SelectionKey key) {
-        pendings.add(key);
-        selector.wakeup(); // JVM is smart enough: only once per loop
     }
 
     public void run() {
