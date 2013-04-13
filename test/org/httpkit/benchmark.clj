@@ -8,7 +8,7 @@
    :headers {"Content-Type" "text/plain"
              "X-header" "美味书签"}
    ;; jdk 6 is slow here, jdk7 is fine. String implemented differently
-   :body (subs const-string 0 1024)})
+   :body "hello world"})
 
 ;;; extreme case.
 ;;; more real world, see server_test.clj

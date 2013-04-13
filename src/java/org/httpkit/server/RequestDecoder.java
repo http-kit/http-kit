@@ -56,8 +56,7 @@ public class RequestDecoder {
 
         if (cStart < cEnd) {
             try {
-                HttpMethod method = HttpMethod
-                        .valueOf(sb.substring(aStart, aEnd).toUpperCase());
+                HttpMethod method = HttpMethod.valueOf(sb.substring(aStart, aEnd).toUpperCase());
                 HttpVersion version = HTTP_1_1;
                 if ("HTTP/1.0".equals(sb.substring(cStart, cEnd))) {
                     version = HTTP_1_0;

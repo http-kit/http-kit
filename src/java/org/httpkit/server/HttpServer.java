@@ -55,7 +55,7 @@ public class HttpServer implements Runnable {
                 s.configureBlocking(false);
                 HttpServerAtta atta = new HttpServerAtta(maxBody, maxLine);
                 SelectionKey k = s.register(selector, OP_READ, atta);
-                atta.asycChannel = new AsyncChannel(k, this);
+                atta.channel = new AsyncChannel(k, this);
             }
         } catch (Exception e) {
             // too many open files. do not quit
@@ -71,24 +71,24 @@ public class HttpServer implements Runnable {
 
         ServerAtta att = (ServerAtta) key.attachment();
         if (att instanceof HttpServerAtta) {
-            handler.clientClose(att.asycChannel, -1);
+            handler.clientClose(att.channel, -1);
         } else {
-            handler.clientClose(att.asycChannel, status);
+            handler.clientClose(att.channel, status);
         }
     }
 
     private void decodeHttp(HttpServerAtta atta, SelectionKey key, SocketChannel ch) {
         try {
             do {
-                atta.asycChannel.reset(); // reuse for performance
+                atta.channel.reset(); // reuse for performance
                 HttpRequest request = atta.decoder.decode(buffer);
                 if (request != null) {
                     if (request.isWebSocket) {
-                        key.attach(new WsServerAtta(atta.asycChannel));
+                        key.attach(new WsServerAtta(atta.channel));
                     } else {
                         atta.keepalive = request.isKeepAlive;
                     }
-                    request.asycChannel = atta.asycChannel;
+                    request.channel = atta.channel;
                     request.remoteAddr = (InetSocketAddress) ch.socket()
                             .getRemoteSocketAddress();
                     handler.handle(request, new ResponseCallback(key, this));
@@ -113,7 +113,7 @@ public class HttpServer implements Runnable {
             do {
                 WSFrame frame = atta.decoder.decode(buffer);
                 if (frame instanceof TextFrame || frame instanceof BinaryFrame) {
-                    handler.handle(atta.asycChannel, frame);
+                    handler.handle(atta.channel, frame);
                     atta.decoder.reset();
                 } else if (frame instanceof PingFrame) {
                     atta.decoder.reset();
@@ -122,7 +122,7 @@ public class HttpServer implements Runnable {
                     // even though the logic connection is closed. the socket
                     // did not, if client willing to reuse it, http-kit is more
                     // than happy
-                    handler.clientClose(atta.asycChannel, ((CloseFrame) frame).getStatus());
+                    handler.clientClose(atta.channel, ((CloseFrame) frame).getStatus());
                     tryWrite(key, WSEncoder.encode(WSDecoder.OPCODE_CLOSE, frame.data));
                 }
             } while (buffer.hasRemaining()); // consume all
@@ -195,38 +195,35 @@ public class HttpServer implements Runnable {
     public void tryWrite(final SelectionKey key, ByteBuffer... buffers) {
         ServerAtta atta = (ServerAtta) key.attachment();
         synchronized (atta) {
-            // If has pending write, order should be maintained. (WebSocket)
-            if (!atta.toWrites.isEmpty()) {
+            if (atta.toWrites.isEmpty()) {
+                SocketChannel ch = (SocketChannel) key.channel();
+                try {
+                    // TCP buffer most of time is empty, writable(8K ~ 256k)
+                    // One IO thread => One thread reading + Many thread writing
+                    // Save 2 system call
+                    ch.write(buffers, 0, buffers.length);
+                    if (buffers[buffers.length - 1].hasRemaining()) {
+                        for (ByteBuffer b : buffers) {
+                            if (b.hasRemaining()) {
+                                atta.toWrites.add(b);
+                            }
+                        }
+                        pendings.add(key);
+                        selector.wakeup();
+                    } else if (!atta.isKeepAlive()) {
+                        closeKey(key, CLOSE_NORMAL);
+                    }
+                } catch (IOException e) {
+                    closeKey(key, CLOSE_AWAY);
+                }
+            } else {
+                // If has pending write, order should be maintained. (WebSocket)
                 for (ByteBuffer b : buffers) {
                     atta.toWrites.add(b);
                 }
                 pendings.add(key);
                 selector.wakeup();
-                return;
             }
-        }
-        SocketChannel ch = (SocketChannel) key.channel();
-        try {
-            // TCP buffer most of time is empty, writable(8K ~ 16K)
-            // One IO thread => One thread reading + Many thread writing
-            ch.write(buffers, 0, buffers.length);
-            if (buffers[buffers.length - 1].hasRemaining()) {
-                synchronized (atta) {
-                    for (ByteBuffer b : buffers) {
-                        if (b.hasRemaining()) {
-                            atta.toWrites.add(b);
-                        }
-                    }
-                }
-                pendings.add(key);
-                selector.wakeup();
-            } else {
-                if (!atta.isKeepAlive()) {
-                    closeKey(key, CLOSE_NORMAL);
-                }
-            }
-        } catch (IOException e) {
-            closeKey(key, CLOSE_NORMAL);
         }
     }
 

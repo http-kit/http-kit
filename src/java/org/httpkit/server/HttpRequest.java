@@ -30,7 +30,7 @@ public class HttpRequest {
     boolean isWebSocket = false;
     
     InetSocketAddress remoteAddr;
-    AsyncChannel asycChannel;
+    AsyncChannel channel;
 
     public HttpRequest(HttpMethod method, String url, HttpVersion version) {
         this.method = method;
