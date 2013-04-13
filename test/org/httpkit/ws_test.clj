@@ -59,12 +59,23 @@
                 (send! con (str (= id i)))))]
       (on-receive con h))))
 
+(defn- repeat-str [n ch]  (apply str (repeat n ch)))
+
+(defn big-messg-order [req]
+  (with-channel req con
+    (doall (pmap (fn [length]
+                   (let [length (+ length 1025)
+                         c (char (+ (int \0) (rem length 30)))]
+                     (send! con (apply str (repeat length c)))))
+                 (repeatedly 25 (partial rand-int (* 1024 1024)))))))
+
 (defroutes test-routes
   (GET "/ws" [] ws-handler)
   (GET "/ws2" [] ws-handler2)
   (GET "/ws3" [] ws-handler3)
   (GET "/ws4" [] ws-handler4)
   (GET "/binary" [] binary-ws-handler)
+  (GET "/interleaved" [] big-messg-order)
   (GET "/order" [] messg-order-handler))
 
 (use-fixtures :once (fn [f]
@@ -153,6 +164,15 @@
       (doseq [_ (range 1 10)]
         (is (= "true" (.getMessage client))))
       (.close client))))
+
+(deftest test-message-are-not-interleaved
+  (let [client (WebSocketClient. "ws://localhost:4348/interleaved")]
+    (doseq [i (range 0 25)]
+      (let [mesg (.getMessage client)
+            ch (first mesg)]
+        (is (> (count mesg) 1024))
+        (is (every? (fn [c] (= c ch)) mesg))))
+    (.close client)))
 
 (deftest test-with-http.async.client
   (with-open [client (h/create-client)]

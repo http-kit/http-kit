@@ -9,7 +9,7 @@ public class WsServerAtta extends ServerAtta {
 
     public WsServerAtta(AsyncChannel channel) {
         this.decoder = new WSDecoder();
-        this.asycChannel = channel;
+        this.channel = channel;
     }
 
     public boolean isKeepAlive() {

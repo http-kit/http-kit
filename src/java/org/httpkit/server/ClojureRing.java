@@ -126,7 +126,7 @@ public class ClojureRing {
         m.put(URI, req.uri);
         m.put(QUERY_STRING, req.queryString);
         m.put(SCHEME, HTTP); // only http is supported
-        m.put(ASYC_CHANNEL, req.asycChannel);
+        m.put(ASYC_CHANNEL, req.channel);
         m.put(WEBSOCKET, req.isWebSocket);
         m.put(REQUEST_METHOD, req.method.KEY);
 
