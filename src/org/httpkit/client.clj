@@ -1,7 +1,7 @@
 (ns org.httpkit.client
   (:refer-clojure :exclude [get])
   (:require [clojure.string :as str])
-  (:import [org.httpkit.client HttpClientConfig HttpClient
+  (:import [org.httpkit.client HttpRequestConfig HttpClient
             IResponseHandler RespListener IFilter MaxBodyFilter]
            [org.httpkit HttpMethod PrefixThreadFactory HttpUtils]
            [java.util.concurrent ThreadPoolExecutor LinkedBlockingQueue TimeUnit]
@@ -66,12 +66,8 @@
 (defn max-body-filter "reject if response's body exceeds size in bytes"
   [size] (MaxBodyFilter. (int size)))
 
-(defn init-client "Initializes and returns a new HTTP client. Timeout: 1 minute, keep-alive: 2 minutes"
-   [& {:keys [timeout user-agent keep-alive]
-       :or {timeout 60000 user-agent "http-kit/2.0" keep-alive 120000}}]
-   (HttpClient. (HttpClientConfig. timeout user-agent keep-alive)))
-
-(defonce default-client (delay (init-client)))
+;;; "Get the default client. Normally, you only need one client per application. You can config parameter per request basic"
+(defonce default-client (delay (HttpClient.)))
 
 (defn request
   "Issues an async HTTP request and returns a promise object to which the value
@@ -102,8 +98,8 @@
  Request options:
     :url :method :headers :timeout :query-params :form-params
     :client :body :basic-auth :user-agent :filter :worker-pool"
-  [{:keys [client timeout filter worker-pool] :as opts
-    :or {client @default-client timeout -1 filter IFilter/ACCEPT_ALL worker-pool default-pool}}
+  [{:keys [client timeout filter worker-pool keepalive sslengine] :as opts
+    :or {client @default-client timeout 60000 filter IFilter/ACCEPT_ALL worker-pool default-pool keepalive 120000}}
    callback]
   (let [{:keys [url method headers body]} (coerce-req opts)
         response (promise)
@@ -122,8 +118,9 @@
                                    :status  status}))
                   (onThrowable [this t]
                     (deliver-resp {:opts opts :error t})))
-        listener (RespListener. handler filter worker-pool)]
-    (.exec ^HttpClient client url method headers body timeout listener)
+        listener (RespListener. handler filter worker-pool)
+        cfg (HttpRequestConfig. method timeout keepalive sslengine)]
+    (.exec ^HttpClient client url headers body cfg listener)
     response))
 
 (defmacro ^:private defreq [method]

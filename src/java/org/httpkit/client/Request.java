@@ -4,15 +4,16 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 
-import org.httpkit.HttpMethod;
 import org.httpkit.PriorityQueue;
+
+import javax.net.ssl.SSLException;
 
 public class Request implements Comparable<Request> {
 
     final InetSocketAddress addr;
     final Decoder decoder;
     final ByteBuffer[] request; // HTTP request
-    final int timeOutMs; // ms
+    final HttpRequestConfig cfg;
     private final PriorityQueue<Request> clients; // update timeout
 
     // is modify from the loop thread. ensure only called once
@@ -26,19 +27,19 @@ public class Request implements Comparable<Request> {
     private long timeoutTs; // future time this request timeout, ms
 
     public Request(InetSocketAddress addr, ByteBuffer[] request, IRespListener handler,
-            PriorityQueue<Request> clients, int timeOutMs, HttpMethod method) {
-        this.decoder = new Decoder(handler, method);
-        this.timeOutMs = timeOutMs;
+                   PriorityQueue<Request> clients, HttpRequestConfig config) {
+        this.cfg = config;
+        this.decoder = new Decoder(handler, config.method);
         this.request = request;
         this.clients = clients;
         this.addr = addr;
-        this.timeoutTs = this.timeOutMs + System.currentTimeMillis();
+        this.timeoutTs = config.timeout + System.currentTimeMillis();
     }
 
     public void onProgress(long now) {
         // update time
         clients.remove(this);
-        timeoutTs = this.timeOutMs + now;
+        timeoutTs = cfg.timeout + now;
         clients.offer(this);
     }
 
@@ -65,4 +66,9 @@ public class Request implements Comparable<Request> {
     public int compareTo(Request o) {
         return (int) (timeoutTs - o.timeoutTs);
     }
+
+    public void recycle(Request old) throws SSLException {
+        this.key = old.key;
+    }
 }
+

@@ -9,7 +9,8 @@
         (clojure.tools [logging :only [info warn]]))
   (:require [org.httpkit.client :as http]
             [clojure.java.io :as io]
-            [clj-http.client :as clj-http]))
+            [clj-http.client :as clj-http])
+  (:import org.httpkit.client.SslContextFactory))
 
 (defroutes test-routes
   (GET "/get" [] "hello world")
@@ -23,6 +24,9 @@
   (DELETE "/delete" [] "deleted")
   (ANY "/ua" [] (fn [req] ((-> req :headers) "user-agent")))
   (GET "/keep-alive" [] (fn [req] (-> req :params :id)))
+  (GET "/length" [] (fn [req]
+                      (let [l (-> req :params :length to-int)]
+                        (subs const-string 0 l))))
   (GET "/p" [] (fn [req] (pr-str (:params req))))
   (ANY "/params" [] (fn [req] (-> req :params :param1)))
   (PUT "/body" [] (fn [req] {:body (:body req)
@@ -30,22 +34,28 @@
                             :headers {"content-type" "text/plain"}})))
 
 (use-fixtures :once
-              (fn [f]
-                (let [server (run-server (site test-routes) {:port 4347})
-                      jetty (run-jetty (site test-routes) {:port 14347
-                                                           :join? false})]
-                  (try (f) (finally (server) (.stop jetty))))))
+  (fn [f]
+    (let [server (run-server (site test-routes) {:port 4347})
+          jetty (run-jetty (site test-routes) {:port 14347
+                                               :join? false
+                                               :ssl-port 9898
+                                               :ssl? true
+                                               :key-password "123456"
+                                               :keystore "test/ssl_keystore"})]
+      (try (f) (finally (server) (.stop jetty))))))
 
 (comment
   (defonce server1 (run-server (site test-routes) {:port 4347})))
 
-(defmacro bench
-  [title & forms]
+(defmacro bench [title & forms]
   `(let [start# (. System (nanoTime))]
      ~@forms
      (println (str ~title "Elapsed time: "
                    (/ (double (- (. System (nanoTime)) start#)) 1000000.0)
                    " msecs"))))
+
+(defn- trust-everybody []
+  (.createSSLEngine (SslContextFactory/getClientContext)))
 
 (deftest test-http-client
   (doseq [host ["http://127.0.0.1:4347" "http://127.0.0.1:14347"]]
@@ -58,7 +68,7 @@
                                                          resp)))))
     (is (= 200 (:status @(http/patch (str host "/patch") (fn [resp]
                                                            (is (= 200 (:status resp)))
-                                                          resp)))))
+                                                           resp)))))
     (is (= 200 (:status @(http/delete (str host "/delete")))))
     (is (= 200 (:status @(http/head (str host "/get")))))
     (is (= 200 (:status @(http/post (str host "/post")))))
@@ -103,18 +113,23 @@
           (is (= 200 (:status @r))))))))
 
 (deftest performance-bench
-  (doseq [{:keys [url name]} [{:url "http://127.0.0.1:14347/get"
-                               :name "jetty server"}]]
+  (let [url "http://127.0.0.1:14347/get"]
     ;; just for fun
-    (bench "http-kit, concurrency 1, 2000 requests: "
-           (doseq [_ (range 0 2000)] @(http/get url)))
-    (bench "clj-http, concurrency 1, 2000 requests: "
-           (doseq [_ (range 0 2000)] (clj-http/get url)))
-    (bench "http-kit, concurrency 10, 2000 requests: "
-           (doseq [_ (range 0 200)]
+    (bench "http-kit, concurrency 1, 1000 requests: "
+           (doseq [_ (range 0 1000)] @(http/get url)))
+    (bench "clj-http, concurrency 1, 1000 requests: "
+           (doseq [_ (range 0 1000)] (clj-http/get url)))
+    (bench "http-kit, concurrency 10, 1000 requests: "
+           (doseq [_ (range 0 100)]
              (let [requests (doall (map (fn [u] (http/get u))
                                         (repeat 10 url)))]
-               (doseq [r requests] @r))))))
+               (doseq [r requests] @r)))))
+  (let [url "https://127.0.0.1:9898/get"]
+    (bench "http-kit, https, concurrency 1, 1000 requests: "
+           (doseq [_ (range 0 1000)] @(http/get url {:sslengine (trust-everybody)})))
+    (bench "http-kit, https, keepalive disabled, concurrency 1, 1000 requests: "
+           (doseq [_ (range 0 1000)] @(http/get url {:sslengine (trust-everybody)
+                                                     :keepalive -1})))))
 
 (deftest test-http-client-user-agent
   (let [ua "test-ua"
@@ -174,6 +189,23 @@
     (is (= url (:u params)))
     (is (= "false" (:try params)))))
 
+(deftest test-https
+  (doseq [i (range 0 2)]
+    (doseq [length (repeatedly 40 (partial rand-int (* 4 1024 1024)))]
+      (is (= length (-> @(http/get (str "https://localhost:9898/length?length=" length)
+                                   {:sslengine (trust-everybody)})
+                        :body count))))
+    (doseq [length (repeatedly 40 (partial rand-int (* 4 1024 1024)))]
+      (is (= length (-> @(http/get (str "https://localhost:9898/length?length=" length)
+                                   {:sslengine (trust-everybody)
+                                    :keepalive -1})
+                        :body count))))
+    (doseq [length (repeatedly 40 (partial rand-int (* 4 1024 1024)))]
+      (is (= length (-> @(http/get (str "https://localhost:9898/length?length=" length)
+                                   {:sslengine (trust-everybody)
+                                    :headers {"Connection" (rand-nth ["Close" "keep-alive"])}})
+                        :body count))))))
+
 ;; @(http/get "http://127.0.0.1:4348" {:headers {"Connection" "Close"}})
 
 ;; run many HTTP request to detect any error. urls are in file /tmp/urls, one per line
@@ -209,3 +241,16 @@
 (defn -main [& args]
   (let [urls (shuffle (set (line-seq (io/reader "/tmp/urls"))))]
     (doall (map-indexed fetch-group-urls (partition 1000 urls)))))
+
+(defn handler [req]
+  {:status 200
+   :headers {}
+   :body "hello world"})
+
+(defn star-test []
+  (let [a (run-jetty handler {:ssl-port 9898
+                              :ssl? true
+                              :port 9897
+                              ;; :join? false
+                              :keystore "/tmp/testkeys"
+                              :key-password "123456"})]))

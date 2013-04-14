@@ -3,6 +3,7 @@
         ring.middleware.file-info
         org.httpkit.test-util
         [clojure.java.io :only [input-stream]]
+        [ring.adapter.jetty :only [run-jetty]]
         (compojure [core :only [defroutes GET POST HEAD DELETE ANY context]]
                    [handler :only [site]])
         org.httpkit.server
@@ -276,9 +277,17 @@
 
 ;;; start a test server, for test or benchmark
 (defonce tmp-server (atom nil))
+
 (defn -main [& args]
   (when-let [server @tmp-server]
     (server))
+  ;; start a jetty server with https for https client test
+  (run-jetty (site test-routes) {:port 14347
+                                 :join? false
+                                 :ssl-port 9898
+                                 :ssl? true
+                                 :key-password "123456"
+                                 :keystore "test/ssl_keystore"})
   (reset! tmp-server (run-server (site test-routes) {:port 9090
                                                      :queue-size 102400}))
   (println "server started at 0.0.0.0:9090"))

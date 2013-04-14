@@ -1,9 +1,14 @@
 package org.httpkit.client;
 
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.*;
 import java.net.Proxy.Type;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertificateException;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -12,7 +17,6 @@ import java.util.concurrent.TimeUnit;
 import junit.framework.Assert;
 
 import org.apache.commons.io.IOUtils;
-import org.httpkit.HttpMethod;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -26,6 +30,7 @@ class ResponseHandler implements IResponseHandler {
     }
 
     public void onSuccess(int status, Map<String, String> headers, Object body) {
+        cd.countDown();
         try {
             if (body instanceof String) {
                 // String
@@ -48,13 +53,20 @@ class ResponseHandler implements IResponseHandler {
 
 }
 
+class A {
+
+}
+
+class B extends A {
+
+}
+
+
 public class HttpClientTest {
 
     public HttpClientTest() throws IOException {
-        String userAgent = "Mozilla/5.0 (compatible; Rssminer/1.0; +http://rssminer.net)";
-        HttpClientConfig cfg = new HttpClientConfig(45000, userAgent, 100000);
-
-        client = new HttpClient(cfg);
+        String userAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.31 (KHTML, like Gecko) Chrome/26.0.1410.19 Safari/537.31";
+        client = new HttpClient();
     }
 
     HttpClient client;
@@ -76,7 +88,7 @@ public class HttpClientTest {
     }
 
     public void get(String url) throws URISyntaxException {
-        client.exec(url, HttpMethod.GET, emptyHeader, null, -1, listener);
+        client.exec(url,emptyHeader, null, new HttpRequestConfig(), listener);
     }
 
     @Test
@@ -84,6 +96,27 @@ public class HttpClientTest {
             InterruptedException {
         get("http://wiki.nginx.org/Main");
     }
+
+
+    public static void main(String[] args) throws KeyStoreException, IOException, CertificateException, NoSuchAlgorithmException {
+        KeyStore ks = KeyStore.getInstance("JKS");
+        char[] passphrase = "123456".toCharArray();
+        ks.load(new FileInputStream("/tmp/testkeys"), passphrase);
+
+    }
+
+    @Test
+    public void testHttpS() throws URISyntaxException, InterruptedException {
+//        get("https://d.web2.qq.com");
+        get("https://github.com/http-kit/http-kit");
+
+        cd.await();
+        get("https://github.com/shenfeng/FrameworkBenchmarks");
+
+
+//        get("https://google.com");
+    }
+
 
     @Test
     public void testSocksProxy() throws UnknownHostException, URISyntaxException,

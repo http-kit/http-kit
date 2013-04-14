@@ -11,7 +11,8 @@
   :plugins [[lein-swank "1.4.4"]]
   :license {:name "Apache License, Version 2.0"
             :url "http://www.apache.org/licenses/LICENSE-2.0.html"}
-  :jvm-opts ["-Dclojure.compiler.disable-locals-clearing=true"]
+  :jvm-opts ["-Dclojure.compiler.disable-locals-clearing=true"
+             "-Xms1g" "-Xmx1g"]         ; test https require more memory
   :profiles {:1.5 {:dependencies [[org.clojure/clojure "1.5.1"]]}
              :test {:java-source-paths ["test/java" "src/java"]}
              :dev {:dependencies [[junit/junit "4.8.2"]

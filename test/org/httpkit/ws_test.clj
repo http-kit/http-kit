@@ -59,8 +59,6 @@
                 (send! con (str (= id i)))))]
       (on-receive con h))))
 
-(defn- repeat-str [n ch]  (apply str (repeat n ch)))
-
 (defn big-messg-order [req]
   (with-channel req con
     (doall (pmap (fn [length]
