@@ -129,7 +129,9 @@
            (doseq [_ (range 0 1000)] @(http/get url {:sslengine (trust-everybody)})))
     (bench "http-kit, https, keepalive disabled, concurrency 1, 1000 requests: "
            (doseq [_ (range 0 1000)] @(http/get url {:sslengine (trust-everybody)
-                                                     :keepalive -1})))))
+                                                     :keepalive -1})))
+    (bench "clj-http, https, concurrency 1, 1000 requests: "
+           (doseq [_ (range 0 1000)] (clj-http/get url {:insecure? true})))))
 
 (deftest test-http-client-user-agent
   (let [ua "test-ua"
@@ -190,21 +192,22 @@
     (is (= "false" (:try params)))))
 
 (deftest test-https
-  (doseq [i (range 0 2)]
-    (doseq [length (repeatedly 40 (partial rand-int (* 4 1024 1024)))]
-      (is (= length (-> @(http/get (str "https://localhost:9898/length?length=" length)
-                                   {:sslengine (trust-everybody)})
-                        :body count))))
-    (doseq [length (repeatedly 40 (partial rand-int (* 4 1024 1024)))]
-      (is (= length (-> @(http/get (str "https://localhost:9898/length?length=" length)
-                                   {:sslengine (trust-everybody)
-                                    :keepalive -1})
-                        :body count))))
-    (doseq [length (repeatedly 40 (partial rand-int (* 4 1024 1024)))]
-      (is (= length (-> @(http/get (str "https://localhost:9898/length?length=" length)
-                                   {:sslengine (trust-everybody)
-                                    :headers {"Connection" (rand-nth ["Close" "keep-alive"])}})
-                        :body count))))))
+  (let [get-url (fn [length] (str "https://localhost:9898/length?length=" length))]
+    (doseq [i (range 0 2)]
+      (doseq [length (repeatedly 40 (partial rand-int (* 4 1024 1024)))]
+        (let [{:keys [body error status]} @(http/get (get-url length)
+                                                     {:sslengine (trust-everybody)})]
+          (if error (.printStackTrace error))
+          (is (= length (count body)))))
+      (doseq [length (repeatedly 40 (partial rand-int (* 4 1024 1024)))]
+        (is (= length (-> @(http/get (get-url length)
+                                     {:sslengine (trust-everybody)
+                                      :keepalive -1})
+                          :body count))))
+      (doseq [length (repeatedly 40 (partial rand-int (* 4 1024 1024)))]
+        (is (= length (-> @(http/get (get-url length)
+                                     (assoc (rand-keep-alive) :sslengine (trust-everybody)))
+                          :body count)))))))
 
 ;; @(http/get "http://127.0.0.1:4348" {:headers {"Connection" "Close"}})
 

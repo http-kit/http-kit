@@ -210,7 +210,7 @@ public class HttpUtils {
         try {
             return Integer.parseInt(hex, 16);
         } catch (Exception e) {
-            throw new ProtocolException("Expect chunk size to be a number: " + hex);
+            throw new ProtocolException("Expect chunk size to be a number, get" + hex);
         }
     }
 

@@ -88,7 +88,7 @@ public class Decoder {
                 break;
             case READ_CHUNK_SIZE:
                 line = readLine(buffer);
-                if (line != null) {
+                if (line != null && !line.isEmpty()) {
                     readRemaining = getChunkSize(line);
                     if (readRemaining == 0) {
                         state = READ_CHUNK_FOOTER;

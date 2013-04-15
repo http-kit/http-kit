@@ -10,7 +10,6 @@ import java.security.NoSuchAlgorithmException;
 import javax.net.ssl.*;
 import javax.net.ssl.SSLEngineResult.Status;
 
-import org.httpkit.HttpMethod;
 import org.httpkit.PriorityQueue;
 
 public class HttpsRequest extends Request {
