@@ -265,6 +265,10 @@
     (= 2 (count (re-seq #"hello world" resp)))
     (= 2 (count (re-seq #"200" resp)))))
 
+(deftest test-ipv6
+  ;; TODO add more
+  (is (= "hello world" (:body (http/get "http://[::1]:4347/")))))
+
 (deftest test-chunked-encoding
   (let [size 4194304
         resp (http/post "http://localhost:4347/chunked-input"
