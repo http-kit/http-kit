@@ -49,13 +49,16 @@ public class Decoder {
         cStart = findNonWhitespace(sb, bEnd);
         cEnd = findEndOfString(sb);
 
-        if (cStart < cEnd) {
+        if ((cStart < cEnd)
+                // Account for buggy web servers that omit Reason-Phrase from Status-Line.
+                // http://www.w3.org/Protocols/HTTP/1.0/draft-ietf-http-spec.html#Response
+            || (cStart == cEnd && bStart < bEnd)){
             try {
                 int status = Integer.parseInt(sb.substring(bStart, bEnd));
                 HttpStatus s = HttpStatus.valueOf(status);
 
                 HttpVersion version = HTTP_1_1;
-                if ("HTTP/1.0".equals(sb.substring(aStart, cEnd))) {
+                if ("HTTP/1.0".equals(sb.substring(aStart, aEnd))) {
                     version = HTTP_1_0;
                 }
 
