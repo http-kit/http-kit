@@ -1,41 +1,67 @@
 package org.httpkit.server;
 
-import static org.httpkit.HttpUtils.*;
-import static org.httpkit.server.ClojureRing.*;
-import static org.httpkit.ws.WSDecoder.*;
+import clojure.lang.IFn;
+import clojure.lang.Keyword;
+import org.httpkit.DynamicBytes;
+import org.httpkit.ws.WSEncoder;
+import org.httpkit.ws.WsServerAtta;
+import sun.misc.Unsafe;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Field;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.concurrent.atomic.AtomicReference;
 
-import org.httpkit.DynamicBytes;
-import org.httpkit.ws.WSEncoder;
-import org.httpkit.ws.WsServerAtta;
-
-import clojure.lang.IFn;
-import clojure.lang.Keyword;
+import static org.httpkit.HttpUtils.*;
+import static org.httpkit.server.ClojureRing.*;
+import static org.httpkit.ws.WSDecoder.*;
 
 @SuppressWarnings({"unchecked"})
 public class AsyncChannel {
+    static final Unsafe unsafe;
+    static final long closedRanOffset;
+    static final long closeHandlerOffset;
+    static final long receiveHandlerOffset;
+    static final long headerSentOffset;
+
     private final SelectionKey key;
     private final HttpServer server;
 
-    final public AtomicReference<Boolean> closedRan = new AtomicReference<Boolean>(false);
-    final AtomicReference<IFn> closeHandler = new AtomicReference<IFn>(null);
-
-    // websocket
-    final AtomicReference<IFn> receiveHandler = new AtomicReference<IFn>(null);
-
+    volatile int closedRan = 0; // 0 => false, 1 => run
     // streaming
-    private volatile boolean isHeaderSent = false;
+    private volatile int isHeaderSent = 0;
 
-    // messages sent from a websocket client should be handled orderly by server
+    volatile IFn closeHandler = null;
+    private volatile IFn receiveHandler = null;
+
+    static {
+        try {
+            // Unsafe instead of AtomicReference to save few bytes of RAM per connection
+            Field field = Unsafe.class.getDeclaredField("theUnsafe");
+            field.setAccessible(true);
+            unsafe = (Unsafe) field.get(null);
+
+            closedRanOffset = unsafe.objectFieldOffset(
+                    AsyncChannel.class.getDeclaredField("closedRan"));
+            closeHandlerOffset = unsafe.objectFieldOffset(
+                    AsyncChannel.class.getDeclaredField("closeHandler"));
+            receiveHandlerOffset = unsafe.objectFieldOffset(
+                    AsyncChannel.class.getDeclaredField("receiveHandler"));
+            headerSentOffset = unsafe.objectFieldOffset(
+                    AsyncChannel.class.getDeclaredField("isHeaderSent"));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+
+    // messages sent from a WebSocket client should be handled orderly by server
+    // Changed from a Single Thread(IO event thread), no volatile needed
     LinkingRunnable serialTask;
 
     public AsyncChannel(SelectionKey key, HttpServer server) {
@@ -44,11 +70,12 @@ public class AsyncChannel {
     }
 
     public void reset() {
-        closedRan.lazySet(false);
-        closeHandler.lazySet(null);
-        receiveHandler.lazySet(null);
-        isHeaderSent = false;
         serialTask = null;
+        unsafe.putOrderedInt(this, closedRanOffset, 0); // lazySet to false
+        unsafe.putOrderedInt(this, headerSentOffset, 0);
+
+        unsafe.putOrderedObject(this, closeHandlerOffset, null); // lazySet to null
+        unsafe.putOrderedObject(this, receiveHandlerOffset, null); // lazySet to null
     }
 
     private static final byte[] finalChunkBytes = "0\r\n\r\n".getBytes();
@@ -112,13 +139,13 @@ public class AsyncChannel {
     }
 
     public void setReceiveHandler(IFn fn) {
-        if (!receiveHandler.compareAndSet(null, fn)) {
-            throw new IllegalStateException("receive handler exist: " + receiveHandler.get());
+        if (!unsafe.compareAndSwapObject(this, receiveHandlerOffset, null, fn)) {
+            throw new IllegalStateException("receive handler exist: " + receiveHandler);
         }
     }
 
     public void messageReceived(final Object mesg) {
-        IFn f = receiveHandler.get();
+        IFn f = receiveHandler;
         if (f != null) {
             f.invoke(mesg); // byte[] or String
         }
@@ -129,17 +156,17 @@ public class AsyncChannel {
     }
 
     public void setCloseHandler(IFn fn) {
-        if (!closeHandler.compareAndSet(null, fn)) { // only once
-            throw new IllegalStateException("close handler exist: " + closeHandler.get());
+        if (!unsafe.compareAndSwapObject(this, closeHandlerOffset, null, fn)) { // only once
+            throw new IllegalStateException("close handler exist: " + closeHandler);
         }
-        if (closedRan.get()) { // no handler, but already closed
+        if (closedRan == 1) { // no handler, but already closed
             fn.invoke(K_UNKNOWN);
         }
     }
 
     public void onClose(int status) {
-        if (closedRan.compareAndSet(false, true)) {
-            IFn f = closeHandler.get();
+        if (unsafe.compareAndSwapInt(this, closedRanOffset, 0, 1)) {
+            IFn f = closeHandler;
             if (f != null) {
                 f.invoke(readable(status));
             }
@@ -148,16 +175,16 @@ public class AsyncChannel {
 
     // also sent CloseFrame a final Chunk
     public boolean serverClose(int status) {
-        if (!closedRan.compareAndSet(false, true)) {
+        if (!unsafe.compareAndSwapInt(this, closedRanOffset, 0, 1)) {
             return false; // already closed
         }
         if (isWebSocket()) {
             server.tryWrite(key, WSEncoder.encode(OPCODE_CLOSE, ByteBuffer.allocate(2)
-                        .putShort((short) status).array()));
+                    .putShort((short) status).array()));
         } else {
             server.tryWrite(key, ByteBuffer.wrap(finalChunkBytes));
         }
-        IFn f = closeHandler.get();
+        IFn f = closeHandler;
         if (f != null) {
             f.invoke(readable(0)); // server close is 0
         }
@@ -165,7 +192,7 @@ public class AsyncChannel {
     }
 
     public boolean send(Object data, boolean close) throws IOException {
-        if (closedRan.get()) {
+        if (closedRan == 1) {
             return false;
         }
 
@@ -193,10 +220,10 @@ public class AsyncChannel {
                 serverClose(1000);
             }
         } else {
-            if (isHeaderSent) {  // HTTP Streaming
+            if (isHeaderSent == 1) {  // HTTP Streaming
                 writeChunk(data, close);
             } else {
-                isHeaderSent = true;
+                isHeaderSent = 1;
                 firstWrite(data, close);
             }
         }
@@ -213,7 +240,7 @@ public class AsyncChannel {
     }
 
     public boolean isClosed() {
-        return closedRan.get();
+        return closedRan == 1;
     }
 
     static Keyword K_BY_SERVER = Keyword.intern("server-close");

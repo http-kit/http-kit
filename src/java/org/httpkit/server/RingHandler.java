@@ -1,21 +1,20 @@
 package org.httpkit.server;
 
-import static org.httpkit.HttpVersion.HTTP_1_0;
-import static org.httpkit.server.ClojureRing.*;
+import clojure.lang.IFn;
+import org.httpkit.HttpUtils;
+import org.httpkit.PrefixThreadFactory;
+import org.httpkit.ws.TextFrame;
+import org.httpkit.ws.WSFrame;
 
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.httpkit.HttpUtils;
-import org.httpkit.PrefixThreadFactory;
-import org.httpkit.ws.TextFrame;
-import org.httpkit.ws.WSFrame;
+import static org.httpkit.HttpVersion.HTTP_1_0;
+import static org.httpkit.server.ClojureRing.*;
 
-import clojure.lang.IFn;
-
-@SuppressWarnings({ "rawtypes", "unchecked" })
+@SuppressWarnings({"rawtypes", "unchecked"})
 class HttpHandler implements Runnable {
 
     final HttpRequest req;
@@ -75,7 +74,7 @@ class WSFrameHandler implements Runnable {
     @Override
     public void run() {
         try {
-            if(frame instanceof TextFrame) {
+            if (frame instanceof TextFrame) {
                 channel.messageReceived(((TextFrame) frame).getText());
             } else {
                 channel.messageReceived(frame.data);
@@ -135,9 +134,9 @@ public class RingHandler implements IHandler {
     }
 
     public void clientClose(final AsyncChannel channel, final int status) {
-        if (!channel.closedRan.get()) { // server did not close it first
+        if (channel.closedRan == 0) { // server did not close it first
             // has close handler, execute it in another thread
-            if (channel.closeHandler.get() != null) {
+            if (channel.closeHandler != null) {
                 try {
                     // no need to maintain order
                     execs.submit(new Runnable() {
@@ -153,8 +152,10 @@ public class RingHandler implements IHandler {
                     HttpUtils.printError("increase :queue-size if this happens often", e);
                 }
             } else {
-                // no close handler, just mark the connection as closed
-                channel.closedRan.set(false);
+                // no close handler, mark the connection as closed
+                // channel.closedRan = 1;
+                // lazySet
+                AsyncChannel.unsafe.putOrderedInt(channel, AsyncChannel.closedRanOffset, 1);
             }
         }
     }
