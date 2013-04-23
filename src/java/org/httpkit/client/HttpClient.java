@@ -1,14 +1,8 @@
 package org.httpkit.client;
 
-import static java.lang.System.currentTimeMillis;
-import static java.nio.channels.SelectionKey.OP_CONNECT;
-import static java.nio.channels.SelectionKey.OP_READ;
-import static java.nio.channels.SelectionKey.OP_WRITE;
-import static org.httpkit.HttpUtils.BUFFER_SIZE;
-import static org.httpkit.HttpUtils.SP;
-import static org.httpkit.HttpUtils.getServerAddr;
-import static org.httpkit.client.State.ALL_READ;
-import static org.httpkit.client.State.READ_INITIAL;
+import org.httpkit.*;
+import org.httpkit.PriorityQueue;
+import org.httpkit.ProtocolException;
 
 import java.io.IOException;
 import java.net.*;
@@ -20,9 +14,11 @@ import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.httpkit.*;
-import org.httpkit.PriorityQueue;
-import org.httpkit.ProtocolException;
+import static java.lang.System.currentTimeMillis;
+import static java.nio.channels.SelectionKey.*;
+import static org.httpkit.HttpUtils.*;
+import static org.httpkit.client.State.ALL_READ;
+import static org.httpkit.client.State.READ_INITIAL;
 
 public final class HttpClient implements Runnable {
     private static final AtomicInteger ID = new AtomicInteger(0);
@@ -82,11 +78,10 @@ public final class HttpClient implements Runnable {
 
     /**
      * tricky part
-     * 
+     * <p/>
      * http-kit think all connections are keep-alived (since some say it is, but
      * actually is not). but, some are not, http-kit pick them out **after the
      * fact** 1. the connection is resued 2. no data received
-     * 
      */
     private boolean cleanAndRetryIfBroken(SelectionKey key, Request req) {
         closeQuietly(key);
@@ -167,8 +162,8 @@ public final class HttpClient implements Runnable {
         }
     }
 
-    public void exec(String url, HttpMethod method, Map<String, Object> headers, Object body,
-            int timeoutMs, IRespListener cb) {
+    public void exec(String url, HttpMethod method, Map<String, Object> _headers, Object body,
+                     int timeoutMs, IRespListener cb) {
         URI uri;
         try {
             uri = new URI(url);
@@ -190,7 +185,7 @@ public final class HttpClient implements Runnable {
         }
 
         // copy to modify, normalize header
-        headers = HttpUtils.camelCase(headers);
+        HeaderMap headers = HeaderMap.camelCase(_headers);
         headers.put("Host", HttpUtils.getHost(uri));
         headers.put("Accept", "*/*");
 
@@ -214,8 +209,8 @@ public final class HttpClient implements Runnable {
         selector.wakeup();
     }
 
-    private ByteBuffer[] encode(HttpMethod method, Map<String, Object> headers, Object body,
-            URI uri) throws IOException {
+    private ByteBuffer[] encode(HttpMethod method, HeaderMap headers, Object body,
+                                URI uri) throws IOException {
         ByteBuffer bodyBuffer = HttpUtils.bodyBuffer(body);
 
         if (body != null) {
@@ -226,13 +221,13 @@ public final class HttpClient implements Runnable {
         DynamicBytes bytes = new DynamicBytes(196);
         bytes.append(method.toString()).append(SP).append(HttpUtils.getPath(uri));
         bytes.append(" HTTP/1.1\r\n");
-        HttpUtils.encodeHeaders(bytes, headers);
+        headers.encodeHeaders(bytes);
         ByteBuffer headBuffer = ByteBuffer.wrap(bytes.get(), 0, bytes.length());
 
         if (bodyBuffer == null) {
-            return new ByteBuffer[] { headBuffer };
+            return new ByteBuffer[]{headBuffer};
         } else {
-            return new ByteBuffer[] { headBuffer, bodyBuffer };
+            return new ByteBuffer[]{headBuffer, bodyBuffer};
         }
     }
 

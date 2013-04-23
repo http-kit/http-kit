@@ -1,8 +1,7 @@
 package org.httpkit;
 
-import static java.lang.Character.isWhitespace;
-import static java.lang.Math.min;
-import static java.net.InetAddress.getByName;
+import clojure.lang.ISeq;
+import clojure.lang.Seqable;
 
 import java.io.*;
 import java.net.*;
@@ -10,13 +9,14 @@ import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel.MapMode;
 import java.nio.charset.Charset;
-import java.util.*;
-import java.util.Map.Entry;
+import java.util.Date;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import clojure.lang.ISeq;
-import clojure.lang.Seqable;
+import static java.lang.Character.isWhitespace;
+import static java.lang.Math.min;
+import static java.net.InetAddress.getByName;
 
 public class HttpUtils {
 
@@ -70,38 +70,6 @@ public class HttpUtils {
     // space ' '
     public static final byte SP = 32;
 
-    public static void encodeHeaders(DynamicBytes bytes, Map<String, Object> headers) {
-        for (Entry<String, Object> e : headers.entrySet()) {
-            String k = e.getKey();
-            Object v = e.getValue();
-            if (v instanceof String) {
-                bytes.append(k);
-                bytes.append(COLON);
-                bytes.append(SP);
-                // supposed to be ISO-8859-1, but utf-8 is compatible.
-                // filename in Content-Disposition can be utf8
-                bytes.append((String) v, HttpUtils.UTF_8);
-                bytes.append(CR);
-                bytes.append(LF);
-                // ring spec says it could be a seq
-            } else if (v instanceof Seqable) {
-                ISeq seq = ((Seqable) v).seq();
-                while (seq != null) {
-                    bytes.append(k);
-                    bytes.append(COLON);
-                    bytes.append(SP);
-                    bytes.append(seq.first().toString(), HttpUtils.UTF_8);
-                    bytes.append(CR);
-                    bytes.append(LF);
-                    seq = seq.next();
-                }
-            }
-        }
-
-        bytes.append(CR);
-        bytes.append(LF);
-    }
-
     public static ByteBuffer bodyBuffer(Object body) throws IOException {
         if (body == null) {
             return null;
@@ -141,20 +109,20 @@ public class HttpUtils {
                 e = true;
             } else {
                 switch (c) {
-                case '"':
-                case '%':
-                case '<':
-                case '>':
-                case '\\':
-                case '^':
-                case '`':
-                case '{':
-                case '}':
-                case '|':
-                    e = true;
-                    break;
-                default:
-                    e = false;
+                    case '"':
+                    case '%':
+                    case '<':
+                    case '>':
+                    case '\\':
+                    case '^':
+                    case '`':
+                    case '{':
+                    case '}':
+                    case '|':
+                        e = true;
+                        break;
+                    default:
+                        e = false;
                 }
             }
             if (e) {
@@ -212,18 +180,6 @@ public class HttpUtils {
         } catch (Exception e) {
             throw new ProtocolException("Expect chunk size to be a number: " + hex);
         }
-    }
-
-    // HTTP header's key is Content-Type
-    public static Map<String, Object> camelCase(Map<String, Object> headers) {
-        TreeMap<String, Object> tmp = new TreeMap<String, Object>();
-
-        if (headers != null) {
-            for (Entry<String, Object> e : headers.entrySet()) {
-                tmp.put(HttpUtils.camelCase(e.getKey()), e.getValue());
-            }
-        }
-        return tmp;
     }
 
     // content-type => Content-Type

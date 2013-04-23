@@ -1,13 +1,13 @@
 package org.httpkit.server;
 
 import clojure.lang.IFn;
+import org.httpkit.HeaderMap;
 import org.httpkit.HttpUtils;
 import org.httpkit.PrefixThreadFactory;
 import org.httpkit.ws.TextFrame;
 import org.httpkit.ws.WSFrame;
 
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -31,16 +31,20 @@ class HttpHandler implements Runnable {
         try {
             Map resp = (Map) handler.invoke(buildRequestMap(req));
             if (resp == null) { // handler return null
-                cb.run(encode(404, null, null));
+                cb.run(encode(404, new HeaderMap(), null));
             } else {
                 Object body = resp.get(BODY);
                 if (!(body instanceof AsyncChannel)) { // hijacked
                     boolean addKeepalive = req.version == HTTP_1_0 && req.isKeepAlive;
-                    cb.run(encode(getStatus(resp), getHeaders(resp, addKeepalive), body));
+                    HeaderMap headers = HeaderMap.camelCase((Map) resp.get(HEADERS));
+                    if (req.version == HTTP_1_0 && req.isKeepAlive) {
+                        headers.put("Connection", "Keep-Alive");
+                    }
+                    cb.run(encode(getStatus(resp), headers, body));
                 }
             }
         } catch (Throwable e) {
-            cb.run(encode(500, new TreeMap<String, Object>(), e.getMessage()));
+            cb.run(encode(500, new HeaderMap(), e.getMessage()));
             HttpUtils.printError(req.method + " " + req.uri, e);
         }
     }
@@ -101,7 +105,7 @@ public class RingHandler implements IHandler {
             execs.submit(new HttpHandler(req, cb, handler));
         } catch (RejectedExecutionException e) {
             HttpUtils.printError("increase :queue-size if this happens often", e);
-            cb.run(encode(503, null, "Server is overloaded, please try later"));
+            cb.run(encode(503, new HeaderMap(), "Server is overloaded, please try later"));
         }
     }
 

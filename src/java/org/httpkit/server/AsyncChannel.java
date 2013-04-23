@@ -3,6 +3,7 @@ package org.httpkit.server;
 import clojure.lang.IFn;
 import clojure.lang.Keyword;
 import org.httpkit.DynamicBytes;
+import org.httpkit.HeaderMap;
 import org.httpkit.ws.WSEncoder;
 import org.httpkit.ws.WsServerAtta;
 import sun.misc.Unsafe;
@@ -15,7 +16,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.Map;
-import java.util.TreeMap;
 
 import static org.httpkit.HttpUtils.*;
 import static org.httpkit.server.ClojureRing.*;
@@ -90,12 +90,16 @@ public class AsyncChannel {
         ByteBuffer buffers[];
         int status = 200;
         Object body = data;
-        Map<String, Object> headers = new TreeMap<String, Object>();
+        HeaderMap headers;
+//        Map<String, Object> headers = new TreeMap<String, Object>();
         if (data instanceof Map) {
             Map<Keyword, Object> resp = (Map<Keyword, Object>) data;
-            headers = getHeaders(resp, false);
+            headers = HeaderMap.camelCase((Map) resp.get(HEADERS));
+//            headers = getHeaders(resp);
             status = getStatus(resp);
             body = resp.get(BODY);
+        } else {
+            headers = new HeaderMap();
         }
 
         if (headers.isEmpty()) { // default 200 and text/html
@@ -119,6 +123,7 @@ public class AsyncChannel {
         }
         server.tryWrite(key, buffers);
     }
+
 
     private void writeChunk(Object body, boolean close) throws IOException {
         if (body instanceof Map) { // only get body if a map
@@ -152,7 +157,8 @@ public class AsyncChannel {
     }
 
     public void sendHandshake(Map<String, Object> headers) {
-        server.tryWrite(key, encode(101, headers, null));
+        HeaderMap map = HeaderMap.camelCase(headers);
+        server.tryWrite(key, encode(101, map, null));
     }
 
     public void setCloseHandler(IFn fn) {

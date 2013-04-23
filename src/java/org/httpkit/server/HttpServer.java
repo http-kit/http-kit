@@ -1,11 +1,7 @@
 package org.httpkit.server;
 
-import static java.nio.channels.SelectionKey.OP_ACCEPT;
-import static java.nio.channels.SelectionKey.OP_READ;
-import static java.nio.channels.SelectionKey.OP_WRITE;
-import static org.httpkit.ws.CloseFrame.CLOSE_AWAY;
-import static org.httpkit.ws.CloseFrame.CLOSE_MESG_BIG;
-import static org.httpkit.ws.CloseFrame.CLOSE_NORMAL;
+import org.httpkit.*;
+import org.httpkit.ws.*;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -14,8 +10,8 @@ import java.nio.channels.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-import org.httpkit.*;
-import org.httpkit.ws.*;
+import static java.nio.channels.SelectionKey.*;
+import static org.httpkit.ws.CloseFrame.*;
 
 public class HttpServer implements Runnable {
 
@@ -101,10 +97,10 @@ public class HttpServer implements Runnable {
             closeKey(key, -1);
         } catch (RequestTooLargeException e) {
             atta.keepalive = false;
-            tryWrite(key, ClojureRing.encode(413, null, e.getMessage()));
+            tryWrite(key, ClojureRing.encode(413, new HeaderMap(), e.getMessage()));
         } catch (LineTooLargeException e) {
             atta.keepalive = false; // close after write
-            tryWrite(key, ClojureRing.encode(414, null, e.getMessage()));
+            tryWrite(key, ClojureRing.encode(414, new HeaderMap(), e.getMessage()));
         }
     }
 

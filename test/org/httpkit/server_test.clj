@@ -25,6 +25,19 @@
     {:status 200
      :body (FileInputStream. file)}))
 
+(defn many-headers-handler [req]
+  (let [count (or (-> req :params :count to-int) 20)]
+    {:status 200
+     :headers (into {} (map (fn [idx]
+                              [(str "key-" idx) (str "value-" idx)])
+                            (range 0 count)))}))
+
+(map (fn [idx]
+       [(str "key-" idx) (str "value-" idx)])
+     (range 0 10))
+
+;; (into {} [[1 2]])
+
 (defn multipart-handler [req]
   (let [{:keys [title file]} (:params req)]
     {:status 200
@@ -93,6 +106,7 @@
 (defroutes test-routes
   (GET "/" [] "hello world")
   (GET "/timeout" [] async-with-timeout)
+  (GET "/headers" [] many-headers-handler)
   (ANY "/spec" [] (fn [req] (pr-str (dissoc req :body :async-channel))))
   (GET "/string" [] (fn [req] {:status 200
                               :headers {"Content-Type" "text/plain"}
@@ -159,6 +173,11 @@
     (is (= (:status resp) 200))
     (is (= (get-in resp [:headers "content-type"]) "text/plain"))
     (is (= (:body resp) "Hello World"))))
+
+(deftest test-many-headers
+  (let [resp (http/get "http://localhost:4347/headers?count=51")]
+    (is (= (:status resp) 200))
+    (is (= (get-in resp [:headers "key-50"]) "value-50"))))
 
 (deftest test-body-file
   (doseq [length (range 1 (* 1024 1024 8) 1439987)]
