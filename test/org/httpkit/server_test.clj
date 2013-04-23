@@ -32,12 +32,6 @@
                               [(str "key-" idx) (str "value-" idx)])
                             (range 0 count)))}))
 
-(map (fn [idx]
-       [(str "key-" idx) (str "value-" idx)])
-     (range 0 10))
-
-;; (into {} [[1 2]])
-
 (defn multipart-handler [req]
   (let [{:keys [title file]} (:params req)]
     {:status 200
