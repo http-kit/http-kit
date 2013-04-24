@@ -13,11 +13,11 @@ import java.security.NoSuchAlgorithmException;
 
 public class HttpsRequest extends Request {
 
-    public static final SSLContext DEFAUTL_CONTEXT;
+    public static final SSLContext DEFAULT_CONTEXT;
 
     static {
         try {
-            DEFAUTL_CONTEXT = SSLContext.getDefault();
+            DEFAULT_CONTEXT = SSLContext.getDefault();
         } catch (NoSuchAlgorithmException e) {
             throw new Error("Failed to initialize SSLContext", e);
         }
@@ -31,8 +31,8 @@ public class HttpsRequest extends Request {
         this.engine = config.engine;
     }
 
-    private ByteBuffer myNetData = ByteBuffer.allocate(32 * 1024);
-    private ByteBuffer peerNetData = ByteBuffer.allocate(32 * 1024);
+    private ByteBuffer myNetData = ByteBuffer.allocate(48 * 1024);
+    private ByteBuffer peerNetData = ByteBuffer.allocate(48 * 1024);
 
     private static final ByteBuffer EMPTY_BUFFER = ByteBuffer.allocate(0);
     boolean handshaken = false;
@@ -47,14 +47,13 @@ public class HttpsRequest extends Request {
 
     final int unwrapRead(ByteBuffer peerAppData) throws IOException {
         // TODO, make sure peerNetData has remaing place
-        int read = ((SocketChannel) key.channel()).read(peerNetData);
+        int read = ((SocketChannel) key.channel()).read(peerNetData), unwrapped = 0;
         if (read > 0) {
             peerNetData.flip();
 //            log("--read peernet--", read, "bytes");
-            read = 0; // how many bytes produced
             SSLEngineResult res;
             while ((res = engine.unwrap(peerNetData, peerAppData)).getStatus() == Status.OK) {
-                read += res.bytesProduced();
+                unwrapped += res.bytesProduced();
                 if (!peerNetData.hasRemaining())
                     break;
             }
@@ -62,20 +61,23 @@ public class HttpsRequest extends Request {
             peerNetData.compact();
             switch (res.getStatus()) {
                 case OK:
-                case BUFFER_UNDERFLOW:
-                    return read;
+                case BUFFER_UNDERFLOW: // 0
+                    return unwrapped;
                 case CLOSED:
-                    return read > 0 ? read : -1;
-                case BUFFER_OVERFLOW:
+                    System.out.println("closed, unwrapped " + unwrapped);
+                    return unwrapped > 0 ? unwrapped : -1;
+                case BUFFER_OVERFLOW: // can't => peerAppData is 64k
                     System.out.println("unwrapRead--------overflow-----------------");
                     // TODO Overflow, need large buffer
                     return -1;
             }
+            return unwrapped;
+        } else {
+            return read;
         }
-        return read;
     }
 
-    private final void wrap() throws SSLException {
+    private final void wrapRequest() throws SSLException {
         myNetData.clear();
         SSLEngineResult res = engine.wrap(request, myNetData);
         if (res.getStatus() != Status.OK) {
@@ -84,11 +86,11 @@ public class HttpsRequest extends Request {
         myNetData.flip();
     }
 
-    final void writeWrapped() throws IOException {
+    final void writeWrappedRequest() throws IOException {
         if (myNetData.hasRemaining()) {
             ((SocketChannel) key.channel()).write(myNetData);
         } else if (request[request.length - 1].hasRemaining()) {
-            wrap();
+            wrapRequest();
             ((SocketChannel) key.channel()).write(myNetData);
         }
         if (myNetData.hasRemaining() || request[request.length - 1].hasRemaining()) {
@@ -125,9 +127,8 @@ public class HttpsRequest extends Request {
                         peerNetData.compact();
                         log("--hs unwrap--", res);
                         switch (res.getStatus()) {
-                            // OK, BUFFER_OVERFLOW
-                            case BUFFER_OVERFLOW:
-                                System.out.println("-----------");
+                            case BUFFER_OVERFLOW: // Not possible, peerAppData is 64k
+                                System.out.println("---handshake overflow-----------");
                                 break;
                             case CLOSED:
                                 return -1;
@@ -140,7 +141,7 @@ public class HttpsRequest extends Request {
                     break;
                 case NEED_WRAP:
                     SSLEngineResult res = engine.wrap(EMPTY_BUFFER, myNetData);
-                    log("--hs wrap--: ", res);
+                    log("--hs wrapRequest--: ", res);
                     myNetData.flip();
                     ((SocketChannel) key.channel()).write(myNetData);
                     if (myNetData.hasRemaining()) {
@@ -157,8 +158,8 @@ public class HttpsRequest extends Request {
                     || hs == SSLEngineResult.HandshakeStatus.FINISHED;
             log("--hs--", hs, handshaken);
             if (handshaken) {
-                wrap();
-                writeWrapped(); // TCP buffer maybe empty this time
+                wrapRequest();
+                writeWrappedRequest(); // TCP buffer maybe empty this time
             }
         }
         return 0;
@@ -168,6 +169,6 @@ public class HttpsRequest extends Request {
         super.recycle(old);
         this.engine = ((HttpsRequest) old).engine;
         this.handshaken = true;
-        wrap(); // prepare for write
+        wrapRequest(); // prepare for write
     }
 }

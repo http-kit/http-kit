@@ -225,12 +225,12 @@
     (when (string? body)
       (info status url " time" (str e "ms") "length: " (count body)))
     (when error
-      (warn url error))))
+      (warn error url))))
 
 (defn- get-url [url]
   (let [s (System/currentTimeMillis)
         options {:request-start-time (System/currentTimeMillis)
-                 :timeout 1000
+                 :timeout 5000
                  :filter (http/max-body-filter 4194304)
                  :user-agent chrome}]
     (http/get url options callback)))
@@ -244,16 +244,3 @@
 (defn -main [& args]
   (let [urls (shuffle (set (line-seq (io/reader "/tmp/urls"))))]
     (doall (map-indexed fetch-group-urls (partition 1000 urls)))))
-
-(defn handler [req]
-  {:status 200
-   :headers {}
-   :body "hello world"})
-
-(defn star-test []
-  (let [a (run-jetty handler {:ssl-port 9898
-                              :ssl? true
-                              :port 9897
-                              ;; :join? false
-                              :keystore "/tmp/testkeys"
-                              :key-password "123456"})]))

@@ -76,11 +76,12 @@ public final class HttpClient implements Runnable {
     }
 
     /**
-     * tricky part
-     * <p/>
      * http-kit think all connections are keep-alived (since some say it is, but
-     * actually is not). but, some are not, http-kit pick them out **after the
-     * fact** 1. the connection is resued 2. no data received
+     * actually is not). but, some are not, http-kit pick them out after the fact
+     * <ol>
+     * <li>The connection is reused</li>
+     * <li>No data received</li>
+     * </ol>
      */
     private boolean cleanAndRetryIfBroken(SelectionKey key, Request req) {
         closeQuietly(key);
@@ -94,8 +95,7 @@ public final class HttpClient implements Runnable {
             requests.remove(req); // remove from timeout queue
             pending.offer(req); // queue for retry
             selector.wakeup();
-            // retry (re-open a connection to server, sent the request again)
-            return true;
+            return true; // retry: re-open a connection to server, sent the request again
         }
         return false;
     }
@@ -123,6 +123,10 @@ public final class HttpClient implements Runnable {
                 // os X get Connection reset by peer error,
                 req.finish(e);
             }
+            // java.security.InvalidAlgorithmParameterException: Prime size must be multiple of 64, and can only range from 512 to 1024 (inclusive)
+            // java.lang.RuntimeException: Could not generate DH keypair
+        } catch (Exception e) {
+            req.finish(e);
         }
 
         if (read == -1) { // read all, remote closed it cleanly
@@ -166,7 +170,7 @@ public final class HttpClient implements Runnable {
                 int b = ((HttpsRequest) req).doHandshake(buffer);
 //                if(b < 0)
             } else if (https) {
-                ((HttpsRequest) req).writeWrapped();
+                ((HttpsRequest) req).writeWrappedRequest();
             } else {
                 ByteBuffer[] request = req.request;
                 ch.write(request);

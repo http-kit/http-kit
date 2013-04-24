@@ -5,6 +5,7 @@ import org.httpkit.HttpMethod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.net.ssl.SSLEngine;
 import java.io.IOException;
 import java.util.Map;
 import java.util.TreeMap;
@@ -37,7 +38,9 @@ public class HttpsClientTest {
         ExecutorService pool = Executors.newCachedThreadPool();
         for (String url : urls) {
             final CountDownLatch cd = new CountDownLatch(1);
-            HttpRequestConfig cfg = new HttpRequestConfig(HttpMethod.GET, 10000, -1, SslContextFactory.getClientContext().createSSLEngine());
+            SSLEngine engine = SslContextFactory.getClientContext().createSSLEngine();
+            engine = null;
+            HttpRequestConfig cfg = new HttpRequestConfig(HttpMethod.GET, 10000, -1, engine);
             client.exec(url, new TreeMap<String, Object>(), null, cfg, new RespListener(new IResponseHandler() {
                 public void onSuccess(int status, Map<String, String> headers, Object body) {
                     int length = body instanceof String ? ((String) body).length() :
