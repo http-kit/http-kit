@@ -1,19 +1,19 @@
 package org.httpkit.server;
 
-import static clojure.lang.Keyword.intern;
-import static org.httpkit.HttpUtils.*;
+import clojure.lang.IPersistentMap;
+import clojure.lang.Keyword;
+import clojure.lang.PersistentArrayMap;
+import org.httpkit.DynamicBytes;
+import org.httpkit.HeaderMap;
+import org.httpkit.HttpStatus;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
-import org.httpkit.DynamicBytes;
-import org.httpkit.HttpStatus;
-
-import clojure.lang.IPersistentMap;
-import clojure.lang.Keyword;
-import clojure.lang.PersistentArrayMap;
+import static clojure.lang.Keyword.intern;
+import static org.httpkit.HttpUtils.*;
 
 //  SimpleDateFormat is not thread safe
 class DateFormatter extends ThreadLocal<SimpleDateFormat> {
@@ -31,7 +31,7 @@ class DateFormatter extends ThreadLocal<SimpleDateFormat> {
     }
 }
 
-@SuppressWarnings({ "rawtypes", "unchecked" })
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class ClojureRing {
 
     public static final Keyword SERVER_PORT = intern("server-port");
@@ -64,29 +64,10 @@ public class ClojureRing {
         return status;
     }
 
-    public static Map<String, Object> getHeaders(final Map resp, final boolean addKeepalive) {
-        Map<String, Object> headers = (Map) resp.get(HEADERS);
-        // copy to modify
-        if (headers == null) {
-            headers = new TreeMap<String, Object>();
-        } else {
-            headers = new TreeMap<String, Object>(headers);
-        }
-        if (addKeepalive) {
-            headers.put("Connection", "Keep-Alive");
-        }
-        return headers;
-    }
-
     public static final String CL = "Content-Length";
 
-    public static ByteBuffer[] encode(int status, Map<String, Object> headers, Object body) {
-        headers = camelCase(headers);
-        headers.put("Server", "http-kit");
-        // rfc says the header is needed
-        headers.put("Date", DateFormatter.getDate());
+    public static ByteBuffer[] encode(int status, HeaderMap headers, Object body) {
         ByteBuffer bodyBuffer;
-
         try {
             bodyBuffer = bodyBuffer(body);
             // only write length if not chunked
@@ -104,17 +85,19 @@ public class ClojureRing {
             headers.put(CL, Integer.toString(b.length));
             bodyBuffer = ByteBuffer.wrap(b);
         }
+        headers.put("Server", "http-kit");
+        headers.put("Date", DateFormatter.getDate()); // rfc says the Date is needed
 
         DynamicBytes bytes = new DynamicBytes(196);
         byte[] bs = HttpStatus.valueOf(status).getInitialLineBytes();
         bytes.append(bs, bs.length);
-        encodeHeaders(bytes, headers);
+        headers.encodeHeaders(bytes);
         ByteBuffer headBuffer = ByteBuffer.wrap(bytes.get(), 0, bytes.length());
 
         if (bodyBuffer != null)
-            return new ByteBuffer[] { headBuffer, bodyBuffer };
+            return new ByteBuffer[]{headBuffer, bodyBuffer};
         else
-            return new ByteBuffer[] { headBuffer };
+            return new ByteBuffer[]{headBuffer};
     }
 
     public static IPersistentMap buildRequestMap(HttpRequest req) {

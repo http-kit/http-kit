@@ -101,10 +101,10 @@ public class HttpServer implements Runnable {
             closeKey(key, -1);
         } catch (RequestTooLargeException e) {
             atta.keepalive = false;
-            tryWrite(key, ClojureRing.encode(413, null, e.getMessage()));
+            tryWrite(key, ClojureRing.encode(413, new HeaderMap(), e.getMessage()));
         } catch (LineTooLargeException e) {
             atta.keepalive = false; // close after write
-            tryWrite(key, ClojureRing.encode(414, null, e.getMessage()));
+            tryWrite(key, ClojureRing.encode(414, new HeaderMap(), e.getMessage()));
         }
     }
 

@@ -75,7 +75,7 @@ public class HttpRequest {
     public void setHeaders(Map<String, String> headers) {
         String h = headers.get("host");
         if (h != null) {
-            int idx = h.indexOf(':');
+            int idx = h.lastIndexOf(':');
             if (idx != -1) {
                 this.serverName = h.substring(0, idx);
                 serverPort = Integer.valueOf(h.substring(idx + 1));

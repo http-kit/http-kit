@@ -35,6 +35,12 @@ public class DynamicBytes {
         return this;
     }
 
+    public void append(byte b1, byte b2) {
+        expandIfNeeded(2);
+        data[idx++] = b1;
+        data[idx++] = b2;
+    }
+
     @Override
     public String toString() {
         return "DynamicBytes[len=" + idx + ", cap=" + data.length + ']';

@@ -1,21 +1,20 @@
 package org.httpkit.server;
 
-import static org.httpkit.HttpVersion.HTTP_1_0;
-import static org.httpkit.server.ClojureRing.*;
-
-import java.util.Map;
-import java.util.TreeMap;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicReference;
-
+import clojure.lang.IFn;
+import org.httpkit.HeaderMap;
 import org.httpkit.HttpUtils;
 import org.httpkit.PrefixThreadFactory;
 import org.httpkit.ws.TextFrame;
 import org.httpkit.ws.WSFrame;
 
-import clojure.lang.IFn;
+import java.util.Map;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicReference;
 
-@SuppressWarnings({ "rawtypes", "unchecked" })
+import static org.httpkit.HttpVersion.HTTP_1_0;
+import static org.httpkit.server.ClojureRing.*;
+
+@SuppressWarnings({"rawtypes", "unchecked"})
 class HttpHandler implements Runnable {
 
     final HttpRequest req;
@@ -32,16 +31,20 @@ class HttpHandler implements Runnable {
         try {
             Map resp = (Map) handler.invoke(buildRequestMap(req));
             if (resp == null) { // handler return null
-                cb.run(encode(404, null, null));
+                cb.run(encode(404, new HeaderMap(), null));
             } else {
                 Object body = resp.get(BODY);
                 if (!(body instanceof AsyncChannel)) { // hijacked
                     boolean addKeepalive = req.version == HTTP_1_0 && req.isKeepAlive;
-                    cb.run(encode(getStatus(resp), getHeaders(resp, addKeepalive), body));
+                    HeaderMap headers = HeaderMap.camelCase((Map) resp.get(HEADERS));
+                    if (req.version == HTTP_1_0 && req.isKeepAlive) {
+                        headers.put("Connection", "Keep-Alive");
+                    }
+                    cb.run(encode(getStatus(resp), headers, body));
                 }
             }
         } catch (Throwable e) {
-            cb.run(encode(500, new TreeMap<String, Object>(), e.getMessage()));
+            cb.run(encode(500, new HeaderMap(), e.getMessage()));
             HttpUtils.printError(req.method + " " + req.uri, e);
         }
     }
@@ -75,7 +78,7 @@ class WSFrameHandler implements Runnable {
     @Override
     public void run() {
         try {
-            if(frame instanceof TextFrame) {
+            if (frame instanceof TextFrame) {
                 channel.messageReceived(((TextFrame) frame).getText());
             } else {
                 channel.messageReceived(frame.data);
@@ -102,7 +105,7 @@ public class RingHandler implements IHandler {
             execs.submit(new HttpHandler(req, cb, handler));
         } catch (RejectedExecutionException e) {
             HttpUtils.printError("increase :queue-size if this happens often", e);
-            cb.run(encode(503, null, "Server is overloaded, please try later"));
+            cb.run(encode(503, new HeaderMap(), "Server is overloaded, please try later"));
         }
     }
 
@@ -135,9 +138,9 @@ public class RingHandler implements IHandler {
     }
 
     public void clientClose(final AsyncChannel channel, final int status) {
-        if (!channel.closedRan.get()) { // server did not close it first
+        if (channel.closedRan == 0) { // server did not close it first
             // has close handler, execute it in another thread
-            if (channel.closeHandler.get() != null) {
+            if (channel.closeHandler != null) {
                 try {
                     // no need to maintain order
                     execs.submit(new Runnable() {
@@ -153,8 +156,10 @@ public class RingHandler implements IHandler {
                     HttpUtils.printError("increase :queue-size if this happens often", e);
                 }
             } else {
-                // no close handler, just mark the connection as closed
-                channel.closedRan.set(false);
+                // no close handler, mark the connection as closed
+                // channel.closedRan = 1;
+                // lazySet
+                AsyncChannel.unsafe.putOrderedInt(channel, AsyncChannel.closedRanOffset, 1);
             }
         }
     }

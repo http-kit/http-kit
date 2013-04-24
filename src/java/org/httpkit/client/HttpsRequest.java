@@ -1,16 +1,15 @@
 package org.httpkit.client;
 
+import org.httpkit.PriorityQueue;
+
+import javax.net.ssl.*;
+import javax.net.ssl.SSLEngineResult.Status;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.security.NoSuchAlgorithmException;
-
-import javax.net.ssl.*;
-import javax.net.ssl.SSLEngineResult.Status;
-
-import org.httpkit.PriorityQueue;
 
 public class HttpsRequest extends Request {
 
@@ -138,6 +137,7 @@ public class HttpsRequest extends Request {
                         }
                         // do not flip to write here, since TCP buffer is writable
                     }
+                    break;
                 case NEED_WRAP:
                     SSLEngineResult res = engine.wrap(EMPTY_BUFFER, myNetData);
                     log("--hs wrap--: ", res);

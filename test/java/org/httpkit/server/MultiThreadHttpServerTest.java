@@ -2,11 +2,10 @@ package org.httpkit.server;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Map;
-import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import org.httpkit.HeaderMap;
 import org.httpkit.ws.TextFrame;
 import org.httpkit.ws.WSFrame;
 
@@ -30,7 +29,7 @@ class MultiThreadHandler implements IHandler {
     public void handle(HttpRequest request, final ResponseCallback callback) {
         exec.submit(new Runnable() {
             public void run() {
-                Map<String, Object> header = new TreeMap<String, Object>();
+                HeaderMap header = new HeaderMap();
                 header.put("Connection", "Keep-Alive");
                 ByteBuffer[] bytes = ClojureRing.encode(200, header, SingleThreadHandler.body);
                 callback.run(bytes);
