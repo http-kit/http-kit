@@ -104,24 +104,22 @@ public final class HttpClient implements Runnable {
         Request req = (Request) key.attachment();
         SocketChannel ch = (SocketChannel) key.channel();
         int read = 0;
-        boolean https = req instanceof HttpsRequest;
         try {
-            if (https && !((HttpsRequest) req).handshaken) {
-                // TODO when read < 0, it's an error
-                buffer.clear();
-                read = ((HttpsRequest) req).doHandshake(buffer);
-                return;
-            } else if (https) {
-                buffer.clear();
-                read = ((HttpsRequest) req).unwrapRead(buffer);
+            buffer.clear();
+            if (req instanceof HttpsRequest) {
+                HttpsRequest httpsReq = (HttpsRequest) req;
+                if (httpsReq.handshaken) {
+                    // SSLEngine closed => fine, will return -1 in the next run
+                    read = httpsReq.unwrapRead(buffer);
+                } else {
+                    read = httpsReq.doHandshake(buffer);
+                }
             } else {
-                buffer.clear();
                 read = ch.read(buffer);
             }
         } catch (IOException e) { // The remote forcibly closed the connection
             if (!cleanAndRetryIfBroken(key, req)) {
-                // os X get Connection reset by peer error,
-                req.finish(e);
+                req.finish(e); // os X get Connection reset by peer error,
             }
             // java.security.InvalidAlgorithmParameterException: Prime size must be multiple of 64, and can only range from 512 to 1024 (inclusive)
             // java.lang.RuntimeException: Could not generate DH keypair
@@ -148,7 +146,7 @@ public final class HttpClient implements Runnable {
             } catch (Exception e) {
                 closeQuietly(key);
                 req.finish(e);
-                HttpUtils.printError("Should not happen!!", e); // decoding
+                HttpUtils.printError("should not happen", e); // decoding
             }
         }
     }
@@ -163,18 +161,22 @@ public final class HttpClient implements Runnable {
     private void doWrite(SelectionKey key) {
         Request req = (Request) key.attachment();
         SocketChannel ch = (SocketChannel) key.channel();
-        boolean https = req instanceof HttpsRequest;
         try {
-            if (https && !((HttpsRequest) req).handshaken) {
-                buffer.clear();
-                int b = ((HttpsRequest) req).doHandshake(buffer);
-//                if(b < 0)
-            } else if (https) {
-                ((HttpsRequest) req).writeWrappedRequest();
+            if (req instanceof HttpsRequest) {
+                HttpsRequest httpsReq = (HttpsRequest) req;
+                if (httpsReq.handshaken) {
+                    // will flip to OP_READ
+                    httpsReq.writeWrappedRequest();
+                } else {
+                    buffer.clear();
+                    if (httpsReq.doHandshake(buffer) < 0) {
+                        req.finish(); // will be a No status exception
+                    }
+                }
             } else {
-                ByteBuffer[] request = req.request;
-                ch.write(request);
-                if (!request[request.length - 1].hasRemaining()) {
+                ByteBuffer[] buffers = req.request;
+                ch.write(buffers);
+                if (!buffers[buffers.length - 1].hasRemaining()) {
                     key.interestOps(OP_READ);
                 }
             }
@@ -182,11 +184,13 @@ public final class HttpClient implements Runnable {
             if (!cleanAndRetryIfBroken(key, req)) {
                 req.finish(e);
             }
+        } catch (Exception e) { // rarely happen
+            req.finish(e);
         }
     }
 
     public void exec(String url, Map<String, Object> _headers, Object body,
-                     HttpRequestConfig cfg, IRespListener cb) {
+                     RequestConfig cfg, IRespListener cb) {
         URI uri;
         try {
             uri = new URI(url);
@@ -214,7 +218,7 @@ public final class HttpClient implements Runnable {
         headers.put("Accept", "*/*");
 
         if (!headers.containsKey("User-Agent")) // allow override
-            headers.put("User-Agent", HttpRequestConfig.DEFAULT_USER_AGENT); // default
+            headers.put("User-Agent", RequestConfig.DEFAULT_USER_AGENT); // default
         if (!headers.containsKey("Accept-Encoding"))
             headers.put("Accept-Encoding", "gzip, deflate"); // compression is good
 
@@ -278,7 +282,6 @@ public final class HttpClient implements Runnable {
     private void processPending() {
         Request job = null;
         while ((job = pending.poll()) != null) {
-//            System.out.println(job);
             if (job.cfg.keepAlive > 0) {
                 PersistentConn con = keepalives.remove(job.addr);
                 if (con != null) { // keep alive

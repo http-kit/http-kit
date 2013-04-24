@@ -88,7 +88,7 @@ public class HttpClientTest {
     }
 
     public void get(String url) throws URISyntaxException {
-        client.exec(url,emptyHeader, null, new HttpRequestConfig(), listener);
+        client.exec(url,emptyHeader, null, new RequestConfig(), listener);
     }
 
     @Test

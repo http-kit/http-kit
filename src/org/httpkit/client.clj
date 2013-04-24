@@ -1,8 +1,8 @@
 (ns org.httpkit.client
   (:refer-clojure :exclude [get])
   (:require [clojure.string :as str])
-  (:import [org.httpkit.client HttpRequestConfig HttpClient
-            IResponseHandler RespListener IFilter MaxBodyFilter]
+  (:import [org.httpkit.client HttpClient IResponseHandler RespListener
+            IFilter MaxBodyFilter RequestConfig]
            [org.httpkit HttpMethod PrefixThreadFactory HttpUtils]
            [java.util.concurrent ThreadPoolExecutor LinkedBlockingQueue TimeUnit]
            [java.net URI URLEncoder]
@@ -119,7 +119,7 @@
                   (onThrowable [this t]
                     (deliver-resp {:opts opts :error t})))
         listener (RespListener. handler filter worker-pool)
-        cfg (HttpRequestConfig. method timeout keepalive sslengine)]
+        cfg (RequestConfig. method timeout keepalive sslengine)]
     (.exec ^HttpClient client url headers body cfg listener)
     response))
 

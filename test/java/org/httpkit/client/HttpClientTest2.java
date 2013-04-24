@@ -34,7 +34,7 @@ public class HttpClientTest2 {
             };
 
             httpClient.exec("http://wc31415.blogcn.com/articles/%E4%B8%8A%E3%80%8A%E4%B8%AD%E5%9B%BD%E9%9D%92%E5%B9%B4%E6%8A%A5%E3%80%8B%E4%BA%86%EF%BC%8C%E5%A5%BD%E5%83%8F%E6%98%AF%E4%B8%AA%E5%A4%A7%E6%8A%A5%E3%80%82.html",
-                    null, null, new HttpRequestConfig(), new RespListener(handler,
+                    null, null, new RequestConfig(), new RespListener(handler,
                     IFilter.ACCEPT_ALL, pool));
             System.out.println("-----------------------");
             c.await();

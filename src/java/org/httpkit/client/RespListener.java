@@ -1,6 +1,6 @@
 package org.httpkit.client;
 
-import static org.httpkit.HttpUtils.CONTENT_ENCODING;
+import org.httpkit.*;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -12,7 +12,7 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.Inflater;
 import java.util.zip.InflaterInputStream;
 
-import org.httpkit.*;
+import static org.httpkit.HttpUtils.CONTENT_ENCODING;
 
 class Handler implements Runnable {
 
@@ -23,7 +23,7 @@ class Handler implements Runnable {
     private final IResponseHandler handler;
 
     public Handler(IResponseHandler handler, int status, Map<String, String> headers,
-            Object body, Throwable e) {
+                   Object body, Throwable e) {
         this.status = status;
         this.headers = headers;
         this.body = body;
@@ -36,7 +36,7 @@ class Handler implements Runnable {
     }
 
     public Handler(IResponseHandler handler, int status, Map<String, String> headers,
-            Object body) {
+                   Object body) {
         this(handler, status, headers, body, null);
     }
 

@@ -40,7 +40,7 @@ public class HttpsClientTest {
             final CountDownLatch cd = new CountDownLatch(1);
             SSLEngine engine = SslContextFactory.getClientContext().createSSLEngine();
             engine = null;
-            HttpRequestConfig cfg = new HttpRequestConfig(HttpMethod.GET, 10000, -1, engine);
+            RequestConfig cfg = new RequestConfig(HttpMethod.GET, 10000, -1, engine);
             client.exec(url, new TreeMap<String, Object>(), null, cfg, new RespListener(new IResponseHandler() {
                 public void onSuccess(int status, Map<String, String> headers, Object body) {
                     int length = body instanceof String ? ((String) body).length() :

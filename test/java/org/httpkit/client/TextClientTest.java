@@ -60,7 +60,7 @@ public class TextClientTest {
                     System.out.println(body);
                 }
             };
-            client.exec(url, null, null, new HttpRequestConfig(), new RespListener(handler,
+            client.exec(url, null, null, new RequestConfig(), new RespListener(handler,
                     IFilter.ACCEPT_ALL, pool));
         }
 

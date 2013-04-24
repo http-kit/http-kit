@@ -6,7 +6,7 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 import java.security.NoSuchAlgorithmException;
 
-public class HttpRequestConfig {
+public class RequestConfig {
     public static final SSLContext DEFAUTL_CONTEXT;
 
     static {
@@ -24,7 +24,7 @@ public class HttpRequestConfig {
 
     public static String  DEFAULT_USER_AGENT = "http-kit/2.0";
 
-    public HttpRequestConfig(HttpMethod method, int timeoutMs, int keepAliveMs, SSLEngine engine) {
+    public RequestConfig(HttpMethod method, int timeoutMs, int keepAliveMs, SSLEngine engine) {
         if (engine == null) {
             engine = DEFAUTL_CONTEXT.createSSLEngine();
         }
@@ -35,7 +35,7 @@ public class HttpRequestConfig {
         this.method = method;
     }
 
-    public HttpRequestConfig() { // for easy test only
+    public RequestConfig() { // for easy test only
         this(HttpMethod.GET, 40000, -1, null);
     }
 }

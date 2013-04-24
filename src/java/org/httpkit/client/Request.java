@@ -1,33 +1,31 @@
 package org.httpkit.client;
 
-import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
-import java.nio.channels.SelectionKey;
-
 import org.httpkit.PriorityQueue;
 
 import javax.net.ssl.SSLException;
+import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.channels.SelectionKey;
 
 public class Request implements Comparable<Request> {
 
     final InetSocketAddress addr;
     final Decoder decoder;
     final ByteBuffer[] request; // HTTP request
-    final HttpRequestConfig cfg;
+    final RequestConfig cfg;
     private final PriorityQueue<Request> clients; // update timeout
 
     // is modify from the loop thread. ensure only called once
     private boolean isDone = false;
 
-    public boolean isReuseConn = false; // a reused socket sent the request
-    public boolean isConnected = false;
-
+    boolean isReuseConn = false; // a reused socket sent the request
+    boolean isConnected = false;
     SelectionKey key; // for timeout, close connection
 
     private long timeoutTs; // future time this request timeout, ms
 
     public Request(InetSocketAddress addr, ByteBuffer[] request, IRespListener handler,
-                   PriorityQueue<Request> clients, HttpRequestConfig config) {
+                   PriorityQueue<Request> clients, RequestConfig config) {
         this.cfg = config;
         this.decoder = new Decoder(handler, config.method);
         this.request = request;
@@ -37,10 +35,12 @@ public class Request implements Comparable<Request> {
     }
 
     public void onProgress(long now) {
-        // update time
-        clients.remove(this);
-        timeoutTs = cfg.timeout + now;
-        clients.offer(this);
+        if (cfg.timeout + now - timeoutTs > 800) {
+            // update time
+            clients.remove(this);
+            timeoutTs = cfg.timeout + now;
+            clients.offer(this);
+        }
     }
 
     public void finish() {
