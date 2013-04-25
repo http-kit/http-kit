@@ -1,15 +1,13 @@
 package org.httpkit.server;
 
-import static org.httpkit.HttpUtils.CHARSET;
-import static org.httpkit.HttpUtils.CONNECTION;
-import static org.httpkit.HttpUtils.CONTENT_TYPE;
-import static org.httpkit.HttpVersion.HTTP_1_1;
+import org.httpkit.*;
 
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.util.Map;
 
-import org.httpkit.*;
+import static org.httpkit.HttpUtils.*;
+import static org.httpkit.HttpVersion.HTTP_1_1;
 
 public class HttpRequest {
     public final String queryString;
@@ -28,7 +26,7 @@ public class HttpRequest {
     String charset = "utf8";
     boolean isKeepAlive = false;
     boolean isWebSocket = false;
-    
+
     InetSocketAddress remoteAddr;
     AsyncChannel channel;
 

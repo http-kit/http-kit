@@ -1,12 +1,10 @@
 package org.httpkit.timer;
 
-import java.util.concurrent.atomic.AtomicBoolean;
-
+import clojure.lang.IFn;
 import org.httpkit.HttpUtils;
 import org.httpkit.PriorityQueue;
 
-
-import clojure.lang.IFn;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class TimerService implements Runnable {
 

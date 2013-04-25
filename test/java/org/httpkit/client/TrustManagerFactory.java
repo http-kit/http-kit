@@ -1,13 +1,6 @@
 package org.httpkit.client;
 
-/**
- * copy from netty
- */
-
-import javax.net.ssl.ManagerFactoryParameters;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.TrustManagerFactorySpi;
-import javax.net.ssl.X509TrustManager;
+import javax.net.ssl.*;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
@@ -22,18 +15,18 @@ public class TrustManagerFactory extends TrustManagerFactorySpi {
         }
 
         public void checkClientTrusted(X509Certificate[] chain,
-                String authType) throws CertificateException {
+                                       String authType) throws CertificateException {
             // Always trust
         }
 
         public void checkServerTrusted(X509Certificate[] chain,
-                String authType) throws CertificateException {
+                                       String authType) throws CertificateException {
             // Always trust
         }
     };
 
     public static TrustManager[] getTrustManagers() {
-        return new TrustManager[] { DUMMY_TRUST_MANAGER };
+        return new TrustManager[]{DUMMY_TRUST_MANAGER};
     }
 
     @Override

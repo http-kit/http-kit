@@ -6,8 +6,9 @@ import java.util.Queue;
 /**
  * Copy and modified from java.util.PriorityQueue. Remove unused method. Modify
  * {@code remove} to return the removed element
- * 
+ * <p/>
  * used by timer and the client
+ *
  * @param <E>
  */
 @SuppressWarnings("unchecked")
@@ -34,10 +35,10 @@ public class PriorityQueue<E> {
      * Creates a {@code PriorityQueue} with the specified initial capacity that
      * orders its elements according to their {@linkplain Comparable natural
      * ordering}.
+     * <p/>
+     * the initial capacity for this priority queue
      *
-     *            the initial capacity for this priority queue
-     * @throws IllegalArgumentException
-     *             if {@code initialCapacity} is less than 1
+     * @throws IllegalArgumentException if {@code initialCapacity} is less than 1
      */
     public PriorityQueue() {
         this.queue = new Object[DEFAULT_INITIAL_CAPACITY];
@@ -52,9 +53,8 @@ public class PriorityQueue<E> {
 
     /**
      * Increases the capacity of the array.
-     * 
-     * @param minCapacity
-     *            the desired minimum capacity
+     *
+     * @param minCapacity the desired minimum capacity
      */
     private void grow(int minCapacity) {
         int oldCapacity = queue.length;
@@ -75,14 +75,12 @@ public class PriorityQueue<E> {
 
     /**
      * Inserts the specified element into this priority queue.
-     * 
+     *
      * @return {@code true} (as specified by {@link Queue#offer})
-     * @throws ClassCastException
-     *             if the specified element cannot be compared with elements
-     *             currently in this priority queue according to the priority
-     *             queue's ordering
-     * @throws NullPointerException
-     *             if the specified element is null
+     * @throws ClassCastException   if the specified element cannot be compared with elements
+     *                              currently in this priority queue according to the priority
+     *                              queue's ordering
+     * @throws NullPointerException if the specified element is null
      */
     public boolean offer(E e) {
         if (e == null)
@@ -101,7 +99,7 @@ public class PriorityQueue<E> {
     /**
      * Retrieves, but does not remove, the head of this queue, or returns null
      * if this queue is empty.
-     * 
+     *
      * @return
      */
     public E peek() {
@@ -116,9 +114,8 @@ public class PriorityQueue<E> {
      * {@code o.equals(e)}, if this queue contains one or more such elements.
      * Returns {@code true} if and only if this queue contained the specified
      * element (or equivalently, if this queue changed as a result of the call).
-     * 
-     * @param o
-     *            element to be removed from this queue, if present
+     *
+     * @param o element to be removed from this queue, if present
      * @return Element removed
      */
     public E remove(Object o) {
@@ -139,7 +136,6 @@ public class PriorityQueue<E> {
     /**
      * Retrieves and removes the head of this queue, or returns null if this
      * queue is empty.
-     * 
      */
     public E poll() {
         if (size == 0)
@@ -155,7 +151,7 @@ public class PriorityQueue<E> {
 
     /**
      * Removes the ith element from queue.
-     * 
+     * <p/>
      * Normally this method leaves the elements at up to i-1, inclusive,
      * untouched. Under these circumstances, it returns null. Occasionally, in
      * order to maintain the heap invariant, it must swap a later element of the
@@ -186,15 +182,13 @@ public class PriorityQueue<E> {
      * Inserts item x at position k, maintaining heap invariant by promoting x
      * up the tree until it is greater than or equal to its parent, or is the
      * root.
-     * 
+     * <p/>
      * To simplify and speed up coercions and comparisons. the Comparable and
      * Comparator versions are separated into different methods that are
      * otherwise identical. (Similarly for siftDown.)
-     * 
-     * @param k
-     *            the position to fill
-     * @param x
-     *            the item to insert
+     *
+     * @param k the position to fill
+     * @param x the item to insert
      */
     private void siftUp(int k, E x) {
         Comparable<? super E> key = (Comparable<? super E>) x;
@@ -213,11 +207,9 @@ public class PriorityQueue<E> {
      * Inserts item x at position k, maintaining heap invariant by demoting x
      * down the tree repeatedly until it is less than or equal to its children
      * or is a leaf.
-     * 
-     * @param k
-     *            the position to fill
-     * @param x
-     *            the item to insert
+     *
+     * @param k the position to fill
+     * @param x the item to insert
      */
     private void siftDown(int k, E x) {
         Comparable<? super E> key = (Comparable<? super E>) x;

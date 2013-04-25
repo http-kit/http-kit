@@ -1,18 +1,20 @@
 package org.httpkit.client;
 
-import static org.httpkit.HttpUtils.*;
-import static org.httpkit.HttpVersion.HTTP_1_0;
-import static org.httpkit.HttpVersion.HTTP_1_1;
-import static org.httpkit.client.State.*;
+import org.httpkit.*;
 
 import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.TreeMap;
 
-import org.httpkit.*;
+import static org.httpkit.HttpUtils.*;
+import static org.httpkit.HttpVersion.HTTP_1_0;
+import static org.httpkit.HttpVersion.HTTP_1_1;
+import static org.httpkit.client.State.*;
 
 enum State {
-    ALL_READ, READ_CHUNK_DELIMITER, READ_CHUNK_FOOTER, READ_CHUNK_SIZE, READ_CHUNKED_CONTENT, READ_FIXED_LENGTH_CONTENT, READ_HEADER, READ_INITIAL, READ_VARIABLE_LENGTH_CONTENT
+    ALL_READ, READ_CHUNK_DELIMITER, READ_CHUNK_FOOTER, READ_CHUNK_SIZE,
+    READ_CHUNKED_CONTENT, READ_FIXED_LENGTH_CONTENT, READ_HEADER, READ_INITIAL,
+    READ_VARIABLE_LENGTH_CONTENT
 }
 
 public class Decoder {
@@ -52,7 +54,7 @@ public class Decoder {
         if ((cStart < cEnd)
                 // Account for buggy web servers that omit Reason-Phrase from Status-Line.
                 // http://www.w3.org/Protocols/HTTP/1.0/draft-ietf-http-spec.html#Response
-            || (cStart == cEnd && bStart < bEnd)){
+                || (cStart == cEnd && bStart < bEnd)) {
             try {
                 int status = Integer.parseInt(sb.substring(bStart, bEnd));
                 HttpStatus s = HttpStatus.valueOf(status);
@@ -80,58 +82,58 @@ public class Decoder {
         byte[] bodyBuffer = new byte[BUFFER_SIZE];
         while (buffer.hasRemaining() && state != State.ALL_READ) {
             switch (state) {
-            case READ_INITIAL:
-                line = readLine(buffer);
-                if (line != null) {
-                    parseInitialLine(line);
-                }
-                break;
-            case READ_HEADER:
-                readHeaders(buffer);
-                break;
-            case READ_CHUNK_SIZE:
-                line = readLine(buffer);
-                if (line != null && !line.isEmpty()) {
-                    readRemaining = getChunkSize(line);
-                    if (readRemaining == 0) {
-                        state = READ_CHUNK_FOOTER;
-                    } else {
-                        state = READ_CHUNKED_CONTENT;
+                case READ_INITIAL:
+                    line = readLine(buffer);
+                    if (line != null) {
+                        parseInitialLine(line);
                     }
-                }
+                    break;
+                case READ_HEADER:
+                    readHeaders(buffer);
+                    break;
+                case READ_CHUNK_SIZE:
+                    line = readLine(buffer);
+                    if (line != null && !line.isEmpty()) {
+                        readRemaining = getChunkSize(line);
+                        if (readRemaining == 0) {
+                            state = READ_CHUNK_FOOTER;
+                        } else {
+                            state = READ_CHUNKED_CONTENT;
+                        }
+                    }
 
-                break;
-            case READ_FIXED_LENGTH_CONTENT:
-                toRead = Math.min(buffer.remaining(), readRemaining);
-                buffer.get(bodyBuffer, 0, toRead);
-                listener.onBodyReceived(bodyBuffer, toRead);
-                readRemaining -= toRead;
-                if (readRemaining == 0) {
+                    break;
+                case READ_FIXED_LENGTH_CONTENT:
+                    toRead = Math.min(buffer.remaining(), readRemaining);
+                    buffer.get(bodyBuffer, 0, toRead);
+                    listener.onBodyReceived(bodyBuffer, toRead);
+                    readRemaining -= toRead;
+                    if (readRemaining == 0) {
+                        state = ALL_READ;
+                    }
+                    break;
+                case READ_CHUNKED_CONTENT:
+                    toRead = Math.min(buffer.remaining(), readRemaining);
+                    buffer.get(bodyBuffer, 0, toRead);
+                    listener.onBodyReceived(bodyBuffer, toRead);
+                    readRemaining -= toRead;
+                    if (readRemaining == 0) {
+                        state = READ_CHUNK_DELIMITER;
+                    }
+                    break;
+                case READ_CHUNK_FOOTER:
+                    readEmptyLine(buffer);
                     state = ALL_READ;
-                }
-                break;
-            case READ_CHUNKED_CONTENT:
-                toRead = Math.min(buffer.remaining(), readRemaining);
-                buffer.get(bodyBuffer, 0, toRead);
-                listener.onBodyReceived(bodyBuffer, toRead);
-                readRemaining -= toRead;
-                if (readRemaining == 0) {
-                    state = READ_CHUNK_DELIMITER;
-                }
-                break;
-            case READ_CHUNK_FOOTER:
-                readEmptyLine(buffer);
-                state = ALL_READ;
-                break;
-            case READ_CHUNK_DELIMITER:
-                readEmptyLine(buffer);
-                state = READ_CHUNK_SIZE;
-                break;
-            case READ_VARIABLE_LENGTH_CONTENT:
-                toRead = buffer.remaining();
-                buffer.get(bodyBuffer, 0, toRead);
-                listener.onBodyReceived(bodyBuffer, toRead);
-                break;
+                    break;
+                case READ_CHUNK_DELIMITER:
+                    readEmptyLine(buffer);
+                    state = READ_CHUNK_SIZE;
+                    break;
+                case READ_VARIABLE_LENGTH_CONTENT:
+                    toRead = buffer.remaining();
+                    buffer.get(bodyBuffer, 0, toRead);
+                    listener.onBodyReceived(bodyBuffer, toRead);
+                    break;
             }
         }
         return state;

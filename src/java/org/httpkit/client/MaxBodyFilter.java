@@ -1,8 +1,8 @@
 package org.httpkit.client;
 
-import java.util.Map;
-
 import org.httpkit.DynamicBytes;
+
+import java.util.Map;
 
 // if the response is too large, protect OOM
 // For example, HTML expected, but a big mp4 file is returned

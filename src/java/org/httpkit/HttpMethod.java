@@ -1,7 +1,8 @@
 package org.httpkit;
 
-import static clojure.lang.Keyword.intern;
 import clojure.lang.Keyword;
+
+import static clojure.lang.Keyword.intern;
 
 public enum HttpMethod {
 

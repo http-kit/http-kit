@@ -1,17 +1,16 @@
 package org.httpkit.client;
 
-import java.util.Map;
-
 import org.httpkit.HttpStatus;
 import org.httpkit.HttpVersion;
 
+import java.util.Map;
+
 /**
  * Interface for response received from server
- * 
+ * <p/>
  * A low level interface, can be used for very large file download
- * 
+ *
  * @author feng
- * 
  */
 public interface IRespListener {
 

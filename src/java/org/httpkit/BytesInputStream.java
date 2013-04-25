@@ -22,7 +22,7 @@ public class BytesInputStream extends InputStream {
 
     /**
      * get the underlying bytes, copied
-     * 
+     *
      * @return
      */
     public byte[] bytes() {

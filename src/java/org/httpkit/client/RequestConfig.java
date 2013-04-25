@@ -22,7 +22,7 @@ public class RequestConfig {
     final SSLEngine engine;
     final HttpMethod method;
 
-    public static String  DEFAULT_USER_AGENT = "http-kit/2.0";
+    public static String DEFAULT_USER_AGENT = "http-kit/2.0";
 
     public RequestConfig(HttpMethod method, int timeoutMs, int keepAliveMs, SSLEngine engine) {
         if (engine == null) {

@@ -4,7 +4,6 @@ import javax.net.ssl.SSLContext;
 
 /**
  * copied from netty
- * 
  */
 public class SslContextFactory {
 
