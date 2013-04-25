@@ -2,7 +2,7 @@
   (:refer-clojure :exclude [get])
   (:require [clojure.string :as str])
   (:import [org.httpkit.client HttpClient IResponseHandler RespListener
-            IFilter MaxBodyFilter RequestConfig]
+            IFilter RequestConfig]
            [org.httpkit HttpMethod PrefixThreadFactory HttpUtils]
            [java.util.concurrent ThreadPoolExecutor LinkedBlockingQueue TimeUnit]
            [java.net URI URLEncoder]
@@ -11,7 +11,7 @@
 ;;;; Utils
 
 (defn- utf8-bytes [s] (.getBytes         (str s) "utf8"))
-(defn url-encode [s] (URLEncoder/encode (str s) "utf8"))
+(defn url-encode [s]  (URLEncoder/encode (str s) "utf8"))
 (defn- base64-encode [bytes] (DatatypeConverter/printBase64Binary bytes))
 
 (defn- basic-auth-value [basic-auth]
@@ -23,9 +23,9 @@
 (defn- prepare-request-headers
   [{:keys [headers form-params basic-auth user-agent] :as req}]
   (merge headers
-    (when form-params {"Content-Type"  "application/x-www-form-urlencoded"})
-    (when basic-auth  {"Authorization" (basic-auth-value basic-auth)})
-    (when user-agent  {"User-Agent"    user-agent})))
+         (when form-params {"Content-Type"  "application/x-www-form-urlencoded"})
+         (when basic-auth  {"Authorization" (basic-auth-value basic-auth)})
+         (when user-agent  {"User-Agent"    user-agent})))
 
 (defn- prepare-response-headers [headers]
   (reduce (fn [m [k v]] (assoc m (keyword k) v)) {} headers))
@@ -64,7 +64,7 @@
 ;;;; Public API
 
 (defn max-body-filter "reject if response's body exceeds size in bytes"
-  [size] (MaxBodyFilter. (int size)))
+  [size] (org.httpkit.client.IFilter$MaxBodyFilter. (int size)))
 
 ;;; "Get the default client. Normally, you only need one client per application. You can config parameter per request basic"
 (defonce default-client (delay (HttpClient.)))

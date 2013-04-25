@@ -3,10 +3,10 @@ package org.httpkit.server;
 public class HttpServerAtta extends ServerAtta {
 
     public HttpServerAtta(int maxBody, int maxLine) {
-        decoder = new RequestDecoder(maxBody, maxLine);
+        decoder = new Decoder(maxBody, maxLine);
     }
 
-    public final RequestDecoder decoder;
+    public final Decoder decoder;
 
     // close the connection after write?
     // greedy: if client support it( HTTP/1.1 without keep-alive: close,
