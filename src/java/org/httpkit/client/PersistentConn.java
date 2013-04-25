@@ -15,6 +15,7 @@ public class PersistentConn implements Comparable<PersistentConn> {
     }
 
     public boolean equals(Object obj) {
+        // for PriorityQueue to remove by key and by addr
         return addr.equals(obj) || key.equals(obj);
     }
 

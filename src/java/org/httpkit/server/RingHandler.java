@@ -94,7 +94,6 @@ class HttpHandler implements Runnable {
             } else {
                 Object body = resp.get(BODY);
                 if (!(body instanceof AsyncChannel)) { // hijacked
-                    boolean addKeepalive = req.version == HTTP_1_0 && req.isKeepAlive;
                     HeaderMap headers = HeaderMap.camelCase((Map) resp.get(HEADERS));
                     if (req.version == HTTP_1_0 && req.isKeepAlive) {
                         headers.put("Connection", "Keep-Alive");
@@ -183,9 +182,7 @@ public class RingHandler implements IHandler {
             if (old == null) { // No previous job
                 execs.submit(job);
             } else {
-                if (old.next.compareAndSet(null, job)) {
-                    // successfully append to previous task
-                } else {
+                if (!old.next.compareAndSet(null, job)) { // successfully append to previous task
                     // previous message is handled, order is guaranteed.
                     execs.submit(job);
                 }

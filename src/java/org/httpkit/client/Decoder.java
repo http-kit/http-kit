@@ -83,8 +83,7 @@ public class Decoder {
         while (buffer.hasRemaining() && state != State.ALL_READ) {
             switch (state) {
                 case READ_INITIAL:
-                    line = readLine(buffer);
-                    if (line != null) {
+                    if ((line = readLine(buffer)) != null) {
                         parseInitialLine(line);
                     }
                     break;

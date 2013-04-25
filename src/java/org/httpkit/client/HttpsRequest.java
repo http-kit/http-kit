@@ -62,7 +62,7 @@ public class HttpsRequest extends Request {
         }
     }
 
-    private final void wrapRequest() throws SSLException {
+    private void wrapRequest() throws SSLException {
         myNetData.clear();
         SSLEngineResult res = engine.wrap(request, myNetData);
         if (res.getStatus() != Status.OK) {

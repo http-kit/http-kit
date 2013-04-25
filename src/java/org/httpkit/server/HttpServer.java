@@ -215,9 +215,7 @@ public class HttpServer implements Runnable {
                 }
             } else {
                 // If has pending write, order should be maintained. (WebSocket)
-                for (ByteBuffer b : buffers) {
-                    atta.toWrites.add(b);
-                }
+                Collections.addAll(atta.toWrites, buffers);
                 pending.add(key);
                 selector.wakeup();
             }
