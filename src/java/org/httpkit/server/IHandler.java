@@ -1,11 +1,9 @@
 package org.httpkit.server;
 
-import org.httpkit.ws.WSFrame;
-
 public interface IHandler {
-    void handle(HttpRequest request, ResponseCallback callback);
+    void handle(HttpRequest request, RespCallback callback);
 
-    void handle(AsyncChannel channel, WSFrame frame);
+    void handle(AsyncChannel channel, Frame frame);
 
     public void clientClose(AsyncChannel channel, int status);
 

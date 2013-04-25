@@ -4,8 +4,6 @@ import clojure.lang.IFn;
 import clojure.lang.Keyword;
 import org.httpkit.DynamicBytes;
 import org.httpkit.HeaderMap;
-import org.httpkit.ws.WSEncoder;
-import org.httpkit.ws.WsServerAtta;
 import sun.misc.Unsafe;
 
 import java.io.IOException;
@@ -19,7 +17,7 @@ import java.util.Map;
 
 import static org.httpkit.HttpUtils.*;
 import static org.httpkit.server.ClojureRing.*;
-import static org.httpkit.ws.WSDecoder.*;
+import static org.httpkit.server.WSDecoder.*;
 
 @SuppressWarnings({"unchecked"})
 public class AsyncChannel {
@@ -107,10 +105,10 @@ public class AsyncChannel {
         }
 
         if (close) { // normal response, Content-Length. Every http client understand it
-            buffers = encode(status, headers, body);
+            buffers = HttpEncode(status, headers, body);
         } else {
             headers.put("Transfer-Encoding", "chunked"); // first chunk
-            ByteBuffer[] bb = encode(status, headers, body);
+            ByteBuffer[] bb = HttpEncode(status, headers, body);
             if (body == null) {
                 buffers = bb;
             } else {
@@ -158,7 +156,7 @@ public class AsyncChannel {
 
     public void sendHandshake(Map<String, Object> headers) {
         HeaderMap map = HeaderMap.camelCase(headers);
-        server.tryWrite(key, encode(101, map, null));
+        server.tryWrite(key, HttpEncode(101, map, null));
     }
 
     public void setCloseHandler(IFn fn) {
@@ -185,7 +183,7 @@ public class AsyncChannel {
             return false; // already closed
         }
         if (isWebSocket()) {
-            server.tryWrite(key, WSEncoder.encode(OPCODE_CLOSE, ByteBuffer.allocate(2)
+            server.tryWrite(key, WsEncode(OPCODE_CLOSE, ByteBuffer.allocate(2)
                     .putShort((short) status).array()));
         } else {
             server.tryWrite(key, ByteBuffer.wrap(finalChunkBytes));
@@ -211,12 +209,12 @@ public class AsyncChannel {
             }
 
             if (data instanceof String) { // null is not allowed
-                server.tryWrite(key, WSEncoder.encode(OPCODE_TEXT, ((String) data).getBytes(UTF_8)));
+                server.tryWrite(key, WsEncode(OPCODE_TEXT, ((String) data).getBytes(UTF_8)));
             } else if (data instanceof byte[]) {
-                server.tryWrite(key, WSEncoder.encode(OPCODE_BINARY, (byte[]) data));
+                server.tryWrite(key, WsEncode(OPCODE_BINARY, (byte[]) data));
             } else if (data instanceof InputStream) {
                 DynamicBytes bytes = readAll((InputStream) data);
-                server.tryWrite(key, WSEncoder.encode(OPCODE_BINARY, bytes.get(), bytes.length()));
+                server.tryWrite(key, WsEncode(OPCODE_BINARY, bytes.get(), bytes.length()));
             } else if (data != null) { // ignore null
                 throw new IllegalArgumentException(
                         "only accept string, byte[], InputStream, get" + data);
@@ -242,7 +240,7 @@ public class AsyncChannel {
     }
 
     public boolean isWebSocket() {
-        return key.attachment() instanceof WsServerAtta;
+        return key.attachment() instanceof WsAtta;
     }
 
     public boolean isClosed() {

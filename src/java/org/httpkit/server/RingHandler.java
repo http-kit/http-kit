@@ -1,27 +1,86 @@
 package org.httpkit.server;
 
-import clojure.lang.IFn;
+import clojure.lang.*;
 import org.httpkit.HeaderMap;
 import org.httpkit.HttpUtils;
 import org.httpkit.PrefixThreadFactory;
-import org.httpkit.ws.TextFrame;
-import org.httpkit.ws.WSFrame;
 
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static clojure.lang.Keyword.intern;
+import static org.httpkit.HttpUtils.HttpEncode;
 import static org.httpkit.HttpVersion.HTTP_1_0;
 import static org.httpkit.server.ClojureRing.*;
+import static org.httpkit.server.Frame.TextFrame;
+
+@SuppressWarnings({"rawtypes", "unchecked"})
+class ClojureRing {
+
+    static final Keyword SERVER_PORT = intern("server-port");
+    static final Keyword SERVER_NAME = intern("server-name");
+    static final Keyword REMOTE_ADDR = intern("remote-addr");
+    static final Keyword URI = intern("uri");
+    static final Keyword QUERY_STRING = intern("query-string");
+    static final Keyword SCHEME = intern("scheme");
+    static final Keyword REQUEST_METHOD = intern("request-method");
+    static final Keyword HEADERS = intern("headers");
+    static final Keyword CONTENT_TYPE = intern("content-type");
+    static final Keyword CONTENT_LENGTH = intern("content-length");
+    static final Keyword CHARACTER_ENCODING = intern("character-encoding");
+    static final Keyword BODY = intern("body");
+    static final Keyword WEBSOCKET = intern("websocket?");
+    static final Keyword ASYC_CHANNEL = intern("async-channel");
+
+    static final Keyword HTTP = intern("http");
+
+    static final Keyword STATUS = intern("status");
+
+    public static int getStatus(Map<Keyword, Object> resp) {
+        int status = 200;
+        Object s = resp.get(STATUS);
+        if (s instanceof Long) {
+            status = ((Long) s).intValue();
+        } else if (s instanceof Integer) {
+            status = (Integer) s;
+        }
+        return status;
+    }
+
+    public static IPersistentMap buildRequestMap(HttpRequest req) {
+        // ring spec
+        Map<Object, Object> m = new TreeMap<Object, Object>();
+        m.put(SERVER_PORT, req.serverPort);
+        m.put(SERVER_NAME, req.serverName);
+        m.put(REMOTE_ADDR, req.getRemoteAddr());
+        m.put(URI, req.uri);
+        m.put(QUERY_STRING, req.queryString);
+        m.put(SCHEME, HTTP); // only http is supported
+        m.put(ASYC_CHANNEL, req.channel);
+        m.put(WEBSOCKET, req.isWebSocket);
+        m.put(REQUEST_METHOD, req.method.KEY);
+
+        // key is already lower cased, required by ring spec
+        m.put(HEADERS, PersistentArrayMap.create(req.headers));
+        m.put(CONTENT_TYPE, req.contentType);
+        m.put(CONTENT_LENGTH, req.contentLength);
+        m.put(CHARACTER_ENCODING, req.charset);
+        m.put(BODY, req.getBody());
+        return PersistentArrayMap.create(m);
+    }
+}
+
 
 @SuppressWarnings({"rawtypes", "unchecked"})
 class HttpHandler implements Runnable {
 
     final HttpRequest req;
-    final ResponseCallback cb;
+    final RespCallback cb;
     final IFn handler;
 
-    public HttpHandler(HttpRequest req, ResponseCallback cb, IFn handler) {
+    public HttpHandler(HttpRequest req, RespCallback cb, IFn handler) {
         this.req = req;
         this.cb = cb;
         this.handler = handler;
@@ -31,7 +90,7 @@ class HttpHandler implements Runnable {
         try {
             Map resp = (Map) handler.invoke(buildRequestMap(req));
             if (resp == null) { // handler return null
-                cb.run(encode(404, new HeaderMap(), null));
+                cb.run(HttpEncode(404, new HeaderMap(), null));
             } else {
                 Object body = resp.get(BODY);
                 if (!(body instanceof AsyncChannel)) { // hijacked
@@ -40,11 +99,11 @@ class HttpHandler implements Runnable {
                     if (req.version == HTTP_1_0 && req.isKeepAlive) {
                         headers.put("Connection", "Keep-Alive");
                     }
-                    cb.run(encode(getStatus(resp), headers, body));
+                    cb.run(HttpEncode(getStatus(resp), headers, body));
                 }
             }
         } catch (Throwable e) {
-            cb.run(encode(500, new HeaderMap(), e.getMessage()));
+            cb.run(HttpEncode(500, new HeaderMap(), e.getMessage()));
             HttpUtils.printError(req.method + " " + req.uri, e);
         }
     }
@@ -66,11 +125,11 @@ class LinkingRunnable implements Runnable {
     }
 }
 
-class WSFrameHandler implements Runnable {
-    private WSFrame frame;
+class WSHandler implements Runnable {
+    private Frame frame;
     private AsyncChannel channel;
 
-    protected WSFrameHandler(AsyncChannel channel, WSFrame frame) {
+    protected WSHandler(AsyncChannel channel, Frame frame) {
         this.channel = channel;
         this.frame = frame;
     }
@@ -100,12 +159,12 @@ public class RingHandler implements IHandler {
         this.handler = handler;
     }
 
-    public void handle(HttpRequest req, ResponseCallback cb) {
+    public void handle(HttpRequest req, RespCallback cb) {
         try {
             execs.submit(new HttpHandler(req, cb, handler));
         } catch (RejectedExecutionException e) {
             HttpUtils.printError("increase :queue-size if this happens often", e);
-            cb.run(encode(503, new HeaderMap(), "Server is overloaded, please try later"));
+            cb.run(HttpEncode(503, new HeaderMap(), "Server is overloaded, please try later"));
         }
     }
 
@@ -113,8 +172,8 @@ public class RingHandler implements IHandler {
         execs.shutdownNow();
     }
 
-    public void handle(AsyncChannel channel, WSFrame frame) {
-        WSFrameHandler task = new WSFrameHandler(channel, frame);
+    public void handle(AsyncChannel channel, Frame frame) {
+        WSHandler task = new WSHandler(channel, frame);
 
         // messages from the same client are handled orderly
         LinkingRunnable job = new LinkingRunnable(task);

@@ -1,7 +1,6 @@
 package org.httpkit.server;
 
 import org.httpkit.*;
-import org.httpkit.ws.*;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -11,7 +10,9 @@ import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import static java.nio.channels.SelectionKey.*;
-import static org.httpkit.ws.CloseFrame.*;
+import static org.httpkit.HttpUtils.HttpEncode;
+import static org.httpkit.HttpUtils.WsEncode;
+import static org.httpkit.server.Frame.CloseFrame.*;
 
 public class HttpServer implements Runnable {
 
@@ -26,7 +27,7 @@ public class HttpServer implements Runnable {
 
     private Thread serverThread;
 
-    private final ConcurrentLinkedQueue<SelectionKey> pendings = new ConcurrentLinkedQueue<SelectionKey>();
+    private final ConcurrentLinkedQueue<SelectionKey> pending = new ConcurrentLinkedQueue<SelectionKey>();
     // shared, single thread
     private final ByteBuffer buffer = ByteBuffer.allocateDirect(1024 * 64);
 
@@ -49,7 +50,7 @@ public class HttpServer implements Runnable {
         try {
             while ((s = ch.accept()) != null) {
                 s.configureBlocking(false);
-                HttpServerAtta atta = new HttpServerAtta(maxBody, maxLine);
+                HttpAtta atta = new HttpAtta(maxBody, maxLine);
                 SelectionKey k = s.register(selector, OP_READ, atta);
                 atta.channel = new AsyncChannel(k, this);
             }
@@ -66,28 +67,28 @@ public class HttpServer implements Runnable {
         }
 
         ServerAtta att = (ServerAtta) key.attachment();
-        if (att instanceof HttpServerAtta) {
+        if (att instanceof HttpAtta) {
             handler.clientClose(att.channel, -1);
         } else {
             handler.clientClose(att.channel, status);
         }
     }
 
-    private void decodeHttp(HttpServerAtta atta, SelectionKey key, SocketChannel ch) {
+    private void decodeHttp(HttpAtta atta, SelectionKey key, SocketChannel ch) {
         try {
             do {
                 atta.channel.reset(); // reuse for performance
                 HttpRequest request = atta.decoder.decode(buffer);
                 if (request != null) {
                     if (request.isWebSocket) {
-                        key.attach(new WsServerAtta(atta.channel));
+                        key.attach(new WsAtta(atta.channel));
                     } else {
                         atta.keepalive = request.isKeepAlive;
                     }
                     request.channel = atta.channel;
                     request.remoteAddr = (InetSocketAddress) ch.socket()
                             .getRemoteSocketAddress();
-                    handler.handle(request, new ResponseCallback(key, this));
+                    handler.handle(request, new RespCallback(key, this));
                     // pipelining not supported : need queue to ensure order
                     // AsyncChannel can't be reseted here
                     atta.decoder.reset();
@@ -97,29 +98,29 @@ public class HttpServer implements Runnable {
             closeKey(key, -1);
         } catch (RequestTooLargeException e) {
             atta.keepalive = false;
-            tryWrite(key, ClojureRing.encode(413, new HeaderMap(), e.getMessage()));
+            tryWrite(key, HttpEncode(413, new HeaderMap(), e.getMessage()));
         } catch (LineTooLargeException e) {
             atta.keepalive = false; // close after write
-            tryWrite(key, ClojureRing.encode(414, new HeaderMap(), e.getMessage()));
+            tryWrite(key, HttpEncode(414, new HeaderMap(), e.getMessage()));
         }
     }
 
-    private void decodeWs(WsServerAtta atta, SelectionKey key) {
+    private void decodeWs(WsAtta atta, SelectionKey key) {
         try {
             do {
-                WSFrame frame = atta.decoder.decode(buffer);
+                Frame frame = atta.decoder.decode(buffer);
                 if (frame instanceof TextFrame || frame instanceof BinaryFrame) {
                     handler.handle(atta.channel, frame);
                     atta.decoder.reset();
                 } else if (frame instanceof PingFrame) {
                     atta.decoder.reset();
-                    tryWrite(key, WSEncoder.encode(WSDecoder.OPCODE_PONG, frame.data));
+                    tryWrite(key, WsEncode(WSDecoder.OPCODE_PONG, frame.data));
                 } else if (frame instanceof CloseFrame) {
                     // even though the logic connection is closed. the socket
                     // did not, if client willing to reuse it, http-kit is more
                     // than happy
                     handler.clientClose(atta.channel, ((CloseFrame) frame).getStatus());
-                    tryWrite(key, WSEncoder.encode(WSDecoder.OPCODE_CLOSE, frame.data));
+                    tryWrite(key, WsEncode(WSDecoder.OPCODE_CLOSE, frame.data));
                 }
             } while (buffer.hasRemaining()); // consume all
         } catch (ProtocolException e) {
@@ -137,12 +138,12 @@ public class HttpServer implements Runnable {
                 // remote entity shut the socket down cleanly.
                 closeKey(key, CLOSE_AWAY);
             } else if (read > 0) {
-                final ServerAtta atta = (ServerAtta) key.attachment();
                 buffer.flip(); // flip for read
-                if (atta instanceof HttpServerAtta) {
-                    decodeHttp((HttpServerAtta) atta, key, ch);
+                final ServerAtta atta = (ServerAtta) key.attachment();
+                if (atta instanceof HttpAtta) {
+                    decodeHttp((HttpAtta) atta, key, ch);
                 } else {
-                    decodeWs((WsServerAtta) atta, key);
+                    decodeWs((WsAtta) atta, key);
                 }
             }
         } catch (IOException e) { // the remote forcibly closed the connection
@@ -204,7 +205,7 @@ public class HttpServer implements Runnable {
                                 atta.toWrites.add(b);
                             }
                         }
-                        pendings.add(key);
+                        pending.add(key);
                         selector.wakeup();
                     } else if (!atta.isKeepAlive()) {
                         closeKey(key, CLOSE_NORMAL);
@@ -217,7 +218,7 @@ public class HttpServer implements Runnable {
                 for (ByteBuffer b : buffers) {
                     atta.toWrites.add(b);
                 }
-                pendings.add(key);
+                pending.add(key);
                 selector.wakeup();
             }
         }
@@ -227,7 +228,7 @@ public class HttpServer implements Runnable {
         while (true) {
             try {
                 SelectionKey k = null;
-                while ((k = pendings.poll()) != null) {
+                while ((k = pending.poll()) != null) {
                     if (k.isValid()) {
                         k.interestOps(OP_WRITE);
                     }
@@ -253,7 +254,7 @@ public class HttpServer implements Runnable {
                 }
                 selectedKeys.clear();
             } catch (ClosedSelectorException ignore) {
-                return;
+                return; // stopped
             } catch (Exception e) { // catch any exception, print it
                 HttpUtils.printError("http server loop error, should not happen", e);
             }

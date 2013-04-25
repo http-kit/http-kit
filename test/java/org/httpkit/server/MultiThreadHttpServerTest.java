@@ -1,13 +1,13 @@
 package org.httpkit.server;
 
+import org.httpkit.HeaderMap;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import org.httpkit.HeaderMap;
-import org.httpkit.ws.TextFrame;
-import org.httpkit.ws.WSFrame;
+import static org.httpkit.HttpUtils.HttpEncode;
 
 class MultiThreadHandler implements IHandler {
     private ExecutorService exec;
@@ -22,22 +22,22 @@ class MultiThreadHandler implements IHandler {
     }
 
     @Override
-    public void handle(AsyncChannel channel, WSFrame frame) {
+    public void handle(AsyncChannel channel, Frame frame) {
 
     }
 
-    public void handle(HttpRequest request, final ResponseCallback callback) {
+    public void handle(HttpRequest request, final RespCallback callback) {
         exec.submit(new Runnable() {
             public void run() {
                 HeaderMap header = new HeaderMap();
                 header.put("Connection", "Keep-Alive");
-                ByteBuffer[] bytes = ClojureRing.encode(200, header, SingleThreadHandler.body);
+                ByteBuffer[] bytes = HttpEncode(200, header, SingleThreadHandler.body);
                 callback.run(bytes);
             }
         });
     }
 
-    public void handle(AsyncChannel channel, TextFrame frame) {
+    public void handle(AsyncChannel channel, Frame.TextFrame frame) {
     }
 
     public void clientClose(AsyncChannel channel, int status) {

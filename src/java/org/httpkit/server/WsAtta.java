@@ -1,13 +1,10 @@
-package org.httpkit.ws;
+package org.httpkit.server;
 
-import org.httpkit.server.AsyncChannel;
-import org.httpkit.server.ServerAtta;
-
-public class WsServerAtta extends ServerAtta {
+public class WsAtta extends ServerAtta {
 
     final public WSDecoder decoder;
 
-    public WsServerAtta(AsyncChannel channel) {
+    public WsAtta(AsyncChannel channel) {
         this.decoder = new WSDecoder();
         this.channel = channel;
     }

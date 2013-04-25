@@ -11,7 +11,7 @@ import static org.httpkit.HttpUtils.*;
 import static org.httpkit.HttpVersion.HTTP_1_0;
 import static org.httpkit.HttpVersion.HTTP_1_1;
 
-public class Decoder {
+public class HttpDecoder {
 
     public enum State {
         ALL_READ, READ_INITIAL, READ_HEADER, READ_FIXED_LENGTH_CONTENT, READ_CHUNK_SIZE, READ_CHUNKED_CONTENT, READ_CHUNK_FOOTER, READ_CHUNK_DELIMITER,
@@ -32,7 +32,7 @@ public class Decoder {
     private final int maxBody;
     private final int maxLine;
 
-    public Decoder(int maxBody, int maxLine) {
+    public HttpDecoder(int maxBody, int maxLine) {
         this.maxBody = maxBody;
         this.maxLine = maxLine;
     }

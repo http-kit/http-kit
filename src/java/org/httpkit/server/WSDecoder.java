@@ -1,4 +1,4 @@
-package org.httpkit.ws;
+package org.httpkit.server;
 
 import org.httpkit.ProtocolException;
 
@@ -28,7 +28,7 @@ public class WSDecoder {
     private boolean finalFlag;
     private int opcode = -1;
 
-    public WSFrame decode(ByteBuffer buffer) throws ProtocolException {
+    public Frame decode(ByteBuffer buffer) throws ProtocolException {
         while (buffer.hasRemaining()) {
             switch (state) {
                 case FRAME_START:
@@ -56,8 +56,7 @@ public class WSDecoder {
                         long length = buffer.getLong();
                         // if negative, that too big, drop it.
                         if (length < 65536) {
-                            throw new ProtocolException(
-                                    "invalid data frame length. max payload length 4M");
+                            throw new ProtocolException("invalid data frame length. max payload length 4M");
                         }
                         abortIfTooLarge(length);
                         payloadLength = (int) length;
@@ -104,13 +103,13 @@ public class WSDecoder {
                         if (finalFlag) {
                             switch (opcode) {
                                 case OPCODE_TEXT:
-                                    return new TextFrame(content);
+                                    return new Frame.TextFrame(content);
                                 case OPCODE_BINARY:
-                                    return new BinaryFrame(content);
+                                    return new Frame.BinaryFrame(content);
                                 case OPCODE_PING:
-                                    return new PingFrame(content);
+                                    return new Frame.PingFrame(content);
                                 case OPCODE_CLOSE:
-                                    return new CloseFrame(content);
+                                    return new Frame.CloseFrame(content);
                                 default:
                                     throw new ProtocolException("not impl for opcode: " + opcode);
                             }
@@ -127,10 +126,9 @@ public class WSDecoder {
 
     public void abortIfTooLarge(long length) throws ProtocolException {
         // TODO configurable
-        if (length > 4194304) { // 4M, drop if message is too big
+        if (length > 1024 * 1024 * 4) { // 4M, drop if message is too big
             throw new ProtocolException("Max payload length 4m, get: " + length);
         }
-
     }
 
     public void reset() {

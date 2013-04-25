@@ -9,14 +9,30 @@ import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel.MapMode;
 import java.nio.charset.Charset;
-import java.util.Date;
-import java.util.Map;
+import java.text.SimpleDateFormat;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.lang.Character.isWhitespace;
 import static java.lang.Math.min;
 import static java.net.InetAddress.getByName;
+
+//  SimpleDateFormat is not thread safe
+class DateFormatter extends ThreadLocal<SimpleDateFormat> {
+    protected SimpleDateFormat initialValue() {
+        // Formats into HTTP date format (RFC 822/1123).
+        SimpleDateFormat f = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.US);
+        f.setTimeZone(TimeZone.getTimeZone("GMT"));
+        return f;
+    }
+
+    private static final DateFormatter FORMATTER = new DateFormatter();
+
+    public static String getDate() {
+        return FORMATTER.get().format(new Date());
+    }
+}
 
 public class HttpUtils {
 
@@ -382,5 +398,66 @@ public class HttpUtils {
         }
         // default utf8
         return result == null ? UTF_8 : result;
+    }
+
+    public static final String CL = "Content-Length";
+
+    public static ByteBuffer[] HttpEncode(int status, HeaderMap headers, Object body) {
+        ByteBuffer bodyBuffer;
+        try {
+            bodyBuffer = bodyBuffer(body);
+            // only write length if not chunked
+            if (!CHUNKED.equals(headers.get("Transfer-Encoding"))) {
+                if (bodyBuffer != null) {
+                    headers.put(CL, Integer.toString(bodyBuffer.remaining()));
+                } else {
+                    headers.put(CL, "0");
+                }
+            }
+        } catch (IOException e) {
+            byte[] b = e.getMessage().getBytes(ASCII);
+            status = 500;
+            headers.clear();
+            headers.put(CL, Integer.toString(b.length));
+            bodyBuffer = ByteBuffer.wrap(b);
+        }
+        headers.put("Server", "http-kit");
+        headers.put("Date", DateFormatter.getDate()); // rfc says the Date is needed
+
+        DynamicBytes bytes = new DynamicBytes(196);
+        byte[] bs = HttpStatus.valueOf(status).getInitialLineBytes();
+        bytes.append(bs, bs.length);
+        headers.encodeHeaders(bytes);
+        ByteBuffer headBuffer = ByteBuffer.wrap(bytes.get(), 0, bytes.length());
+
+        if (bodyBuffer != null)
+            return new ByteBuffer[]{headBuffer, bodyBuffer};
+        else
+            return new ByteBuffer[]{headBuffer};
+    }
+
+    public static ByteBuffer WsEncode(byte opcode, byte[] data, int length) {
+        byte b0 = 0;
+        b0 |= 1 << 7; // FIN
+        b0 |= opcode;
+        ByteBuffer buffer = ByteBuffer.allocate(length + 10); // max
+        buffer.put(b0);
+
+        if (length <= 125) {
+            buffer.put((byte) (length));
+        } else if (length <= 0xFFFF) {
+            buffer.put((byte) 126);
+            buffer.putShort((short) length);
+        } else {
+            buffer.put((byte) 127);
+            buffer.putLong(length);
+        }
+        buffer.put(data, 0, length);
+        buffer.flip();
+        return buffer;
+    }
+
+    public static ByteBuffer WsEncode(byte opcode, byte[] data) {
+        return WsEncode(opcode, data, data.length);
     }
 }
