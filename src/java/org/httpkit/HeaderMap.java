@@ -23,31 +23,32 @@ public class HeaderMap {
     public final int INIT_SIZE = 8;
 
     private int size = 0;
-    private String keys[] = new String[INIT_SIZE];
-    private Object values[] = new Object[INIT_SIZE];
+    private Object arrays[] = new Object[INIT_SIZE * 2];
 
     public void put(String key, Object obj) {
-        if (size == keys.length - 1) {
-            keys = Arrays.copyOf(keys, keys.length * 2);
-            values = Arrays.copyOf(values, keys.length * 2);
+        final int total = size << 1;
+        if (total == arrays.length) {
+            arrays = Arrays.copyOf(arrays, arrays.length * 2);
         }
-        keys[size] = key;
-        values[size] = obj;
+        arrays[total] = key;
+        arrays[total + 1] = obj;
         size += 1;
     }
 
     public Object get(String key) {
-        for (int i = 0; i < size; ++i) {
-            if (key.equals(keys[i])) {
-                return values[i];
+        final int total = size << 1; // * 2
+        for (int i = 0; i < total; i += 2) {
+            if (key.equals(arrays[i])) {
+                return arrays[i + 1];
             }
         }
         return null;
     }
 
     public boolean containsKey(String key) {
-        for (String k : keys) {
-            if (key.equals(k)) {
+        final int total = size << 1; // * 2
+        for (int i = 0; i < total; i += 2) {
+            if (key.equals(arrays[i])) {
                 return true;
             }
         }
@@ -69,38 +70,29 @@ public class HeaderMap {
     }
 
     public void encodeHeaders(DynamicBytes bytes) {
-        for (int i = 0; i < size; ++i) {
-            String k = keys[i];
-            Object v = values[i];
+        final int total = size << 1;
+        for (int i = 0; i < total; i += 2) {
+            String k = (String) arrays[i];
+            Object v = arrays[i + 1];
             if (v instanceof String) {
                 bytes.append(k);
                 bytes.append(COLON, SP);
-//                bytes.append(COLON);
-//                bytes.append(SP);
                 // supposed to be ISO-8859-1, but utf-8 is compatible.
                 // filename in Content-Disposition can be utf8
                 bytes.append((String) v, HttpUtils.UTF_8);
-                bytes.append(CR).append(LF);
-//                bytes.append(CR);
-//                bytes.append(LF);
+                bytes.append(CR, LF);
                 // ring spec says it could be a seq
             } else if (v instanceof Seqable) {
                 ISeq seq = ((Seqable) v).seq();
                 while (seq != null) {
                     bytes.append(k);
-                    bytes.append(COLON).append(SP);
-//                    bytes.append(COLON);
-//                    bytes.append(SP);
+                    bytes.append(COLON, SP);
                     bytes.append(seq.first().toString(), HttpUtils.UTF_8);
-                    bytes.append(CR).append(LF);
-//                    bytes.append(CR);
-//                    bytes.append(LF);
+                    bytes.append(CR, LF);
                     seq = seq.next();
                 }
             }
         }
-        bytes.append(CR).append(LF);
-//        bytes.append(CR);
-//        bytes.append(LF);
+        bytes.append(CR, LF);
     }
 }

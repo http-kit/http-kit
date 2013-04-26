@@ -3,6 +3,7 @@
   (:require [clojure.java.io :as io])
   (:import org.httpkit.HttpUtils
            org.httpkit.DynamicBytes
+           org.httpkit.HeaderMap
            java.net.URI
            java.nio.charset.Charset))
 
@@ -53,3 +54,12 @@
 (deftest test-get-host
   (is (= "shenfeng.me" (HttpUtils/getHost (URI. "http://shenfeng.me/what"))))
   (is (= "shenfeng.me:7979" (HttpUtils/getHost (URI. "http://shenfeng.me:7979/what")))))
+
+(deftest test-headermap
+  (let [m ^HeaderMap (HeaderMap.)]
+    (doseq [i (range 1 70)]
+      (.put m (str "key-" i) (str "value-" i))
+      (doseq [j (range 1 i)]
+        (is (= (str "value-" j) (.get m (str "key-" j))))
+        (is (.containsKey m (str "key-" j))))
+      (is (not (.containsKey m (str "key-" (inc i))))))))
