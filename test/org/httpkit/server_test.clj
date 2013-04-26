@@ -29,9 +29,11 @@
 (defn many-headers-handler [req]
   (let [count (or (-> req :params :count to-int) 20)]
     {:status 200
-     :headers (into {} (map (fn [idx]
-                              [(str "key-" idx) (str "value-" idx)])
-                            (range 0 count)))}))
+     :headers (assoc
+                  (into {} (map (fn [idx]
+                                  [(str "key-" idx) (str "value-" idx)])
+                                (range 0 (inc count))))
+                "x-header-1" ["abc" "def"])}))
 
 (defn multipart-handler [req]
   (let [{:keys [title file]} (:params req)]
@@ -170,9 +172,10 @@
     (is (= (:body resp) "Hello World"))))
 
 (deftest test-many-headers
-  (let [resp (http/get "http://localhost:4347/headers?count=51")]
-    (is (= (:status resp) 200))
-    (is (= (get-in resp [:headers "key-50"]) "value-50"))))
+  (doseq [c (range 5 40)]
+    (let [resp (http/get (str "http://localhost:4347/headers?count=" c))]
+      (is (= (:status resp) 200))
+      (is (= (get-in resp [:headers (str "key-" c)]) (str "value-" c))))))
 
 (deftest test-body-file
   (doseq [length (range 1 (* 1024 1024 8) 1439987)]

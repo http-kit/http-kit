@@ -24,7 +24,7 @@ public class HeaderMap {
 
     private int size = 0;
     private String keys[] = new String[INIT_SIZE];
-    private Object values[] = new String[INIT_SIZE];
+    private Object values[] = new Object[INIT_SIZE];
 
     public void put(String key, Object obj) {
         if (size == keys.length - 1) {
