@@ -55,16 +55,16 @@ class Handler implements Runnable {
 public class RespListener implements IRespListener {
 
     private boolean isText() {
-        if (status == HttpStatus.OK) {
+        if (status.getCode() == 200) {
             String type = headers.get(HttpUtils.CONTENT_TYPE);
             if (type != null) {
                 type = type.toLowerCase();
                 // TODO may miss something
-                return type.contains("text") || type.contains("json");
+                return type.contains("text") || type.contains("json") || type.contains("xml");
             } else {
                 return false;
             }
-        } else {
+        } else {  // non 200: treat as text
             return true;
         }
     }
