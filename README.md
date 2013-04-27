@@ -34,4 +34,4 @@ Please use the [GitHub issues page](https://github.com/http-kit/http-kit/issues)
 
 ### License
 
-Copyright &copy; 2012 [Feng Shen](http://shenfeng.me/). Distributed under the [Apache License Version 2.0](http://www.apache.org/licenses/LICENSE-2.0.html).
+Copyright &copy; 2012-2013 [Feng Shen](http://shenfeng.me/). Distributed under the [Apache License Version 2.0](http://www.apache.org/licenses/LICENSE-2.0.html).
