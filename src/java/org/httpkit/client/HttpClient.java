@@ -198,6 +198,12 @@ public final class HttpClient implements Runnable {
             cb.onThrowable(e);
             return;
         }
+
+        if(uri.getHost() == null) {
+            cb.onThrowable(new IllegalArgumentException("host is null: " + url));
+            return;
+        }
+
         String scheme = uri.getScheme();
         if (!"http".equals(scheme) && !"https".equals(scheme)) {
             cb.onThrowable(new ProtocolException(scheme + " is not supported"));
