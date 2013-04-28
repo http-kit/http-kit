@@ -112,26 +112,31 @@
         (doseq [r requests]
           (is (= 200 (:status @r))))))))
 
-(deftest performance-bench
+(deftest ^:benchmark performance-bench
   (let [url "http://127.0.0.1:14347/get"]
     ;; just for fun
-    (bench "http-kit, concurrency 1, 1000 requests: "
-           (doseq [_ (range 0 1000)] @(http/get url)))
-    (bench "clj-http, concurrency 1, 1000 requests: "
-           (doseq [_ (range 0 1000)] (clj-http/get url)))
-    (bench "http-kit, concurrency 10, 1000 requests: "
-           (doseq [_ (range 0 100)]
+    (bench "http-kit, concurrency 1, 3000 requests: "
+           (doseq [_ (range 0 3000)] @(http/get url)))
+    (bench "clj-http, concurrency 1, 3000 requests: "
+           (doseq [_ (range 0 3000)] (clj-http/get url)))
+    (bench "http-kit, concurrency 10, 3000 requests: "
+           (doseq [_ (range 0 300)]
              (let [requests (doall (map (fn [u] (http/get u))
                                         (repeat 10 url)))]
-               (doseq [r requests] @r)))))
+               (doseq [r requests] @r))))) ; wait all finish
   (let [url "https://127.0.0.1:9898/get"]
     (bench "http-kit, https, concurrency 1, 1000 requests: "
            (doseq [_ (range 0 1000)] @(http/get url {:sslengine (trust-everybody)})))
+    (bench "http-kit, https, concurrency 10, 1000 requests: "
+           (doseq [_ (range 0 100)]
+             (let [requests (doall (map (fn [u] (http/get u {:sslengine (trust-everybody)}))
+                                        (repeat 10 url)))]
+               (doseq [r requests] @r)))) ; wait all finish
+    (bench "clj-http, https, concurrency 1, 1000 requests: "
+           (doseq [_ (range 0 1000)] (clj-http/get url {:insecure? true})))
     (bench "http-kit, https, keepalive disabled, concurrency 1, 1000 requests: "
            (doseq [_ (range 0 1000)] @(http/get url {:sslengine (trust-everybody)
-                                                     :keepalive -1})))
-    (bench "clj-http, https, concurrency 1, 1000 requests: "
-           (doseq [_ (range 0 1000)] (clj-http/get url {:insecure? true})))))
+                                                     :keepalive -1})))))
 
 (deftest test-http-client-user-agent
   (let [ua "test-ua"

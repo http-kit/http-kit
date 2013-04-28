@@ -22,6 +22,8 @@ lein test
 # may be useful. more info, see the code server_test.clj
 ./scripts/start_test_server
 
+# some numbers about how fast can http-kit's client can run
+lein test :benchmark
 ```
 
 ### Contact & Contribution

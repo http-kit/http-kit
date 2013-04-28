@@ -9,6 +9,9 @@
   :test-paths ["test"]
   :jar-exclusions [#".*java$"]
   :plugins [[lein-swank "1.4.4"]]
+  :test-selectors {:default (complement :benchmark)
+                   :benchmark :benchmark
+                   :all (fn [_] true)}
   :license {:name "Apache License, Version 2.0"
             :url "http://www.apache.org/licenses/LICENSE-2.0.html"}
   :jvm-opts ["-Dclojure.compiler.disable-locals-clearing=true"

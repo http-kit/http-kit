@@ -23,23 +23,18 @@
                           (println e)
                           (send! con msg)))))))
 
-(defn ws-handler2 [req]
+(defn ws-handler-sent-on-connect [req]
   (with-channel req con
     (send! con "hello") ;; should sendable when on-connet
     (send! con "world")
     (on-receive con (fn [mesg]
                       ;; only :body is picked
-                      (send! con {:body  mesg}))))) ; echo back
+                      (send! con {:body mesg}))))) ; echo back
 
-(defn ws-handler3 [req] ;; test with http.async.client
+(defn ws-handler-async-client [req] ;; test with http.async.client
   (with-channel req con
     (on-receive con (fn [mesg]
                       (send! con mesg)))))
-
-(defn ws-handler4 [req]
-  (with-channel req con
-    (on-receive con (fn [mesg]
-                      (send! con (pr-str {:message mesg}))))))
 
 (defn binary-ws-handler [req]
   (with-channel req con
@@ -77,9 +72,8 @@
 
 (defroutes test-routes
   (GET "/ws" [] ws-handler)
-  (GET "/ws2" [] ws-handler2)
-  (GET "/ws3" [] ws-handler3)
-  (GET "/ws4" [] ws-handler4)
+  (GET "/sent-on-connect" [] ws-handler-sent-on-connect)
+  (GET "/http-async-client" [] ws-handler-async-client)
   (GET "/binary" [] binary-ws-handler)
   (GET "/interleaved" [] not-interleave-handler)
   (GET "/order" [] messg-order-handler))
@@ -126,21 +120,13 @@
     (.close client)))
 
 (deftest test-sent-message-in-body      ; issue #14
-  (let [client (WebSocketClient. "ws://localhost:4348/ws2")]
+  (let [client (WebSocketClient. "ws://localhost:4348/sent-on-connect")]
     (is (= "hello" (.getMessage client)))
     (is (= "world" (.getMessage client)))
-    (doseq [idx (range 0 5)]
+    (doseq [idx (range 0 3)]
       (let [mesg (str "message#" idx)]
         (.sendMessage client mesg)
         (is (= mesg (.getMessage client))))) ;; echo expected
-    (.close client)))
-
-(deftest test-on-send-properly-applyed      ; issue #14
-  (let [client (WebSocketClient. "ws://localhost:4348/ws4")]
-    (doseq [idx (range 0 5)]
-      (let [mesg (str "message#" idx)]
-        (.sendMessage client mesg)
-        (is (= mesg (:message (read-string (.getMessage client)))))))
     (.close client)))
 
 (deftest test-binary-frame
@@ -195,7 +181,7 @@
   (with-open [client (h/create-client)]
     (let [latch (promise)
           received-msg (atom nil)
-          ws (h/websocket client "ws://localhost:4348/ws3"
+          ws (h/websocket client "ws://localhost:4348/http-async-client"
                           :text (fn [con mesg]
                                   (reset! received-msg mesg)
                                   (deliver latch true))
