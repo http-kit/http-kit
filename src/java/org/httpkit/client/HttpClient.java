@@ -206,7 +206,8 @@ public final class HttpClient implements Runnable {
 
         String scheme = uri.getScheme();
         if (!"http".equals(scheme) && !"https".equals(scheme)) {
-            cb.onThrowable(new ProtocolException(scheme + " is not supported"));
+            String message = (scheme == null) ? "No protocol specified" : scheme + " is not supported";
+            cb.onThrowable(new ProtocolException(message));
             return;
         }
 
