@@ -39,8 +39,7 @@ public class HttpServer implements Runnable {
         this.selector = Selector.open();
         this.serverChannel = ServerSocketChannel.open();
         serverChannel.configureBlocking(false);
-        InetSocketAddress addr = new InetSocketAddress(ip, port);
-        serverChannel.socket().bind(addr);
+        serverChannel.socket().bind(new InetSocketAddress(ip, port));
         serverChannel.register(selector, OP_ACCEPT);
     }
 

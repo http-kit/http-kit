@@ -1,5 +1,11 @@
 package org.httpkit.client;
 
+import junit.framework.Assert;
+import org.apache.commons.io.IOUtils;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -13,13 +19,6 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-
-import junit.framework.Assert;
-
-import org.apache.commons.io.IOUtils;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
 
 class ResponseHandler implements IResponseHandler {
 
@@ -79,7 +78,7 @@ public class HttpClientTest {
     public void setup() throws IOException {
         cd = new CountDownLatch(1);
         listener = new RespListener(new ResponseHandler(cd), IFilter.ACCEPT_ALL,
-                Executors.newCachedThreadPool());
+                Executors.newCachedThreadPool(), 0);
     }
 
     @After
@@ -88,7 +87,7 @@ public class HttpClientTest {
     }
 
     public void get(String url) throws URISyntaxException {
-        client.exec(url,emptyHeader, null, new RequestConfig(), listener);
+        client.exec(url, emptyHeader, null, new RequestConfig(), listener);
     }
 
     @Test

@@ -95,11 +95,22 @@
     (println \"resp1's status: \" (:status @resp1))
     (println \"resp2's status: \" (:status @resp2)))
 
- Request options:
-    :url :method :headers :timeout :query-params :form-params
+  Output coercion:
+  ;; Return the body as a byte stream
+  (request {:url \"http://site.com/favicon.ico\" :as :stream})
+  ;; Coerce as a byte-array
+  (request {:url \"http://site.com/favicon.ico\" :as :byte-array})
+  ;; return the body as a string body
+  (request {:url \"http://site.com/string.txt\" :as :text})
+  ;; Try to automatically coerce the output based on the content-type header, currently supports :text :stream, (with automatic charset detection)
+  (request {:url \"http://site.com/string.txt\" :as :auto})
+
+  Request options:
+    :url :method :headers :timeout :query-params :form-params :as
     :client :body :basic-auth :user-agent :filter :worker-pool"
-  [{:keys [client timeout filter worker-pool keepalive sslengine] :as opts
-    :or {client @default-client timeout 60000 filter IFilter/ACCEPT_ALL worker-pool default-pool keepalive 120000}}
+  [{:keys [client timeout filter worker-pool keepalive sslengine as] :as opts
+    :or {client @default-client timeout 60000 filter IFilter/ACCEPT_ALL
+         worker-pool default-pool keepalive 120000 as :auto}}
    callback]
   (let [{:keys [url method headers body]} (coerce-req opts)
         response (promise)
@@ -118,7 +129,9 @@
                                    :status  status}))
                   (onThrowable [this t]
                     (deliver-resp {:opts opts :error t})))
-        listener (RespListener. handler filter worker-pool)
+        listener (RespListener. handler filter worker-pool
+                                ;; only the 4 support now
+                                (case as :auto 1 :text 2 :stream 3 :byte-array 4))
         cfg (RequestConfig. method timeout keepalive sslengine)]
     (.exec ^HttpClient client url headers body cfg listener)
     response))

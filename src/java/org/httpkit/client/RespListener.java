@@ -19,30 +19,23 @@ class Handler implements Runnable {
     private final int status;
     private final Map<String, String> headers;
     private final Object body;
-    private final Throwable e;
     private final IResponseHandler handler;
 
     public Handler(IResponseHandler handler, int status, Map<String, String> headers,
-                   Object body, Throwable e) {
+                   Object body) {
+        this.handler = handler;
         this.status = status;
         this.headers = headers;
         this.body = body;
-        this.e = e;
-        this.handler = handler;
     }
 
     public Handler(IResponseHandler handler, Throwable e) {
-        this(handler, 0, null, null, e);
-    }
-
-    public Handler(IResponseHandler handler, int status, Map<String, String> headers,
-                   Object body) {
-        this(handler, status, headers, body, null);
+        this(handler, 0, null, e);
     }
 
     public void run() {
-        if (e != null) {
-            handler.onThrowable(e);
+        if (body instanceof Throwable) {
+            handler.onThrowable((Throwable) body);
         } else {
             handler.onSuccess(status, headers, body);
         }
@@ -106,11 +99,13 @@ public class RespListener implements IRespListener {
     private final IResponseHandler handler;
     private final IFilter filter;
     private final ExecutorService pool;
+    final int coercion;
 
-    public RespListener(IResponseHandler handler, IFilter filter, ExecutorService pool) {
+    public RespListener(IResponseHandler handler, IFilter filter, ExecutorService pool, int coercion) {
         body = new DynamicBytes(1024 * 16);
         this.filter = filter;
         this.handler = handler;
+        this.coercion = coercion;
         this.pool = pool;
     }
 
@@ -128,13 +123,18 @@ public class RespListener implements IRespListener {
         }
         try {
             DynamicBytes bytes = unzipBody();
-            if (isText()) {
+            // 1=> auto, 2=>text, 3=>stream, 4=>byte-array
+            if (coercion == 2 || (coercion == 1 && isText())) {
                 Charset charset = HttpUtils.detectCharset(headers, bytes);
                 String html = new String(bytes.get(), 0, bytes.length(), charset);
                 pool.submit(new Handler(handler, status.getCode(), headers, html));
             } else {
                 BytesInputStream is = new BytesInputStream(bytes.get(), bytes.length());
-                pool.submit(new Handler(handler, status.getCode(), headers, is));
+                if (coercion == 4) { // byte-array
+                    pool.submit(new Handler(handler, status.getCode(), headers, is.bytes()));
+                } else {
+                    pool.submit(new Handler(handler, status.getCode(), headers, is));
+                }
             }
         } catch (IOException e) {
             handler.onThrowable(e);

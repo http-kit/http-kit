@@ -1,5 +1,9 @@
 package org.httpkit.client;
 
+import org.httpkit.HttpMethod;
+import org.junit.Before;
+import org.junit.Test;
+
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
@@ -7,10 +11,6 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-
-import org.httpkit.HttpMethod;
-import org.junit.Before;
-import org.junit.Test;
 
 public class TextClientTest {
     HttpClient client;
@@ -61,7 +61,7 @@ public class TextClientTest {
                 }
             };
             client.exec(url, null, null, new RequestConfig(), new RespListener(handler,
-                    IFilter.ACCEPT_ALL, pool));
+                    IFilter.ACCEPT_ALL, pool, 1));
         }
 
         latch.await();

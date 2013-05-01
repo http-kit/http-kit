@@ -196,6 +196,20 @@
     (is (= url (:u params)))
     (is (= "false" (:try params)))))
 
+(deftest test-output-coercion
+  (let [url "http://localhost:4347/length?length=1024"]
+    (let [body (:body @(http/get url {:as :text}))]
+      (is (string? body))
+      (is (= 1024 (count body))))
+    (let [body (:body @(http/get url))] ; auto
+      (is (string? body)))
+    (let [body (:body @(http/get url {:as :auto}))] ; auto
+      (is (string? body)))
+    (let [body (:body @(http/get url {:as :stream}))]
+      (is (instance? java.io.InputStream body)))
+    (let [body (:body @(http/get url {:as :byte-array}))]
+      (is (= 1024 (alength body))))))
+
 (deftest test-https
   (let [get-url (fn [length] (str "https://localhost:9898/length?length=" length))]
     (doseq [i (range 0 2)]
