@@ -137,8 +137,11 @@ public final class HttpClient implements Runnable {
             try {
                 if (req.decoder.decode(buffer) == ALL_READ) {
                     req.finish();
-                    if (req.cfg.keepAlive > 0)
+                    if (req.cfg.keepAlive > 0) {
                         keepalives.offer(new PersistentConn(now + req.cfg.keepAlive, req.addr, key));
+                    } else {
+                        closeQuietly(key);
+                    }
                 }
             } catch (HTTPException e) {
                 closeQuietly(key);
@@ -153,6 +156,7 @@ public final class HttpClient implements Runnable {
 
     private void closeQuietly(SelectionKey key) {
         try {
+            // TODO engine.closeInbound
             key.channel().close();
         } catch (Exception ignore) {
         }

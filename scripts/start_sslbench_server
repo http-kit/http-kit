@@ -5,6 +5,7 @@
 CP=`lein classpath`
 
 java -cp "$CP" \
-    -Xms128m -Xmx128m \
+    -Xms256m -Xmx256m \
     -Xdebug -Xrunjdwp:transport=dt_socket,address=9094,server=y,suspend=n \
+    -XX:HeapDumpPath=/tmp -XX:+HeapDumpOnOutOfMemoryError \
     clojure.main -m org.httpkit.ssl-bench
