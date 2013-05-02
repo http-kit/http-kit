@@ -3,18 +3,12 @@ package org.httpkit;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.InetSocketAddress;
-import java.net.Socket;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.UnknownHostException;
-
-import org.httpkit.HttpUtils;
+import java.net.*;
 
 public class SpecialHttpClient {
 
-    public static void main(String[] args) {
-        System.out.println(getPartial("http://127.0.0.1:9090/slow"));
+    public static void main(String[] args) throws Exception {
+        System.out.println(http10("http://127.0.0.1:9090/"));
     }
 
     // request + request sent to server, wait for 2 server responses
@@ -38,11 +32,31 @@ public class SpecialHttpClient {
         int read = is.read(buffer);
         s.close();
         return new String(buffer, 0, read);
+    }
 
+    public static String http10(String url) throws Exception {
+        URI uri = new URI(url);
+        InetSocketAddress addr = HttpUtils.getServerAddr(uri);
+
+        Socket s = new Socket();
+        s.connect(addr);
+        OutputStream os = s.getOutputStream();
+
+        String request = "GET " + HttpUtils.getPath(uri)
+                + " HTTP/1.0\r\nHost: localhost\r\nConnection: keep-alive\r\n\r\n";
+        os.write((request + request).getBytes());
+        os.flush();
+
+        InputStream is = s.getInputStream();
+
+        byte[] buffer = new byte[8096];
+        int read = is.read(buffer);
+        s.close();
+        return new String(buffer, 0, read);
     }
 
     // sent request one byte at a time
-    public static String slowGet(String url) throws URISyntaxException, UnknownHostException,
+    public static String slowGet(String url) throws URISyntaxException,
             IOException, InterruptedException {
 
         URI uri = new URI(url);

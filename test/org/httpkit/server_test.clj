@@ -285,6 +285,12 @@
     (= 2 (count (re-seq #"hello world" resp)))
     (= 2 (count (re-seq #"200" resp)))))
 
+(deftest test-http10-keepalive
+  ;; request + request sent to server, wait for 2 server responses
+  (let [resp (SpecialHttpClient/http10 "http://localhost:4347/")]
+    (is (re-find #"200" resp))
+    (is (re-find #"Keep-Alive" resp))))
+
 (deftest test-ipv6
   ;; TODO add more
   (is (= "hello world" (:body (http/get "http://[::1]:4347/")))))
