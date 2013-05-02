@@ -7,11 +7,11 @@
 
 (defn ssl-handler [req]
   (with-channel req channel
-    (let [length (or (-> req :params :length) 1024)
+    (let [length (to-int (or (-> req :params :length) "1024"))
           opts {:sslengine (trust-everybody)}]
-      (http/get (str "https://localhost:9898/length?length=" (to-int length)) opts
+      (http/get (str "https://localhost:9898/length?length=" length) opts
                 (fn [{:keys [status body headers error opts]}]
-                  (when-not (= (count body) length)
+                  (when-not (== (count body) length)
                     (println "error, expect: " length "; but get: " (count body)))
                   (send! channel (str (count body))))))))
 

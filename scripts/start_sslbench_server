@@ -4,27 +4,7 @@
 
 CP=`lein classpath`
 
-REQUEST_N=150000
-REQUEST_C=100
-
-# -Xdebug -Xrunjdwp:transport=dt_socket,address=9093,server=y,suspend=n \
-
 java -cp "$CP" \
     -Xms128m -Xmx128m \
+    -Xdebug -Xrunjdwp:transport=dt_socket,address=9094,server=y,suspend=n \
     clojure.main -m org.httpkit.ssl-bench
-
-exit 0
-
-# Just for reference. Mon Feb 18 23:42:17 CST 2013
-# AIR  1.7G i5-2557M
-# ab -n 1000000 -c 100  -k http://127.0.0.0:8000/  =>  Requests per second:    34116.10 [#/sec] (mean)
-# Desktop Intel(R) Core(TM) i7-2600 CPU @ 3.40GHz
-# ab -k -n 1000000 -c 100  http://127.0.0.1:8000/ => Requests per second:    101161.86 [#/sec] (mean)
-
-
-
-PID=$!
-echo "pid is $PID, sleep 4 seconds to wait start, listen on port 8000"
-sleep 4
-echo "warm up JVM by ab -n $REQUEST_N -c $REQUEST_C"
-ab -n $REQUEST_N -c $REQUEST_C http://localhost:8000/

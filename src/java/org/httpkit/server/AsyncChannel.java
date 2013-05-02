@@ -4,6 +4,7 @@ import clojure.lang.IFn;
 import clojure.lang.Keyword;
 import org.httpkit.DynamicBytes;
 import org.httpkit.HeaderMap;
+import org.httpkit.HttpVersion;
 import sun.misc.Unsafe;
 
 import java.io.IOException;
@@ -30,12 +31,14 @@ public class AsyncChannel {
     private final SelectionKey key;
     private final HttpServer server;
 
+    private HttpRequest request;     // package private, for http 1.0 keep-alive
+
     volatile int closedRan = 0; // 0 => false, 1 => run
     // streaming
     private volatile int isHeaderSent = 0;
 
-    volatile IFn closeHandler = null;
     private volatile IFn receiveHandler = null;
+    volatile IFn closeHandler = null;
 
     static {
         try {
@@ -67,7 +70,8 @@ public class AsyncChannel {
         this.server = server;
     }
 
-    public void reset() {
+    public void reset(HttpRequest request) {
+        this.request = request;
         serialTask = null;
         unsafe.putOrderedInt(this, closedRanOffset, 0); // lazySet to false
         unsafe.putOrderedInt(this, headerSentOffset, 0);
@@ -89,11 +93,9 @@ public class AsyncChannel {
         int status = 200;
         Object body = data;
         HeaderMap headers;
-//        Map<String, Object> headers = new TreeMap<String, Object>();
         if (data instanceof Map) {
             Map<Keyword, Object> resp = (Map<Keyword, Object>) data;
             headers = HeaderMap.camelCase((Map) resp.get(HEADERS));
-//            headers = getHeaders(resp);
             status = getStatus(resp);
             body = resp.get(BODY);
         } else {
@@ -102,6 +104,10 @@ public class AsyncChannel {
 
         if (headers.isEmpty()) { // default 200 and text/html
             headers.put("Content-Type", "text/html; charset=utf-8");
+        }
+
+        if (request.isKeepAlive && request.version == HttpVersion.HTTP_1_0) {
+            headers.put("Connection", "Keep-Alive");
         }
 
         if (close) { // normal response, Content-Length. Every http client understand it
@@ -217,7 +223,7 @@ public class AsyncChannel {
                 server.tryWrite(key, WsEncode(OPCODE_BINARY, bytes.get(), bytes.length()));
             } else if (data != null) { // ignore null
                 throw new IllegalArgumentException(
-                        "only accept string, byte[], InputStream, get" + data);
+                        "only accept string, byte[], InputStream, get " + data.getClass());
             }
 
             if (close) {

@@ -76,20 +76,19 @@ public class HttpServer implements Runnable {
     private void decodeHttp(HttpAtta atta, SelectionKey key, SocketChannel ch) {
         try {
             do {
-                atta.channel.reset(); // reuse for performance
+                AsyncChannel channel = atta.channel;
                 HttpRequest request = atta.decoder.decode(buffer);
                 if (request != null) {
+                    channel.reset(request);
                     if (request.isWebSocket) {
-                        key.attach(new WsAtta(atta.channel));
+                        key.attach(new WsAtta(channel));
                     } else {
                         atta.keepalive = request.isKeepAlive;
                     }
-                    request.channel = atta.channel;
-                    request.remoteAddr = (InetSocketAddress) ch.socket()
-                            .getRemoteSocketAddress();
+                    request.channel = channel;
+                    request.remoteAddr = (InetSocketAddress) ch.socket().getRemoteSocketAddress();
                     handler.handle(request, new RespCallback(key, this));
                     // pipelining not supported : need queue to ensure order
-                    // AsyncChannel can't be reseted here
                     atta.decoder.reset();
                 }
             } while (buffer.hasRemaining()); // consume all
