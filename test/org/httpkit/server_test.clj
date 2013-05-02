@@ -120,6 +120,9 @@
   (POST "/multipart" [] multipart-handler)
   (POST "/chunked-input" [] (fn [req] {:status 200
                                       :body (str (:content-length req))}))
+  (GET "/length" [] (fn [req]
+                      (let [l (-> req :params :length to-int)]
+                        (subs const-string 0 l))))
   (GET "/null" [] (fn [req] {:status 200 :body nil}))
   (GET "/demo" [] streaming-demo)
 

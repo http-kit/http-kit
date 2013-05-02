@@ -9,8 +9,7 @@
         (clojure.tools [logging :only [info warn]]))
   (:require [org.httpkit.client :as http]
             [clojure.java.io :as io]
-            [clj-http.client :as clj-http])
-  (:import org.httpkit.client.SslContextFactory))
+            [clj-http.client :as clj-http]))
 
 (defroutes test-routes
   (GET "/get" [] "hello world")
@@ -53,9 +52,6 @@
      (println (str ~title "Elapsed time: "
                    (/ (double (- (. System (nanoTime)) start#)) 1000000.0)
                    " msecs"))))
-
-(defn- trust-everybody []
-  (.createSSLEngine (SslContextFactory/getClientContext)))
 
 (deftest test-http-client
   (doseq [host ["http://127.0.0.1:4347" "http://127.0.0.1:14347"]]
