@@ -120,12 +120,13 @@
 
   See org.httpkit.timer ns for optional timeout facilities."
   [request ch-name & body]
-  `(let [^AsyncChannel ~ch-name (:async-channel ~request)]
+  `(let [~ch-name (:async-channel ~request)]
      (if (:websocket? ~request)
        (if-let [key# (get-in ~request [:headers "sec-websocket-key"])]
-         (do (.sendHandshake ~ch-name {"Upgrade"    "websocket"
-                                       "Connection" "Upgrade"
-                                       "Sec-WebSocket-Accept" (accept key#)})
+         (do (.sendHandshake ~(with-meta ch-name {:tag `AsyncChannel})
+                             {"Upgrade"    "websocket"
+                              "Connection" "Upgrade"
+                              "Sec-WebSocket-Accept" (accept key#)})
              ~@body
              {:body ~ch-name})
          {:status 400 :body "Bad Sec-WebSocket-Key header"})

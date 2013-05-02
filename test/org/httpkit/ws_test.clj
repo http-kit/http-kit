@@ -39,7 +39,7 @@
 (defn binary-ws-handler [req]
   (with-channel req con
     (on-receive con (fn [data]
-                      (let [retdata (doto (aclone data) (java.util.Arrays/sort))
+                      (let [retdata (doto (aclone ^bytes data) (java.util.Arrays/sort))
                             data (if (rand-nth [true false])
                                    (java.io.ByteArrayInputStream. retdata)
                                    retdata)]
