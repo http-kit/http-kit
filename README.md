@@ -32,7 +32,7 @@ Please use the [GitHub issues page](https://github.com/http-kit/http-kit/issues)
 
 ### Change log
 
-[history.md](https://github.com/http-kit/http-kit/blob/protocol-api/history.md)
+[history.md](https://github.com/http-kit/http-kit/blob/master/history.md)
 
 ### License
 
