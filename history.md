@@ -56,3 +56,17 @@ HTTP server:
 
 ### 2.0.1 (2013/4/12)
    1. Performance improvement. About 50% ~ 90% when benchmark due to IO model change: One IO thread => On thread reading, decoding + many threads writing
+
+### 2.1.0 (2013/5/3)
+HTTP server:
+   1. Fix for IPv6 address <Thomas Heller>
+   2. Saving RAM by using HeaderMap and Unsafe
+   3. Fix HTTP streaming does not sent keep-alive header for HTTP 1.0 keep-alived request
+   4. Get rid of reflection warning
+
+HTTP client:
+   1. Support HTTPS
+   2. Check to make sure host is not null
+   3. Output coercion: :as option, accepted :auto :text :stream :byte-array.
+   4. application/xml is a text response
+   5. FIX: handle buggy web servers returning uncompliant Status-Line <Laszlo Toeroek>
