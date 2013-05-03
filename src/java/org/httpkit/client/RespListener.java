@@ -102,7 +102,7 @@ public class RespListener implements IRespListener {
     final int coercion;
 
     public RespListener(IResponseHandler handler, IFilter filter, ExecutorService pool, int coercion) {
-        body = new DynamicBytes(1024 * 16);
+        body = new DynamicBytes(1024 * 8);
         this.filter = filter;
         this.handler = handler;
         this.coercion = coercion;

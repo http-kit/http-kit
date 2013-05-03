@@ -16,8 +16,18 @@
                     (println "error, expect: " length "; but get: " (count body)))
                   (send! channel (str (count body))))))))
 
+(defn proxy-handler [req]
+  (with-channel req channel
+    (let [length (to-int (or (-> req :params :length) "1024"))]
+      (http/get (str "http://localhost:9090/length?length=" length)
+                (fn [{:keys [status body headers error opts]}]
+                  (when-not (== (count body) length)
+                    (println "error, expect: " length "; but get: " (count body)))
+                  (send! channel (str (count body))))))))
+
 (defroutes test-routes
-  (GET "/" [] ssl-handler))
+  (GET "/" [] ssl-handler)
+  (GET "/proxy" [] proxy-handler))
 
 (defn -main [& args]
   (run-server (site test-routes) {:port 8080

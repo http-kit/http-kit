@@ -25,16 +25,12 @@ public class HttpDecoder {
     private Map<String, String> headers = new TreeMap<String, String>();
     byte[] content;
 
-    int lineBufferIdx = 0;
-    // 1k buffer, increase as necessary;
-    private byte[] lineBuffer = new byte[1024];
-
     private final int maxBody;
-    private final int maxLine;
+    private final LineReader lineReader;
 
     public HttpDecoder(int maxBody, int maxLine) {
         this.maxBody = maxBody;
-        this.maxLine = maxLine;
+        this.lineReader = new LineReader(maxLine);
     }
 
     private void createRequest(String sb) throws ProtocolException {
@@ -78,7 +74,7 @@ public class HttpDecoder {
                 case ALL_READ:
                     return request;
                 case READ_INITIAL:
-                    line = readLine(buffer);
+                    line = lineReader.readLine(buffer);
                     if (line != null) {
                         createRequest(line);
                         state = State.READ_HEADER;
@@ -88,7 +84,7 @@ public class HttpDecoder {
                     readHeaders(buffer);
                     break;
                 case READ_CHUNK_SIZE:
-                    line = readLine(buffer);
+                    line = lineReader.readLine(buffer);
                     if (line != null) {
                         readRemaining = getChunkSize(line);
                         if (readRemaining == 0) {
@@ -152,10 +148,10 @@ public class HttpDecoder {
 
     private void readHeaders(ByteBuffer buffer) throws LineTooLargeException,
             RequestTooLargeException, ProtocolException {
-        String line = readLine(buffer);
+        String line = lineReader.readLine(buffer);
         while (line != null && !line.isEmpty()) {
             HttpUtils.splitAndAddHeader(line, headers);
-            line = readLine(buffer);
+            line = lineReader.readLine(buffer);
         }
 
         if (line == null) {
@@ -188,42 +184,12 @@ public class HttpDecoder {
         }
     }
 
-    String readLine(ByteBuffer buffer) throws LineTooLargeException {
-        byte b;
-        boolean more = true;
-        while (buffer.hasRemaining() && more) {
-            b = buffer.get();
-            if (b == CR) {
-                if (buffer.hasRemaining() && buffer.get() == LF) {
-                    more = false;
-                }
-            } else if (b == LF) {
-                more = false;
-            } else {
-                if (lineBufferIdx == maxLine - 2) {
-                    throw new LineTooLargeException("line length exceed " + lineBuffer.length);
-                }
-                if (lineBufferIdx == lineBuffer.length) {
-                    lineBuffer = Arrays.copyOf(lineBuffer, lineBuffer.length * 2);
-                }
-                lineBuffer[lineBufferIdx] = b;
-                ++lineBufferIdx;
-            }
-        }
-        String line = null;
-        if (!more) {
-            line = new String(lineBuffer, 0, lineBufferIdx);
-            lineBufferIdx = 0;
-        }
-        return line;
-    }
-
     public void reset() {
         state = State.READ_INITIAL;
         headers = new TreeMap<String, String>();
         readCount = 0;
         content = null;
-        lineBufferIdx = 0;
+        lineReader.reset();
         request = null;
     }
 
