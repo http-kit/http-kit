@@ -47,8 +47,6 @@ public class HttpUtils {
 
     public static final byte LF = 10; // \n
 
-    public static final int BUFFER_SIZE = 1024 * 64;
-
     // public static final int ABORT_PROCESSING = -1;
 
     // public static final String USER_AGENT = "user-agent";

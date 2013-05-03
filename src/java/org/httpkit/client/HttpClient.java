@@ -31,7 +31,7 @@ public final class HttpClient implements Runnable {
     private volatile boolean running = true;
 
     // shared, single thread
-    private final ByteBuffer buffer = ByteBuffer.allocateDirect(BUFFER_SIZE);
+    private final ByteBuffer buffer = ByteBuffer.allocateDirect(1024 * 64);
     private final Selector selector;
 
     public HttpClient() throws IOException {

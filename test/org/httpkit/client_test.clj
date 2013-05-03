@@ -258,4 +258,6 @@
 
 (defn -main [& args]
   (let [urls (shuffle (set (line-seq (io/reader "/tmp/urls"))))]
-    (doall (map-indexed fetch-group-urls (partition 1000 urls)))))
+    (info "total" (count urls) "urls")
+    (doall (map-indexed fetch-group-urls (partition 1000 urls)))
+    (info "all downloaded")))

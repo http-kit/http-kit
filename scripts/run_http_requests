@@ -5,7 +5,11 @@ mkdir target
 
 CP="classes:$(lein classpath)"
 
-find src/java -name "*.java" | xargs javac -g -Xlint:unchecked -encoding utf8 -cp "$CP" -d classes -sourcepath src/java/
+# find src/java -name "*.java" | xargs javac -g -Xlint:unchecked -encoding utf8 -cp "$CP" -d classes -sourcepath src/java/
+
+# lein javac
+
+./scripts/javac with-test
 
 java -cp "$CP" \
     -Xdebug -Xrunjdwp:transport=dt_socket,address=9092,server=y,suspend=n \

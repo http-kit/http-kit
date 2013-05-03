@@ -31,12 +31,12 @@ public class HttpsRequest extends Request {
     }
 
     SSLEngine engine; // package private
-    private ByteBuffer myNetData = ByteBuffer.allocate(48 * 1024);
-    private ByteBuffer peerNetData = ByteBuffer.allocate(48 * 1024);
+    private ByteBuffer myNetData = ByteBuffer.allocate(40 * 1024);
+    private ByteBuffer peerNetData = ByteBuffer.allocate(40 * 1024);
     boolean handshaken = false;
 
     final int unwrapRead(ByteBuffer peerAppData) throws IOException {
-        // TODO, make sure peerNetData has remaing place
+        // TODO, make sure peerNetData has remaining place
         int read = ((SocketChannel) key.channel()).read(peerNetData), unwrapped = 0;
         if (read > 0) {
             peerNetData.flip();
@@ -49,12 +49,12 @@ public class HttpsRequest extends Request {
             peerNetData.compact();
             switch (res.getStatus()) {
                 case OK:
-                case BUFFER_UNDERFLOW: // 0
+                case BUFFER_UNDERFLOW: // need more data
                     return unwrapped;
                 case CLOSED:
                     return unwrapped > 0 ? unwrapped : -1;
-                case BUFFER_OVERFLOW: // can't => peerAppData is 64k
-                    return -1; // TODO Overflow, need large buffer
+                case BUFFER_OVERFLOW:
+                    return -1; // can't => peerAppData is 64k
             }
             return unwrapped;
         } else {

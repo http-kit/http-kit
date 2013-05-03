@@ -29,8 +29,8 @@ public class HttpsClientTest {
         HttpClient client = new HttpClient();
 
         String[] urls = new String[]{
-                "https://localhost:9898/",
-                "https://localhost:9898/file?l=121021"
+                "https://localhost:9898/spec",
+//                "https://localhost:9898/file?l=121021"
 //                "https://github.com/http-kit/http-kit",
 //                "https://github.com/shenfeng/FrameworkBenchmarks"
         };
@@ -39,12 +39,22 @@ public class HttpsClientTest {
         for (String url : urls) {
             final CountDownLatch cd = new CountDownLatch(1);
             SSLEngine engine = SslContextFactory.getClientContext().createSSLEngine();
-            engine = null;
-            RequestConfig cfg = new RequestConfig(HttpMethod.GET, 10000, -1, engine);
-            client.exec(url, new TreeMap<String, Object>(), null, cfg, new RespListener(new IResponseHandler() {
+//            engine = null;
+            RequestConfig cfg = new RequestConfig(HttpMethod.POST, 10000, -1, engine);
+            TreeMap<String, Object> headers = new TreeMap<String, Object>();
+            for (int i = 0; i < 33; i++) {
+                headers.put("X-long-header" + i, AGENT + AGENT + AGENT + AGENT);
+            }
+            headers.put("User-Agent", AGENT);
+            StringBuilder body = new StringBuilder(16 * 1024);
+            for (int i = 0; i < 16 * 1024; ++i) {
+                body.append(i);
+            }
+            client.exec(url, headers, body.toString(), cfg, new RespListener(new IResponseHandler() {
                 public void onSuccess(int status, Map<String, String> headers, Object body) {
                     int length = body instanceof String ? ((String) body).length() :
                             ((BytesInputStream) body).available();
+                    System.out.println(body);
                     logger.info("{}, {}, {}", status, headers, length);
                     cd.countDown();
                 }
