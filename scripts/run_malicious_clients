@@ -1,0 +1,10 @@
+#! /bin/bash
+
+cd test/java
+
+find . -name "*.class" | xargs rm
+
+CP=`lein classpath`
+
+javac -cp $CP  org/httpkit/MaliciousClients.java
+java -cp $CP -Xms512m -Xmx512m org.httpkit.MaliciousClients $@
