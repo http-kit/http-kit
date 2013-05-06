@@ -27,6 +27,7 @@ public class WSDecoder {
     private int maskingKey;
     private boolean finalFlag;
     private int opcode = -1;
+    private int framePayloadIndex; // masking per frame
 
     public Frame decode(ByteBuffer buffer) throws ProtocolException {
         while (buffer.hasRemaining()) {
@@ -79,6 +80,7 @@ public class WSDecoder {
                         throw new ProtocolException("unmasked client to server frame");
                     }
                     state = State.MASKING_KEY;
+                    framePayloadIndex = 0; // reset
                     break;
                 case MASKING_KEY:
                     maskingKey = buffer.getInt();
@@ -91,12 +93,13 @@ public class WSDecoder {
 
                         byte[] mask = ByteBuffer.allocate(4).putInt(maskingKey).array();
                         for (int i = 0; i < read; i++) {
-                            content[i + idx] = (byte) (content[i + idx] ^ mask[i % 4]);
+                            content[i + idx] = (byte) (content[i + idx] ^ mask[(framePayloadIndex + i) % 4]);
                         }
 
                         payloadRead += read;
                         idx += read;
                     }
+                    framePayloadIndex += read;
 
                     // all read
                     if (payloadRead == payloadLength) {
@@ -137,5 +140,6 @@ public class WSDecoder {
         idx = 0;
         opcode = -1;
         content = null;
+        framePayloadIndex = 0;
     }
 }

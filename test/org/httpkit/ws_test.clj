@@ -31,7 +31,7 @@
                       ;; only :body is picked
                       (send! con {:body mesg}))))) ; echo back
 
-(defn ws-handler-async-client [req] ;; test with http.async.client
+(defn ws-handler-async-client [req] ;; test with http.async.client, echo back
   (with-channel req con
     (on-receive con (fn [mesg]
                       (send! con mesg)))))
@@ -73,6 +73,7 @@
 (defroutes test-routes
   (GET "/ws" [] ws-handler)
   (GET "/sent-on-connect" [] ws-handler-sent-on-connect)
+  (GET "/echo" [] ws-handler-async-client)
   (GET "/http-async-client" [] ws-handler-async-client)
   (GET "/binary" [] binary-ws-handler)
   (GET "/interleaved" [] not-interleave-handler)
@@ -128,6 +129,16 @@
         (.sendMessage client mesg)
         (is (= mesg (.getMessage client))))) ;; echo expected
     (.close client)))
+
+(deftest test-tcp-segmented-frame-does-right  ; issue #47
+  (let [data (slurp "test/ws_unmask_bug_47.txt") ; 65 data, segement sure, since receive buffer is 64K
+        data_3 (str data data data)
+        client (WebSocketClient. "ws://localhost:4348/echo")]
+    (dotimes [_ 3]
+      (.sendFragmentedMesg client data_3 3)
+      (is (= data_3 (.getMessage client)))
+      (.sendMessage client data)
+      (is (= data (.getMessage client))))))
 
 (deftest test-binary-frame
   (let [client (WebSocketClient. "ws://localhost:4348/binary")]

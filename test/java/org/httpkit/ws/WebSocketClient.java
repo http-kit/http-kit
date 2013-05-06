@@ -1,23 +1,19 @@
 package org.httpkit.ws;
 
+import org.jboss.netty.bootstrap.ClientBootstrap;
+import org.jboss.netty.buffer.ChannelBuffer;
+import org.jboss.netty.buffer.ChannelBuffers;
+import org.jboss.netty.channel.*;
+import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory;
+import org.jboss.netty.handler.codec.http.HttpRequestEncoder;
+import org.jboss.netty.handler.codec.http.HttpResponseDecoder;
+import org.jboss.netty.handler.codec.http.websocketx.*;
+
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.Random;
 import java.util.concurrent.*;
-
-import org.jboss.netty.bootstrap.ClientBootstrap;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.buffer.ChannelBuffers;
-import org.jboss.netty.channel.Channel;
-import org.jboss.netty.channel.ChannelFuture;
-import org.jboss.netty.channel.ChannelPipeline;
-import org.jboss.netty.channel.ChannelPipelineFactory;
-import org.jboss.netty.channel.Channels;
-import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory;
-import org.jboss.netty.handler.codec.http.HttpRequestEncoder;
-import org.jboss.netty.handler.codec.http.HttpResponseDecoder;
-import org.jboss.netty.handler.codec.http.websocketx.*;
 
 public class WebSocketClient {
 
@@ -31,7 +27,7 @@ public class WebSocketClient {
         client.sendMessage("{:length 3145728, :times 1}");
         for (int i = 0; i < 1; i++) {
             Object message = client.getMessage();
-            if(message instanceof String) {
+            if (message instanceof String) {
                 System.out.println(((String) message).length());
             }
         }
@@ -53,7 +49,7 @@ public class WebSocketClient {
 
                 pipeline.addLast("decoder", new HttpResponseDecoder());
                 pipeline.addLast("encoder", new HttpRequestEncoder());
-                pipeline.addLast("ws-handler", new WebSocketClientHandler(handshaker, queue,
+                pipeline.addLast("ws-handler", new org.httpkit.ws.WebSocketClientHandler(handshaker, queue,
                         latch));
                 return pipeline;
             }
@@ -71,12 +67,23 @@ public class WebSocketClient {
         ch.write(new TextWebSocketFrame(message));
     }
 
-    public void sendFragmentedMesg(String message) {
+    public void sendFragmentedMesg(String message, int frameCount) {
         int length = message.length();
-        int frame = Math.min(4000, new Random().nextInt(length / 2) + 40);
+        int frame = length / frameCount;
         int i;
         for (i = 0; i < length - frame; i += frame) {
             ch.write(new TextWebSocketFrame(false, 0, message.substring(i, i + frame)));
+        }
+        ch.write(new TextWebSocketFrame(message.substring(i)));
+    }
+
+
+    public void sendFragmentedMesg(String message) {
+        int length = message.length();
+        int perframe = Math.min(4000, new Random().nextInt(length / 2) + 40);
+        int i;
+        for (i = 0; i < length - perframe; i += perframe) {
+            ch.write(new TextWebSocketFrame(false, 0, message.substring(i, i + perframe)));
         }
         ch.write(new TextWebSocketFrame(message.substring(i)));
     }
