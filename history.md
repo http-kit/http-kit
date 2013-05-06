@@ -1,3 +1,6 @@
+## 2.1.1 (2013/5/6)
+   Fix #47: Large websocket requests get corrupted
+
 ## 2.1.0 (2013/5/3)
 HTTP server:
    1. Fix: for IPv6 address <Thomas Heller>

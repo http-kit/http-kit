@@ -7,7 +7,7 @@ See **[http-kit.org](http://http-kit.org)** for documentation, examples, benchma
 Current [semantic](http://semver.org/) version:
 
 ```clj
-[http-kit "2.1.0"]  ; WebSocket and async API are not compatible with the RC releases.
+[http-kit "2.1.1"]
 ```
 
 
