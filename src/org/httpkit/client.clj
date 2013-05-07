@@ -132,8 +132,8 @@
         listener (RespListener. handler filter worker-pool
                                 ;; only the 4 support now
                                 (case as :auto 1 :text 2 :stream 3 :byte-array 4))
-        cfg (RequestConfig. method timeout keepalive sslengine)]
-    (.exec ^HttpClient client url headers body cfg listener)
+        cfg (RequestConfig. method headers body timeout keepalive)]
+    (.exec ^HttpClient client url cfg sslengine listener)
     response))
 
 (defmacro ^:private defreq [method]

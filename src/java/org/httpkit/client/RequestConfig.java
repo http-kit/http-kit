@@ -2,40 +2,27 @@ package org.httpkit.client;
 
 import org.httpkit.HttpMethod;
 
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLEngine;
-import java.security.NoSuchAlgorithmException;
+import java.util.Map;
 
 public class RequestConfig {
-    public static final SSLContext DEFAUTL_CONTEXT;
-
-    static {
-        try {
-            DEFAUTL_CONTEXT = SSLContext.getDefault();
-        } catch (NoSuchAlgorithmException e) {
-            throw new Error("Failed to initialize SSLContext", e);
-        }
-    }
+    public static String DEFAULT_USER_AGENT = "http-kit/2.0";
 
     final int timeout;
     final int keepAlive;
-    final SSLEngine engine;
+    final Object body;
+    final Map<String, Object> headers;
     final HttpMethod method;
 
-    public static String DEFAULT_USER_AGENT = "http-kit/2.0";
-
-    public RequestConfig(HttpMethod method, int timeoutMs, int keepAliveMs, SSLEngine engine) {
-        if (engine == null) {
-            engine = DEFAUTL_CONTEXT.createSSLEngine();
-        }
-        engine.setUseClientMode(true);
+    public RequestConfig(HttpMethod method, Map<String, Object> headers, Object body,
+                         int timeoutMs, int keepAliveMs) {
         this.timeout = timeoutMs;
         this.keepAlive = keepAliveMs;
-        this.engine = engine;
+        this.headers = headers;
+        this.body = body;
         this.method = method;
     }
 
     public RequestConfig() { // for easy test only
-        this(HttpMethod.GET, 40000, -1, null);
+        this(HttpMethod.GET, null, null, 40000, -1);
     }
 }

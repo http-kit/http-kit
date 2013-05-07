@@ -40,7 +40,7 @@ public class HttpsClientTest {
             final CountDownLatch cd = new CountDownLatch(1);
             SSLEngine engine = SslContextFactory.getClientContext().createSSLEngine();
 //            engine = null;
-            RequestConfig cfg = new RequestConfig(HttpMethod.POST, 10000, -1, engine);
+            RequestConfig cfg = new RequestConfig(HttpMethod.POST, null, null, 40000, -1);
             TreeMap<String, Object> headers = new TreeMap<String, Object>();
             for (int i = 0; i < 33; i++) {
                 headers.put("X-long-header" + i, AGENT + AGENT + AGENT + AGENT);
@@ -50,7 +50,7 @@ public class HttpsClientTest {
             for (int i = 0; i < 16 * 1024; ++i) {
                 body.append(i);
             }
-            client.exec(url, headers, body.toString(), cfg, new RespListener(new IResponseHandler() {
+            client.exec(url, cfg, null, new RespListener(new IResponseHandler() {
                 public void onSuccess(int status, Map<String, String> headers, Object body) {
                     int length = body instanceof String ? ((String) body).length() :
                             ((BytesInputStream) body).available();

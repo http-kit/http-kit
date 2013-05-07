@@ -2,32 +2,23 @@ package org.httpkit.client;
 
 import org.httpkit.PriorityQueue;
 
-import javax.net.ssl.*;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLEngineResult;
 import javax.net.ssl.SSLEngineResult.Status;
+import javax.net.ssl.SSLException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
-import java.security.NoSuchAlgorithmException;
 
 public class HttpsRequest extends Request {
-
-    public static final SSLContext DEFAULT_CONTEXT;
     private static final ByteBuffer EMPTY_BUFFER = ByteBuffer.allocate(0);
 
-    static {
-        try {
-            DEFAULT_CONTEXT = SSLContext.getDefault();
-        } catch (NoSuchAlgorithmException e) {
-            throw new Error("Failed to initialize SSLContext", e);
-        }
-    }
-
     public HttpsRequest(InetSocketAddress addr, ByteBuffer[] request, IRespListener handler,
-                        PriorityQueue<Request> clients, RequestConfig config) {
+                        PriorityQueue<Request> clients, RequestConfig config, SSLEngine engine) {
         super(addr, request, handler, clients, config);
-        this.engine = config.engine;
+        this.engine = engine;
     }
 
     SSLEngine engine; // package private

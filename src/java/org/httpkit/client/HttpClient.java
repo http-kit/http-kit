@@ -1,9 +1,10 @@
 package org.httpkit.client;
 
 import org.httpkit.*;
-import org.httpkit.PriorityQueue;
 import org.httpkit.ProtocolException;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLException;
 import java.io.IOException;
 import java.net.*;
@@ -11,18 +12,32 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
-import java.util.*;
+import java.security.NoSuchAlgorithmException;
+import java.util.Iterator;
+import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.lang.System.currentTimeMillis;
 import static java.nio.channels.SelectionKey.*;
-import static org.httpkit.HttpUtils.*;
+import static org.httpkit.HttpUtils.SP;
+import static org.httpkit.HttpUtils.getServerAddr;
 import static org.httpkit.client.State.ALL_READ;
 import static org.httpkit.client.State.READ_INITIAL;
 
 public final class HttpClient implements Runnable {
     private static final AtomicInteger ID = new AtomicInteger(0);
+
+    public static final SSLContext DEFAULT_CONTEXT;
+
+    static {
+        try {
+            DEFAULT_CONTEXT = SSLContext.getDefault();
+        } catch (NoSuchAlgorithmException e) {
+            throw new Error("Failed to initialize SSLContext", e);
+        }
+    }
 
     private final Queue<Request> pending = new ConcurrentLinkedQueue<Request>();
     private final PriorityQueue<Request> requests = new PriorityQueue<Request>();
@@ -193,8 +208,7 @@ public final class HttpClient implements Runnable {
         }
     }
 
-    public void exec(String url, Map<String, Object> _headers, Object body,
-                     RequestConfig cfg, IRespListener cb) {
+    public void exec(String url, RequestConfig cfg, SSLEngine engine, IRespListener cb) {
         URI uri;
         try {
             uri = new URI(url);
@@ -203,7 +217,7 @@ public final class HttpClient implements Runnable {
             return;
         }
 
-        if(uri.getHost() == null) {
+        if (uri.getHost() == null) {
             cb.onThrowable(new IllegalArgumentException("host is null: " + url));
             return;
         }
@@ -224,7 +238,7 @@ public final class HttpClient implements Runnable {
         }
 
         // copy to modify, normalize header
-        HeaderMap headers = HeaderMap.camelCase(_headers);
+        HeaderMap headers = HeaderMap.camelCase(cfg.headers);
         headers.put("Host", HttpUtils.getHost(uri));
         headers.put("Accept", "*/*");
 
@@ -235,13 +249,17 @@ public final class HttpClient implements Runnable {
 
         ByteBuffer request[];
         try {
-            request = encode(cfg.method, headers, body, uri);
+            request = encode(cfg.method, headers, cfg.body, uri);
         } catch (IOException e) {
             cb.onThrowable(e);
             return;
         }
         if ("https".equals(scheme)) {
-            pending.offer(new HttpsRequest(addr, request, cb, requests, cfg));
+            if (engine == null) {
+                engine = DEFAULT_CONTEXT.createSSLEngine();
+            }
+            engine.setUseClientMode(true);
+            pending.offer(new HttpsRequest(addr, request, cb, requests, cfg, engine));
         } else {
             pending.offer(new Request(addr, request, cb, requests, cfg));
         }
