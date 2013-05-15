@@ -14,6 +14,7 @@
 (defroutes test-routes
   (GET "/get" [] "hello world")
   (POST "/post" [] "hello world")
+  (ANY "/204" [] {:status 204})
   (PATCH "/patch" [] "hello world")
   (ANY "/method" [] (fn [req]
                       (let [m (:request-method req)]
@@ -147,6 +148,11 @@
     (is (= p1 (:body @(http/post "http://127.0.0.1:4347/params" query-params))))
     (is (= p1 (:body @(http/get "http://127.0.0.1:4347/params?a=b" query-params))))
     (is (= p1 (:body @(http/post "http://127.0.0.1:4347/params?a=b" query-params))))))
+
+(deftest test-jetty-204-decode-properly
+  ;; fix #52
+  (is (= 204 (:status @(http/get "http://127.0.0.1:14347/204" {:timeout 20}))))
+  (is (= 204 (:status @(http/post "http://127.0.0.1:14347/204" {:timeout 20})))))
 
 (deftest test-http-client-form-params
   (let [url "http://127.0.0.1:4347/params"

@@ -27,6 +27,8 @@ public class Decoder {
     State state = READ_INITIAL;
     private final HttpMethod method;
 
+    private boolean emptyBodyExpected = false;
+
     public Decoder(IRespListener listener, HttpMethod method) {
         this.listener = listener;
         this.method = method;
@@ -56,6 +58,9 @@ public class Decoder {
                 || (cStart == cEnd && bStart < bEnd)) {
             try {
                 int status = Integer.parseInt(sb.substring(bStart, bEnd));
+                // status is not 1xx, 204 or 304, then the body is unbounded.
+                // RFC2616, section 4.4
+                emptyBodyExpected = status / 100 == 1 || status == 204 || status == 304;
                 HttpStatus s = HttpStatus.valueOf(status);
 
                 HttpVersion version = HTTP_1_1;
@@ -165,6 +170,8 @@ public class Decoder {
                 } else {
                     state = READ_FIXED_LENGTH_CONTENT;
                 }
+            } else if (emptyBodyExpected) {
+                state = ALL_READ;
             } else {
                 state = READ_VARIABLE_LENGTH_CONTENT;
                 // for readBody min
