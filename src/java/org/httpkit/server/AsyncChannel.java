@@ -222,8 +222,9 @@ public class AsyncChannel {
                 DynamicBytes bytes = readAll((InputStream) data);
                 server.tryWrite(key, WsEncode(OPCODE_BINARY, bytes.get(), bytes.length()));
             } else if (data != null) { // ignore null
-                throw new IllegalArgumentException(
-                        "only accept string, byte[], InputStream, get " + data.getClass());
+                String mesg = "send! called with data: " + data.toString() +
+                        "(" + data.getClass() + "), but only string, byte[], InputStream expected";
+                throw new IllegalArgumentException(mesg);
             }
 
             if (close) {
