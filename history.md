@@ -1,4 +1,11 @@
+## 2.1.2 (2013/5/15)
+HTTP Client:
+   1. Fix #52: 204 No Content responses from Jetty always timeout
+   2. Do not add Accept header if one is already defined for the request, by Jeffrey Charles
+   3. No need to create SSLEngine for http request
+
 ## 2.1.1 (2013/5/6)
+HTTP Server:
    Fix #47: Large websocket requests get corrupted
 
 ## 2.1.0 (2013/5/3)
