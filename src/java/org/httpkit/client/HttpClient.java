@@ -240,8 +240,9 @@ public final class HttpClient implements Runnable {
         // copy to modify, normalize header
         HeaderMap headers = HeaderMap.camelCase(cfg.headers);
         headers.put("Host", HttpUtils.getHost(uri));
-        headers.put("Accept", "*/*");
 
+        if (!headers.containsKey("Accept")) // allow override
+            headers.put("Accept", "*/*");
         if (!headers.containsKey("User-Agent")) // allow override
             headers.put("User-Agent", RequestConfig.DEFAULT_USER_AGENT); // default
         if (!headers.containsKey("Accept-Encoding"))
