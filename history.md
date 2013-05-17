@@ -1,3 +1,7 @@
+## 2.1.2 (2013/5/17)
+HTTP Client:
+   1. Fix #52: Form-params support dictionaries (nested param)
+
 ## 2.1.2 (2013/5/15)
 HTTP Client:
    1. Fix #52: 204 No Content responses from Jetty always timeout
