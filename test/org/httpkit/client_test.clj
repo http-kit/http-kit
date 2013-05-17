@@ -16,6 +16,7 @@
   (POST "/post" [] "hello world")
   (ANY "/204" [] {:status 204})
   (PATCH "/patch" [] "hello world")
+  (POST "/nested-param" [] (fn [req] (pr-str (:params req))))
   (ANY "/method" [] (fn [req]
                       (let [m (:request-method req)]
                         {:status 200
@@ -229,6 +230,17 @@
         (is (= length (-> @(http/get (get-url length)
                                      (assoc (rand-keep-alive) :sslengine (trust-everybody)))
                           :body count)))))))
+
+;; https://github.com/http-kit/http-kit/issues/54
+(deftest test-nested-param
+  (let [url "http://localhost:4347/nested-param"
+        params {:card {:number "4242424242424242" :exp_month "12"}}]
+    (is (= params (read-string (:body @(http/post url {:form-params params})))))
+    (is (= params (read-string (:body @(http/post
+                                        url
+                                        {:form-params {"card[number]" 4242424242424242
+                                                       "card[exp_month]" 12}})))))
+    (is (= params (read-string (:body (clj-http/post url {:form-params params})))))))
 
 ;; @(http/get "http://127.0.0.1:4348" {:headers {"Connection" "Close"}})
 

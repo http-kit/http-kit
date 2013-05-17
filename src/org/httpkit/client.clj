@@ -1,6 +1,7 @@
 (ns org.httpkit.client
   (:refer-clojure :exclude [get])
   (:require [clojure.string :as str])
+  (:use [clojure.walk :only [prewalk]])
   (:import [org.httpkit.client HttpClient IResponseHandler RespListener
             IFilter RequestConfig]
            [org.httpkit HttpMethod PrefixThreadFactory HttpUtils]
@@ -10,8 +11,8 @@
 
 ;;;; Utils
 
-(defn- utf8-bytes [s] (.getBytes         (str s) "utf8"))
-(defn url-encode [s]  (URLEncoder/encode (str s) "utf8"))
+(defn- utf8-bytes    [s]     (.getBytes         (str s) "utf8"))
+(defn url-encode     [s]     (URLEncoder/encode (str s) "utf8"))
 (defn- base64-encode [bytes] (DatatypeConverter/printBase64Binary bytes))
 
 (defn- basic-auth-value [basic-auth]
@@ -30,10 +31,22 @@
 (defn- prepare-response-headers [headers]
   (reduce (fn [m [k v]] (assoc m (keyword k) v)) {} headers))
 
+;;; {:a {:b 1 :c [1 2 3]}} => {"a[b]" 1, "a[c]" [1 2 3]}
+(defn- nested-param [params]            ; code copyed from clj-http
+  (prewalk (fn [d]
+             (if (and (vector? d) (map? (second d)))
+               (let [[fk m] d]
+                 (reduce (fn [m [sk v]]
+                           (assoc m (str (name fk) \[ (name sk) \]) v))
+                         {} m))
+               d))
+           params))
+
 (defn- query-string
   "Returns URL-encoded query string for given params map."
   [m]
-  (let [param (fn [k v]  (str (url-encode (name k)) "=" (url-encode v)))
+  (let [m (nested-param m)
+        param (fn [k v]  (str (url-encode (name k)) "=" (url-encode v)))
         join  (fn [strs] (str/join "&" strs))]
     (join (for [[k v] m] (if (sequential? v)
                            (join (map (partial param k) (or (seq v) [""])))

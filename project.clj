@@ -21,7 +21,7 @@
              :dev {:dependencies [[junit/junit "4.8.2"]
                                   [org.clojure/tools.logging "0.2.6"]
                                   [ch.qos.logback/logback-classic "1.0.9"]
-                                  [clj-http "0.6.5"]
+                                  [clj-http "0.7.2"]
                                   [io.netty/netty "3.6.5.Final"]
                                   [org.clojure/data.json "0.2.1"]
                                   [http.async.client "0.5.2"]
