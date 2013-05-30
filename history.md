@@ -1,4 +1,4 @@
-## 2.1.2 (2013/5/17)
+## 2.1.3 (2013/5/17)
 HTTP Client:
    1. Fix #52: Form-params support dictionaries (nested param)
 
