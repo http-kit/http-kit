@@ -22,10 +22,11 @@
     (str "Basic " (base64-encode (utf8-bytes basic-auth)))))
 
 (defn- prepare-request-headers
-  [{:keys [headers form-params basic-auth user-agent] :as req}]
+  [{:keys [headers form-params basic-auth oauth-token user-agent] :as req}]
   (merge headers
          (when form-params {"Content-Type"  "application/x-www-form-urlencoded"})
          (when basic-auth  {"Authorization" (basic-auth-value basic-auth)})
+         (when oauth-token {"Authorization" (str "Bearer " oauth-token)})
          (when user-agent  {"User-Agent"    user-agent})))
 
 (defn- prepare-response-headers [headers]
