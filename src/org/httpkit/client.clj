@@ -7,6 +7,7 @@
            [org.httpkit HttpMethod PrefixThreadFactory HttpUtils]
            [java.util.concurrent ThreadPoolExecutor LinkedBlockingQueue TimeUnit]
            [java.net URI URLEncoder]
+           org.httpkit.client.SslContextFactory
            javax.xml.bind.DatatypeConverter))
 
 ;;;; Utils
@@ -56,13 +57,15 @@
 (comment (query-string {:k1 "v1" :k2 "v2" :k3 nil :k4 ["v4a" "v4b"] :k5 []}))
 
 (defn- coerce-req
-  [{:keys [url method body query-params form-params] :as req}]
+  [{:keys [url method body insecure? query-params form-params] :as req}]
   (assoc req
     :url (if query-params
            (if (neg? (.indexOf ^String url (int \?)))
              (str url "?" (query-string query-params))
              (str url "&" (query-string query-params)))
            url)
+    :sslengine (or (:sslengine req)
+                   (when (:insecure? req) (SslContextFactory/trustAnybody)))
     :method (HttpMethod/fromKeyword (or method :get))
     :headers  (prepare-request-headers req)
     ;; :body  ring body: null, String, seq, InputStream, File
@@ -122,11 +125,11 @@
   Request options:
     :url :method :headers :timeout :query-params :form-params :as
     :client :body :basic-auth :user-agent :filter :worker-pool"
-  [{:keys [client timeout filter worker-pool keepalive sslengine as] :as opts
+  [{:keys [client timeout filter worker-pool keepalive as ] :as opts
     :or {client @default-client timeout 60000 filter IFilter/ACCEPT_ALL
          worker-pool default-pool keepalive 120000 as :auto}}
    callback]
-  (let [{:keys [url method headers body]} (coerce-req opts)
+  (let [{:keys [url method headers body sslengine]} (coerce-req opts)
         response (promise)
         deliver-resp #(deliver response ;; deliver the result
                                (try ((or callback identity) %1)

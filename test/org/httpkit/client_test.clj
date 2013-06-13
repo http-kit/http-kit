@@ -3,7 +3,8 @@
         [ring.adapter.jetty :only [run-jetty]]
         [org.httpkit.server :only [run-server]]
         org.httpkit.test-util
-        (compojure [core :only [defroutes GET PUT PATCH DELETE POST HEAD DELETE ANY context]]
+        (compojure [core :only [defroutes GET PUT PATCH DELETE POST HEAD
+                                DELETE ANY context]]
                    [handler :only [site]]
                    [route :only [not-found]])
         (clojure.tools [logging :only [info warn]]))
@@ -124,16 +125,16 @@
                (doseq [r requests] @r))))) ; wait all finish
   (let [url "https://127.0.0.1:9898/get"]
     (bench "http-kit, https, concurrency 1, 1000 requests: "
-           (doseq [_ (range 0 1000)] @(http/get url {:sslengine (trust-everybody)})))
+           (doseq [_ (range 0 1000)] @(http/get url {:insecure? true})))
     (bench "http-kit, https, concurrency 10, 1000 requests: "
            (doseq [_ (range 0 100)]
-             (let [requests (doall (map (fn [u] (http/get u {:sslengine (trust-everybody)}))
+             (let [requests (doall (map (fn [u] (http/get u {:insecure? true}))
                                         (repeat 10 url)))]
                (doseq [r requests] @r)))) ; wait all finish
     (bench "clj-http, https, concurrency 1, 1000 requests: "
            (doseq [_ (range 0 1000)] (clj-http/get url {:insecure? true})))
     (bench "http-kit, https, keepalive disabled, concurrency 1, 1000 requests: "
-           (doseq [_ (range 0 1000)] @(http/get url {:sslengine (trust-everybody)
+           (doseq [_ (range 0 1000)] @(http/get url {:insecure? true
                                                      :keepalive -1})))))
 
 (deftest test-http-client-user-agent
@@ -217,18 +218,16 @@
   (let [get-url (fn [length] (str "https://localhost:9898/length?length=" length))]
     (doseq [i (range 0 2)]
       (doseq [length (repeatedly 40 (partial rand-int (* 4 1024 1024)))]
-        (let [{:keys [body error status]} @(http/get (get-url length)
-                                                     {:sslengine (trust-everybody)})]
+        (let [{:keys [body error status]} @(http/get (get-url length) {:insecure? true})]
           (if error (.printStackTrace error))
           (is (= length (count body)))))
       (doseq [length (repeatedly 40 (partial rand-int (* 4 1024 1024)))]
         (is (= length (-> @(http/get (get-url length)
-                                     {:sslengine (trust-everybody)
-                                      :keepalive -1})
+                                     {:insecure? true :keepalive -1})
                           :body count))))
       (doseq [length (repeatedly 40 (partial rand-int (* 4 1024 1024)))]
         (is (= length (-> @(http/get (get-url length)
-                                     (assoc (rand-keep-alive) :sslengine (trust-everybody)))
+                                     (assoc (rand-keep-alive) :insecure? true))
                           :body count)))))))
 
 ;; https://github.com/http-kit/http-kit/issues/54

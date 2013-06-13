@@ -1,7 +1,6 @@
 (ns org.httpkit.test-util
   (:use clojure.test)
-  (:import [java.io File FileOutputStream FileInputStream]
-           org.httpkit.client.SslContextFactory))
+  (:import [java.io File FileOutputStream FileInputStream]))
 
 (defn- string-80k []
   (apply str (map char
@@ -45,6 +44,3 @@
 
 (defn close-handler [status]
   (reset! channel-closed true))
-
-(defn trust-everybody []
-  (.createSSLEngine (SslContextFactory/getClientContext)))
