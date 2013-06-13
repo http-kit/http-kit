@@ -19,7 +19,7 @@ end
 desc "Install in clojars repository"
 task :clojars => :test do
   sh 'rm -rf *.jar pom.xml classes target && lein pom && lein jar'
-  sh "cp target/*.jar ."
+  sh "cp target/provided/*.jar ."
   sh 'scp pom.xml *.jar clojars@clojars.org:'
 end
 

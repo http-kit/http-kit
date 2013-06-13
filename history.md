@@ -1,3 +1,8 @@
+## 2.1.4 (2013/6/13)
+HTTP Client:
+   1. Fix #60 By jjcomer, Add Oauth request header helper oauth-token
+   2. Fix #62 Add HTTPS client `insecure?` support to allow self-signed certificates to function
+
 ## 2.1.3 (2013/5/17)
 HTTP Client:
    1. Fix #52: Form-params support dictionaries (nested param)
