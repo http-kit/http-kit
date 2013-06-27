@@ -93,12 +93,16 @@
   ;; Asynchronous HTTP response (with optional streaming)
   (defn my-async-handler [request]
     (with-channel request ch ; Request's channel
-      (future ; Respond from any thread
-        (send! ch {:status  200
-                   :headers {\"Content-Type\" \"text/html\"}
-                   :body    \"This is an async response!\"}
-               ;; false ; Uncomment to use chunk encoding for HTTP streaming
-               ))))
+      ;; Make ch available to whoever can deliver the response to it; ex.:
+      (swap! clients conj ch)))   ; given (def clients (atom #{}))
+  ;; Some place later:
+  (doseq [ch @clients]
+    (swap! clients disj ch)
+    (send! ch {:status  200
+                 :headers {\"Content-Type\" \"text/html\"}
+                 :body your-async-response}
+             ;; false ; Uncomment to use chunk encoding for HTTP streaming
+             )))
 
   ;; WebSocket response
   (defn my-chatroom-handler [request]
