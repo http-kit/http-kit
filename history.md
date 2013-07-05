@@ -1,3 +1,7 @@
+## 2.1.5 (2013/7/6)
+HTTP Server:
+   1. Fix #68, Loop of Close frames
+
 ## 2.1.4 (2013/6/13)
 HTTP Client:
    1. Fix #60 By jjcomer, Add Oauth request header helper oauth-token
