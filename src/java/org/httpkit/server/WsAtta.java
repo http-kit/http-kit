@@ -8,8 +8,4 @@ public class WsAtta extends ServerAtta {
         this.decoder = new WSDecoder();
         this.channel = channel;
     }
-
-    public boolean isKeepAlive() {
-        return true; // always keep-alived, wait other close it
-    }
 }

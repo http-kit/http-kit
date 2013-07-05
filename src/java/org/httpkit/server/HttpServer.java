@@ -114,10 +114,9 @@ public class HttpServer implements Runnable {
                     atta.decoder.reset();
                     tryWrite(key, WsEncode(WSDecoder.OPCODE_PONG, frame.data));
                 } else if (frame instanceof CloseFrame) {
-                    // even though the logic connection is closed. the socket
-                    // did not, if client willing to reuse it, http-kit is more
-                    // than happy
                     handler.clientClose(atta.channel, ((CloseFrame) frame).getStatus());
+                    // close the TCP connection after sent
+                    atta.keepalive = false;
                     tryWrite(key, WsEncode(WSDecoder.OPCODE_CLOSE, frame.data));
                 }
             } while (buffer.hasRemaining()); // consume all

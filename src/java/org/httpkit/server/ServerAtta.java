@@ -8,5 +8,15 @@ public abstract class ServerAtta {
 
     protected AsyncChannel channel;
 
-    public abstract boolean isKeepAlive();
+    // close the connection after write?
+
+    /* HTTP: greedy, if client support it( HTTP/1.1 without keep-alive: close),
+             http-kit only close the socket after client first close it
+       WebSocket: When a close frame is received, the socket get closed after the response close frame is sent
+     */
+    protected boolean keepalive = true;
+
+    public boolean isKeepAlive() {
+        return keepalive;
+    }
 }
