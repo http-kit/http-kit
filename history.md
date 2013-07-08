@@ -1,3 +1,6 @@
+## 2.1.6 (2013/7/8)
+  Accept ByteBuffer as the :body, not in the standard Ring Spec, but can make zero copy possbile, if performance is critical. Also useful if ByteBuffer get, just need to sent to another process
+
 ## 2.1.5 (2013/7/6)
 HTTP Server:
    1. Fix #68, Loop of Close frames
