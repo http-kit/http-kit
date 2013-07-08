@@ -104,6 +104,9 @@ public class HttpUtils {
                 seq = seq.next();
             }
             return ByteBuffer.wrap(b.get(), 0, b.length());
+            // makes ultimate optimization possible: no copy
+        } else if (body instanceof ByteBuffer) {
+            return (ByteBuffer) body;
         } else {
             throw new RuntimeException(body.getClass() + " is not understandable");
         }

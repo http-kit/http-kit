@@ -10,7 +10,8 @@
         (clojure.tools [logging :only [info warn]]))
   (:require [org.httpkit.client :as http]
             [clojure.java.io :as io]
-            [clj-http.client :as clj-http]))
+            [clj-http.client :as clj-http])
+  (:import java.nio.ByteBuffer))
 
 (defroutes test-routes
   (GET "/get" [] "hello world")
@@ -186,8 +187,12 @@
 (deftest test-string-file-inputstream-body []
   (let [length (+ (rand-int (* 1024 1024 5)) 100)
         file (gen-tempfile length ".txt")
-        bodys [(subs const-string 0 length) file (java.io.FileInputStream. file)
-               [(subs const-string 0 100) (subs const-string 100 length)]]]
+        bodys [(subs const-string 0 length)    ;string
+               file                            ;file
+               (java.io.FileInputStream. file) ; inputstream
+               [(subs const-string 0 100) (subs const-string 100 length)] ; seqable
+               (ByteBuffer/wrap (.getBytes (subs const-string 0 length))) ; byteBuffer
+               ]]
     (doseq [body bodys]
       (is (= length (count (:body @(http/put "http://127.0.0.1:4347/body"
                                              {:body body}))))))))
