@@ -124,7 +124,7 @@ public class HttpUtils {
             } else {
                 switch (c) {
                     case '"':
-                    case '%':
+//                    case '%':
                     case '<':
                     case '>':
                     case '\\':
@@ -213,7 +213,7 @@ public class HttpUtils {
     }
 
     public static String getPath(URI uri) {
-        String path = encodeURI(uri.getPath());
+        String path = encodeURI(uri.getRawPath());
         String query = uri.getRawQuery();
         if ("".equals(path))
             path = "/";
