@@ -1,3 +1,6 @@
+## 2.1.7 (2013/7/19)
+  fix #70 follow clj-http's way of encoding URI
+
 ## 2.1.6 (2013/7/8)
   Accept ByteBuffer as the :body, not in the standard Ring Spec, but can make zero copy possbile, if performance is critical. Also useful if ByteBuffer get, just need to sent to another process
 

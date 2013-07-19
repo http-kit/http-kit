@@ -127,6 +127,7 @@ public class HttpUtils {
             } else {
                 switch (c) {
                     case '"':
+                        // https://github.com/http-kit/http-kit/issues/70
 //                    case '%':
                     case '<':
                     case '>':
