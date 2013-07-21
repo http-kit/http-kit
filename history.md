@@ -1,3 +1,6 @@
+## 2.1.8 (2013/7/22)
+  busy server with small RAM may OOM: do not fail, see #71
+
 ## 2.1.7 (2013/7/19)
   fix #70 follow clj-http's way of encoding URI
 

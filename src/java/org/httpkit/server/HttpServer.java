@@ -250,7 +250,9 @@ public class HttpServer implements Runnable {
                 selectedKeys.clear();
             } catch (ClosedSelectorException ignore) {
                 return; // stopped
-            } catch (Exception e) { // catch any exception, print it
+                // do not exits the while IO event loop. if exits, then will not process any IO event
+                // jvm can catch any exception, including OOM
+            } catch (Throwable e) { // catch any exception(including OOM), print it
                 HttpUtils.printError("http server loop error, should not happen", e);
             }
         }

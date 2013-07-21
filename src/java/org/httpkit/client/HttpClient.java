@@ -373,8 +373,8 @@ public final class HttpClient implements Runnable {
                 }
                 clearTimeout(now);
                 processPending();
-            } catch (IOException e) {
-                HttpUtils.printError("select exception", e);
+            } catch (Throwable e) { // catch any exception (including OOM), print it: do not exits the loop
+                HttpUtils.printError("select exception, should not happen", e);
             }
         }
     }
