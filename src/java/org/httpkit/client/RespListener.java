@@ -13,15 +13,16 @@ import java.util.zip.Inflater;
 import java.util.zip.InflaterInputStream;
 
 import static org.httpkit.HttpUtils.CONTENT_ENCODING;
+import static org.httpkit.HttpUtils.CONTENT_TYPE;
 
 class Handler implements Runnable {
 
     private final int status;
-    private final Map<String, String> headers;
+    private final Map<String, Object> headers;
     private final Object body;
     private final IResponseHandler handler;
 
-    public Handler(IResponseHandler handler, int status, Map<String, String> headers,
+    public Handler(IResponseHandler handler, int status, Map<String, Object> headers,
                    Object body) {
         this.handler = handler;
         this.status = status;
@@ -49,7 +50,7 @@ public class RespListener implements IRespListener {
 
     private boolean isText() {
         if (status.getCode() == 200) {
-            String type = headers.get(HttpUtils.CONTENT_TYPE);
+            String type = HttpUtils.getStringValue(headers, CONTENT_TYPE);
             if (type != null) {
                 type = type.toLowerCase();
                 // TODO may miss something
@@ -63,7 +64,7 @@ public class RespListener implements IRespListener {
     }
 
     private DynamicBytes unzipBody() throws IOException {
-        String encoding = headers.get(CONTENT_ENCODING);
+        String encoding = HttpUtils.getStringValue(headers, CONTENT_ENCODING);
         if (encoding == null || body.length() == 0) {
             return body;
         }
@@ -94,7 +95,7 @@ public class RespListener implements IRespListener {
     private final DynamicBytes body;
 
     // can be empty
-    private Map<String, String> headers = new TreeMap<String, String>();
+    private Map<String, Object> headers = new TreeMap<String, Object>();
     private HttpStatus status;
     private final IResponseHandler handler;
     private final IFilter filter;
@@ -145,7 +146,7 @@ public class RespListener implements IRespListener {
         pool.submit(new Handler(handler, t));
     }
 
-    public void onHeadersReceived(Map<String, String> headers) throws AbortException {
+    public void onHeadersReceived(Map<String, Object> headers) throws AbortException {
         this.headers = headers;
         if (filter != null && !filter.accept(headers)) {
             throw new AbortException("Rejected when header received");

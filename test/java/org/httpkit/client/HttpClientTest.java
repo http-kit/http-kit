@@ -28,7 +28,7 @@ class ResponseHandler implements IResponseHandler {
         this.cd = cd;
     }
 
-    public void onSuccess(int status, Map<String, String> headers, Object body) {
+    public void onSuccess(int status, Map<String, Object> headers, Object body) {
         cd.countDown();
         try {
             if (body instanceof String) {

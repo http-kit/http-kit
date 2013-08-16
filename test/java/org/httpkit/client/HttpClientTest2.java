@@ -25,7 +25,7 @@ public class HttpClientTest2 {
                     c.countDown();
                 }
 
-                public void onSuccess(int status, Map<String, String> headers, Object body) {
+                public void onSuccess(int status, Map<String, Object> headers, Object body) {
                     System.out.println(status);
                     System.out.println(headers);
                     System.out.println(body);

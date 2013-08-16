@@ -19,7 +19,7 @@ enum State {
 
 public class Decoder {
 
-    private final Map<String, String> headers = new TreeMap<String, String>();
+    private final Map<String, Object> headers = new TreeMap<String, Object>();
     // package visible
     final IRespListener listener;
     private final LineReader lineReader;
@@ -158,11 +158,11 @@ public class Decoder {
             return;
         }
 
-        String te = headers.get(TRANSFER_ENCODING);
+        String te = HttpUtils.getStringValue(headers, TRANSFER_ENCODING);
         if (CHUNKED.equals(te)) {
             state = READ_CHUNK_SIZE;
         } else {
-            String cl = headers.get(CONTENT_LENGTH);
+            String cl = HttpUtils.getStringValue(headers, CONTENT_LENGTH);
             if (cl != null) {
                 readRemaining = Integer.parseInt(cl);
                 if (readRemaining == 0) {

@@ -1,24 +1,15 @@
 package org.httpkit.client;
 
-import static org.httpkit.HttpUtils.TRANSFER_ENCODING;
+import junit.framework.Assert;
+import org.httpkit.*;
+import org.httpkit.codec.Utils;
+import org.junit.Test;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Map;
 
-import junit.framework.Assert;
-
-import org.httpkit.HttpMethod;
-import org.httpkit.HttpStatus;
-import org.httpkit.HttpVersion;
-import org.httpkit.LineTooLargeException;
-import org.httpkit.ProtocolException;
-import org.httpkit.client.AbortException;
-import org.httpkit.client.Decoder;
-import org.httpkit.client.IRespListener;
-import org.httpkit.client.State;
-import org.httpkit.codec.Utils;
-import org.junit.Test;
+import static org.httpkit.HttpUtils.TRANSFER_ENCODING;
 
 public class HttpClientDecoderTest {
 
@@ -38,7 +29,7 @@ public class HttpClientDecoderTest {
                 Assert.assertEquals(status, HttpStatus.OK);
             }
 
-            public void onHeadersReceived(Map<String, String> headers) throws AbortException {
+            public void onHeadersReceived(Map<String, Object> headers) throws AbortException {
                 Assert.assertNotNull(headers.get(TRANSFER_ENCODING));
             }
 

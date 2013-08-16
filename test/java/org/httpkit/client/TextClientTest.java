@@ -56,7 +56,7 @@ public class TextClientTest {
                     t.printStackTrace();
                 }
 
-                public void onSuccess(int status, Map<String, String> headers, Object body) {
+                public void onSuccess(int status, Map<String, Object> headers, Object body) {
                     System.out.println(body);
                 }
             };

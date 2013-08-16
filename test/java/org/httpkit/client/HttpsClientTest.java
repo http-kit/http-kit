@@ -51,7 +51,7 @@ public class HttpsClientTest {
                 body.append(i);
             }
             client.exec(url, cfg, null, new RespListener(new IResponseHandler() {
-                public void onSuccess(int status, Map<String, String> headers, Object body) {
+                public void onSuccess(int status, Map<String, Object> headers, Object body) {
                     int length = body instanceof String ? ((String) body).length() :
                             ((BytesInputStream) body).available();
                     System.out.println(body);

@@ -16,7 +16,7 @@ public interface IFilter {
             return true;
         }
 
-        public boolean accept(Map<String, String> headers) {
+        public boolean accept(Map<String, Object> headers) {
             return true;
         }
 
@@ -34,7 +34,7 @@ public interface IFilter {
             this.length = maxLength;
         }
 
-        public boolean accept(Map<String, String> headers) {
+        public boolean accept(Map<String, Object> headers) {
             return true;
         }
 
@@ -47,7 +47,7 @@ public interface IFilter {
         }
     }
 
-    public boolean accept(Map<String, String> headers);
+    public boolean accept(Map<String, Object> headers);
 
     public boolean accept(DynamicBytes partialBody);
 }

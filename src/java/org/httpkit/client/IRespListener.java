@@ -18,7 +18,7 @@ public interface IRespListener {
 
     public void onCompleted();
 
-    public void onHeadersReceived(Map<String, String> headers) throws AbortException;
+    public void onHeadersReceived(Map<String, Object> headers) throws AbortException;
 
     public void onInitialLineReceived(HttpVersion version, HttpStatus status)
             throws AbortException;

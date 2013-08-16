@@ -12,7 +12,7 @@ public interface IResponseHandler {
      * @param body    Response body, for text is a String, for binary is a
      *                InputStream
      */
-    void onSuccess(int status, Map<String, String> headers, Object body);
+    void onSuccess(int status, Map<String, Object> headers, Object body);
 
     void onThrowable(Throwable t);
 }

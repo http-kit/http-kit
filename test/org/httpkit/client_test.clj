@@ -30,6 +30,10 @@
   (GET "/length" [] (fn [req]
                       (let [l (-> req :params :length to-int)]
                         (subs const-string 0 l))))
+  (GET "/multi-header" [] (fn [req]
+                            {:status 200
+                             :headers {"x-method" ["value1", "value2"]
+                                       "x-method2" ["value1", "value2", "value3"]}}))
   (GET "/p" [] (fn [req] (pr-str (:params req))))
   (ANY "/params" [] (fn [req] (-> req :params :param1)))
   (PUT "/body" [] (fn [req] {:body (:body req)
@@ -245,6 +249,14 @@
                                         {:form-params {"card[number]" 4242424242424242
                                                        "card[exp_month]" 12}})))))
     (is (= params (read-string (:body (clj-http/post url {:form-params params})))))))
+
+(deftest test-header-multiple-values
+  (let [resp @(http/get "http://localhost:4347/multi-header" {:headers {"foo" ["bar" "baz"], "eggplant" "quux"}})
+        resp2 (clj-http/get "http://localhost:4347/multi-header" {:headers {"foo" ["bar" "baz"], "eggplant" "quux"}})]
+    (is (= 200 (:status resp)))
+    (is (= 3 (-> resp :headers :x-method2 count)))
+    (is (= 2 (-> resp :headers :x-method count)))
+    (is (= 200 (:status resp2)))))
 
 ;; @(http/get "http://127.0.0.1:4348" {:headers {"Connection" "Close"}})
 

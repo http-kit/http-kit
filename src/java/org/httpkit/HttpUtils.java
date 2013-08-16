@@ -1,6 +1,7 @@
 package org.httpkit;
 
 import clojure.lang.ISeq;
+import clojure.lang.PersistentList;
 import clojure.lang.Seqable;
 
 import java.io.*;
@@ -296,6 +297,14 @@ public class HttpUtils {
         return bytes;
     }
 
+    public static String getStringValue(Map<String, Object> headers, String key) {
+        Object o = headers.get(key);
+        if(o instanceof String) {
+            return (String)o;
+        }
+        return null;
+    }
+
     public static void printError(String msg, Throwable t) {
         String error = String.format("%s [%s] ERROR - %s", new Date(), Thread.currentThread()
                 .getName(), msg);
@@ -306,7 +315,7 @@ public class HttpUtils {
         System.err.print(str.getBuffer().toString());
     }
 
-    public static void splitAndAddHeader(String sb, Map<String, String> headers) {
+    public static void splitAndAddHeader(String sb, Map<String, Object> headers) {
         final int length = sb.length();
         int nameStart;
         int nameEnd;
@@ -337,7 +346,17 @@ public class HttpUtils {
             // logger.warn("header error: " + sb);
         } else {
             String value = sb.substring(valueStart, valueEnd);
-            headers.put(key.toLowerCase(), value);
+            key = key.toLowerCase();
+            Object v = headers.get(key);
+            if (v == null) {
+                headers.put(key, value);
+            } else {
+                if (v instanceof String) {
+                    headers.put(key, PersistentList.create(Arrays.asList((String) v, value)));
+                } else {
+                    headers.put(key, ((ISeq)v).cons(value));
+                }
+            }
         }
     }
 
@@ -379,9 +398,9 @@ public class HttpUtils {
     }
 
     // unit test in utils-test.clj
-    public static Charset detectCharset(Map<String, String> headers, DynamicBytes body) {
+    public static Charset detectCharset(Map<String, Object> headers, DynamicBytes body) {
         // 1. first from http header: Content-Type: text/html; charset=utf8
-        Charset result = parseCharset(headers.get(CONTENT_TYPE));
+        Charset result = parseCharset(getStringValue(headers, CONTENT_TYPE));
         if (result == null) {
             // 2. decode a little to find charset=???
             String s = new String(body.get(), 0, min(512, body.length()), ASCII);

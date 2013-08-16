@@ -22,7 +22,7 @@ public class HttpDecoder {
     private int readCount = 0; // already read bytes count
 
     HttpRequest request; // package visible
-    private Map<String, String> headers = new TreeMap<String, String>();
+    private Map<String, Object> headers = new TreeMap<String, Object>();
     byte[] content;
 
     private final int maxBody;
@@ -160,11 +160,11 @@ public class HttpDecoder {
 
         request.setHeaders(headers);
 
-        String te = headers.get(TRANSFER_ENCODING);
+        String te = HttpUtils.getStringValue(headers, TRANSFER_ENCODING);
         if (CHUNKED.equals(te)) {
             state = State.READ_CHUNK_SIZE;
         } else {
-            String cl = headers.get(CONTENT_LENGTH);
+            String cl = HttpUtils.getStringValue(headers, CONTENT_LENGTH);
             if (cl != null) {
                 try {
                     readRemaining = Integer.parseInt(cl);
@@ -186,7 +186,7 @@ public class HttpDecoder {
 
     public void reset() {
         state = State.READ_INITIAL;
-        headers = new TreeMap<String, String>();
+        headers = new TreeMap<String, Object>();
         readCount = 0;
         content = null;
         lineReader.reset();
