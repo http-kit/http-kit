@@ -1,3 +1,6 @@
+## 2.1.9 (2013/8/16)
+  HTTP Header, properly handle multiple values with same key. fix #79
+
 ## 2.1.8 (2013/7/22)
   busy server with small RAM may OOM: do not fail, see #71
 

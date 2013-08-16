@@ -7,7 +7,7 @@ See **[http-kit.org](http://http-kit.org)** for documentation, examples, benchma
 Current [semantic](http://semver.org/) version:
 
 ```clj
-[http-kit "2.1.8"]
+[http-kit "2.1.9"]
 ```
 
 
