@@ -9,7 +9,8 @@
             [org.httpkit.client :as client]
             [http.async.client :as h]
             [clj-http.util :as u])
-  (:import [org.httpkit.ws WebSocketClient]))
+  (:import [org.httpkit.ws WebSocketClient]
+           org.httpkit.SpecialHttpClient))
 
 (defn ws-handler [req]
   (with-channel req con
@@ -139,6 +140,11 @@
       (is (= data_3 (.getMessage client)))
       (.sendMessage client data)
       (is (= data (.getMessage client))))))
+
+;; client can sent a byte a time
+;; https://github.com/http-kit/http-kit/issues/80
+(deftest test-slow-client
+    (is (SpecialHttpClient/slowWebSocketClient "ws://localhost:4348/echo")))
 
 (deftest test-binary-frame
   (let [client (WebSocketClient. "ws://localhost:4348/binary")]
