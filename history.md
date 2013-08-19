@@ -1,3 +1,6 @@
+## 2.1.10 (2013/8/20)
+  fix 80: more robust websocket decoder, behave well even if client send one byte at a time
+
 ## 2.1.9 (2013/8/16)
   HTTP Header, properly handle multiple values with same key. fix #79
 
