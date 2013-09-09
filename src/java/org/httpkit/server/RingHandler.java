@@ -171,6 +171,19 @@ public class RingHandler implements IHandler {
         execs.shutdownNow();
     }
 
+    public void gracefulClose(long timeoutMillis) {
+        execs.shutdown();
+        try {
+            if (!execs.awaitTermination(timeoutMillis, TimeUnit.MILLISECONDS)) {
+                execs.shutdownNow();
+            }
+        }
+        catch (InterruptedException ie) {
+            execs.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
+
     public void handle(AsyncChannel channel, Frame frame) {
         WSHandler task = new WSHandler(channel, frame);
 

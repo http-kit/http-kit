@@ -320,3 +320,33 @@
   (reset! tmp-server (run-server (site test-routes) {:port 9090
                                                      :queue-size 102400}))
   (println "server started at 0.0.0.0:9090"))
+
+
+
+;;; Test graceful shutdown
+(defn- slow-request-handler
+  [sleep-time]
+  (fn [request]
+    (Thread/sleep sleep-time)
+    request))
+
+(deftest test-immediate-close-kills-inflight-requests
+  (let [server (run-server (slow-request-handler 2000) {:port 3474})
+        resp (future (http/get "http://localhost:3474"))]
+    (Thread/sleep 100)
+    (server)
+    (is (thrown? Exception @resp))))
+
+(deftest test-graceful-close-kills-long-inflight-requests
+  (let [server (run-server (slow-request-handler 2000) {:port 3474})
+        resp (future (http/get "http://localhost:3474"))]
+    (Thread/sleep 100)
+    (server :graceful-timeout 100)
+    (is (thrown? Exception @resp))))
+
+(deftest test-graceful-close-responds-to-inflight-requests
+  (let [server (run-server (slow-request-handler 500) {:port 3474})
+        resp (future (http/get "http://localhost:3474"))]
+    (Thread/sleep 100)
+    (server :graceful-timeout 3000)
+    (is (= 200 (:status @resp)))))
