@@ -21,7 +21,11 @@
   (let [h (RingHandler. thread handler worker-name-prefix queue-size)
         s (HttpServer. ip port h max-body max-line)]
     (.start s)
-    (fn stop-server [] (.close h) (.stop s))))
+    (fn stop-server [& {:keys [graceful-timeout]}]
+      (if graceful-timeout
+        (.gracefulClose h graceful-timeout)
+        (.close h))
+      (.stop s))))
 
 ;;;; Asynchronous extension
 
