@@ -1,3 +1,7 @@
+## 2.1.11 (2013/9/10)
+  the function return by calling run-server, than can be use to stop the server can now take an optional timeout(ms)
+  param to wait exsiting requests to be finished, like (f :timeout 100) (thanks @gordonsyme)
+
 ## 2.1.10 (2013/8/20)
   fix 80: more robust websocket decoder, behave well even if client send one byte at a time
 
