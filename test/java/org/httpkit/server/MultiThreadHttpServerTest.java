@@ -17,7 +17,7 @@ class MultiThreadHandler implements IHandler {
         exec = Executors.newFixedThreadPool(core);
     }
 
-    public void close() {
+    public void close(int timeoutMs) {
 
     }
 

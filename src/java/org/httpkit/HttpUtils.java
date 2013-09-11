@@ -299,8 +299,8 @@ public class HttpUtils {
 
     public static String getStringValue(Map<String, Object> headers, String key) {
         Object o = headers.get(key);
-        if(o instanceof String) {
-            return (String)o;
+        if (o instanceof String) {
+            return (String) o;
         }
         return null;
     }
@@ -354,7 +354,7 @@ public class HttpUtils {
                 if (v instanceof String) {
                     headers.put(key, PersistentList.create(Arrays.asList((String) v, value)));
                 } else {
-                    headers.put(key, ((ISeq)v).cons(value));
+                    headers.put(key, ((ISeq) v).cons(value));
                 }
             }
         }

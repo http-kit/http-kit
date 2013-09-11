@@ -167,20 +167,19 @@ public class RingHandler implements IHandler {
         }
     }
 
-    public void close() {
-        execs.shutdownNow();
-    }
-
-    public void gracefulClose(long timeoutMillis) {
-        execs.shutdown();
-        try {
-            if (!execs.awaitTermination(timeoutMillis, TimeUnit.MILLISECONDS)) {
+    public void close(int timeoutTs) {
+        if (timeoutTs > 0) {
+            execs.shutdown();
+            try {
+                if (!execs.awaitTermination(timeoutTs, TimeUnit.MILLISECONDS)) {
+                    execs.shutdownNow();
+                }
+            } catch (InterruptedException ie) {
                 execs.shutdownNow();
+                Thread.currentThread().interrupt();
             }
-        }
-        catch (InterruptedException ie) {
+        } else {
             execs.shutdownNow();
-            Thread.currentThread().interrupt();
         }
     }
 

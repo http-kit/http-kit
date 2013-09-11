@@ -322,31 +322,34 @@
   (println "server started at 0.0.0.0:9090"))
 
 
-
 ;;; Test graceful shutdown
-(defn- slow-request-handler
-  [sleep-time]
+(defn- slow-request-handler [sleep-time]
   (fn [request]
-    (Thread/sleep sleep-time)
-    request))
+    (try
+      (Thread/sleep sleep-time) {:body "ok"}
+      (catch Exception e
+        {:status 500}))))
 
 (deftest test-immediate-close-kills-inflight-requests
   (let [server (run-server (slow-request-handler 2000) {:port 3474})
-        resp (future (http/get "http://localhost:3474"))]
+        resp (future (try (http/get "http://localhost:3474")
+                          (catch Exception e {:status "fail"})))]
     (Thread/sleep 100)
     (server)
-    (is (thrown? Exception @resp))))
+    (is (= "fail" (:status @resp)))))
 
 (deftest test-graceful-close-kills-long-inflight-requests
   (let [server (run-server (slow-request-handler 2000) {:port 3474})
-        resp (future (http/get "http://localhost:3474"))]
+        resp (future (try (http/get "http://localhost:3474")
+                          (catch Exception e {:status "fail"})))]
     (Thread/sleep 100)
-    (server :graceful-timeout 100)
-    (is (thrown? Exception @resp))))
+    (server :timeout 100)
+    (is (= "fail" (:status @resp)))))
 
 (deftest test-graceful-close-responds-to-inflight-requests
   (let [server (run-server (slow-request-handler 500) {:port 3474})
-        resp (future (http/get "http://localhost:3474"))]
+        resp (future (try (http/get "http://localhost:3474")
+                          (catch Exception e {:status "fail"})))]
     (Thread/sleep 100)
-    (server :graceful-timeout 3000)
+    (server :timeout 3000)
     (is (= 200 (:status @resp)))))

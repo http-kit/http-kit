@@ -263,6 +263,13 @@ public class HttpServer implements Runnable {
         serverThread.start();
     }
 
+    public void stopAccept() {
+        try {
+            serverChannel.close(); // stop accept any request
+        } catch (IOException ignore) {
+        }
+    }
+
     public void stop() {
         if (selector.isOpen()) {
             try {
@@ -272,7 +279,7 @@ public class HttpServer implements Runnable {
                     k.channel().close();
                 }
                 selector.close();
-                handler.close();
+                handler.close(0);
             } catch (IOException ignore) {
             }
             serverThread.interrupt();

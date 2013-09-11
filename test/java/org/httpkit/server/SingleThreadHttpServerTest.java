@@ -18,7 +18,7 @@ class SingleThreadHandler implements IHandler {
         cb.run(bytes);
     }
 
-    public void close() {
+    public void close(int timeoutTs) {
 
     }
 

@@ -6,8 +6,9 @@
 ;;;; Ring server
 
 (defn run-server
-  "Starts (mostly*) Ring-compatible HTTP server and returns a nullary function
-  that stops the server.
+  "Starts (mostly*) Ring-compatible HTTP server and returns a function that stops
+  the server, which can take an optional timeout(ms)
+  param to wait exsiting requests to be finished, like (f :timeout 100).
 
   * See http://http-kit.org/migration.html for differences."
   [handler {:keys [port thread ip max-body max-line worker-name-prefix queue-size]
@@ -21,10 +22,12 @@
   (let [h (RingHandler. thread handler worker-name-prefix queue-size)
         s (HttpServer. ip port h max-body max-line)]
     (.start s)
-    (fn stop-server [& {:keys [graceful-timeout]}]
-      (if graceful-timeout
-        (.gracefulClose h graceful-timeout)
-        (.close h))
+    (fn stop-server [& {:keys [timeout]}]
+      ;; graceful shutdown:
+      ;; 1. server stop accept new request
+      ;; 2. wait for existing requests to finish
+      ;; 3. close the server
+      (when timeout (.stopAccept s) (.close h timeout))
       (.stop s))))
 
 ;;;; Asynchronous extension
