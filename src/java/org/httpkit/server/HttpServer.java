@@ -187,6 +187,10 @@ public class HttpServer implements Runnable {
     }
 
     public void tryWrite(final SelectionKey key, ByteBuffer... buffers) {
+        tryWrite(key, true, buffers);
+    }
+
+    public void tryWrite(final SelectionKey key, boolean close, ByteBuffer... buffers) {
         ServerAtta atta = (ServerAtta) key.attachment();
         synchronized (atta) {
             if (atta.toWrites.isEmpty()) {
@@ -204,7 +208,7 @@ public class HttpServer implements Runnable {
                         }
                         pending.add(key);
                         selector.wakeup();
-                    } else if (!atta.isKeepAlive()) {
+                    } else if (!atta.isKeepAlive() && close) {
                         closeKey(key, CLOSE_NORMAL);
                     }
                 } catch (IOException e) {
