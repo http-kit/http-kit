@@ -8,7 +8,7 @@
 (defn run-server
   "Starts (mostly*) Ring-compatible HTTP server and returns a function that stops
   the server, which can take an optional timeout(ms)
-  param to wait exsiting requests to be finished, like (f :timeout 100).
+  param to wait existing requests to be finished, like (f :timeout 100).
 
   * See http://http-kit.org/migration.html for differences."
   [handler {:keys [port thread ip max-body max-line worker-name-prefix queue-size]
