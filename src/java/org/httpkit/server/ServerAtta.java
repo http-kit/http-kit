@@ -19,4 +19,12 @@ public abstract class ServerAtta {
     public boolean isKeepAlive() {
         return keepalive;
     }
+
+    // HTTP: can be set to false to keep connection open during a chunked response
+    // WebSocket: not applicable
+    protected boolean responsecomplete = true;
+
+    public boolean isResponseComplete() {
+        return responsecomplete;
+    }
 }
