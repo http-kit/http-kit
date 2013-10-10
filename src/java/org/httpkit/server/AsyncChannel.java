@@ -125,7 +125,7 @@ public class AsyncChannel {
         if (close) {
             onClose(0);
         }
-        server.tryWrite(key, buffers);
+        server.tryWrite(key, close, buffers);
     }
 
 
@@ -139,7 +139,7 @@ public class AsyncChannel {
             if (t.hasRemaining()) {
                 ByteBuffer size = chunkSize(t.remaining());
                 buffers = new ByteBuffer[]{size, t, ByteBuffer.wrap(newLineBytes)};
-                server.tryWrite(key, buffers);
+                server.tryWrite(key, close, buffers);
             }
         }
         if (close) {
