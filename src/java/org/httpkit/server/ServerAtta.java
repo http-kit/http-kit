@@ -17,14 +17,19 @@ public abstract class ServerAtta {
     protected boolean keepalive = true;
 
     public boolean isKeepAlive() {
-        return keepalive;
+        return keepalive || chunkedResponseInprogress;
     }
 
-    // HTTP: can be set to false to keep connection open during a chunked response
-    // WebSocket: not applicable
-    protected boolean responsecomplete = true;
+    // Needed in the following situation, thanks @rufoa
+    // https://github.com/http-kit/http-kit/pull/84
+    // 1. client sent Connection: Close => server
+    // 2. server try to streaming the response
+    // 3. server close the connection after first write, which makes a bad streaming
 
-    public boolean isResponseComplete() {
-        return responsecomplete;
+    // only apply to HTTP
+    protected boolean chunkedResponseInprogress = false;
+
+    public void chunkedResponseInprogress(boolean b) {
+        chunkedResponseInprogress = b;
     }
 }

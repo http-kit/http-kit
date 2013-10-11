@@ -176,10 +176,8 @@ public class HttpServer implements Runnable {
                 if (toWrites.size() == 0) {
                     if (atta.isKeepAlive()) {
                         key.interestOps(OP_READ);
-                    } else if (atta.isResponseComplete()) {
+                    } else {
                         closeKey(key, CLOSE_NORMAL);
-                    } else { // not keepalive => no more reqs expected
-                        key.interestOps(0);
                     }
                 }
             }
@@ -189,15 +187,13 @@ public class HttpServer implements Runnable {
     }
 
     public void tryWrite(final SelectionKey key, ByteBuffer... buffers) {
-        tryWrite(key, true, buffers);
+        tryWrite(key, false, buffers);
     }
 
-    public void tryWrite(final SelectionKey key, boolean close, ByteBuffer... buffers) {
+    public void tryWrite(final SelectionKey key, boolean chunkInprogress, ByteBuffer... buffers) {
         ServerAtta atta = (ServerAtta) key.attachment();
         synchronized (atta) {
-            if (atta instanceof HttpAtta) {
-                ((HttpAtta) atta).setResponseComplete(close);
-            }
+            atta.chunkedResponseInprogress(chunkInprogress);
             if (atta.toWrites.isEmpty()) {
                 SocketChannel ch = (SocketChannel) key.channel();
                 try {
@@ -213,7 +209,7 @@ public class HttpServer implements Runnable {
                         }
                         pending.add(key);
                         selector.wakeup();
-                    } else if (!atta.isKeepAlive() && close) {
+                    } else if (!atta.isKeepAlive()) {
                         closeKey(key, CLOSE_NORMAL);
                     }
                 } catch (IOException e) {

@@ -88,6 +88,7 @@ public class AsyncChannel {
         return ByteBuffer.wrap(s.getBytes());
     }
 
+    // Write first HTTP header and [first chunk data]? to client
     private void firstWrite(Object data, boolean close) throws IOException {
         ByteBuffer buffers[];
         int status = 200;
@@ -118,28 +119,34 @@ public class AsyncChannel {
             if (body == null) {
                 buffers = bb;
             } else {
-                buffers = new ByteBuffer[]{bb[0], chunkSize(bb[1].remaining()), bb[1],
-                        ByteBuffer.wrap(newLineBytes)};
+                buffers = new ByteBuffer[]{
+                        bb[0], // header
+                        chunkSize(bb[1].remaining()), // chunk size
+                        bb[1], // chunk data
+                        ByteBuffer.wrap(newLineBytes) // terminating CRLF sequence
+                };
             }
         }
         if (close) {
             onClose(0);
         }
-        server.tryWrite(key, close, buffers);
+        server.tryWrite(key, !close, buffers);
     }
 
-
+    // for streaming, send a chunk of data to client
     private void writeChunk(Object body, boolean close) throws IOException {
         if (body instanceof Map) { // only get body if a map
             body = ((Map<Keyword, Object>) body).get(BODY);
         }
         if (body != null) { // null is ignored
-            ByteBuffer buffers[];
             ByteBuffer t = bodyBuffer(body);
             if (t.hasRemaining()) {
-                ByteBuffer size = chunkSize(t.remaining());
-                buffers = new ByteBuffer[]{size, t, ByteBuffer.wrap(newLineBytes)};
-                server.tryWrite(key, close, buffers);
+                ByteBuffer[] buffers = new ByteBuffer[]{
+                        chunkSize(t.remaining()),
+                        t,  // actual data
+                        ByteBuffer.wrap(newLineBytes) // terminating CRLF sequence
+                };
+                server.tryWrite(key, !close, buffers);
             }
         }
         if (close) {
@@ -192,7 +199,7 @@ public class AsyncChannel {
             server.tryWrite(key, WsEncode(OPCODE_CLOSE, ByteBuffer.allocate(2)
                     .putShort((short) status).array()));
         } else {
-            server.tryWrite(key, ByteBuffer.wrap(finalChunkBytes));
+            server.tryWrite(key, false, ByteBuffer.wrap(finalChunkBytes));
         }
         IFn f = closeHandler;
         if (f != null) {

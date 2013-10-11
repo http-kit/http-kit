@@ -244,6 +244,14 @@
       (is (= (:status resp) 200))
       (is (:headers resp))
       (is (= (:body resp) s))
+      (check-on-close-called)))
+  (doseq [_ (range 1 2)]
+    (let [s (subs const-string 0 (+ (rand-int 1024) 256))
+          resp @(client/get (str "http://localhost:4347/streaming?s=" s)
+                            {:headers {"Connection" "close"}})]
+      (is (= (:status resp) 200))
+      (is (:headers resp))
+      (is (= (:body resp) s))
       (check-on-close-called))))
 
 (deftest test-client-abort-server-receive-on-close

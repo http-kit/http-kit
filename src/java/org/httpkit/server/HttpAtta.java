@@ -6,9 +6,5 @@ public class HttpAtta extends ServerAtta {
         decoder = new HttpDecoder(maxBody, maxLine);
     }
 
-    public void setResponseComplete(boolean value) {
-        responsecomplete = value;
-    }
-
     public final HttpDecoder decoder;
 }
