@@ -1,3 +1,6 @@
+## 2.1.12 (2013/10/11)
+  Fix 84. 1. client sent Connection: Close => server, server try to streaming the response, server close the connection after first write, which makes a bad streaming. (thanks @rufoa)
+
 ## 2.1.11 (2013/9/10)
   the function return by calling run-server, than can be use to stop the server can now take an optional timeout(ms)
   param to wait exsiting requests to be finished, like (f :timeout 100) (thanks @gordonsyme)
