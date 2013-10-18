@@ -61,6 +61,26 @@
                    (/ (double (- (. System (nanoTime)) start#)) 1000000.0)
                    " msecs"))))
 
+(defmulti callback-multi
+  "Assertions to check multimethods can be used as callbacks"
+  :status)
+
+(defmethod callback-multi 200
+  [{status :status :as resp}]
+  (is (= 200 status))
+  resp)
+
+(defmethod callback-multi 404
+  [{status :status :as resp}]
+  (is (= 404 status))
+  resp)
+
+(defmethod callback-multi :default
+  [{status :status :as resp}]
+  (is (not= 200 status))
+  (is (not= 404 status))
+  resp)
+
 (deftest test-http-client
   (doseq [host ["http://127.0.0.1:4347" "http://127.0.0.1:14347"]]
     (is (= 200 (:status @(http/get (str host "/get") (fn [resp]
@@ -77,6 +97,9 @@
     (is (= 200 (:status @(http/head (str host "/get")))))
     (is (= 200 (:status @(http/post (str host "/post")))))
     (is (= 404 (:status @(http/get (str host "/404")))))
+    (is (= 200 (:status @(http/get (str host "/get") callback-multi))))
+    (is (= 404 (:status @(http/get (str host "/404") callback-multi))))
+    (is (= 204 (:status @(http/get (str host "/204") callback-multi))))
     (let [url (str host "/get")]
       (doseq [_ (range 0 10)]
         (let [requests (doall (map (fn [u] (http/get u)) (repeat 20 url)))]
