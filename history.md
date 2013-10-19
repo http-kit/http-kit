@@ -1,3 +1,6 @@
+## 2.1.13 (2013/10/19)
+  Allow callback to be a multimethod for HTTP requests. (thanks @jaley)
+
 ## 2.1.12 (2013/10/11)
   Fix 84. 1. client sent Connection: Close => server, server try to streaming the response, server close the connection after first write, which makes a bad streaming. (thanks @rufoa)
 
