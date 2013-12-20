@@ -39,8 +39,11 @@ public final class HttpClient implements Runnable {
         }
     }
 
+    // queue request, for only issue connection in the IO thread
     private final Queue<Request> pending = new ConcurrentLinkedQueue<Request>();
+    // ongoing requests, saved for timeout check
     private final PriorityQueue<Request> requests = new PriorityQueue<Request>();
+    // reuse TCP connection
     private final PriorityQueue<PersistentConn> keepalives = new PriorityQueue<PersistentConn>();
 
     private volatile boolean running = true;
@@ -337,13 +340,16 @@ public final class HttpClient implements Runnable {
             try {
                 SocketChannel ch = SocketChannel.open();
                 ch.configureBlocking(false);
-                // saved for timeout
-                job.key = ch.register(selector, OP_CONNECT, job);
-                ch.connect(job.addr);
+                boolean connected = ch.connect(job.addr);
+                job.isConnected = connected;
+
+                // if connection is established immediatelly, should wait for write. Fix #98
+                job.key = ch.register(selector, connected ? OP_WRITE : OP_CONNECT, job);
+                // save key for timeout check
                 requests.offer(job);
             } catch (IOException e) {
                 job.finish(e);
-                HttpUtils.printError("Try to connect " + job.addr, e);
+                // HttpUtils.printError("Try to connect " + job.addr, e);
             }
         }
     }
