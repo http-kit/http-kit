@@ -1,3 +1,7 @@
+## 2.1.13 (2013/12/23)
+HTTP client:
+  Fix #98 Strange timeout bug: SocketChannel.connect() may return true if the connection is established immediately, then the OP_CONNECT event will not be tiggered again. (thanks @cannedprimates)
+
 ## 2.1.13 (2013/10/19)
   Allow callback to be a multimethod for HTTP requests. (thanks @jaley)
 
