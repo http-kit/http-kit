@@ -125,12 +125,19 @@
   Request options:
     :url :method :headers :timeout :query-params :form-params :as
     :client :body :basic-auth :user-agent :filter :worker-pool"
-  [{:keys [client timeout filter worker-pool keepalive as ] :as opts
-    :or {client @default-client timeout 60000 filter IFilter/ACCEPT_ALL
-         worker-pool default-pool keepalive 120000 as :auto}}
+  [{:keys [client timeout filter worker-pool keepalive as follow-redirects max-redirects response]
+    :as opts
+    :or {client @default-client
+         timeout 60000
+         follow-redirects true
+         max-redirects 10
+         filter IFilter/ACCEPT_ALL
+         worker-pool default-pool
+         response (promise)
+         keepalive 120000
+         as :auto}}
    callback]
   (let [{:keys [url method headers body sslengine]} (coerce-req opts)
-        response (promise)
         deliver-resp #(deliver response ;; deliver the result
                                (try ((or callback identity) %1)
                                     (catch Exception e
@@ -140,10 +147,21 @@
                                       {:opts opts :error e})))
         handler (reify IResponseHandler
                   (onSuccess [this status headers body]
-                    (deliver-resp {:opts    opts
-                                   :body    body
-                                   :headers (prepare-response-headers headers)
-                                   :status  status}))
+                    (if (and follow-redirects
+                             (or (= 301 status) (= 302 status)))
+                      (if (>= max-redirects (count (:trace-redirects opts)))
+                        (request (assoc opts ; follow 301 and 302 redirect
+                                   :url (.toString (.resolve (URI. url) (.get headers "location")))
+                                   :response response
+                                   :trace-redirects (conj (:trace-redirects opts) url))
+                                 callback)
+                        (deliver-resp {:opts (dissoc opts :response)
+                                       :error (Exception. (str "too many redirects: "
+                                                               (count (:trace-redirects opts))))}))
+                      (deliver-resp {:opts    (dissoc opts :response)
+                                     :body    body
+                                     :headers (prepare-response-headers headers)
+                                     :status  status})))
                   (onThrowable [this t]
                     (deliver-resp {:opts opts :error t})))
         listener (RespListener. handler filter worker-pool

@@ -17,6 +17,13 @@
   (GET "/get" [] "hello world")
   (POST "/post" [] "hello world")
   (ANY "/204" [] {:status 204})
+  (GET "/redirect" [] (fn [req]
+                        (let [total (-> req :params :total to-int)
+                              n (-> req :params :n to-int)]
+                          (if (>= n total)
+                            {:status 200 :body "ok"}
+                            {:status 302
+                             :headers {"location" (str "redirect?total=" total "&n=" (inc n))}}))))
   (PATCH "/patch" [] "hello world")
   (POST "/nested-param" [] (fn [req] (pr-str (:params req))))
   (ANY "/method" [] (fn [req]
@@ -272,6 +279,12 @@
                                         {:form-params {"card[number]" 4242424242424242
                                                        "card[exp_month]" 12}})))))
     (is (= params (read-string (:body (clj-http/post url {:form-params params})))))))
+
+(deftest test-redirect
+  (let [url "http://localhost:4347/redirect?total=5&n=0"]
+    (is (:error @(http/get url {:max-redirects 3}))) ;; too many redirects
+    (is (= 200 (:status @(http/get url {:max-redirects 6}))))
+    (is (= 302 (:status @(http/get url {:follow-redirects false}))))))
 
 (deftest test-header-multiple-values
   (let [resp @(http/get "http://localhost:4347/multi-header" {:headers {"foo" ["bar" "baz"], "eggplant" "quux"}})

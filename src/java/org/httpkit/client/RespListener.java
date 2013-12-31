@@ -35,10 +35,14 @@ class Handler implements Runnable {
     }
 
     public void run() {
-        if (body instanceof Throwable) {
-            handler.onThrowable((Throwable) body);
-        } else {
-            handler.onSuccess(status, headers, body);
+        try {
+            if (body instanceof Throwable) {
+                handler.onThrowable((Throwable) body);
+            } else {
+                handler.onSuccess(status, headers, body);
+            }
+        } catch (Exception e) { // onSuccess may throw Exception
+            handler.onThrowable(e); // should not throw exception
         }
     }
 }
