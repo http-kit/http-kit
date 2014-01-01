@@ -24,6 +24,7 @@
                             {:status 200 :body "ok"}
                             {:status 302
                              :headers {"location" (str "redirect?total=" total "&n=" (inc n))}}))))
+  (POST "/multipart" [] (fn [req] {:status 200}))
   (PATCH "/patch" [] "hello world")
   (POST "/nested-param" [] (fn [req] (pr-str (:params req))))
   (ANY "/method" [] (fn [req]
@@ -285,6 +286,12 @@
     (is (:error @(http/get url {:max-redirects 3}))) ;; too many redirects
     (is (= 200 (:status @(http/get url {:max-redirects 6}))))
     (is (= 302 (:status @(http/get url {:follow-redirects false}))))))
+
+(deftest test-multipart
+  (is (= 200 (:status @(http/post "http://localhost:4347/multipart"
+                                  {:multipart [{:name "title" :content "httpkit's project.clj"}
+                                               {:name "Content/type" :content "text/plain"}
+                                               {:name "file" :content (clojure.java.io/file "project.clj")}]})))))
 
 (deftest test-header-multiple-values
   (let [resp @(http/get "http://localhost:4347/multi-header" {:headers {"foo" ["bar" "baz"], "eggplant" "quux"}})

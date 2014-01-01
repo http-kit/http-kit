@@ -7,7 +7,7 @@
            [org.httpkit HttpMethod PrefixThreadFactory HttpUtils]
            [java.util.concurrent ThreadPoolExecutor LinkedBlockingQueue TimeUnit]
            [java.net URI URLEncoder]
-           org.httpkit.client.SslContextFactory
+           [org.httpkit.client SslContextFactory MultipartEntity]
            javax.xml.bind.DatatypeConverter))
 
 ;;;; Utils
@@ -57,19 +57,28 @@
 (comment (query-string {:k1 "v1" :k2 "v2" :k3 nil :k4 ["v4a" "v4b"] :k5 []}))
 
 (defn- coerce-req
-  [{:keys [url method body insecure? query-params form-params] :as req}]
-  (assoc req
-    :url (if query-params
-           (if (neg? (.indexOf ^String url (int \?)))
-             (str url "?" (query-string query-params))
-             (str url "&" (query-string query-params)))
-           url)
-    :sslengine (or (:sslengine req)
-                   (when (:insecure? req) (SslContextFactory/trustAnybody)))
-    :method (HttpMethod/fromKeyword (or method :get))
-    :headers  (prepare-request-headers req)
-    ;; :body  ring body: null, String, seq, InputStream, File
-    :body     (if form-params (query-string form-params) body)))
+  [{:keys [url method body insecure? query-params form-params multipart] :as req}]
+  (let [r (assoc req
+            :url (if query-params
+                   (if (neg? (.indexOf ^String url (int \?)))
+                     (str url "?" (query-string query-params))
+                     (str url "&" (query-string query-params)))
+                   url)
+            :sslengine (or (:sslengine req)
+                           (when (:insecure? req) (SslContextFactory/trustAnybody)))
+            :method    (HttpMethod/fromKeyword (or method :get))
+            :headers   (prepare-request-headers req)
+            ;; :body ring body: null, String, seq, InputStream, File, ByteBuffer
+            :body      (if form-params (query-string form-params) body))]
+    (if multipart
+      (let [entities (map (fn [{:keys [name content filename]}]
+                            (MultipartEntity. name content filename)) multipart)
+            boudary (MultipartEntity/genBoundary entities)]
+        (assoc r
+          :headers (assoc (:headers req)
+                     "Content-Type" (str "multipart/form-data; boundary=" boudary))
+          :body    (MultipartEntity/encode boudary entities)))
+      r)))
 
 ;; thread pool for executing callbacks, since they may take a long time to execute.
 ;; protect the IO loop thread: no starvation
