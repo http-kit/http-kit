@@ -17,13 +17,15 @@
   (GET "/get" [] "hello world")
   (POST "/post" [] "hello world")
   (ANY "/204" [] {:status 204})
-  (GET "/redirect" [] (fn [req]
+  (ANY "/redirect" [] (fn [req]
                         (let [total (-> req :params :total to-int)
-                              n (-> req :params :n to-int)]
+                              n (-> req :params :n to-int)
+                              code (to-int (or (-> req :params :code) "302"))]
                           (if (>= n total)
-                            {:status 200 :body "ok"}
-                            {:status 302
-                             :headers {"location" (str "redirect?total=" total "&n=" (inc n))}}))))
+                            {:status 200 :body (-> req :request-method name)}
+                            {:status code
+                             :headers {"location" (str "redirect?total=" total "&n=" (inc n)
+                                                       "&code=" code)}}))))
   (POST "/multipart" [] (fn [req] {:status 200}))
   (PATCH "/patch" [] "hello world")
   (POST "/nested-param" [] (fn [req] (pr-str (:params req))))
@@ -285,7 +287,10 @@
   (let [url "http://localhost:4347/redirect?total=5&n=0"]
     (is (:error @(http/get url {:max-redirects 3}))) ;; too many redirects
     (is (= 200 (:status @(http/get url {:max-redirects 6}))))
-    (is (= 302 (:status @(http/get url {:follow-redirects false}))))))
+    (is (= 302 (:status @(http/get url {:follow-redirects false}))))
+    (is (= "get" (:body @(http/post url {:as :text})))) ; should switch to get method
+    (is (= "post" (:body @(http/post (str url "&code=307") {:as :text})))) ; should not change method
+    ))
 
 (deftest test-multipart
   (is (= 200 (:status @(http/post "http://localhost:4347/multipart"

@@ -157,11 +157,15 @@
         handler (reify IResponseHandler
                   (onSuccess [this status headers body]
                     (if (and follow-redirects
-                             (or (= 301 status) (= 302 status)))
+                             (#{301 302 303 307 308} status)) ; should follow redirect
                       (if (>= max-redirects (count (:trace-redirects opts)))
                         (request (assoc opts ; follow 301 and 302 redirect
-                                   :url (.toString (.resolve (URI. url) (.get headers "location")))
+                                   :url (.toString ^URI (.resolve (URI. url) ^String
+                                                                  (.get headers "location")))
                                    :response response
+                                   :method (if (#{301 302 303} status)
+                                             :get ;; change to :GET
+                                             (:method opts))  ;; do not change
                                    :trace-redirects (conj (:trace-redirects opts) url))
                                  callback)
                         (deliver-resp {:opts (dissoc opts :response)
