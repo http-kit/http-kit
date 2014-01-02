@@ -1,4 +1,9 @@
-## 2.1.13 (2013/12/23)
+## 2.1.15 (2013/12/23)
+HTTP client:
+  1. New feature: support automatically follow redirects
+  2. New feature: support multipart/form-data file upload
+
+## 2.1.14 (2013/12/23)
 HTTP client:
   Fix #98 Strange timeout bug: SocketChannel.connect() may return true if the connection is established immediately, then the OP_CONNECT event will not be tiggered again. (thanks @cannedprimates)
 

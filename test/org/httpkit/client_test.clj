@@ -289,9 +289,8 @@
 
 (deftest test-multipart
   (is (= 200 (:status @(http/post "http://localhost:4347/multipart"
-                                  {:multipart [{:name "title" :content "httpkit's project.clj"}
-                                               {:name "Content/type" :content "text/plain"}
-                                               {:name "file" :content (clojure.java.io/file "project.clj")}]})))))
+                                  {:multipart [{:name "comment" :content "httpkit's project.clj"}
+                                               {:name "file" :content (clojure.java.io/file "project.clj") :filename "project.clj"}]})))))
 
 (deftest test-header-multiple-values
   (let [resp @(http/get "http://localhost:4347/multi-header" {:headers {"foo" ["bar" "baz"], "eggplant" "quux"}})
