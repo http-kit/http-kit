@@ -7,13 +7,13 @@ See **[http-kit.org](http://http-kit.org)** for documentation, examples, benchma
 Current [semantic](http://semver.org/) version:
 
 ```clj
-[http-kit "2.1.15"]
+[http-kit "2.1.16"]
 ```
 
 
 ### Hack locally
 
-Hacker friendly: Zero dependency, written from ground-up with only ~3k lines of code (including java), clean and tidy.
+Hacker friendly: Zero dependency, written from ground-up with only ~3.5k lines of code (including java), clean and tidy.
 
 ```sh
 # modify as you want, unit tests back you up

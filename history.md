@@ -1,4 +1,8 @@
-## 2.1.15 (2013/12/23)
+## 2.1.16 (2014/1/3)
+HTTP Client:
+    follow 301, 302, 303, 307, 308 properly (thanks paulbutcher)
+
+## 2.1.15 (2014/1/1)
 HTTP client:
   1. New feature: support automatically follow redirects
   2. New feature: support multipart/form-data file upload
