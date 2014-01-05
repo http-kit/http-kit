@@ -201,3 +201,40 @@
 (defreq put)
 (defreq options)
 (defreq patch)
+
+;(defn send! [ch data]
+;  (println ch))
+;
+;(defn close [ch]
+;  (println ch))
+
+(defprotocol Channel 
+  (send! [ch data])
+  (close [ch])
+  (on-close [ch callback])
+  (on-open [ch callback])
+  (on-error [ch callback]) 
+  (on-receive [ch callback]))
+
+(extend-type WebSocketChannel
+  Channel 
+  (send! [ch data] (.send ch data))
+  (close [ch] (.close ch))
+  (on-close [ch callback] (.setCloseHandler ch callback))
+  (on-open [ch callback] (.setOpenHandler ch callback))
+  (on-receive [ch callback] (.setReceiveHandler ch callback))
+  (on-error [ch callback] (.setErrorHandler ch callback)))
+
+(defmacro with-channel [ch-name url 
+                        {:keys [on-close on-open 
+                                on-receive on-error] :as opt} 
+                        & body]
+  `(let [~ch-name (comment "Initialization using url")]
+     (do 
+       (on-close ~ch-name on-close)
+       (on-receive ~ch-name on-receive)
+       (on-open ~ch-name on-open)
+       (on-error ~ch-name on-error)
+       (.startHandshake ~(with-meta ch-name {:tag WebSocketChannel}))
+       ~@body
+       nil)))
