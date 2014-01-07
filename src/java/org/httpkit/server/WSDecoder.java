@@ -38,6 +38,10 @@ public class WSDecoder {
         this.allowUnmasked = allowUnmasked;
     }
 
+    public WSDecoder() {
+        this.allowUnmasked = false;
+    }
+
     // 8 bytes are enough
     // protect against long/short/int are not fully received
     private ByteBuffer tmpBuffer = ByteBuffer.allocate(8);

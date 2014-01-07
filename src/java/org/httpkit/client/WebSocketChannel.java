@@ -260,7 +260,9 @@ public final class WebSocketChannel implements Runnable {
                 Frame frame = decoder.decode(buffer);
                 if (frame instanceof TextFrame) {
                     IPersistentMap mp = defaultParameters.assoc(Keyword.intern("data"), ((TextFrame)frame).getText());
-                    this.receiveHandler.invoke(mp);
+                    if (this.receiveHandler != null)
+                        this.receiveHandler.invoke(mp);
+                    decoder.reset();
                 } else {
                 }
             }

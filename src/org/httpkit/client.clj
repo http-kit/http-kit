@@ -233,12 +233,12 @@
   Demo:
   (require ['org.httpkit.client :as 'http] :reload)
   (def s (http/with-channel ch 
-              {:url "ws://127.0.0.1:8080"
+              {:url \"ws://127.0.0.1:8080\"
                :on-open #(println (:url %))
                :on-receive #(println (:data %))
-               :on-close #(println "close!")}))
+               :on-close #(println \"close!\")}))
 
-  (http/send! s "hello world")
+  (http/send! s \"hello world\")
   "
   `(let [~ch-name (WebSocketChannel. ~url ~opt)]
      (do 
