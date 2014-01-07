@@ -14,6 +14,7 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.Random;
 
 import static java.lang.Character.isWhitespace;
 import static java.lang.Math.min;
@@ -458,6 +459,18 @@ public class HttpUtils {
     }
 
     public static ByteBuffer WsEncode(byte opcode, byte[] data, int length) {
+        return WsEncode(opcode, data, length, false);
+    }
+
+    public static ByteBuffer WsEncode(byte opcode, byte[] data) {
+        return WsEncode(opcode, data, data.length, false);
+    }
+
+    public static ByteBuffer WsEncode(byte opcode, byte[] data, boolean masked) {
+        return WsEncode(opcode, data, data.length, masked);
+    }
+
+    public static ByteBuffer WsEncode(byte opcode, byte[] data, int length, boolean masked) {
         byte b0 = 0;
         b0 |= 1 << 7; // FIN
         b0 |= opcode;
@@ -465,20 +478,29 @@ public class HttpUtils {
         buffer.put(b0);
 
         if (length <= 125) {
-            buffer.put((byte) (length));
+            byte tmp = (byte) (length);
+            if (masked) tmp |= 1 << 7;
+            buffer.put(tmp);
         } else if (length <= 0xFFFF) {
-            buffer.put((byte) 126);
+            byte tmp = (byte) 126;
+            if (masked) tmp |= 1 << 7;
+            buffer.put(tmp);
             buffer.putShort((short) length);
         } else {
-            buffer.put((byte) 127);
+            byte tmp = (byte) 127;
+            if (masked) tmp |= 1 << 7;
+            buffer.put(tmp);
             buffer.putLong(length);
         }
-        buffer.put(data, 0, length);
+        if (masked) {
+            byte[] mask = new byte[4];
+            new Random().nextBytes(mask);
+            buffer.put(mask);
+            for (int i = 0; i < data.length; i++) 
+                buffer.put((byte) (data[i] ^ mask[i % 4]));
+        } else
+            buffer.put(data, 0, length);
         buffer.flip();
         return buffer;
-    }
-
-    public static ByteBuffer WsEncode(byte opcode, byte[] data) {
-        return WsEncode(opcode, data, data.length);
     }
 }

@@ -2,7 +2,7 @@
   (:refer-clojure :exclude [get])
   (:require [clojure.string :as str])
   (:use [clojure.walk :only [prewalk]])
-  (:import [org.httpkit.client HttpClient IResponseHandler RespListener
+  (:import [org.httpkit.client HttpClient IResponseHandler RespListener WebSocketChannel
             IFilter RequestConfig]
            [org.httpkit HttpMethod PrefixThreadFactory HttpUtils]
            [java.util.concurrent ThreadPoolExecutor LinkedBlockingQueue TimeUnit]
@@ -219,22 +219,22 @@
 (extend-type WebSocketChannel
   Channel 
   (send! [ch data] (.send ch data))
-  (close [ch] (.close ch))
+  (close [ch] (.closeNormally ch))
   (on-close [ch callback] (.setCloseHandler ch callback))
   (on-open [ch callback] (.setOpenHandler ch callback))
   (on-receive [ch callback] (.setReceiveHandler ch callback))
   (on-error [ch callback] (.setErrorHandler ch callback)))
 
-(defmacro with-channel [ch-name url 
-                        {:keys [on-close on-open 
+(defmacro with-channel [ch-name 
+                        {:keys [url on-close on-open 
                                 on-receive on-error] :as opt} 
                         & body]
-  `(let [~ch-name (comment "Initialization using url")]
+  `(let [~ch-name (WebSocketChannel. ~url ~opt)]
      (do 
-       (on-close ~ch-name on-close)
-       (on-receive ~ch-name on-receive)
-       (on-open ~ch-name on-open)
-       (on-error ~ch-name on-error)
+       (on-close ~ch-name ~on-close)
+       (on-receive ~ch-name ~on-receive)
+       (on-open ~ch-name ~on-open)
+       (on-error ~ch-name ~on-error)
        (.startHandshake ~(with-meta ch-name {:tag WebSocketChannel}))
        ~@body
-       nil)))
+       ~ch-name)))

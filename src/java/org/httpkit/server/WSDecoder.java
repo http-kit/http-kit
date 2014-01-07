@@ -29,6 +29,15 @@ public class WSDecoder {
     private int opcode = -1;
     private int framePayloadIndex; // masking per frame
 
+    private boolean allowUnmasked = false;
+    private boolean masked = false;
+
+    public WSDecoder(boolean allowUnmasked) {
+        // When used by client, the decoder must be able to take unmasked message
+        // TODO maybe i should put this class into upper package
+        this.allowUnmasked = allowUnmasked;
+    }
+
     // 8 bytes are enough
     // protect against long/short/int are not fully received
     private ByteBuffer tmpBuffer = ByteBuffer.allocate(8);
@@ -63,8 +72,8 @@ public class WSDecoder {
                     break;
                 case READ_LENGTH:
                     b = buffer.get(); // MASK, PAYLOAD LEN 1
-                    boolean masked = (b & 0x80) != 0;
-                    if (!masked) {
+                    masked = (b & 0x80) != 0;
+                    if (!masked && !allowUnmasked) {
                         throw new ProtocolException("unmasked client to server frame");
                     }
                     payloadLength = b & 0x7F;
@@ -101,7 +110,7 @@ public class WSDecoder {
                     }
                     break; // wait for more data from TCP
                 case MASKING_KEY:
-                    if (isAvailable(buffer, 4)) {
+                    if ((!masked && allowUnmasked) || isAvailable(buffer, 4)) {
                         maskingKey = tmpBuffer.getInt();
                         tmpBuffer.clear();
                         if (content == null) {
@@ -128,8 +137,10 @@ public class WSDecoder {
                         buffer.get(content, idx, read);
 
                         byte[] mask = ByteBuffer.allocate(4).putInt(maskingKey).array();
-                        for (int i = 0; i < read; i++) {
-                            content[i + idx] = (byte) (content[i + idx] ^ mask[(framePayloadIndex + i) % 4]);
+                        if (masked) {
+                            for (int i = 0; i < read; i++) {
+                                content[i + idx] = (byte) (content[i + idx] ^ mask[(framePayloadIndex + i) % 4]);
+                            }
                         }
 
                         payloadRead += read;
