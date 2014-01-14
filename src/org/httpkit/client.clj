@@ -145,7 +145,7 @@
          response (promise)
          keepalive 120000
          as :auto}}
-   callback]
+   & [callback]]
   (let [{:keys [url method headers body sslengine]} (coerce-req opts)
         deliver-resp #(deliver response ;; deliver the result
                                (try ((or callback identity) %1)
