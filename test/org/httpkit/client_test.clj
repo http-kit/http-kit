@@ -48,7 +48,8 @@
   (ANY "/params" [] (fn [req] (-> req :params :param1)))
   (PUT "/body" [] (fn [req] {:body (:body req)
                             :status 200
-                            :headers {"content-type" "text/plain"}})))
+                            :headers {"content-type" "text/plain"}}))
+  (GET "/test-header" [] (fn [{:keys [headers]}] (str (get headers "test-header")))))
 
 (use-fixtures :once
   (fn [f]
@@ -304,6 +305,14 @@
     (is (= 3 (-> resp :headers :x-method2 count)))
     (is (= 2 (-> resp :headers :x-method count)))
     (is (= 200 (:status resp2)))))
+
+(deftest test-headers-stringified
+  (doseq [[sent expected] [["test" "test"]
+                           [0 "0"]
+                           ['("a" "b") "(\"a\" \"b\")"]]]
+    (let [received (:body @(http/get "http://localhost:4347/test-header"
+                             {:headers {"test-header" sent}}))]
+        (is (= received expected)))))
 
 ;; @(http/get "http://127.0.0.1:4348" {:headers {"Connection" "Close"}})
 
