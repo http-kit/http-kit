@@ -309,6 +309,7 @@
 (deftest test-headers-stringified
   (doseq [[sent expected] [["test" "test"]
                            [0 "0"]
+                           ['(0) "0"]
                            ['("a" "b") "(\"a\" \"b\")"]]]
     (let [received (:body @(http/get "http://localhost:4347/test-header"
                              {:headers {"test-header" sent}}))]
