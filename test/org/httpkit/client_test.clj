@@ -297,6 +297,16 @@
                                   {:multipart [{:name "comment" :content "httpkit's project.clj"}
                                                {:name "file" :content (clojure.java.io/file "project.clj") :filename "project.clj"}]})))))
 
+
+(deftest test-coerce-req
+  "Headers should be the same regardless of multipart"
+  (let [coerce-req #'org.httpkit.client/coerce-req
+        request {:basic-auth ["user" "pass"]}]
+    (is (= (keys (:headers (coerce-req request)))
+           (remove #(= % "Content-Type")
+                   (keys (:headers (coerce-req (assoc request :multipart [{:name "foo" :content "bar"}])))))))))
+
+
 (deftest test-header-multiple-values
   (let [resp @(http/get "http://localhost:4347/multi-header" {:headers {"foo" ["bar" "baz"], "eggplant" "quux"}})
         resp2 (clj-http/get "http://localhost:4347/multi-header" {:headers {"foo" ["bar" "baz"], "eggplant" "quux"}})]

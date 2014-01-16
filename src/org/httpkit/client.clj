@@ -73,11 +73,11 @@
     (if multipart
       (let [entities (map (fn [{:keys [name content filename]}]
                             (MultipartEntity. name content filename)) multipart)
-            boudary (MultipartEntity/genBoundary entities)]
-        (assoc r
-          :headers (assoc (:headers req)
-                     "Content-Type" (str "multipart/form-data; boundary=" boudary))
-          :body    (MultipartEntity/encode boudary entities)))
+            boundary (MultipartEntity/genBoundary entities)]
+        (-> r
+            (assoc-in [:headers "Content-Type"]
+                      (str "multipart/form-data; boundary=" boundary))
+            (assoc :body (MultipartEntity/encode boundary entities))))
       r)))
 
 ;; thread pool for executing callbacks, since they may take a long time to execute.
