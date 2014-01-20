@@ -18,6 +18,8 @@ public class WSDecoder {
         FRAME_START, READ_LENGTH, READ_2_LENGTH, READ_8_LENGTH, MASKING_KEY, PAYLOAD, CORRUPT
     }
 
+    private final int maxSize;
+
     private State state = State.FRAME_START;
     private byte[] content;
     private int idx = 0;
@@ -32,6 +34,10 @@ public class WSDecoder {
     // 8 bytes are enough
     // protect against long/short/int are not fully received
     private ByteBuffer tmpBuffer = ByteBuffer.allocate(8);
+
+    public WSDecoder(int maxSize) {
+        this.maxSize = maxSize;
+    }
 
     private boolean isAvailable(ByteBuffer src, int length) {
         while (tmpBuffer.position() < length) {
@@ -164,8 +170,7 @@ public class WSDecoder {
     }
 
     public void abortIfTooLarge(long length) throws ProtocolException {
-        // TODO configurable
-        if (length > 1024 * 1024 * 4) { // 4M, drop if message is too big
+        if (length > maxSize) { // drop if message is too big
             throw new ProtocolException("Max payload length 4m, get: " + length);
         }
     }

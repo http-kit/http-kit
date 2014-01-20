@@ -32,7 +32,7 @@ public class Decoder {
     public Decoder(IRespListener listener, HttpMethod method) {
         this.listener = listener;
         this.method = method;
-        lineReader = new LineReader(8096);
+        lineReader = new LineReader(16192); // max 16k header line
     }
 
     private void parseInitialLine(String sb) throws ProtocolException, AbortException {

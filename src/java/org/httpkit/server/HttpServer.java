@@ -32,11 +32,14 @@ public class HttpServer implements Runnable {
     static final String THREAD_NAME = "server-loop";
 
     private final IHandler handler;
-    private final int maxBody;
-    private final int maxLine;
+    private final int maxBody; // max http body size
+    private final int maxLine; // max header line size
+
+    private final int maxWs; // websocket, max message size
 
     private final Selector selector;
     private final ServerSocketChannel serverChannel;
+
 
     private Thread serverThread;
 
@@ -46,11 +49,13 @@ public class HttpServer implements Runnable {
     // shared, single thread
     private final ByteBuffer buffer = ByteBuffer.allocateDirect(1024 * 64);
 
-    public HttpServer(String ip, int port, IHandler handler, int maxBody, int maxLine)
+    public HttpServer(String ip, int port, IHandler handler, int maxBody, int maxLine, int maxWs)
             throws IOException {
         this.handler = handler;
         this.maxLine = maxLine;
         this.maxBody = maxBody;
+        this.maxWs = maxWs;
+
         this.selector = Selector.open();
         this.serverChannel = ServerSocketChannel.open();
         serverChannel.configureBlocking(false);
@@ -96,7 +101,7 @@ public class HttpServer implements Runnable {
                 if (request != null) {
                     channel.reset(request);
                     if (request.isWebSocket) {
-                        key.attach(new WsAtta(channel));
+                        key.attach(new WsAtta(channel, maxWs));
                     } else {
                         atta.keepalive = request.isKeepAlive;
                     }
