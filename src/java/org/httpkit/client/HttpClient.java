@@ -2,6 +2,7 @@ package org.httpkit.client;
 
 import org.httpkit.*;
 import org.httpkit.ProtocolException;
+import clojure.lang.IPersistentMap;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
@@ -18,6 +19,7 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.ExecutorService; 
 
 import static java.lang.System.currentTimeMillis;
 import static java.nio.channels.SelectionKey.*;
@@ -45,6 +47,8 @@ public final class HttpClient implements Runnable {
     private final PriorityQueue<Request> requests = new PriorityQueue<Request>();
     // reuse TCP connection
     private final PriorityQueue<PersistentConn> keepalives = new PriorityQueue<PersistentConn>();
+
+    private final Queue<WebSocketChannel> pendingWS = new ConcurrentLinkedQueue<WebSocketChannel>();
 
     private volatile boolean running = true;
 
@@ -119,7 +123,13 @@ public final class HttpClient implements Runnable {
     }
 
     private void doRead(SelectionKey key, long now) {
-        Request req = (Request) key.attachment();
+        Object atta = key.attachment();
+        if (atta instanceof WebSocketChannel) {
+            WebSocketChannel ch = (WebSocketChannel) atta;
+            ch.doRead();
+            return;
+        }
+        Request req = (Request) atta;
         SocketChannel ch = (SocketChannel) key.channel();
         int read = 0;
         try {
@@ -181,7 +191,14 @@ public final class HttpClient implements Runnable {
     }
 
     private void doWrite(SelectionKey key) {
-        Request req = (Request) key.attachment();
+        Object atta = key.attachment();
+        if (atta instanceof WebSocketChannel) {
+            WebSocketChannel ch = (WebSocketChannel) atta;
+            ch.doWrite();
+            return;
+        }
+            
+        Request req = (Request) atta;
         SocketChannel ch = (SocketChannel) key.channel();
         try {
             if (req instanceof HttpsRequest) {
@@ -272,6 +289,19 @@ public final class HttpClient implements Runnable {
         selector.wakeup();
     }
 
+    public WebSocketChannel exec(String url, IPersistentMap opt, ExecutorService execs) {
+        //TODO: add wss support
+        WebSocketChannel ch; 
+        try {
+            ch = new WebSocketChannel(execs, url, opt);
+            pendingWS.offer(ch);
+        } catch (IOException e) {
+            return null;
+        }
+        selector.wakeup();
+        return ch;
+    }
+
     private ByteBuffer[] encode(HttpMethod method, HeaderMap headers, Object body,
                                 URI uri) throws IOException {
         ByteBuffer bodyBuffer = HttpUtils.bodyBuffer(body);
@@ -296,19 +326,61 @@ public final class HttpClient implements Runnable {
 
     private void finishConnect(SelectionKey key, long now) {
         SocketChannel ch = (SocketChannel) key.channel();
-        Request req = (Request) key.attachment();
+        // TODO: Forgive me, premature optimization is the root of all evil
+        // Actually instanceof is not that bad in terms of performance
+        // WS is easier than normal http request (to some extent)
+
+        Object atta = key.attachment();
+        if (atta instanceof WebSocketChannel) {
+            WebSocketChannel wsch = (WebSocketChannel) atta;
+            try {
+                if (!ch.finishConnect()) return; // this is important
+                wsch.doHandshake();
+            } catch (Throwable e) {
+                closeQuietly(key);
+                return;
+            }
+            key.interestOps(OP_WRITE);
+            return;
+        }
+
+        Request req = (Request) atta;
         try {
-            if (ch.finishConnect()) {
+            if (!ch.finishConnect()) return;
+            if (atta instanceof Request) {
                 req.isConnected = true;
                 req.onProgress(now);
                 key.interestOps(OP_WRITE);
                 if (req instanceof HttpsRequest) {
                     ((HttpsRequest) req).engine.beginHandshake();
                 }
-            }
+            } 
+
         } catch (IOException e) {
             closeQuietly(key); // not added to kee-alive yet;
             req.finish(e);
+        }
+    }
+
+    private void processPendingWS() {
+        WebSocketChannel channel = null;
+        while ((channel = pendingWS.poll()) != null) {
+            try {
+                SocketChannel ch = SocketChannel.open();
+                ch.configureBlocking(false);
+                boolean connected = ch.connect(channel.addr);
+                channel.key = ch.register(selector, connected ? OP_WRITE : OP_CONNECT, channel);
+                try {
+                    if (connected) {
+                        channel.doHandshake();
+                    }
+                } catch (Throwable e) {
+                    closeQuietly(channel.key);
+                    return;
+                }
+            } catch (IOException e) {
+                channel.closeForError();
+            }
         }
     }
 
@@ -379,6 +451,7 @@ public final class HttpClient implements Runnable {
                 }
                 clearTimeout(now);
                 processPending();
+                processPendingWS();
             } catch (Throwable e) { // catch any exception (including OOM), print it: do not exits the loop
                 HttpUtils.printError("select exception, should not happen", e);
             }

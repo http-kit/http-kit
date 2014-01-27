@@ -202,12 +202,6 @@
 (defreq options)
 (defreq patch)
 
-;(defn send! [ch data]
-;  (println ch))
-;
-;(defn close [ch]
-;  (println ch))
-
 (defprotocol Channel 
   (send! [ch data])
   (close [ch])
@@ -225,27 +219,44 @@
   (on-receive [ch callback] (.setReceiveHandler ch callback))
   (on-error [ch callback] (.setErrorHandler ch callback)))
 
-(defmacro with-channel [ch-name 
-                        {:keys [url on-close on-open 
-                                on-receive on-error] :as opt} 
-                        & body]
-  "
-  Demo:
-  (require ['org.httpkit.client :as 'http] :reload)
-  (def s (http/with-channel ch 
-              {:url \"ws://127.0.0.1:8080\"
-               :on-open #(println (:url %))
-               :on-receive #(println (:data %))
-               :on-close #(println \"close!\")}))
 
-  (http/send! s \"hello world\")
-  "
-  `(let [~ch-name (WebSocketChannel. ~url ~opt)]
-     (do 
-       (on-close ~ch-name ~on-close)
-       (on-receive ~ch-name ~on-receive)
-       (on-open ~ch-name ~on-open)
-       (on-error ~ch-name ~on-error)
-       (.startHandshake ~(with-meta ch-name {:tag WebSocketChannel}))
-       ~@body
-       ~ch-name)))
+;(defmacro with-channel [ch-name 
+;                        {:keys [url on-close on-open 
+;                                on-receive on-error
+;                                client worker-pool] :as opt
+;                         :or {client @default-client
+;                              worker-pool default-pool}} 
+;                        & body]
+;  "
+;  Demo:
+;  (require ['org.httpkit.client :as 'http] :reload)
+;  (def s (http/with-channel ch 
+;              {:url \"ws://127.0.0.1:8080\"
+;               :on-open #(println (:url %))
+;               :on-receive #(println (:data %))
+;               :on-close #(println \"close!\")}))
+;
+;  (http/send! s \"hello world\")
+;  "
+;  `(let [~ch-name (.exec ^HttpClient ~'client ~url ~opt ~'worker-pool)]
+;     (do 
+;       (on-close ~ch-name ~on-close)
+;       (on-receive ~ch-name ~on-receive)
+;       (on-open ~ch-name ~on-open)
+;       (on-error ~ch-name ~on-error)
+;       ~@body
+;       ~ch-name))) 
+
+(defn WebSocket [{:keys [url on-close on-open 
+                         on-receive on-error
+                         client worker-pool] :as opt
+                  :or {client @default-client
+                       worker-pool default-pool}}]
+  (let [ch (.exec ^HttpClient client url opt worker-pool)
+        not-nil-and-set #(when %2 (%1 ch %2))]
+    (do
+      (.setCloseHandler ch on-close)
+      (.setOpenHandler ch on-open)
+      (.setReceiveHandler ch on-receive)
+      (.setErrorHandler ch on-error)
+      ch)))
