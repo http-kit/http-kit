@@ -23,12 +23,13 @@
   (let [h (RingHandler. thread handler worker-name-prefix queue-size)
         s (HttpServer. ip port h max-body max-line max-ws)]
     (.start s)
-    (fn stop-server [& {:keys [timeout] :or {timeout 100}}]
-      ;; graceful shutdown:
-      ;; 1. server stop accept new request
-      ;; 2. wait for existing requests to finish
-      ;; 3. close the server
-      (.stop s timeout))))
+    (with-meta (fn stop-server [& {:keys [timeout] :or {timeout 100}}]
+                 ;; graceful shutdown:
+                 ;; 1. server stop accept new request
+                 ;; 2. wait for existing requests to finish
+                 ;; 3. close the server
+                 (.stop s timeout))
+      {:local-port (.getPort s)})))
 
 ;;;; Asynchronous extension
 

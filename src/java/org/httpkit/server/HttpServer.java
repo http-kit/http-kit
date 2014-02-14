@@ -315,4 +315,8 @@ public class HttpServer implements Runnable {
             }
         }
     }
+
+    public int getPort() {
+        return this.serverChannel.socket().getLocalPort();
+    }
 }
