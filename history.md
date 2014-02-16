@@ -1,3 +1,11 @@
+## 2.1.17 (2014/2/16)
+HTTP Server:
+    1. Allow max websocket message size configrable: max-ws option
+    2. #121 return the local-port of the server by meta
+HTTP Client:
+    1. #110 Stringify headers in the client. (thanks cursork)
+    2. #106 Fixed :multipart clobbering Authorization, User-Agent headers (thanks christianromney)
+
 ## 2.1.16 (2014/1/3)
 HTTP Client:
     follow 301, 302, 303, 307, 308 properly (thanks paulbutcher)
