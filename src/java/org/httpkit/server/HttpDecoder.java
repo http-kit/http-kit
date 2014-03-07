@@ -66,6 +66,12 @@ public class HttpDecoder {
         }
     }
 
+    public boolean requiresContinue() {
+        String expect = (String) headers.get(EXPECT);
+        return (request != null && request.version == HTTP_1_1 &&
+            expect != null && CONTINUE.equalsIgnoreCase(expect));
+    }
+
     public HttpRequest decode(ByteBuffer buffer) throws LineTooLargeException,
             ProtocolException, RequestTooLargeException {
         String line;

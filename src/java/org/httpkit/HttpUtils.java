@@ -85,6 +85,11 @@ public class HttpUtils {
     // space ' '
     public static final byte SP = 32;
 
+    public static final String EXPECT = "expect";
+
+    public static final String CONTINUE = "100-continue";
+
+
     public static ByteBuffer bodyBuffer(Object body) throws IOException {
         if (body == null) {
             return null;
