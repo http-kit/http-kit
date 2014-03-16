@@ -118,7 +118,8 @@
                             "\nreceive:\n" r))
               (is false))))
         (let [d (subs const-string 0 120)]
-          (= d (.ping client d)))))
+          (= d (.ping client d))
+          (= d (.pong client d)))))
     (.close client)))
 
 (deftest test-sent-message-in-body      ; issue #14
@@ -144,7 +145,7 @@
 ;; client can sent a byte a time
 ;; https://github.com/http-kit/http-kit/issues/80
 (deftest test-slow-client
-    (is (SpecialHttpClient/slowWebSocketClient "ws://localhost:4348/echo")))
+  (is (SpecialHttpClient/slowWebSocketClient "ws://localhost:4348/echo")))
 
 (deftest test-binary-frame
   (let [client (WebSocketClient. "ws://localhost:4348/binary")]

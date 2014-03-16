@@ -153,6 +153,8 @@ public class WSDecoder {
                                     return new Frame.BinaryFrame(content);
                                 case OPCODE_PING:
                                     return new Frame.PingFrame(content);
+                                case OPCODE_PONG:
+                                    return new Frame.PongFrame(content);
                                 case OPCODE_CLOSE:
                                     return new Frame.CloseFrame(content);
                                 default:

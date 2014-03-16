@@ -58,6 +58,12 @@ public abstract class Frame {
         }
     }
 
+    public static class PongFrame extends Frame {
+        public PongFrame(byte[] data) {
+            super(data);
+        }
+    }
+
     public static class TextFrame extends Frame {
         private final String msg;
 
