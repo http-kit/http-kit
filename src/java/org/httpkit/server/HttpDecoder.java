@@ -48,7 +48,7 @@ public class HttpDecoder {
         bEnd = findWhitespace(sb, bStart);
 
         cStart = findNonWhitespace(sb, bEnd);
-        cEnd = findEndOfString(sb);
+        cEnd = findEndOfString(sb, cStart);
 
         if (cStart < cEnd) {
             try {

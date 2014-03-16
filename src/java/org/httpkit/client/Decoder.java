@@ -50,7 +50,7 @@ public class Decoder {
         bEnd = findWhitespace(sb, bStart);
 
         cStart = findNonWhitespace(sb, bEnd);
-        cEnd = findEndOfString(sb);
+        cEnd = findEndOfString(sb, cStart);
 
         if ((cStart < cEnd)
                 // Account for buggy web servers that omit Reason-Phrase from Status-Line.

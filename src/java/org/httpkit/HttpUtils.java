@@ -155,9 +155,9 @@ public class HttpUtils {
         return new String(buffer.get(), 0, buffer.length(), UTF_8);
     }
 
-    public static int findEndOfString(String sb) {
+    public static int findEndOfString(String sb, int offset) {
         int result;
-        for (result = sb.length(); result > 0; result--) {
+        for (result = sb.length(); result > offset; result--) {
             if (!isWhitespace(sb.charAt(result - 1))) {
                 break;
             }
@@ -339,7 +339,7 @@ public class HttpUtils {
         }
 
         valueStart = findNonWhitespace(sb, colonEnd);
-        valueEnd = findEndOfString(sb);
+        valueEnd = findEndOfString(sb, valueStart);
 
         String key = sb.substring(nameStart, nameEnd);
         if (valueStart > valueEnd) { // ignore
