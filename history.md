@@ -1,3 +1,12 @@
+## 2.1.18 (2014/4/18)
+HTTP Server:
+    1. #125 NPE on stop_server
+    2. #127 only trust the computed Content-Length heade
+    3. #134  pong frame expect a ping frame as response
+HTTP Client:
+    1. #127 only trust the computed Content-Length heade
+    2: #131 Fix the client handling of empty Reason-Phrase (Thanks Pyry Jahkola)
+
 ## 2.1.17 (2014/2/16)
 HTTP Server:
     1. Allow max websocket message size configrable: max-ws option
