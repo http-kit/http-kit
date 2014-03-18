@@ -106,11 +106,11 @@
   (GET "/headers" [] many-headers-handler)
   (ANY "/spec" [] (fn [req] (pr-str (dissoc req :body :async-channel))))
   (GET "/string" [] (fn [req] {:status 200
-                               :headers {"Content-Type" "text/plain"}
-                               :body "Hello World"}))
+                              :headers {"Content-Type" "text/plain"}
+                              :body "Hello World"}))
   (GET "/iseq" [] (fn [req] {:status 200
-                             :headers {"Content-Type" "text/plain"}
-                             :body (range 1 10)}))
+                            :headers {"Content-Type" "text/plain"}
+                            :body (range 1 10)}))
   (GET "/file" [] (wrap-file-info file-handler))
   (GET "/ws" [] (fn [req]
                   (with-channel req con
@@ -119,10 +119,13 @@
   (GET "/inputstream" [] inputstream-handler)
   (POST "/multipart" [] multipart-handler)
   (POST "/chunked-input" [] (fn [req] {:status 200
-                                       :body (str (:content-length req))}))
+                                      :body (str (:content-length req))}))
   (GET "/length" [] (fn [req]
                       (let [l (-> req :params :length to-int)]
-                        (subs const-string 0 l))))
+                        {:status 200
+                         ;; this is wrong, but server should correct it
+                         :headers {"content-length" 10000}
+                         :body (subs const-string 0 l)})))
   (GET "/null" [] (fn [req] {:status 200 :body nil}))
   (GET "/demo" [] streaming-demo)
 
@@ -196,6 +199,14 @@
 (deftest test-body-inputstream
   (doseq [length (range 1 (* 1024 1024 5) 1439987)] ; max 5m, many files
     (let [uri (str "http://localhost:4347/inputstream?l=" length)
+          resp (http/get uri)]
+      (is (= (:status resp) 200))
+      (is (= length (count (:body resp)))))))
+
+;; https://github.com/http-kit/http-kit/issues/127
+(deftest test-wrong-content-length
+  (doseq [length (range 1 1000 333)] ; max 5m, many files
+    (let [uri (str "http://localhost:4347/length?length=" length)
           resp (http/get uri)]
       (is (= (:status resp) 200))
       (is (= length (count (:body resp)))))))

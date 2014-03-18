@@ -430,9 +430,10 @@ public class HttpUtils {
             // only write length if not chunked
             if (!CHUNKED.equals(headers.get("Transfer-Encoding"))) {
                 if (bodyBuffer != null) {
-                    headers.put(CL, Integer.toString(bodyBuffer.remaining()));
+                    // trust the computed length
+                    headers.putOrReplace(CL, Integer.toString(bodyBuffer.remaining()));
                 } else {
-                    headers.put(CL, "0");
+                    headers.putOrReplace(CL, "0");
                 }
             }
         } catch (IOException e) {

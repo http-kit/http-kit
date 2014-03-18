@@ -242,10 +242,14 @@ public final class HttpClient implements Runnable {
 
         // copy to modify, normalize header
         HeaderMap headers = HeaderMap.camelCase(cfg.headers);
-        headers.put("Host", HttpUtils.getHost(uri));
 
-        if (!headers.containsKey("Accept")) // allow override
-            headers.put("Accept", "*/*");
+        if (!headers.containsKey("Host")) // if caller set it explicitly, let he do it
+            headers.put("Host", HttpUtils.getHost(uri));
+        /**
+         * commented on 2014/3/18: Accept is not required
+         */
+//        if (!headers.containsKey("Accept")) // allow override
+//            headers.put("Accept", "*/*");
         if (!headers.containsKey("User-Agent")) // allow override
             headers.put("User-Agent", RequestConfig.DEFAULT_USER_AGENT); // default
         if (!headers.containsKey("Accept-Encoding"))
@@ -277,9 +281,9 @@ public final class HttpClient implements Runnable {
         ByteBuffer bodyBuffer = HttpUtils.bodyBuffer(body);
 
         if (body != null) {
-            headers.put("Content-Length", Integer.toString(bodyBuffer.remaining()));
+            headers.putOrReplace("Content-Length", Integer.toString(bodyBuffer.remaining()));
         } else {
-            headers.put("Content-Length", "0");
+            headers.putOrReplace("Content-Length", "0");
         }
         DynamicBytes bytes = new DynamicBytes(196);
         bytes.append(method.toString()).append(SP).append(HttpUtils.getPath(uri));

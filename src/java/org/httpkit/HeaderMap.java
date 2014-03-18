@@ -26,13 +26,24 @@ public class HeaderMap {
     private Object arrays[] = new Object[INIT_SIZE * 2];
 
     public void put(String key, Object obj) {
-        final int total = size << 1;
+        final int total = size * 2;
         if (total == arrays.length) {
             arrays = Arrays.copyOf(arrays, arrays.length * 2);
         }
         arrays[total] = key;
         arrays[total + 1] = obj;
         size += 1;
+    }
+
+    public void putOrReplace(String key, Object obj) {
+        final int total = size * 2; // * 2
+        for (int i = 0; i < total; i += 2) {
+            if (key.equals(arrays[i])) {
+                arrays[i + 1] = obj;// replace
+                return;
+            }
+        }
+        put(key, obj);
     }
 
     public Object get(String key) {
@@ -46,7 +57,7 @@ public class HeaderMap {
     }
 
     public boolean containsKey(String key) {
-        final int total = size << 1; // * 2
+        final int total = size * 2; // * 2
         for (int i = 0; i < total; i += 2) {
             if (key.equals(arrays[i])) {
                 return true;
@@ -70,7 +81,7 @@ public class HeaderMap {
     }
 
     public void encodeHeaders(DynamicBytes bytes) {
-        final int total = size << 1;
+        final int total = size * 2;
         for (int i = 0; i < total; i += 2) {
             String k = (String) arrays[i];
             Object v = arrays[i + 1];
