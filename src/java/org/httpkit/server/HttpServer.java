@@ -74,7 +74,7 @@ public class HttpServer implements Runnable {
                 atta.channel = new AsyncChannel(k, this);
             }
         } catch (Exception e) {
-            // too many open files. do not quit
+            // eg: too many open files. do not quit
             HttpUtils.printError("accept incoming request", e);
         }
     }
@@ -309,7 +309,15 @@ public class HttpServer implements Runnable {
             Set<SelectionKey> t = selector.keys();
             SelectionKey[] keys = t.toArray(new SelectionKey[t.size()]);
             for (SelectionKey k : keys) {
-                closeKey(k, 0); // 0 => close by server
+                /**
+                 * 1. t.toArray will fill null if given array is larger.
+                 * 2. compute t.size(), then try to fill the array, if in the mean time, another
+                 *    thread close one SelectionKey, will result a NPE
+                 *
+                 * https://github.com/http-kit/http-kit/issues/125
+                 */
+                if (k != null)
+                    closeKey(k, 0); // 0 => close by server
             }
 
             try {
