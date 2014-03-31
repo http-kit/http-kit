@@ -11,3 +11,7 @@ pom.xml
 /target
 /.idea
 /_site
+
+*.swp
+.lein-repl-history
+.nrepl-port
