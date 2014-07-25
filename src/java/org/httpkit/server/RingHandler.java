@@ -204,22 +204,29 @@ public class RingHandler implements IHandler {
             HttpUtils.printError("increase :queue-size if this happens often", e);
         }
     }
-
-    public void clientClose(final AsyncChannel channel, final int status) {
+    public void clientClose(final AsyncChannel channel, final int status, boolean currentThread) {
         if (channel.closedRan == 0) { // server did not close it first
             // has close handler, execute it in another thread
             if (channel.closeHandler != null) {
                 try {
                     // no need to maintain order
-                    execs.submit(new Runnable() {
-                        public void run() {
-                            try {
-                                channel.onClose(status);
-                            } catch (Exception e) {
-                                HttpUtils.printError("on close handler", e);
-                            }
+                    if (currentThread) {
+                        try {
+                            channel.onClose(status);
+                        } catch (Exception e) {
+                            HttpUtils.printError("on close handler", e);
                         }
-                    });
+                    } else {
+                        execs.submit(new Runnable() {
+                                public void run() {
+                                    try {
+                                        channel.onClose(status);
+                                    } catch (Exception e) {
+                                        HttpUtils.printError("on close handler", e);
+                                    }
+                                }
+                            });
+                    }
                 } catch (RejectedExecutionException e) {
                     HttpUtils.printError("increase :queue-size if this happens often", e);
                 }

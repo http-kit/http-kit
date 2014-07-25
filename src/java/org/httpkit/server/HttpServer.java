@@ -79,7 +79,7 @@ public class HttpServer implements Runnable {
         }
     }
 
-    private void closeKey(final SelectionKey key, int status) {
+    private void closeKey(final SelectionKey key, int status, boolean currentThread) {
         try {
             key.channel().close();
         } catch (Exception ignore) {
@@ -87,9 +87,9 @@ public class HttpServer implements Runnable {
 
         ServerAtta att = (ServerAtta) key.attachment();
         if (att instanceof HttpAtta) {
-            handler.clientClose(att.channel, -1);
+            handler.clientClose(att.channel, -1, currentThread);
         } else if (att != null) {
-            handler.clientClose(att.channel, status);
+            handler.clientClose(att.channel, status, currentThread);
         }
     }
 
@@ -113,7 +113,7 @@ public class HttpServer implements Runnable {
                 }
             } while (buffer.hasRemaining()); // consume all
         } catch (ProtocolException e) {
-            closeKey(key, -1);
+            closeKey(key, -1, false);
         } catch (RequestTooLargeException e) {
             atta.keepalive = false;
             tryWrite(key, HttpEncode(413, new HeaderMap(), e.getMessage()));
@@ -137,7 +137,7 @@ public class HttpServer implements Runnable {
                     atta.decoder.reset();
                     tryWrite(key, WsEncode(WSDecoder.OPCODE_PING, frame.data));
                 } else if (frame instanceof CloseFrame) {
-                    handler.clientClose(atta.channel, ((CloseFrame) frame).getStatus());
+                    handler.clientClose(atta.channel, ((CloseFrame) frame).getStatus(), false);
                     // close the TCP connection after sent
                     atta.keepalive = false;
                     tryWrite(key, WsEncode(WSDecoder.OPCODE_CLOSE, frame.data));
@@ -145,7 +145,7 @@ public class HttpServer implements Runnable {
             } while (buffer.hasRemaining()); // consume all
         } catch (ProtocolException e) {
             System.err.printf("%s [%s] WARN - %s\n", new Date(), THREAD_NAME, e.getMessage());
-            closeKey(key, CLOSE_MESG_BIG); // TODO more specific error
+            closeKey(key, CLOSE_MESG_BIG, false); // TODO more specific error
         }
     }
 
@@ -156,7 +156,7 @@ public class HttpServer implements Runnable {
             int read = ch.read(buffer);
             if (read == -1) {
                 // remote entity shut the socket down cleanly.
-                closeKey(key, CLOSE_AWAY);
+                closeKey(key, CLOSE_AWAY, false);
             } else if (read > 0) {
                 buffer.flip(); // flip for read
                 final ServerAtta atta = (ServerAtta) key.attachment();
@@ -167,7 +167,7 @@ public class HttpServer implements Runnable {
                 }
             }
         } catch (IOException e) { // the remote forcibly closed the connection
-            closeKey(key, CLOSE_AWAY);
+            closeKey(key, CLOSE_AWAY, false);
         }
     }
 
@@ -200,12 +200,12 @@ public class HttpServer implements Runnable {
                     if (atta.isKeepAlive()) {
                         key.interestOps(OP_READ);
                     } else {
-                        closeKey(key, CLOSE_NORMAL);
+                        closeKey(key, CLOSE_NORMAL, false);
                     }
                 }
             }
         } catch (IOException e) { // the remote forcibly closed the connection
-            closeKey(key, CLOSE_AWAY);
+            closeKey(key, CLOSE_AWAY, false);
         }
     }
 
@@ -257,7 +257,7 @@ public class HttpServer implements Runnable {
                             k.key.interestOps(OP_WRITE);
                         }
                     } else {
-                        closeKey(k.key, k.Op);
+                        closeKey(k.key, k.Op, false);
                     }
                 }
                 if (selector.select() <= 0) {
@@ -317,7 +317,7 @@ public class HttpServer implements Runnable {
                  * https://github.com/http-kit/http-kit/issues/125
                  */
                 if (k != null)
-                    closeKey(k, 0); // 0 => close by server
+                    closeKey(k, 0, true); // 0 => close by server
             }
 
             try {
@@ -325,6 +325,8 @@ public class HttpServer implements Runnable {
             } catch (IOException ignore) {
             }
         }
+
+
     }
 
     public int getPort() {
