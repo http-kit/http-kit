@@ -276,7 +276,7 @@ public class HttpUtils {
 
     public static ByteBuffer readAll(File f) throws IOException {
         int length = (int) f.length();
-        if (length >= 1024 * 1024 * 2) { // 2M
+        if (length >= 1024 * 1024 * 20) { // 20M
             FileInputStream fs = new FileInputStream(f);
             MappedByteBuffer buffer = fs.getChannel().map(MapMode.READ_ONLY, 0, length);
             fs.close();
