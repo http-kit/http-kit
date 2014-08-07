@@ -221,7 +221,25 @@ public class RingHandler implements IHandler {
                         }
                     });
                 } catch (RejectedExecutionException e) {
-                    HttpUtils.printError("increase :queue-size if this happens often", e);
+                    /*
+                    https://github.com/http-kit/http-kit/issues/152
+                    https://github.com/http-kit/http-kit/pull/155
+
+                    When stop-server get called, the thread-pool will call shutdown, wait for sometime
+                    for work to be finished.
+
+                    For websocket and long polling with closeHandler registered, we exec closeHandler
+                    in the current thread. Get this idea from @pyr, by #155
+                     */
+                    if (execs.isShutdown()) {
+                        try {
+                            channel.onClose(status);  // do it in current thread
+                        } catch (Exception e1) {
+                            HttpUtils.printError("on close handler", e);
+                        }
+                    } else {
+                        HttpUtils.printError("increase :queue-size if this happens often", e);
+                    }
                 }
             } else {
                 // no close handler, mark the connection as closed
