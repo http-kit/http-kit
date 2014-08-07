@@ -348,15 +348,11 @@ public class HttpUtils {
             String value = sb.substring(valueStart, valueEnd);
             key = key.toLowerCase();
             Object v = headers.get(key);
-            if (v == null) {
-                headers.put(key, value);
-            } else {
-                if (v instanceof String) {
-                    headers.put(key, PersistentList.create(Arrays.asList((String) v, value)));
-                } else {
-                    headers.put(key, ((ISeq) v).cons(value));
-                }
+            if (v != null) {
+                // https://github.com/http-kit/http-kit/issues/108
+                value = v.toString() + "," + value;
             }
+            headers.put(key, value);
         }
     }
 
