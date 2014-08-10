@@ -85,7 +85,7 @@
 (def default-pool (let [max (.availableProcessors (Runtime/getRuntime))
                         queue (LinkedBlockingQueue.)
                         factory (PrefixThreadFactory. "client-worker-")]
-                    (ThreadPoolExecutor. 0 max 60 TimeUnit/SECONDS queue factory)))
+                    (ThreadPoolExecutor. max max 60 TimeUnit/SECONDS queue factory)))
 
 ;;;; Public API
 
