@@ -1,15 +1,15 @@
 ## 2.1.18 (2014/4/18)
 HTTP Server:
   1. #125 NPE on stop_server
-  2. #127 only trust the computed Content-Length heade
-  3. #134  pong frame expect a ping frame as response
+  2. #127 only trust the computed Content-Length header
+  3. #134  pong frame expects a ping frame as response
 HTTP Client:
-  1. #127 only trust the computed Content-Length heade
+  1. #127 only trust the computed Content-Length header
   2. #131 Fix the client handling of empty Reason-Phrase (Thanks Pyry Jahkola)
 
 ## 2.1.17 (2014/2/16)
 HTTP Server:
-  1. Allow max websocket message size configrable: max-ws option
+  1. Allow max websocket message size configurable: max-ws option
   2. #121 return the local-port of the server by meta
 HTTP Client:
   1. #110 Stringify headers in the client. (thanks cursork)
@@ -26,7 +26,7 @@ HTTP client:
 
 ## 2.1.14 (2013/12/23)
 HTTP client:
-  Fix #98 Strange timeout bug: SocketChannel.connect() may return true if the connection is established immediately, then the OP_CONNECT event will not be tiggered again. (thanks @cannedprimates)
+  Fix #98 Strange timeout bug: SocketChannel.connect() may return true if the connection is established immediately, then the OP_CONNECT event will not be triggered again. (thanks @cannedprimates)
 
 ## 2.1.13 (2013/10/19)
   Allow callback to be a multimethod for HTTP requests. (thanks @jaley)
@@ -36,7 +36,7 @@ HTTP client:
 
 ## 2.1.11 (2013/9/10)
   the function return by calling run-server, than can be use to stop the server can now take an optional timeout(ms)
-  param to wait exsiting requests to be finished, like (f :timeout 100) (thanks @gordonsyme)
+  param to wait existing requests to be finished, like (f :timeout 100) (thanks @gordonsyme)
 
 ## 2.1.10 (2013/8/20)
   fix 80: more robust websocket decoder, behave well even if client send one byte at a time
@@ -84,11 +84,11 @@ HTTP server:
    4. Get rid of reflection warning
 
 HTTP client:
-   1. Support HTTPS. ~110k of RAM for issueing a HTTPS request
+   1. Support HTTPS. ~110k of RAM for issuing a HTTPS request
    2. Check to make sure url host is not null, fix a possible NPE
    3. Output coercion: :as option, accepted :auto :text :stream :byte-array.
    4. application/xml is a text response
-   5. FIX: handle buggy web servers returning uncompliant Status-Line <Laszlo Toeroek>
+   5. FIX: handle buggy web servers returning non-compliant Status-Line <Laszlo Toeroek>
 
 ## 2.0.1 (2013/4/12)
    1. Performance improvement. About 50% ~ 90% when benchmark due to IO model change: One IO thread => On thread reading, decoding + many threads writing
@@ -130,9 +130,9 @@ HTTP server:
 HTTP server:
   1. Support HTTP/1.0 keep-alive
   2. Better error reporting
-  3. Better serving larget file(mmap),
+  3. Better serving largest file(mmap),
   4. `:queue-size` option to protect high traffic web server
-  5. API redisign: `async-response` and `if-ws-request` for better flexibility
+  5. API redesign: `async-response` and `if-ws-request` for better flexibility
 
 HTTP client:
   1. API redesign: by using promise and callback, support both sync and async call
