@@ -8,6 +8,8 @@ public abstract class ServerAtta {
 
     protected AsyncChannel channel;
 
+	protected final long creationTime = System.currentTimeMillis();
+
     // close the connection after write?
 
     /* HTTP: greedy, if client support it( HTTP/1.1 without keep-alive: close),
@@ -32,4 +34,6 @@ public abstract class ServerAtta {
     public void chunkedResponseInprogress(boolean b) {
         chunkedResponseInprogress = b;
     }
+
+	public long getCreationTime() { return creationTime; }
 }

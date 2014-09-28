@@ -11,17 +11,20 @@
   param to wait existing requests to be finished, like (f :timeout 100).
 
   * See http://http-kit.org/migration.html for differences."
-  [handler {:keys [port thread ip max-body max-line worker-name-prefix queue-size max-ws]
-            :or   {ip "0.0.0.0"  ; which ip (if has many ips) to bind
-                   port 8090     ; which port listen incomming request
-                   thread 4      ; http worker thread count
-                   queue-size 20480 ; max job queued before reject to project self
+  [handler {:keys [port thread ip max-body max-line worker-name-prefix queue-size max-ws socket-idle-timeout]
+            :or   {ip                 "0.0.0.0"  ; which ip (if has many ips) to bind
+                   port               8090     ; which port listen incomming request
+                   thread             4      ; http worker thread count
+                   queue-size         20480 ; max job queued before reject to project self
                    worker-name-prefix "worker-" ; woker thread name prefix
-                   max-body 8388608             ; max http body: 8m
-                   max-ws  4194304              ; max websocket message size: 4m
-                   max-line 4096}}]  ; max http inital line length: 4K
+                   max-body           8388608             ; max http body: 8m
+                   max-ws             4194304              ; max websocket message size: 4m
+                   max-line           4096                ; max http inital line length: 4K
+                   socket-idle-timeout 0    ; socket idle timeout in millis: 0ms (disabled)
+                   }
+            }]
   (let [h (RingHandler. thread handler worker-name-prefix queue-size)
-        s (HttpServer. ip port h max-body max-line max-ws)]
+        s (HttpServer. ip port h max-body max-line max-ws socket-idle-timeout)]
     (.start s)
     (with-meta (fn stop-server [& {:keys [timeout] :or {timeout 100}}]
                  ;; graceful shutdown:
