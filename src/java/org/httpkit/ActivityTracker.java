@@ -6,7 +6,7 @@ package org.httpkit;
  * Twitter: @nbenari
  * Date: 9/29/14
  */
-public interface LRUCache<E>
+public interface ActivityTracker<E>
 {
 	E getLastInactive(long interval, long now);
 

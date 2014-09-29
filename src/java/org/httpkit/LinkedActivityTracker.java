@@ -12,7 +12,7 @@ import java.util.HashMap;
  * It holds its values inside the list in insertion order, adding to each its insertion time.
  * This way it can remove easily from its tail an element that is too old.
  */
-public class LinkedLRUCache<K> implements LRUCache<K>
+public class LinkedActivityTracker<K> implements ActivityTracker<K>
 {
 	private class Element
 	{

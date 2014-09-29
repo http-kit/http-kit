@@ -47,7 +47,7 @@ public class HttpServer implements Runnable {
     private Thread serverThread;
 
 	private long now;
-	private final LRUCache<SelectionKey> lruCache;
+	private final ActivityTracker<SelectionKey> activityTracker;
 
     // queue operations from worker threads to the IO thread
     private final ConcurrentLinkedQueue<PendingKey> pending = new ConcurrentLinkedQueue<PendingKey>();
@@ -70,9 +70,9 @@ public class HttpServer implements Runnable {
         serverChannel.register(selector, OP_ACCEPT);
 		// Incur no overhead if idle socket timeout feature not needed.
 		if (socketIdleTimeout > 0)
-			lruCache = new LinkedLRUCache<SelectionKey>();
+			activityTracker = new LinkedActivityTracker<SelectionKey>();
 		else
-			lruCache = new NoopLRUCache<SelectionKey>();
+			activityTracker = new NoopActivityTracker<SelectionKey>();
     }
 
     void accept(SelectionKey key) {
@@ -80,7 +80,7 @@ public class HttpServer implements Runnable {
         SocketChannel s;
         try {
             while ((s = ch.accept()) != null) {
-				lruCache.add(key, now);
+				activityTracker.add(key, now);
                 s.configureBlocking(false);
                 HttpAtta atta = new HttpAtta(maxBody, maxLine);
                 SelectionKey k = s.register(selector, OP_READ, atta);
@@ -98,7 +98,7 @@ public class HttpServer implements Runnable {
         } catch (Exception ignore) {
         }
 
-		lruCache.remove(key);
+		activityTracker.remove(key);
 
         ServerAtta att = (ServerAtta) key.attachment();
         if (att instanceof HttpAtta) {
@@ -173,7 +173,7 @@ public class HttpServer implements Runnable {
                 // remote entity shut the socket down cleanly.
                 closeKey(key, CLOSE_AWAY);
             } else if (read > 0) {
-				lruCache.update(key, now);
+				activityTracker.update(key, now);
                 buffer.flip(); // flip for read
                 final ServerAtta atta = (ServerAtta) key.attachment();
                 if (atta instanceof HttpAtta) {
@@ -201,7 +201,7 @@ public class HttpServer implements Runnable {
                     // TODO investigate why needed.
                     // ws request for write, but has no data?
                 } else if (size > 0) {
-					lruCache.update(key, now);
+					activityTracker.update(key, now);
                     ByteBuffer buffers[] = new ByteBuffer[size];
                     toWrites.toArray(buffers);
                     ch.write(buffers, 0, buffers.length);
@@ -269,9 +269,9 @@ public class HttpServer implements Runnable {
 			now = currentTimeMillis();
             try {
 
-				while(!lruCache.isEmpty())
+				while(!activityTracker.isEmpty())
 				{
-					final SelectionKey inactiveKey = lruCache.getLastInactive(socketIdleTimeout, now);
+					final SelectionKey inactiveKey = activityTracker.getLastInactive(socketIdleTimeout, now);
 					if (inactiveKey != null)
 						closeKey(inactiveKey, CLOSE_NORMAL);
 					else

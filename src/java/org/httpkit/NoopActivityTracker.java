@@ -6,7 +6,7 @@ package org.httpkit;
  * Twitter: @nbenari
  * Date: 9/29/14
  */
-public class NoopLRUCache<E> implements LRUCache<E>
+public class NoopActivityTracker<E> implements ActivityTracker<E>
 {
 	@Override
 	public E getLastInactive(long interval, long now)
