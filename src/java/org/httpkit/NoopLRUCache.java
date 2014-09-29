@@ -1,19 +1,21 @@
 package org.httpkit;
 
 /**
- * Author: noam
+ * Author: Noam Ben Ari
+ * Github: @NoamB
+ * Twitter: @nbenari
  * Date: 9/29/14
  */
-public class NoopActivityCollection<E> implements IActivityCollection<E>
+public class NoopLRUCache<E> implements LRUCache<E>
 {
 	@Override
-	public E getLastInactive(long interval)
+	public E getLastInactive(long interval, long now)
 	{
 		return null;
 	}
 
 	@Override
-	public boolean add(E e)
+	public boolean add(E e, long now)
 	{
 		return false;
 	}
@@ -25,7 +27,7 @@ public class NoopActivityCollection<E> implements IActivityCollection<E>
 	}
 
 	@Override
-	public boolean update(E e)
+	public boolean update(E e, long now)
 	{
 		return false;
 	}

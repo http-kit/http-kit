@@ -9,6 +9,7 @@ import java.nio.channels.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+import static java.lang.System.currentTimeMillis;
 import static java.nio.channels.SelectionKey.*;
 import static org.httpkit.HttpUtils.HttpEncode;
 import static org.httpkit.HttpUtils.WsEncode;
@@ -45,7 +46,8 @@ public class HttpServer implements Runnable {
 
     private Thread serverThread;
 
-	private final IActivityCollection<SelectionKey> activityCollection;
+	private long now;
+	private final LRUCache<SelectionKey> lruCache;
 
     // queue operations from worker threads to the IO thread
     private final ConcurrentLinkedQueue<PendingKey> pending = new ConcurrentLinkedQueue<PendingKey>();
@@ -68,9 +70,9 @@ public class HttpServer implements Runnable {
         serverChannel.register(selector, OP_ACCEPT);
 		// Incur no overhead if idle socket timeout feature not needed.
 		if (socketIdleTimeout > 0)
-			activityCollection = new ActivityCollection<SelectionKey>();
+			lruCache = new LinkedLRUCache<SelectionKey>();
 		else
-			activityCollection = new NoopActivityCollection<SelectionKey>();
+			lruCache = new NoopLRUCache<SelectionKey>();
     }
 
     void accept(SelectionKey key) {
@@ -78,7 +80,7 @@ public class HttpServer implements Runnable {
         SocketChannel s;
         try {
             while ((s = ch.accept()) != null) {
-				addKeyMetadata(key);
+				lruCache.add(key, now);
                 s.configureBlocking(false);
                 HttpAtta atta = new HttpAtta(maxBody, maxLine);
                 SelectionKey k = s.register(selector, OP_READ, atta);
@@ -90,18 +92,13 @@ public class HttpServer implements Runnable {
         }
     }
 
-	private void addKeyMetadata(SelectionKey key)
-	{
-		activityCollection.add(key);
-	}
-
 	private void closeKey(final SelectionKey key, int status) {
         try {
             key.channel().close();
         } catch (Exception ignore) {
         }
 
-		activityCollection.remove(key);
+		lruCache.remove(key);
 
         ServerAtta att = (ServerAtta) key.attachment();
         if (att instanceof HttpAtta) {
@@ -176,7 +173,7 @@ public class HttpServer implements Runnable {
                 // remote entity shut the socket down cleanly.
                 closeKey(key, CLOSE_AWAY);
             } else if (read > 0) {
-				activityCollection.update(key);
+				lruCache.update(key, now);
                 buffer.flip(); // flip for read
                 final ServerAtta atta = (ServerAtta) key.attachment();
                 if (atta instanceof HttpAtta) {
@@ -204,7 +201,7 @@ public class HttpServer implements Runnable {
                     // TODO investigate why needed.
                     // ws request for write, but has no data?
                 } else if (size > 0) {
-					activityCollection.update(key);
+					lruCache.update(key, now);
                     ByteBuffer buffers[] = new ByteBuffer[size];
                     toWrites.toArray(buffers);
                     ch.write(buffers, 0, buffers.length);
@@ -269,11 +266,12 @@ public class HttpServer implements Runnable {
 
     public void run() {
         while (true) {
+			now = currentTimeMillis();
             try {
 
-				while(!activityCollection.isEmpty())
+				while(!lruCache.isEmpty())
 				{
-					final SelectionKey inactiveKey = activityCollection.getLastInactive(socketIdleTimeout);
+					final SelectionKey inactiveKey = lruCache.getLastInactive(socketIdleTimeout, now);
 					if (inactiveKey != null)
 						closeKey(inactiveKey, CLOSE_NORMAL);
 					else
