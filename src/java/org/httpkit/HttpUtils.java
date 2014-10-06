@@ -439,7 +439,6 @@ public class HttpUtils {
             headers.put(CL, Integer.toString(b.length));
             bodyBuffer = ByteBuffer.wrap(b);
         }
-        headers.put("Server", "http-kit");
         headers.put("Date", DateFormatter.getDate()); // rfc says the Date is needed
 
         DynamicBytes bytes = new DynamicBytes(196);
