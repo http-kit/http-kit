@@ -168,7 +168,7 @@ public class WSDecoder {
                             payloadRead = 0;
                             if (opcode > 0)
                               fragmentedOpCode = opcode;
-                            opcode = OPCODE_CONT;
+                            opcode = -1;
                         }
                     }
                     break;
