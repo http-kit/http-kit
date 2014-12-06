@@ -29,6 +29,7 @@ public class WSDecoder {
     private int maskingKey;
     private boolean finalFlag;
     private int opcode = -1;
+    private int fragmentedOpCode = -1;
     private int framePayloadIndex; // masking per frame
 
     // 8 bytes are enough
@@ -99,7 +100,7 @@ public class WSDecoder {
                         tmpBuffer.clear();
                         // if negative, that too big, drop it.
                         if (length < 65536) {
-                            throw new ProtocolException("invalid data frame length. max payload length 4M");
+                            throw new ProtocolException("invalid data frame length. most significant bit is not zero or length fits in unsigned short.");
                         }
                         abortIfTooLarge(length);
                         payloadLength = (int) length;
@@ -146,6 +147,8 @@ public class WSDecoder {
                     // all read (this frame)
                     if (payloadRead == payloadLength) {
                         if (finalFlag) {
+                            if (fragmentedOpCode > 0)
+                              opcode = fragmentedOpCode;
                             switch (opcode) {
                                 case OPCODE_TEXT:
                                     return new Frame.TextFrame(content);
@@ -163,6 +166,9 @@ public class WSDecoder {
                         } else {
                             state = State.FRAME_START;
                             payloadRead = 0;
+                            if (opcode > 0)
+                              fragmentedOpCode = opcode;
+                            opcode = OPCODE_CONT;
                         }
                     }
                     break;
