@@ -26,6 +26,12 @@
     {:status 200
      :body (FileInputStream. file)}))
 
+(defn inputstream-length [is]
+  (loop [n 0]
+    (if (= -1 (.read is))
+      n
+      (recur (inc n)))))
+
 (defn many-headers-handler [req]
   (let [count (or (-> req :params :count to-int) 20)]
     {:status 200
@@ -100,6 +106,10 @@
            (when (open? channel)
              (schedule-task time (sent-messge)))))))))
 
+(defn hang-server-handler [req]
+  (with-channel req channel
+    (reset! handler-called true)))
+
 (defroutes test-routes
   (GET "/" [] "hello world")
   (GET "/timeout" [] async-with-timeout)
@@ -118,8 +128,9 @@
   (context "/ws2" [] ws/test-routes)
   (GET "/inputstream" [] inputstream-handler)
   (POST "/multipart" [] multipart-handler)
-  (POST "/chunked-input" [] (fn [req] {:status 200
-                                      :body (str (:content-length req))}))
+  (POST "/chunked-input" [] (fn [{:keys [body]}]
+                              {:status 200
+                               :body (str (inputstream-length body))}))
   (GET "/length" [] (fn [req]
                       (let [l (-> req :params :length to-int)]
                         {:status 200
@@ -134,6 +145,7 @@
   (GET "/streaming" [] streaming-handler)
   (GET "/async-response" [] async-response-handler)
   (GET "/async-just-body" [] async-just-body)
+  (POST "/hang" [] hang-server-handler)
   (ANY "*" [] (fn [req] (pr-str (dissoc req :async-channel)))))
 
 (use-fixtures :once (fn [f]
@@ -376,3 +388,8 @@
     (Thread/sleep 100)
     (server :timeout 3000)
     (is (= 200 (:status @resp)))))
+
+(deftest test-client-hangs-handler-called
+  (doseq [i (range 0 2)]
+    (SpecialHttpClient/postChunkedHang "http://localhost:4347/hang")
+    (check-handler-called)))

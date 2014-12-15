@@ -227,4 +227,24 @@ public class SpecialHttpClient {
             return null;
         }
     }
+
+    // Post the headers of a chunked request, and hangs there.
+    // Used for testing that route handlers have access to the body input stream right after the headers are sent
+    public static void postChunkedHang(String url) {
+        try {
+            URI uri = new URI(url);
+            InetSocketAddress addr = HttpUtils.getServerAddr(uri);
+
+            Socket s = new Socket();
+            s.connect(addr);
+            s.setSoTimeout(100);
+            OutputStream os = s.getOutputStream();
+
+            String request = "POST " + HttpUtils.getPath(uri)
+                    + " HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\n\r\n";
+
+            os.write(request.getBytes());
+            os.flush();
+        } catch (Exception e) {}
+    }
 }

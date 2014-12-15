@@ -14,6 +14,6 @@ public class RespCallback {
 
     // maybe in another thread :worker thread
     public void run(ByteBuffer... buffers) {
-        server.tryWrite(key, buffers);
+        server.tryWrite(key, true, buffers);
     }
 }

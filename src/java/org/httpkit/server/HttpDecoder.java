@@ -2,8 +2,10 @@ package org.httpkit.server;
 
 import org.httpkit.*;
 
+import java.io.IOException;
+import java.io.PipedInputStream;
+import java.io.PipedOutputStream;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -13,17 +15,29 @@ import static org.httpkit.HttpVersion.HTTP_1_1;
 
 public class HttpDecoder {
 
+    public enum DecodingState {INITIALIZED, ONGOING, FINISHED}
+
+    public class DecodingResult {
+        public DecodingState state;
+        public HttpRequest request;
+
+        public DecodingResult(DecodingState state, HttpRequest request) {
+            this.state = state;
+            this.request = request;
+        }
+    }
+
     public enum State {
         ALL_READ, READ_INITIAL, READ_HEADER, READ_FIXED_LENGTH_CONTENT, READ_CHUNK_SIZE, READ_CHUNKED_CONTENT, READ_CHUNK_FOOTER, READ_CHUNK_DELIMITER,
     }
 
     private State state = State.READ_INITIAL;
-    private int readRemaining = 0; // bytes need read
+    private int readRemaining = -1; // bytes need read
     private int readCount = 0; // already read bytes count
 
     HttpRequest request; // package visible
     private Map<String, Object> headers = new TreeMap<String, Object>();
-    byte[] content;
+    PipedOutputStream content;
 
     private final int maxBody;
     private final LineReader lineReader;
@@ -66,23 +80,30 @@ public class HttpDecoder {
         }
     }
 
-    public HttpRequest decode(ByteBuffer buffer) throws LineTooLargeException,
-            ProtocolException, RequestTooLargeException {
+    public DecodingResult decode(ByteBuffer buffer) throws LineTooLargeException,
+            ProtocolException, RequestTooLargeException, IOException {
         String line;
         while (buffer.hasRemaining()) {
             switch (state) {
                 case ALL_READ:
-                    return request;
+                    finish();
+                    return new DecodingResult(DecodingState.FINISHED, null);
                 case READ_INITIAL:
                     line = lineReader.readLine(buffer);
                     if (line != null) {
                         createRequest(line);
                         state = State.READ_HEADER;
+                        content = new PipedOutputStream();
                     }
                     break;
                 case READ_HEADER:
                     readHeaders(buffer);
-                    break;
+                    if (state != state.READ_HEADER) {
+                        if (state != State.ALL_READ) {
+                            request.setBody(new PipedInputStream(content, maxBody), readRemaining);
+                        }
+                        return new DecodingResult(DecodingState.INITIALIZED, request);
+                    }
                 case READ_CHUNK_SIZE:
                     line = lineReader.readLine(buffer);
                     if (line != null) {
@@ -91,13 +112,6 @@ public class HttpDecoder {
                             state = State.READ_CHUNK_FOOTER;
                         } else {
                             throwIfBodyIsTooLarge();
-                            if (content == null) {
-                                content = new byte[readRemaining];
-                            } else if (content.length < readCount + readRemaining) {
-                                // *1.3 to protect slow client
-                                int newLength = (int) ((readRemaining + readCount) * 1.3);
-                                content = Arrays.copyOf(content, newLength);
-                            }
                             state = State.READ_CHUNKED_CONTENT;
                         }
                     }
@@ -124,12 +138,12 @@ public class HttpDecoder {
                     break;
             }
         }
-        return state == State.ALL_READ ? request : null;
+        return new DecodingResult(state == State.ALL_READ ? DecodingState.FINISHED : DecodingState.ONGOING, null);
     }
 
-    private void finish() {
+    private void finish() throws IOException {
         state = State.ALL_READ;
-        request.setBody(content, readCount);
+        content.close();
     }
 
     void readEmptyLine(ByteBuffer buffer) {
@@ -139,9 +153,11 @@ public class HttpDecoder {
         }
     }
 
-    void readFixedLength(ByteBuffer buffer) {
+    void readFixedLength(ByteBuffer buffer) throws IOException {
         int toRead = Math.min(buffer.remaining(), readRemaining);
-        buffer.get(content, readCount, toRead);
+        byte[] tmp = new byte[toRead];
+        buffer.get(tmp);
+        content.write(tmp);
         readRemaining -= toRead;
         readCount += toRead;
     }
@@ -170,7 +186,6 @@ public class HttpDecoder {
                     readRemaining = Integer.parseInt(cl);
                     if (readRemaining > 0) {
                         throwIfBodyIsTooLarge();
-                        content = new byte[readRemaining];
                         state = State.READ_FIXED_LENGTH_CONTENT;
                     } else {
                         state = State.ALL_READ;
