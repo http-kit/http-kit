@@ -3,8 +3,6 @@ package org.httpkit.server;
 import org.httpkit.*;
 
 import java.io.IOException;
-import java.io.PipedInputStream;
-import java.io.PipedOutputStream;
 import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.TreeMap;
@@ -37,7 +35,7 @@ public class HttpDecoder {
 
     HttpRequest request; // package visible
     private Map<String, Object> headers = new TreeMap<String, Object>();
-    PipedOutputStream content;
+    TriggeredPipedOutputStream content;
 
     private final int maxBody;
     private final LineReader lineReader;
@@ -93,14 +91,14 @@ public class HttpDecoder {
                     if (line != null) {
                         createRequest(line);
                         state = State.READ_HEADER;
-                        content = new PipedOutputStream();
+                        content = new TriggeredPipedOutputStream();
                     }
                     break;
                 case READ_HEADER:
                     readHeaders(buffer);
                     if (state != state.READ_HEADER) {
                         if (state != State.ALL_READ) {
-                            request.setBody(new PipedInputStream(content, maxBody), readRemaining);
+                            request.setBody(new TriggeredPipedInputStream(content, maxBody), readRemaining);
                         }
                         return new DecodingResult(DecodingState.INITIALIZED, request);
                     }
@@ -199,10 +197,13 @@ public class HttpDecoder {
         }
     }
 
-    public void reset() {
+    public void reset() throws IOException {
         state = State.READ_INITIAL;
         headers = new TreeMap<String, Object>();
         readCount = 0;
+        if (content != null) {
+            content.close();
+        }
         content = null;
         lineReader.reset();
         request = null;
