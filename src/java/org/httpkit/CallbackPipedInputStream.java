@@ -5,21 +5,21 @@ import clojure.lang.IFn;
 import java.io.IOException;
 import java.io.PipedInputStream;
 
-public class TriggeredPipedInputStream extends PipedInputStream implements TriggeredInputStream {
+public class CallbackPipedInputStream extends PipedInputStream implements CallbackInputStream {
 
     IFn handler;
     boolean ended = false;
 
-    public TriggeredPipedInputStream(TriggeredPipedOutputStream s, int pipeSize) throws IOException {
+    public CallbackPipedInputStream(CallbackPipedOutputStream s, int pipeSize) throws IOException {
         super(s, pipeSize);
         s.connectHandler(this);
     }
 
-    synchronized public void setHandler(IFn h) {
+    synchronized public void setCallback(IFn h) {
         handler = h;
     }
 
-    synchronized public void handle() {
+    synchronized public void callback() {
         if (handler != null) {
             handler.invoke();
         }
@@ -27,7 +27,7 @@ public class TriggeredPipedInputStream extends PipedInputStream implements Trigg
 
     void end() {
         ended = true;
-        handle();
+        callback();
     }
 
     public boolean ended() {

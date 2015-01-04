@@ -3,17 +3,17 @@ package org.httpkit;
 import java.io.IOException;
 import java.io.PipedOutputStream;
 
-public class TriggeredPipedOutputStream extends PipedOutputStream {
+public class CallbackPipedOutputStream extends PipedOutputStream {
 
-    private TriggeredPipedInputStream handler;
+    private CallbackPipedInputStream handler;
 
-    public void connectHandler(TriggeredPipedInputStream h) {
+    public void connectHandler(CallbackPipedInputStream h) {
         handler = h;
     }
 
     void handle() {
         if (handler != null) {
-            handler.handle();
+            handler.callback();
         }
     }
 

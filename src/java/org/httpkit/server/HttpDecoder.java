@@ -35,7 +35,7 @@ public class HttpDecoder {
 
     HttpRequest request; // package visible
     private Map<String, Object> headers = new TreeMap<String, Object>();
-    TriggeredPipedOutputStream content;
+    CallbackPipedOutputStream content;
 
     private final int maxBody;
     private final LineReader lineReader;
@@ -91,14 +91,14 @@ public class HttpDecoder {
                     if (line != null) {
                         createRequest(line);
                         state = State.READ_HEADER;
-                        content = new TriggeredPipedOutputStream();
+                        content = new CallbackPipedOutputStream();
                     }
                     break;
                 case READ_HEADER:
                     readHeaders(buffer);
                     if (state != state.READ_HEADER) {
                         if (state != State.ALL_READ) {
-                            request.setBody(new TriggeredPipedInputStream(content, maxBody), readRemaining);
+                            request.setBody(new CallbackPipedInputStream(content, maxBody), readRemaining);
                         }
                         return new DecodingResult(DecodingState.INITIALIZED, request);
                     }
