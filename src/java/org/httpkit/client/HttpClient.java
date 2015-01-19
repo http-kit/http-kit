@@ -266,7 +266,9 @@ public final class HttpClient implements Runnable {
             if (engine == null) {
                 engine = DEFAULT_CONTEXT.createSSLEngine();
             }
-            engine.setUseClientMode(true);
+            if(!engine.getUseClientMode())
+                engine.setUseClientMode(true);
+
             pending.offer(new HttpsRequest(addr, request, cb, requests, cfg, engine));
         } else {
             pending.offer(new Request(addr, request, cb, requests, cfg));
