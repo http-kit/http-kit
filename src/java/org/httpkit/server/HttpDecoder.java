@@ -98,7 +98,8 @@ public class HttpDecoder {
                     readHeaders(buffer);
                     if (state != state.READ_HEADER) {
                         if (state != State.ALL_READ) {
-                            request.setBody(new CallbackPipedInputStream(content, maxBody), readRemaining);
+                            int pipeSize = state == state.READ_CHUNK_SIZE ? maxBody : readRemaining;
+                            request.setBody(new CallbackPipedInputStream(content, pipeSize), readRemaining);
                         }
                         return new DecodingResult(DecodingState.INITIALIZED, request);
                     }
