@@ -302,6 +302,7 @@
     (is (= 200 (:status @(http/get url {:max-redirects 6}))))
     (is (= 302 (:status @(http/get url {:follow-redirects false}))))
     (is (= "get" (:body @(http/post url {:as :text})))) ; should switch to get method
+    (is (= "post" (:body @(http/post url {:as :text :allow-unsafe-redirect-methods true})))) ; should not change method
     (is (= "post" (:body @(http/post (str url "&code=307") {:as :text})))) ; should not change method
     ))
 

@@ -164,7 +164,8 @@
                                    :url (.toString ^URI (.resolve (URI. url) ^String
                                                                   (.get headers "location")))
                                    :response response
-                                   :method (if (#{301 302 303} status)
+                                   :method (if (and (not (:allow-unsafe-redirect-methods opts))
+                                                    (#{301 302 303} status))
                                              :get ;; change to :GET
                                              (:method opts))  ;; do not change
                                    :trace-redirects (conj (:trace-redirects opts) url))
