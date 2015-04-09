@@ -190,7 +190,7 @@
            "See `request` for details.")
      ~'{:arglists '([url & [opts callback]] [url & [callback]])}
      ~'[url & [s1 s2]]
-     (if (or (instance? clojure.lang.MultiFn ~'s1) (fn? ~'s1))
+     (if (or (instance? clojure.lang.MultiFn ~'s1) (fn? ~'s1) (keyword? ~'s1))
        (request {:url ~'url :method ~(keyword method)} ~'s1)
        (request (merge ~'s1 {:url ~'url :method ~(keyword method)}) ~'s2))))
 
