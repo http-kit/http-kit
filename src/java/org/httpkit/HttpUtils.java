@@ -419,6 +419,37 @@ public class HttpUtils {
 
     public static final String CL = "Content-Length";
 
+    public static String FlashPolicyFileResponseString(List<String> allowAccessURIs) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("<?xml version=\"1.0\"?>");
+        builder.append("<!DOCTYPE cross-domain-policy SYSTEM \"http://www.macromedia.com/xml/dtds/cross-domain-policy.dtd\">");
+        builder.append("<cross-domain-policy>");
+        for(String uriStr : allowAccessURIs) {
+            if("*".equals(uriStr)) {
+                builder.append("<allow-access-from domain=\"*\" to-ports=\"*\"/>");
+                continue;
+            }
+            URI uri = URI.create(uriStr);
+            builder.append(String.format("<allow-access-from domain=\"%s\" to-ports=\"%d\"/>", uri.getHost(), uri.getPort()));
+        }
+        if(allowAccessURIs.size()<1) {
+            builder.append("<allow-access-from domain=\"*\" to-ports=\"*\"/>");
+        }
+        builder.append("</cross-domain-policy>");
+        return builder.toString();
+    }
+
+    public static ByteBuffer FlashPolicyFileResponse(List<String> allowAccessURIs) {
+        ByteBuffer bodyBuffer;
+        try {
+            bodyBuffer = bodyBuffer(FlashPolicyFileResponseString(allowAccessURIs));
+        } catch (IOException e) {
+            byte[] b = e.getMessage().getBytes(ASCII);
+            bodyBuffer = ByteBuffer.wrap(b);
+        }
+        return bodyBuffer;
+    }
+
     public static ByteBuffer[] HttpEncode(int status, HeaderMap headers, Object body) {
         ByteBuffer bodyBuffer;
         try {
