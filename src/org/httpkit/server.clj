@@ -29,7 +29,8 @@
                  ;; 2. wait for existing requests to finish
                  ;; 3. close the server
                  (.stop s timeout))
-      {:local-port (.getPort s)})))
+      {:local-port (.getPort s)
+       :server s})))
 
 ;;;; Asynchronous extension
 
