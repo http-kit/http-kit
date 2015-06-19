@@ -310,9 +310,9 @@ public class HttpServer implements Runnable {
 
         // close socket, notify on-close handlers
         if (selector.isOpen()) {
-            Set<SelectionKey> t = selector.keys();
-            SelectionKey[] keys = t.toArray(new SelectionKey[t.size()]);
-            for (SelectionKey k : keys) {
+//            Set<SelectionKey> keys = selector.keys();
+//            SelectionKey[] keys = t.toArray(new SelectionKey[t.size()]);
+            for (SelectionKey k : selector.keys()) {
                 /**
                  * 1. t.toArray will fill null if given array is larger.
                  * 2. compute t.size(), then try to fill the array, if in the mean time, another
