@@ -363,8 +363,13 @@ public final class HttpClient implements Runnable {
     public void run() {
         while (running) {
             try {
+                Request first = requests.peek();
+                long timeout = 2000;
+                if (first != null) {
+                    timeout = Math.max(first.toTimeout(currentTimeMillis()), 200L);
+                }
+                int select = selector.select(timeout);
                 long now = currentTimeMillis();
-                int select = selector.select(2000);
                 if (select > 0) {
                     Set<SelectionKey> selectedKeys = selector.selectedKeys();
                     Iterator<SelectionKey> ite = selectedKeys.iterator();
