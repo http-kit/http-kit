@@ -11,6 +11,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 import static java.nio.channels.SelectionKey.*;
 import static org.httpkit.HttpUtils.HttpEncode;
+import static org.httpkit.HttpUtils.FlashPolicyFileResponse;
+import static org.httpkit.HttpUtils.FlashPolicyFileResponseString;
 import static org.httpkit.HttpUtils.WsEncode;
 import static org.httpkit.server.Frame.CloseFrame.*;
 
@@ -48,6 +50,8 @@ public class HttpServer implements Runnable {
 
     // shared, single thread
     private final ByteBuffer buffer = ByteBuffer.allocateDirect(1024 * 64);
+
+    private List<String> allowAccessURIs = new ArrayList<String>();
 
     public HttpServer(String ip, int port, IHandler handler, int maxBody, int maxLine, int maxWs)
             throws IOException {
@@ -93,6 +97,10 @@ public class HttpServer implements Runnable {
         }
     }
 
+    public void addAllowAccessUri(String uri) {
+        allowAccessURIs.add(uri);
+    }
+
     private void decodeHttp(HttpAtta atta, SelectionKey key, SocketChannel ch) {
         try {
             do {
@@ -120,6 +128,9 @@ public class HttpServer implements Runnable {
         } catch (LineTooLargeException e) {
             atta.keepalive = false; // close after write
             tryWrite(key, HttpEncode(414, new HeaderMap(), e.getMessage()));
+        } catch (FlashPolicyFileRequestFoundExceiption e) {
+            atta.keepalive = false;
+            tryWrite(key, FlashPolicyFileResponse(allowAccessURIs));
         }
     }
 

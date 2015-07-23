@@ -39,7 +39,7 @@ public class LineReader {
             }
         }
         String line = null;
-        if (!more) {
+        if (!more || !buffer.hasRemaining()) {
             line = new String(lineBuffer, 0, lineBufferIdx);
             lineBufferIdx = 0;
         }

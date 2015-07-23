@@ -67,7 +67,7 @@ public class HttpDecoder {
     }
 
     public HttpRequest decode(ByteBuffer buffer) throws LineTooLargeException,
-            ProtocolException, RequestTooLargeException {
+            ProtocolException, RequestTooLargeException, FlashPolicyFileRequestFoundExceiption {
         String line;
         while (buffer.hasRemaining()) {
             switch (state) {
@@ -75,6 +75,9 @@ public class HttpDecoder {
                     return request;
                 case READ_INITIAL:
                     line = lineReader.readLine(buffer);
+                    if("<policy-file-request/>\0".equals(line)) {
+                        throw new FlashPolicyFileRequestFoundExceiption(line);
+                    }
                     if (line != null) {
                         createRequest(line);
                         state = State.READ_HEADER;
