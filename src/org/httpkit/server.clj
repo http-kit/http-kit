@@ -1,9 +1,16 @@
 (ns org.httpkit.server
-  (:import [org.httpkit.server AsyncChannel HttpServer RingHandler]
+  (:import [org.httpkit.server AsyncChannel HttpServer RingHandler ProxyProtocolOption]
            javax.xml.bind.DatatypeConverter
            java.security.MessageDigest))
 
 ;;;; Ring server
+
+(defn- to-proxy-enum
+  [opt]
+  (case opt
+    :enable   ProxyProtocolOption/ENABLED
+    :disable  ProxyProtocolOption/DISABLED
+    :optional ProxyProtocolOption/OPTIONAL))
 
 (defn run-server
   "Starts (mostly*) Ring-compatible HTTP server and returns a function that stops
@@ -12,7 +19,7 @@
 
   * See http://http-kit.org/migration.html for differences."
   [handler
-   & [{:keys [port thread ip max-body max-line worker-name-prefix queue-size max-ws]
+   & [{:keys [port thread ip max-body max-line worker-name-prefix queue-size max-ws proxy-protocol]
        :or   {ip "0.0.0.0" ; which ip (if has many ips) to bind
               port 8090    ; which port listen incomming request
               thread 4     ; http worker thread count
@@ -21,9 +28,10 @@
               max-body 8388608 ; max http body: 8m
               max-ws   4194304 ; max websocket message size: 4m
               max-line 4096    ; max http inital line length: 4K
+              proxy-protocol :disable ; proxy protocol is disabled by default
               }}]]
   (let [h (RingHandler. thread handler worker-name-prefix queue-size)
-        s (HttpServer. ip port h max-body max-line max-ws)]
+        s (HttpServer. ip port h max-body max-line max-ws (to-proxy-enum proxy-protocol))]
     (.start s)
     (with-meta (fn stop-server [& {:keys [timeout] :or {timeout 100}}]
                  ;; graceful shutdown:
