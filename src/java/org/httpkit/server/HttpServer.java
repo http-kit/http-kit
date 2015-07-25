@@ -1,13 +1,25 @@
 package org.httpkit.server;
 
-import org.httpkit.*;
-
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.nio.channels.*;
-import java.util.*;
+import java.nio.channels.ClosedSelectorException;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
+import java.util.Collections;
+import java.util.Date;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
+
+import org.httpkit.HeaderMap;
+import org.httpkit.HttpUtils;
+import org.httpkit.LineTooLargeException;
+import org.httpkit.ProtocolException;
+import org.httpkit.RequestTooLargeException;
 
 import static java.nio.channels.SelectionKey.*;
 import static org.httpkit.HttpUtils.HttpEncode;
@@ -40,6 +52,7 @@ public class HttpServer implements Runnable {
     private final Selector selector;
     private final ServerSocketChannel serverChannel;
 
+    private final ProxyProtocolOption proxyProtocolOption;
 
     private Thread serverThread;
 
@@ -49,12 +62,14 @@ public class HttpServer implements Runnable {
     // shared, single thread
     private final ByteBuffer buffer = ByteBuffer.allocateDirect(1024 * 64);
 
-    public HttpServer(String ip, int port, IHandler handler, int maxBody, int maxLine, int maxWs)
+    public HttpServer(String ip, int port, IHandler handler, int maxBody, int maxLine, int maxWs,
+                      ProxyProtocolOption proxyProtocolOption)
             throws IOException {
         this.handler = handler;
         this.maxLine = maxLine;
         this.maxBody = maxBody;
         this.maxWs = maxWs;
+        this.proxyProtocolOption = proxyProtocolOption;
 
         this.selector = Selector.open();
         this.serverChannel = ServerSocketChannel.open();
@@ -69,7 +84,7 @@ public class HttpServer implements Runnable {
         try {
             while ((s = ch.accept()) != null) {
                 s.configureBlocking(false);
-                HttpAtta atta = new HttpAtta(maxBody, maxLine);
+                HttpAtta atta = new HttpAtta(maxBody, maxLine, proxyProtocolOption);
                 SelectionKey k = s.register(selector, OP_READ, atta);
                 atta.channel = new AsyncChannel(k, this);
             }
