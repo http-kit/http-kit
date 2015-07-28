@@ -250,6 +250,12 @@ public class HttpDecoder {
 
     private void readHeaders(ByteBuffer buffer) throws LineTooLargeException,
             RequestTooLargeException, ProtocolException {
+        if (proxyProtocolOption == ProxyProtocolOption.OPTIONAL
+            || proxyProtocolOption == ProxyProtocolOption.ENABLED) {
+            headers.put("x-forwarded-for", xForwardedFor);
+            headers.put("x-forwarded-proto", xForwardedProto);
+            headers.put("x-forwarded-port", xForwardedPort);
+        }
         String line = lineReader.readLine(buffer);
         while (line != null && !line.isEmpty()) {
             HttpUtils.splitAndAddHeader(line, headers);
