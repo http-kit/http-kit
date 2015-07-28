@@ -73,7 +73,7 @@ public class HttpDecoder {
 
     private boolean parseProxyLine(String line) throws ProtocolException {
         // PROXY TCP4 255.255.255.255 255.255.255.255 65535 65535\r\n
-        if (line.startsWith("PROXY ")) {
+        if (!line.startsWith("PROXY ")) {
             return false;
         }
 
