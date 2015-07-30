@@ -9,10 +9,12 @@ import java.nio.channels.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+import static java.lang.System.currentTimeMillis;
 import static java.nio.channels.SelectionKey.*;
 import static org.httpkit.HttpUtils.HttpEncode;
 import static org.httpkit.HttpUtils.WsEncode;
 import static org.httpkit.server.Frame.CloseFrame.*;
+import static org.httpkit.server.Frame.CloseFrame.CLOSE_NORMAL;
 
 class PendingKey {
     public final SelectionKey key;
@@ -36,6 +38,7 @@ public class HttpServer implements Runnable {
     private final int maxLine; // max header line size
 
     private final int maxWs; // websocket, max message size
+    private final int socketIdleTimeout;
 
     private final Selector selector;
     private final ServerSocketChannel serverChannel;
@@ -43,24 +46,33 @@ public class HttpServer implements Runnable {
 
     private Thread serverThread;
 
+	private long now;
+	private final ActivityTracker<SelectionKey> activityTracker;
+
     // queue operations from worker threads to the IO thread
     private final ConcurrentLinkedQueue<PendingKey> pending = new ConcurrentLinkedQueue<PendingKey>();
 
     // shared, single thread
     private final ByteBuffer buffer = ByteBuffer.allocateDirect(1024 * 64);
 
-    public HttpServer(String ip, int port, IHandler handler, int maxBody, int maxLine, int maxWs)
+    public HttpServer(String ip, int port, IHandler handler, int maxBody, int maxLine, int maxWs, int socketIdleTimeout)
             throws IOException {
         this.handler = handler;
         this.maxLine = maxLine;
         this.maxBody = maxBody;
         this.maxWs = maxWs;
+		this.socketIdleTimeout = socketIdleTimeout;
 
         this.selector = Selector.open();
         this.serverChannel = ServerSocketChannel.open();
         serverChannel.configureBlocking(false);
         serverChannel.socket().bind(new InetSocketAddress(ip, port));
         serverChannel.register(selector, OP_ACCEPT);
+		// Incur no overhead if idle socket timeout feature not needed.
+		if (socketIdleTimeout > 0)
+			activityTracker = new LinkedActivityTracker<SelectionKey>();
+		else
+			activityTracker = new NoopActivityTracker<SelectionKey>();
     }
 
     void accept(SelectionKey key) {
@@ -68,6 +80,7 @@ public class HttpServer implements Runnable {
         SocketChannel s;
         try {
             while ((s = ch.accept()) != null) {
+				activityTracker.add(key, now);
                 s.configureBlocking(false);
                 HttpAtta atta = new HttpAtta(maxBody, maxLine);
                 SelectionKey k = s.register(selector, OP_READ, atta);
@@ -79,11 +92,13 @@ public class HttpServer implements Runnable {
         }
     }
 
-    private void closeKey(final SelectionKey key, int status) {
+	private void closeKey(final SelectionKey key, int status) {
         try {
             key.channel().close();
         } catch (Exception ignore) {
         }
+
+		activityTracker.remove(key);
 
         ServerAtta att = (ServerAtta) key.attachment();
         if (att instanceof HttpAtta) {
@@ -158,6 +173,7 @@ public class HttpServer implements Runnable {
                 // remote entity shut the socket down cleanly.
                 closeKey(key, CLOSE_AWAY);
             } else if (read > 0) {
+				activityTracker.update(key, now);
                 buffer.flip(); // flip for read
                 final ServerAtta atta = (ServerAtta) key.attachment();
                 if (atta instanceof HttpAtta) {
@@ -171,7 +187,7 @@ public class HttpServer implements Runnable {
         }
     }
 
-    private void doWrite(SelectionKey key) {
+	private void doWrite(SelectionKey key) {
         ServerAtta atta = (ServerAtta) key.attachment();
         SocketChannel ch = (SocketChannel) key.channel();
         try {
@@ -185,6 +201,7 @@ public class HttpServer implements Runnable {
                     // TODO investigate why needed.
                     // ws request for write, but has no data?
                 } else if (size > 0) {
+					activityTracker.update(key, now);
                     ByteBuffer buffers[] = new ByteBuffer[size];
                     toWrites.toArray(buffers);
                     ch.write(buffers, 0, buffers.length);
@@ -249,7 +266,18 @@ public class HttpServer implements Runnable {
 
     public void run() {
         while (true) {
+			now = currentTimeMillis();
             try {
+
+				while(!activityTracker.isEmpty())
+				{
+					final SelectionKey inactiveKey = activityTracker.getLastInactive(socketIdleTimeout, now);
+					if (inactiveKey != null)
+						closeKey(inactiveKey, CLOSE_NORMAL);
+					else
+						break;
+				}
+
                 PendingKey k;
                 while ((k = pending.poll()) != null) {
                     if (k.Op == PendingKey.OP_WRITE) {
@@ -271,6 +299,7 @@ public class HttpServer implements Runnable {
                     if (!key.isValid()) {
                         continue;
                     }
+
                     if (key.isAcceptable()) {
                         accept(key);
                     } else if (key.isReadable()) {
