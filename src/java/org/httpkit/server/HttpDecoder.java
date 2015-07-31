@@ -31,7 +31,7 @@ public class HttpDecoder {
      * Pattern for matching numbers 0 to 255.  We use this in the IPV4 address pattern to prevent invalid sequences
      * from be parsed by InetAddress.getByName and thus being treated as a name instead of an address.
      */
-    private static final String IPV4SEG = "(?:0|1\\d{0,2}|2(?:[0-4]\\d+|5[0-5]?|[6-9])?|[3-9]\\d?)";
+    private static final String IPV4SEG = "(?:0|1\\d{0,2}|2(?:[0-4]\\d*|5[0-5]?|[6-9])?|[3-9]\\d?)";
     private static final String IPV4ADDR = IPV4SEG + "(?:\\." + IPV4SEG + "){3}";
     /**
      * Pattern for a port number.  We are not as strict in our pattern matching as we are with ipv4 address
