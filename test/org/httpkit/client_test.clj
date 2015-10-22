@@ -120,7 +120,16 @@
           (doseq [r requests]
             (is (= 200 (:status @r))))))
       (doseq [_ (range 0 200)]
-        (is (= 200 (:status @(http/get url))))))))
+        (is (= 200 (:status @(http/get url))))))
+
+    (testing "callback exception handling"
+      (let [{error :error} @(http/get (str host "/get")
+                                      (fn [_] (throw (Exception. "Exception"))))]
+        (is (= "Exception" (.getMessage error))))
+
+      (let [{error :error} @(http/get (str host "/get")
+                                      (fn [_] (throw (Throwable. "Throwable"))))]
+        (is (= "Throwable" (.getMessage error)))))))
 
 
 (deftest test-unicode-encoding
