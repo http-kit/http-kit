@@ -149,7 +149,7 @@
   (let [{:keys [url method headers body sslengine]} (coerce-req opts)
         deliver-resp #(deliver response ;; deliver the result
                                (try ((or callback identity) %1)
-                                    (catch Exception e
+                                    (catch Throwable e
                                       ;; dump stacktrace to stderr
                                       (HttpUtils/printError (str method " " url "'s callback") e)
                                       ;; return the error
