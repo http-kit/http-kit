@@ -5,8 +5,16 @@
 See **[http-kit.org](http://http-kit.org)** for documentation, examples, benchmarks, etc.
 
 Current [semantic](http://semver.org/) version:
+```clojure
+[http-kit "2.1.19"] ; Latest official version
+[com.taoensso.forks/http-kit "2.1.20"] ; Unofficial (+possibly unstable) fork[1]
+```
 
-[![Clojars Project](http://clojars.org/http-kit/latest-version.svg)](http://clojars.org/http-kit)
+### [1] Unofficial fork (temporary)
+
+http-kit's author (@shenfeng) unfortunately hasn't had much time to maintain http-kit recently. In an attempt to help out, I've created a temporary fork which includes the latest merged pull requests, etc. I'm not too familiar with the code base (and pretty short on time myself), so merging only what look like obvious fixes. **Please exercise caution using this fork in production**. PR's and/or feedback welcome!
+
+\- @ptaoussanis
 
 ### Hack locally
 
