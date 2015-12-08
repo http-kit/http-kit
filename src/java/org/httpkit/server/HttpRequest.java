@@ -3,6 +3,8 @@ package org.httpkit.server;
 import org.httpkit.*;
 
 import java.io.InputStream;
+import java.io.PipedInputStream;
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Map;
 
@@ -10,12 +12,13 @@ import static org.httpkit.HttpUtils.*;
 import static org.httpkit.HttpVersion.HTTP_1_1;
 
 public class HttpRequest {
+
     public final String queryString;
     public final String uri;
     public final HttpMethod method;
     public final HttpVersion version;
 
-    private byte[] body;
+    private PipedInputStream body;
 
     // package visible
     int serverPort = 80;
@@ -43,11 +46,8 @@ public class HttpRequest {
         }
     }
 
-    public InputStream getBody() {
-        if (body != null) {
-            return new BytesInputStream(body, contentLength);
-        }
-        return null;
+    public InputStream getBody() throws IOException {
+        return body;
     }
 
     public String getRemoteAddr() {
@@ -65,7 +65,7 @@ public class HttpRequest {
         }
     }
 
-    public void setBody(byte[] body, int count) {
+    public void setBody(PipedInputStream body, int count) throws IOException {
         this.body = body;
         this.contentLength = count;
     }

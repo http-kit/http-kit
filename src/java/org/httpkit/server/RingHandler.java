@@ -5,6 +5,7 @@ import org.httpkit.HeaderMap;
 import org.httpkit.HttpUtils;
 import org.httpkit.PrefixThreadFactory;
 
+import java.io.IOException;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.*;
@@ -49,7 +50,7 @@ class ClojureRing {
         return status;
     }
 
-    public static IPersistentMap buildRequestMap(HttpRequest req) {
+    public static IPersistentMap buildRequestMap(HttpRequest req) throws IOException {
         // ring spec
         Map<Object, Object> m = new TreeMap<Object, Object>();
         m.put(SERVER_PORT, req.serverPort);

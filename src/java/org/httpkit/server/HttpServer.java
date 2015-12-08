@@ -97,19 +97,24 @@ public class HttpServer implements Runnable {
         try {
             do {
                 AsyncChannel channel = atta.channel;
-                HttpRequest request = atta.decoder.decode(buffer);
-                if (request != null) {
-                    channel.reset(request);
-                    if (request.isWebSocket) {
-                        key.attach(new WsAtta(channel, maxWs));
-                    } else {
-                        atta.keepalive = request.isKeepAlive;
-                    }
-                    request.channel = channel;
-                    request.remoteAddr = (InetSocketAddress) ch.socket().getRemoteSocketAddress();
-                    handler.handle(request, new RespCallback(key, this));
-                    // pipelining not supported : need queue to ensure order
-                    atta.decoder.reset();
+                HttpDecoder.DecodingResult decodingResult = atta.decoder.decode(buffer);
+                switch (decodingResult.state){
+                    case INITIALIZED:
+                        channel.reset(decodingResult.request);
+                        if (decodingResult.request.isWebSocket) {
+                            key.attach(new WsAtta(channel, maxWs));
+                        } else {
+                            atta.keepalive = decodingResult.request.isKeepAlive;
+                        }
+                        decodingResult.request.channel = channel;
+                        decodingResult.request.remoteAddr = (InetSocketAddress) ch.socket().getRemoteSocketAddress();
+                        handler.handle(decodingResult.request, new RespCallback(key, this));
+                        break;
+                    case ONGOING:
+                        break;
+                    case FINISHED:
+                        atta.decoder.reset();
+                        break;
                 }
             } while (buffer.hasRemaining()); // consume all
         } catch (ProtocolException e) {
@@ -120,6 +125,9 @@ public class HttpServer implements Runnable {
         } catch (LineTooLargeException e) {
             atta.keepalive = false; // close after write
             tryWrite(key, HttpEncode(414, new HeaderMap(), e.getMessage()));
+        } catch (IOException e) {
+            atta.keepalive = false; // close after write
+            tryWrite(key, HttpEncode(500, new HeaderMap(), e.getMessage()));
         }
     }
 

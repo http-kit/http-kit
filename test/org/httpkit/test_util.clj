@@ -24,6 +24,7 @@
 (defn to-int [int-str] (Integer/valueOf int-str))
 
 (def channel-closed (atom false))
+(def handler-called (atom false))
 
 (defn- sleep [n]
   (let [end (+ (System/currentTimeMillis) n)]
@@ -44,3 +45,11 @@
 
 (defn close-handler [status]
   (reset! channel-closed true))
+
+(defn check-handler-called []
+  (loop [i 0]
+    (when (and (not @handler-called) (< i 5))
+      (sleep 10)
+      (recur (inc i))))
+  (is @handler-called)
+  (reset! handler-called false))
