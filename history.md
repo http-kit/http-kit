@@ -1,3 +1,15 @@
+## [fork] 2.1.20 (2015 Dec 8)
+HTTP Server:
+  1. #86 Allow run-server being called without any opts (@djui)
+  2. #185 Do not set client mode on SSLEngine if already set (@izarov)
+  3. #234 Catch Throwable when delivering response (@msassak)
+  4. #239 HTTP client: keep form params in multipart requests (@skazhy)
+HTTP Client:
+  No changes
+
+## 2.1.19 (2014 Aug 25)
+  ??
+
 ## 2.1.18 (2014/4/18)
 HTTP Server:
   1. #125 NPE on stop_server
