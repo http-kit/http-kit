@@ -135,7 +135,8 @@
   Request options:
     :url :method :headers :timeout :query-params :form-params :as
     :client :body :basic-auth :user-agent :filter :worker-pool"
-  [{:keys [client timeout filter worker-pool keepalive as follow-redirects max-redirects response]
+  [{:keys [client timeout filter worker-pool keepalive as follow-redirects max-redirects response
+           trace-redirects allow-unsafe-redirect-methods]
     :as opts
     :or {client @default-client
          timeout 60000
@@ -159,20 +160,20 @@
                   (onSuccess [this status headers body]
                     (if (and follow-redirects
                              (#{301 302 303 307 308} status)) ; should follow redirect
-                      (if (>= max-redirects (count (:trace-redirects opts)))
+                      (if (>= max-redirects (count trace-redirects))
                         (request (assoc opts ; follow 301 and 302 redirect
                                    :url (.toString ^URI (.resolve (URI. url) ^String
                                                                   (.get headers "location")))
                                    :response response
-                                   :method (if (and (not (:allow-unsafe-redirect-methods opts))
+                                   :method (if (and (not allow-unsafe-redirect-methods)
                                                     (#{301 302 303} status))
                                              :get ;; change to :GET
                                              (:method opts))  ;; do not change
-                                   :trace-redirects (conj (:trace-redirects opts) url))
+                                   :trace-redirects (conj trace-redirects url))
                                  callback)
                         (deliver-resp {:opts (dissoc opts :response)
                                        :error (Exception. (str "too many redirects: "
-                                                               (count (:trace-redirects opts))))}))
+                                                               (count trace-redirects)))}))
                       (deliver-resp {:opts    (dissoc opts :response)
                                      :body    body
                                      :headers (prepare-response-headers headers)
