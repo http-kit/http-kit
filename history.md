@@ -1,4 +1,15 @@
-## [fork] 2.1.20 (2015 Dec 8)
+## 2.1.21-alpha2 (2015 Dec 12)
+
+> == 2.1.21-alpha1 (Clojars upload error)
+
+HTTP Server:
+  * [#217] More accurate timeout handling (@mbarbon)
+  * [#130] Server can now respond to HTTP_1.1/Expect : 100-continue header once per request (@valentini)
+
+HTTP Client:
+  * [#201] Client: option to keep "unsafe" method on redirect (@dzaharee)
+
+## [temporary fork] 2.1.20 (2015 Dec 8)
 HTTP Server:
   1. #86 Allow run-server being called without any opts (@djui)
   2. #185 Do not set client mode on SSLEngine if already set (@izarov)
