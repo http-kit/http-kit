@@ -8,7 +8,7 @@ Current [semantic](http://semver.org/) versions:
 
 ```clojure
 [http-kit "2.1.19"]        ; Stable
-[http-kit "2.2.21-alpha2"] ; Dev
+[http-kit "2.1.21-alpha2"] ; Dev
 ```
 
 ## Library status
