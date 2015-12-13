@@ -11,28 +11,28 @@
   param to wait existing requests to be finished, like (f :timeout 100).
 
   * See http://http-kit.org/migration.html for differences."
-  [handler
-   & [{:keys [port thread ip max-body max-line worker-name-prefix queue-size max-ws]
-       :or   {ip "0.0.0.0" ; which ip (if has many ips) to bind
-              port 8090    ; which port listen incomming request
-              thread 4     ; http worker thread count
-              queue-size 20480 ; max job queued before reject to project self
-              worker-name-prefix "worker-" ; woker thread name prefix
-              max-body 8388608 ; max http body: 8m
-              max-ws   4194304 ; max websocket message size: 4m
-              max-line 4096    ; max http inital line length: 4K
-              }}]]
-  (let [h (RingHandler. thread handler worker-name-prefix queue-size)
-        s (HttpServer. ip port h max-body max-line max-ws)]
-    (.start s)
-    (with-meta (fn stop-server [& {:keys [timeout] :or {timeout 100}}]
-                 ;; graceful shutdown:
-                 ;; 1. server stop accept new request
-                 ;; 2. wait for existing requests to finish
-                 ;; 3. close the server
-                 (.stop s timeout))
-      {:local-port (.getPort s)
-       :server s})))
+  ([handler] (run-server handler nil))
+  ([handler {:keys [port thread ip max-body max-line worker-name-prefix queue-size max-ws]
+             :or   {ip "0.0.0.0" ; which ip (if has many ips) to bind
+                    port 8090    ; which port listen incomming request
+                    thread 4     ; http worker thread count
+                    queue-size 20480 ; max job queued before reject to project self
+                    worker-name-prefix "worker-" ; woker thread name prefix
+                    max-body 8388608 ; max http body: 8m
+                    max-ws   4194304 ; max websocket message size: 4m
+                    max-line 4096    ; max http inital line length: 4K
+                    }}]
+   (let [h (RingHandler. thread handler worker-name-prefix queue-size)
+         s (HttpServer. ip port h max-body max-line max-ws)]
+     (.start s)
+     (with-meta (fn stop-server [& {:keys [timeout] :or {timeout 100}}]
+                  ;; graceful shutdown:
+                  ;; 1. server stop accept new request
+                  ;; 2. wait for existing requests to finish
+                  ;; 3. close the server
+                  (.stop s timeout))
+       {:local-port (.getPort s)
+        :server s}))))
 
 ;;;; Asynchronous extension
 
