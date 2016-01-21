@@ -149,6 +149,7 @@ public class WSDecoder {
                         if (finalFlag) {
                             if (fragmentedOpCode > 0)
                               opcode = fragmentedOpCode;
+                            fragmentedOpCode = -1;
                             switch (opcode) {
                                 case OPCODE_TEXT:
                                     return new Frame.TextFrame(content);
