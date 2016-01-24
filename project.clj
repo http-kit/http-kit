@@ -9,7 +9,7 @@
   :global-vars {*warn-on-reflection* true}
 
   :dependencies
-  [[org.clojure/clojure "1.4.0"]]
+  [[org.clojure/clojure "1.5.1"]]
 
   :plugins
   [[lein-swank   "1.4.4"]
