@@ -31,8 +31,7 @@
    :all (fn [_] true)}
 
   :profiles
-  {:1.5  {:dependencies [[org.clojure/clojure "1.5.1"]]}
-   :test {:java-source-paths ["test/java" "src/java"]}
+  {:test {:java-source-paths ["test/java" "src/java"]}
    :dev  {:dependencies
           [[junit/junit "4.8.2"]
            [org.clojure/tools.logging "0.2.6"]
