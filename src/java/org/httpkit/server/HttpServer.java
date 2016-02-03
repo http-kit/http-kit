@@ -60,7 +60,7 @@ public class HttpServer implements Runnable {
     private final ConcurrentLinkedQueue<PendingKey> pending = new ConcurrentLinkedQueue<PendingKey>();
 
     // shared, single thread
-    private final ByteBuffer buffer = ByteBuffer.allocateDirect(1024 * 64);
+    private final ByteBuffer buffer = ByteBuffer.allocateDirect(1024 * 64 - 1);
 
     public HttpServer(String ip, int port, IHandler handler, int maxBody, int maxLine, int maxWs,
                       ProxyProtocolOption proxyProtocolOption)
