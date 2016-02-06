@@ -106,11 +106,14 @@
   (GET "/headers" [] many-headers-handler)
   (ANY "/spec" [] (fn [req] (pr-str (dissoc req :body :async-channel))))
   (GET "/string" [] (fn [req] {:status 200
-                              :headers {"Content-Type" "text/plain"}
-                              :body "Hello World"}))
+                               :headers {"Content-Type" "text/plain"}
+                               :body "Hello World"}))
   (GET "/iseq" [] (fn [req] {:status 200
-                            :headers {"Content-Type" "text/plain"}
-                            :body (range 1 10)}))
+                             :headers {"Content-Type" "text/plain"}
+                             :body (range 1 10)}))
+  (GET "/iseq-empty" [] (fn [req] {:status 200
+                                   :headers {"Content-Type" "text/plain"}
+                                   :body '()}))
   (GET "/file" [] (wrap-file-info file-handler))
   (GET "/ws" [] (fn [req]
                   (with-channel req con
@@ -119,7 +122,7 @@
   (GET "/inputstream" [] inputstream-handler)
   (POST "/multipart" [] multipart-handler)
   (POST "/chunked-input" [] (fn [req] {:status 200
-                                      :body (str (:content-length req))}))
+                                       :body (str (:content-length req))}))
   (GET "/length" [] (fn [req]
                       (let [l (-> req :params :length to-int)]
                         {:status 200
