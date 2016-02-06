@@ -104,7 +104,8 @@ public class HttpUtils {
             return readAll((File) body);
         } else if (body instanceof Seqable) {
             ISeq seq = ((Seqable) body).seq();
-            DynamicBytes b = new DynamicBytes(seq.count() * 512);
+            int count = (seq == null) ? 0 : seq.count();
+            DynamicBytes b = new DynamicBytes(count * 512);
             while (seq != null) {
                 b.append(seq.first().toString(), UTF_8);
                 seq = seq.next();

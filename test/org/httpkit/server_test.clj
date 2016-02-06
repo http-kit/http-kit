@@ -110,7 +110,10 @@
                               :body "Hello World"}))
   (GET "/iseq" [] (fn [req] {:status 200
                             :headers {"Content-Type" "text/plain"}
-                            :body (range 1 10)}))
+                             :body (range 1 10)}))
+  (GET "/iseq-empty" [] (fn [req] {:status 200
+                                   :headers {"Content-Type" "text/plain"}
+                                   :body '()}))
   (GET "/file" [] (wrap-file-info file-handler))
   (GET "/ws" [] (fn [req]
                   (with-channel req con
