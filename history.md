@@ -19,7 +19,13 @@ HTTP Client:
   No changes
 
 ## 2.1.19 (2014 Aug 25)
-  ??
+HTTP Server:
+  1. #108 Duplicate headers cons'ed into list don't conform with ring spec
+  2. #152 Exception when stopping server
+  3. #155 Call on-close handlers on calling thread when threadpool is closed
+HTTP Client:
+  1. #149 Added methods required for CalDAV (@robbieh)
+  2. #157 Default HttpClient callback thread pool is always one (@dlebrero)
 
 ## 2.1.18 (2014/4/18)
 HTTP Server:
