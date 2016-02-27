@@ -104,14 +104,17 @@ public class HttpUtils {
             return readAll((File) body);
         } else if (body instanceof Seqable) {
             ISeq seq = ((Seqable) body).seq();
-            int count = (seq == null) ? 0 : seq.count();
-            DynamicBytes b = new DynamicBytes(count * 512);
-            while (seq != null) {
-                b.append(seq.first().toString(), UTF_8);
-                seq = seq.next();
+            if (seq == null) {
+                return null;
+            } else {
+                DynamicBytes b = new DynamicBytes(seq.count() * 512);
+                while (seq != null) {
+                    b.append(seq.first().toString(), UTF_8);
+                    seq = seq.next();
+                }
+                return ByteBuffer.wrap(b.get(), 0, b.length());
+                // makes ultimate optimization possible: no copy
             }
-            return ByteBuffer.wrap(b.get(), 0, b.length());
-            // makes ultimate optimization possible: no copy
         } else if (body instanceof ByteBuffer) {
             return (ByteBuffer) body;
         } else {
