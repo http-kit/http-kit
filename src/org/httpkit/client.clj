@@ -99,7 +99,9 @@
 (defn request
   "Issues an async HTTP request and returns a promise object to which the value
   of `(callback {:opts _ :status _ :headers _ :body _})` or
-     `(callback {:opts _ :error _})` will be delivered.
+     `(callback {:opts _ :error _})` will be delivered. 
+  The latter will be delivered on client errors only, not on http errors which will be 
+  contained in the :status of the first. 
 
   When unspecified, `callback` is the identity
 
