@@ -310,7 +310,10 @@
     (is (re-find #"200" resp))
     (is (re-find #"Keep-Alive" resp))))
 
-(deftest test-ipv6
+(deftest ^:skip-travis test-ipv6
+  ;; Skipping this on Travis because of difficulties with [::1] IPv6
+  ;; on AWS CIs, Ref. https://github.com/travis-ci/travis-ci/issues/4964
+
   ;; TODO add more
   (is (= "hello world" (:body (http/get "http://[::1]:4347/")))))
 

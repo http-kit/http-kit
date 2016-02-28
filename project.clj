@@ -27,6 +27,7 @@
   :jar-exclusions [#".*java$"]
   :test-selectors
   {:default (complement :benchmark)
+   :travis  (complement #(or (:benchmark %) (:skip-travis %)))
    :benchmark :benchmark
    :all (fn [_] true)}
 
