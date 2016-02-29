@@ -205,10 +205,10 @@
                                   (deliver latch true))
                           :close (fn [con status]
                                    ;; (println "close:" con status)
-                                   )
+)
                           :open (fn [con]
                                   ;; (println "opened:" con)
-                                  ))]
+))]
       ;; (h/send ws :byte (byte-array 10)) not implemented yet
       (let [msg "testing12"]
         (h/send ws :text msg)
