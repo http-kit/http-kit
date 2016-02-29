@@ -90,7 +90,7 @@
                           :body "canceled"}))))))
 
 (defn streaming-demo [request]
-  (let [time (Integer/valueOf (or (-> request :params :i) 200))]
+  (let [time (Integer/valueOf (or ^String (-> request :params :i) 200))]
     (with-channel request channel
       (on-close channel (fn [status]
                           (println channel "closed" status)))
