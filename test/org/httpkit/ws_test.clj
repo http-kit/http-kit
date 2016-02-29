@@ -118,8 +118,8 @@
                             "\nreceive:\n" r))
               (is false))))
         (let [d (subs const-string 0 120)]
-          (= d (.ping client d))
-          (= d (.pong client d)))))
+          (is (= d (.ping client d)))
+          (is (= d (.pong client d))))))
     (.close client)))
 
 (deftest test-sent-message-in-body      ; issue #14
