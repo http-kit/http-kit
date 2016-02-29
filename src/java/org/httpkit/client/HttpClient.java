@@ -345,6 +345,8 @@ public final class HttpClient implements Runnable {
             }
             try {
                 SocketChannel ch = SocketChannel.open();
+                ch.setOption(StandardSocketOptions.SO_KEEPALIVE, Boolean.TRUE);
+                ch.setOption(StandardSocketOptions.TCP_NODELAY, Boolean.TRUE);
                 ch.configureBlocking(false);
                 boolean connected = ch.connect(job.addr);
                 job.isConnected = connected;
