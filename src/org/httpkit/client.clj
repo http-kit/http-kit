@@ -163,16 +163,19 @@
                     (if (and follow-redirects
                              (#{301 302 303 307 308} status)) ; should follow redirect
                       (if (>= max-redirects (count trace-redirects))
-                        (request (assoc opts ; follow 301 and 302 redirect
-                                        :url (str (.resolve (URI. url) ^String
-                                                                       (.get headers "location")))
-                                        :response response
-                                        :method (if (and (not allow-unsafe-redirect-methods)
-                                                         (#{301 302 303} status))
-                                                  :get ;; change to :GET
-                                                  (:method opts))  ;; do not change
-                                        :trace-redirects (conj trace-redirects url))
-                                 callback)
+                        (let [location (str (.resolve (URI. url) ^String (.get headers "location")))
+                              change-to-get (and (not allow-unsafe-redirect-methods)
+                                                 (#{301 302 303} status))]
+                          (request (assoc opts ; follow 301 and 302 redirect
+                                     :url location
+                                     :response response
+                                     :query-params (if change-to-get nil (:query-params opts))
+                                     :form-params (if change-to-get nil (:form-params opts))
+                                     :method (if change-to-get
+                                               :get ;; change to :GET
+                                               (:method opts))  ;; do not change
+                                     :trace-redirects (conj trace-redirects url))
+                                   callback))
                         (deliver-resp {:opts (dissoc opts :response)
                                        :error (Exception. (str "too many redirects: "
                                                                (count trace-redirects)))}))
