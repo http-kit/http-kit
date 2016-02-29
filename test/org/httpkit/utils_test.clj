@@ -9,7 +9,7 @@
 
 (defn charset [name] (Charset/forName name))
 
-(defn detect-charset [headers body]
+(defn detect-charset [headers ^String body]
   (let [b (doto (DynamicBytes. 128)
             (.append body))]
     (HttpUtils/detectCharset headers b)))

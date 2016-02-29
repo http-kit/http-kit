@@ -30,10 +30,10 @@
   (let [count (or (-> req :params :count to-int) 20)]
     {:status 200
      :headers (assoc
-                  (into {} (map (fn [idx]
-                                  [(str "key-" idx) (str "value-" idx)])
-                                (range 0 (inc count))))
-                "x-header-1" ["abc" "def"])}))
+               (into {} (map (fn [idx]
+                               [(str "key-" idx) (str "value-" idx)])
+                             (range 0 (inc count))))
+               "x-header-1" ["abc" "def"])}))
 
 (defn multipart-handler [req]
   (let [{:keys [title file]} (:params req)]
@@ -66,7 +66,7 @@
                          {:body p})
                false))        ;; do not close
       (send! channel "" true) ;; same as (close channel)
-      )))
+)))
 
 (defn slow-server-handler [req]
   (with-channel req channel
@@ -90,7 +90,7 @@
                           :body "canceled"}))))))
 
 (defn streaming-demo [request]
-  (let [time (Integer/valueOf (or (-> request :params :i) 200))]
+  (let [time (Integer/valueOf (or ^String (-> request :params :i) 200))]
     (with-channel request channel
       (on-close channel (fn [status]
                           (println channel "closed" status)))
@@ -144,7 +144,6 @@
                                     (site test-routes) {:port 4347})]
                         (try (f) (finally (server))))))
 
-
 (deftest test-ring-spec
   (let [req (-> (http/get "http://localhost:4347/spec?c=d"
                           {:query-params {"a" "b"}})
@@ -188,12 +187,12 @@
 
 (deftest test-body-file
   (doseq [length (range 1 (* 1024 1024 8) 1439987)]
-    (let [resp (http/get "http://localhost:4347/file?l=" length)]
+    (let [resp (http/get (str "http://localhost:4347/file?l=" length))]
       (is (= (:status resp) 200))
       (is (= (get-in resp [:headers "content-type"]) "text/plain"))
       (is (= length (count (:body resp)))))))
 
-(deftest test-body-file
+(deftest test-other-body-file
   (let [resp (http/get "http://localhost:4347/file")]
     (is (= (:status resp) 200))
     (is (= (get-in resp [:headers "content-type"]) "text/plain"))

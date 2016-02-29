@@ -59,20 +59,20 @@
 (defn- coerce-req
   [{:keys [url method body insecure? query-params form-params multipart] :as req}]
   (let [r (assoc req
-            :url (if query-params
-                   (if (neg? (.indexOf ^String url (int \?)))
-                     (str url "?" (query-string query-params))
-                     (str url "&" (query-string query-params)))
-                   url)
-            :sslengine (or (:sslengine req)
-                           (when (:insecure? req) (SslContextFactory/trustAnybody)))
-            :method    (HttpMethod/fromKeyword (or method :get))
-            :headers   (prepare-request-headers req)
+                 :url (if query-params
+                        (if (neg? (.indexOf ^String url (int \?)))
+                          (str url "?" (query-string query-params))
+                          (str url "&" (query-string query-params)))
+                        url)
+                 :sslengine (or (:sslengine req)
+                                (when (:insecure? req) (SslContextFactory/trustAnybody)))
+                 :method    (HttpMethod/fromKeyword (or method :get))
+                 :headers   (prepare-request-headers req)
             ;; :body ring body: null, String, seq, InputStream, File, ByteBuffer
-            :body      (if form-params (query-string form-params) body))]
+                 :body      (if form-params (query-string form-params) body))]
     (if multipart
       (let [entities (into (map (fn [{:keys [name content filename]}]
-                             (MultipartEntity. name content filename)) multipart)
+                                  (MultipartEntity. name content filename)) multipart)
                            (map (fn [[k v]] (MultipartEntity. k v nil)) form-params))
             boundary (MultipartEntity/genBoundary entities)]
         (-> r
@@ -99,9 +99,9 @@
 (defn request
   "Issues an async HTTP request and returns a promise object to which the value
   of `(callback {:opts _ :status _ :headers _ :body _})` or
-     `(callback {:opts _ :error _})` will be delivered. 
-  The latter will be delivered on client errors only, not on http errors which will be 
-  contained in the :status of the first. 
+     `(callback {:opts _ :error _})` will be delivered.
+  The latter will be delivered on client errors only, not on http errors which will be
+  contained in the :status of the first.
 
   When unspecified, `callback` is the identity
 
@@ -164,14 +164,14 @@
                              (#{301 302 303 307 308} status)) ; should follow redirect
                       (if (>= max-redirects (count trace-redirects))
                         (request (assoc opts ; follow 301 and 302 redirect
-                                   :url (.toString ^URI (.resolve (URI. url) ^String
-                                                                  (.get headers "location")))
-                                   :response response
-                                   :method (if (and (not allow-unsafe-redirect-methods)
-                                                    (#{301 302 303} status))
-                                             :get ;; change to :GET
-                                             (:method opts))  ;; do not change
-                                   :trace-redirects (conj trace-redirects url))
+                                        :url (str (.resolve (URI. url) ^String
+                                                                       (.get headers "location")))
+                                        :response response
+                                        :method (if (and (not allow-unsafe-redirect-methods)
+                                                         (#{301 302 303} status))
+                                                  :get ;; change to :GET
+                                                  (:method opts))  ;; do not change
+                                        :trace-redirects (conj trace-redirects url))
                                  callback)
                         (deliver-resp {:opts (dissoc opts :response)
                                        :error (Exception. (str "too many redirects: "

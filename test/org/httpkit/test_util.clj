@@ -14,14 +14,14 @@
 (defn ^File gen-tempfile
   "generate a tempfile, the file will be deleted before jvm shutdown"
   ([size extension]
-     (let [tmp (doto
-                   (File/createTempFile "tmp_" extension)
-                 (.deleteOnExit))]
-       (with-open [w (FileOutputStream. tmp)]
-         (.write w ^bytes (.getBytes (subs const-string 0 size))))
-       tmp)))
+   (let [tmp (doto
+              (File/createTempFile "tmp_" extension)
+               (.deleteOnExit))]
+     (with-open [w (FileOutputStream. tmp)]
+       (.write w ^bytes (.getBytes (subs const-string 0 size))))
+     tmp)))
 
-(defn to-int [int-str] (Integer/valueOf int-str))
+(defn to-int [^String int-str] (Integer/valueOf int-str))
 
 (def channel-closed (atom false))
 
