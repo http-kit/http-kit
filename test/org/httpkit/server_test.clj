@@ -187,12 +187,12 @@
 
 (deftest test-body-file
   (doseq [length (range 1 (* 1024 1024 8) 1439987)]
-    (let [resp (http/get "http://localhost:4347/file?l=" length)]
+    (let [resp (http/get (str "http://localhost:4347/file?l=" length))]
       (is (= (:status resp) 200))
       (is (= (get-in resp [:headers "content-type"]) "text/plain"))
       (is (= length (count (:body resp)))))))
 
-(deftest test-body-file
+(deftest test-other-body-file
   (let [resp (http/get "http://localhost:4347/file")]
     (is (= (:status resp) 200))
     (is (= (get-in resp [:headers "content-type"]) "text/plain"))
