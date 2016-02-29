@@ -99,9 +99,9 @@
 (defn request
   "Issues an async HTTP request and returns a promise object to which the value
   of `(callback {:opts _ :status _ :headers _ :body _})` or
-     `(callback {:opts _ :error _})` will be delivered. 
-  The latter will be delivered on client errors only, not on http errors which will be 
-  contained in the :status of the first. 
+     `(callback {:opts _ :error _})` will be delivered.
+  The latter will be delivered on client errors only, not on http errors which will be
+  contained in the :status of the first.
 
   When unspecified, `callback` is the identity
 
@@ -164,7 +164,7 @@
                              (#{301 302 303 307 308} status)) ; should follow redirect
                       (if (>= max-redirects (count trace-redirects))
                         (request (assoc opts ; follow 301 and 302 redirect
-                                        :url (.toString ^URI (.resolve (URI. url) ^String
+                                        :url (str (.resolve (URI. url) ^String
                                                                        (.get headers "location")))
                                         :response response
                                         :method (if (and (not allow-unsafe-redirect-methods)
