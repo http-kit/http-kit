@@ -30,10 +30,10 @@
   (let [count (or (-> req :params :count to-int) 20)]
     {:status 200
      :headers (assoc
-                  (into {} (map (fn [idx]
-                                  [(str "key-" idx) (str "value-" idx)])
-                                (range 0 (inc count))))
-                "x-header-1" ["abc" "def"])}))
+               (into {} (map (fn [idx]
+                               [(str "key-" idx) (str "value-" idx)])
+                             (range 0 (inc count))))
+               "x-header-1" ["abc" "def"])}))
 
 (defn multipart-handler [req]
   (let [{:keys [title file]} (:params req)]
@@ -66,7 +66,7 @@
                          {:body p})
                false))        ;; do not close
       (send! channel "" true) ;; same as (close channel)
-      )))
+)))
 
 (defn slow-server-handler [req]
   (with-channel req channel
@@ -143,7 +143,6 @@
                       (let [server (run-server
                                     (site test-routes) {:port 4347})]
                         (try (f) (finally (server))))))
-
 
 (deftest test-ring-spec
   (let [req (-> (http/get "http://localhost:4347/spec?c=d"

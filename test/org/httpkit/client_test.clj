@@ -50,8 +50,8 @@
   (GET "/p" [] (fn [req] (pr-str (:params req))))
   (ANY "/params" [] (fn [req] (-> req :params :param1)))
   (PUT "/body" [] (fn [req] {:body (:body req)
-                            :status 200
-                            :headers {"content-type" "text/plain"}}))
+                             :status 200
+                             :headers {"content-type" "text/plain"}}))
   (GET "/test-header" [] (fn [{:keys [headers]}] (str (get headers "test-header")))))
 
 (use-fixtures :once
@@ -124,13 +124,12 @@
 
     (testing "callback exception handling"
       (let [{^Exception error :error} @(http/get (str host "/get")
-                                      (fn [_] (throw (Exception. "Exception"))))]
+                                                 (fn [_] (throw (Exception. "Exception"))))]
         (is (= "Exception" (.getMessage error))))
 
       (let [{^Throwable error :error} @(http/get (str host "/get")
-                                      (fn [_] (throw (Throwable. "Throwable"))))]
+                                                 (fn [_] (throw (Throwable. "Throwable"))))]
         (is (= "Throwable" (.getMessage error)))))))
-
 
 (deftest test-unicode-encoding
   (let [u "高性能HTTPServer和Client"
@@ -242,7 +241,7 @@
                (java.io.FileInputStream. file) ; inputstream
                [(subs const-string 0 100) (subs const-string 100 length)] ; seqable
                (ByteBuffer/wrap (.getBytes (subs const-string 0 length))) ; byteBuffer
-               ]]
+]]
     (doseq [body bodys]
       (is (= length (count (:body @(http/put "http://127.0.0.1:4347/body"
                                              {:body body}))))))))
@@ -304,13 +303,12 @@
     (is (= "get" (:body @(http/post url {:as :text})))) ; should switch to get method
     (is (= "post" (:body @(http/post url {:as :text :allow-unsafe-redirect-methods true})))) ; should not change method
     (is (= "post" (:body @(http/post (str url "&code=307") {:as :text})))) ; should not change method
-    ))
+))
 
 (deftest test-multipart
   (is (= 200 (:status @(http/post "http://localhost:4347/multipart"
                                   {:multipart [{:name "comment" :content "httpkit's project.clj"}
                                                {:name "file" :content (clojure.java.io/file "project.clj") :filename "project.clj"}]})))))
-
 
 (deftest test-coerce-req
   "Headers should be the same regardless of multipart"
@@ -319,7 +317,6 @@
     (is (= (keys (:headers (coerce-req request)))
            (remove #(= % "Content-Type")
                    (keys (:headers (coerce-req (assoc request :multipart [{:name "foo" :content "bar"}])))))))))
-
 
 (deftest test-header-multiple-values
   (let [resp @(http/get "http://localhost:4347/multi-header" {:headers {"foo" ["bar" "baz"], "eggplant" "quux"}})
@@ -335,8 +332,8 @@
                            ['(0) "0"]
                            ['("a" "b") "a,b"]]]
     (let [received (:body @(http/get "http://localhost:4347/test-header"
-                             {:headers {"test-header" sent}}))]
-        (is (= received expected)))))
+                                     {:headers {"test-header" sent}}))]
+      (is (= received expected)))))
 
 (defn- utf8 [^String s] (ByteBuffer/wrap (.getBytes s "UTF-8")))
 
@@ -390,9 +387,7 @@
     ;; One header.
     HttpMethod/GET "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"
     [[:init HttpVersion/HTTP_1_1 HttpStatus/OK]
-     [:headers {"content-length" "0"}]]
-
-    ))
+     [:headers {"content-length" "0"}]]))
 
 (deftest test-decode-body
   (are [method resp events] (= (decode method (utf8 resp)) events)
@@ -407,23 +402,21 @@
      [:headers {"content-length" "1"}]]
 
      ;; One byte.
-     HttpMethod/GET "HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\n."
-     [[:init HttpVersion/HTTP_1_1 HttpStatus/OK]
-      [:headers {"content-length" "1"}]
-      [:body [46]]]
+    HttpMethod/GET "HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\n."
+    [[:init HttpVersion/HTTP_1_1 HttpStatus/OK]
+     [:headers {"content-length" "1"}]
+     [:body [46]]]
 
      ;; One byte. The rest is ignored.
-     HttpMethod/GET "HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\n..."
-     [[:init HttpVersion/HTTP_1_1 HttpStatus/OK]
-      [:headers {"content-length" "1"}]
-      [:body [46]]]
+    HttpMethod/GET "HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\n..."
+    [[:init HttpVersion/HTTP_1_1 HttpStatus/OK]
+     [:headers {"content-length" "1"}]
+     [:body [46]]]
 
     ;; The body is omitted for HEAD requests.
     HttpMethod/HEAD "HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\n..."
     [[:init HttpVersion/HTTP_1_1 HttpStatus/OK]
-     [:headers {"content-length" "3"}]]
-
-    ))
+     [:headers {"content-length" "3"}]]))
 
 ;; @(http/get "http://127.0.0.1:4348" {:headers {"Connection" "Close"}})
 
