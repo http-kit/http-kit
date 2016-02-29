@@ -123,11 +123,11 @@
         (is (= 200 (:status @(http/get url))))))
 
     (testing "callback exception handling"
-      (let [{error :error} @(http/get (str host "/get")
+      (let [{^Exception error :error} @(http/get (str host "/get")
                                       (fn [_] (throw (Exception. "Exception"))))]
         (is (= "Exception" (.getMessage error))))
 
-      (let [{error :error} @(http/get (str host "/get")
+      (let [{^Throwable error :error} @(http/get (str host "/get")
                                       (fn [_] (throw (Throwable. "Throwable"))))]
         (is (= "Throwable" (.getMessage error)))))))
 
@@ -266,7 +266,7 @@
       (is (string? body)))
     (let [body (:body @(http/get url {:as :stream}))]
       (is (instance? java.io.InputStream body)))
-    (let [body (:body @(http/get url {:as :byte-array}))]
+    (let [^bytes body (:body @(http/get url {:as :byte-array}))]
       (is (= 1024 (alength body))))))
 
 (deftest test-https
@@ -274,7 +274,7 @@
     (doseq [i (range 0 2)]
       (doseq [length (repeatedly 40 (partial rand-int (* 4 1024 1024)))]
         (let [{:keys [body error status]} @(http/get (get-url length) {:insecure? true})]
-          (if error (.printStackTrace error))
+          (if error (.printStackTrace ^Throwable error))
           (is (= length (count body)))))
       (doseq [length (repeatedly 40 (partial rand-int (* 4 1024 1024)))]
         (is (= length (-> @(http/get (get-url length)
@@ -338,7 +338,7 @@
                              {:headers {"test-header" sent}}))]
         (is (= received expected)))))
 
-(defn- utf8 [s] (ByteBuffer/wrap (.getBytes s "UTF-8")))
+(defn- utf8 [^String s] (ByteBuffer/wrap (.getBytes s "UTF-8")))
 
 (defn- decode
   [method buffer]

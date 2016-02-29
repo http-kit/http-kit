@@ -152,9 +152,9 @@
     (dotimes [_ 5]
       (let [length (min 1024 (rand-int 10024))
             data (byte-array length (take length (repeatedly #(byte (rand-int 126)))))
-            sorted-data (doto (aclone data) (java.util.Arrays/sort))]
+            ^bytes sorted-data (doto (aclone data) (java.util.Arrays/sort))]
         (.sendBinaryData client data)
-        (let [output (.getMessage client)]
+        (let [^bytes output (.getMessage client)]
           (is (java.util.Arrays/equals sorted-data output)))))
     (.close client)))
 
