@@ -93,7 +93,8 @@ public class WebSocketClient {
     }
 
     public Object getMessage() throws InterruptedException {
-        WebSocketFrame frame = queue.poll(5, TimeUnit.SECONDS);
+        int waitTimeout = 30; // Travis CI machines are sometimes very slow
+        WebSocketFrame frame = queue.poll(waitTimeout, TimeUnit.SECONDS);
         if (frame instanceof TextWebSocketFrame) {
             return ((TextWebSocketFrame) frame).getText();
         } else if (frame instanceof BinaryWebSocketFrame) {
