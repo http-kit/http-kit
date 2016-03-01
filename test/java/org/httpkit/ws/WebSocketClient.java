@@ -99,6 +99,8 @@ public class WebSocketClient {
             return ((TextWebSocketFrame) frame).getText();
         } else if (frame instanceof BinaryWebSocketFrame) {
             return frame.getBinaryData().array();
+        } else if (frame == null) {
+            throw new IllegalStateException("Couldn't get message after waiting for " + waitTimeout + " seconds.");
         }
         return frame;
     }
