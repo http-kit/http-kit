@@ -24,7 +24,7 @@
   :javac-options ["-source" "1.6" "-target" "1.6" "-g"]
   :java-source-paths ["src/java"]
   :test-paths ["test"]
-  :jar-exclusions [#".*java$"]
+  :jar-exclusions [#"^java.*"] ; exclude the java directory in source path
   :test-selectors
   {:default (complement :benchmark)
    :travis  (complement #(or (:benchmark %) (:skip-travis %)))
