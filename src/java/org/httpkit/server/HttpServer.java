@@ -159,6 +159,7 @@ public class HttpServer implements Runnable {
                     handler.clientClose(atta.channel, ((CloseFrame) frame).getStatus());
                     // close the TCP connection after sent
                     atta.keepalive = false;
+                    atta.decoder.reset();
                     tryWrite(key, WsEncode(WSDecoder.OPCODE_CLOSE, frame.data));
                 }
             } while (buffer.hasRemaining()); // consume all
