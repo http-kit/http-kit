@@ -60,7 +60,7 @@ public class HttpServer implements Runnable {
     private final ConcurrentLinkedQueue<PendingKey> pending = new ConcurrentLinkedQueue<PendingKey>();
 
     // shared, single thread
-    private final ByteBuffer buffer = ByteBuffer.allocateDirect(1024 * 64);
+    private final ByteBuffer buffer = ByteBuffer.allocateDirect(1024 * 64 - 1);
 
     public HttpServer(String ip, int port, IHandler handler, int maxBody, int maxLine, int maxWs,
                       ProxyProtocolOption proxyProtocolOption)
@@ -253,9 +253,11 @@ public class HttpServer implements Runnable {
                         selector.wakeup();
                     } else if (!atta.isKeepAlive()) {
                         pending.add(new PendingKey(key, CLOSE_NORMAL));
+                        selector.wakeup();
                     }
                 } catch (IOException e) {
                     pending.add(new PendingKey(key, CLOSE_AWAY));
+                    selector.wakeup();
                 }
             } else {
                 // If has pending write, order should be maintained. (WebSocket)
@@ -270,7 +272,8 @@ public class HttpServer implements Runnable {
         while (true) {
             try {
                 PendingKey k;
-                while ((k = pending.poll()) != null) {
+                while (!pending.isEmpty()) {
+                    k = pending.poll();
                     if (k.Op == PendingKey.OP_WRITE) {
                         if (k.key.isValid()) {
                             k.key.interestOps(OP_WRITE);
