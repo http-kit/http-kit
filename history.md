@@ -1,4 +1,47 @@
+## 2.2.0-alpha1 (2016 Mar 3)
+
+```clojure
+[http-kit "2.2.0-alpha1"]
+```
+
+This is a **major release** that *should* be non-breaking but **may require testing**. Please evaluate before using in production (and **please report any problems!**).
+
+A big thank you to all the [contributors for this release][]!
+
+\- Peter Taoussanis (@ptaoussanis)
+
+> Listed changes are relative to last stable release (**2.1.19**)
+
+#### New stuff
+
+* [#236] Server enhancement: add proxy protocol support (@tendant)
+* [#201] Client now supports optional unsafe redirects (@dzaharee)
+
+#### General improvements
+
+* [#130] Server can now respond to `HTTP_1.1/Expect: 100-continue` headers (@valentini)
+* [#217] More accurate timeout handling (@mbarbon)
+* [#234] Catch Throwable when delivering client response (@msassak)
+* [#185] Do not set client mode on SSLEngine if already set (@izarov)
+* [#261 #203] Updated documentation on request function (@javahippie)
+* [#266] Fix #189 - include Java source files in the JAR (@kumarshantanu)
+* [#216] Server optimization: remove an unnecessary operation (@songsd)
+
+#### Bug fixes
+* [#259 #227] Reset decoder after starting the close handshake for the websocket server (@venantius)
+* [#258 #148] Remind the selector to wake up (@venantius)
+* [#248] Correctly reset fragmentedOpCode on WS frame completion (@daviesian)
+* [#250] Omit invalid headers and prevent possible exceptions (e.g., NullPointerException) (@Chienlung)
+* [#255] Fixed empty sequence NPE, added test (@leblowl)
+* [#264 #219] Set SO_KEEPALIVE and TCP_NODELAY for client socket (@jruthe)
+* [#264 #209] Clear query and form params on 301-303 redirects (@jruthe)
+* [#254] ByteBuffer is 0-based (@Thingographist)
+
 ## 2.1.21-alpha2 (2015 Dec 12)
+
+```clojure
+[http-kit "2.1.21-alpha2"]
+```
 
 > == 2.1.21-alpha1 (Clojars upload error)
 
@@ -9,7 +52,14 @@ HTTP Server:
 HTTP Client:
   * [#201] Client: option to keep "unsafe" method on redirect (@dzaharee)
 
-## [temporary fork] 2.1.20 (2015 Dec 8)
+## 2.1.20 (2015 Dec 8)
+
+```clojure
+[com.taoensso.forks/http-kit "2.1.20"]
+```
+
+> This release was a **temporary fork**
+
 HTTP Server:
   1. #86 Allow run-server being called without any opts (@djui)
   2. #185 Do not set client mode on SSLEngine if already set (@izarov)
@@ -175,3 +225,6 @@ HTTP client:
 * 1.1.1 HTTP client: allow custom ACCEPT_ENCODING, default gzip, deflate
 * 1.1.0 defasync and async HTTP client clojure API
 * 1.0.3  using UTF8 to encode HTTP response header: fix can not encode Chinese char
+
+
+[contributors for this release]: https://github.com/http-kit/http-kit/commits/master
