@@ -6,7 +6,7 @@
 
 This is a **major release** that *should* be non-breaking but **may require testing**. Please evaluate before using in production (and **please report any problems!**).
 
-A big thank you to all the [contributors for this release][]!
+A big thank you to all the [contributors for this release][https://github.com/http-kit/http-kit/commits/master]!
 
 \- Peter Taoussanis (@ptaoussanis)
 
@@ -225,6 +225,3 @@ HTTP client:
 * 1.1.1 HTTP client: allow custom ACCEPT_ENCODING, default gzip, deflate
 * 1.1.0 defasync and async HTTP client clojure API
 * 1.0.3  using UTF8 to encode HTTP response header: fix can not encode Chinese char
-
-
-[contributors for this release]: https://github.com/http-kit/http-kit/commits/master
