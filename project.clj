@@ -27,7 +27,7 @@
   :jar-exclusions [#"^java.*"] ; exclude the java directory in source path
   :test-selectors
   {:default (complement :benchmark)
-   :ci  (complement #(or (:benchmark %) (:skip-ci %)))
+   :travis  (complement #(or (:benchmark %) (:skip-travis %)))
    :benchmark :benchmark
    :all (fn [_] true)}
 
