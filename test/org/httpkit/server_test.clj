@@ -312,8 +312,8 @@
     (is (re-find #"200" resp))
     (is (re-find #"Keep-Alive" resp))))
 
-(deftest ^:skip-ci test-ipv6
-  ;; Skipping this on CI because of difficulties with [::1] IPv6
+(deftest ^:skip-travis test-ipv6
+  ;; Skipping this on Travis because of difficulties with [::1] IPv6
   ;; on AWS CIs, Ref. https://github.com/travis-ci/travis-ci/issues/4964
 
   ;; TODO add more
