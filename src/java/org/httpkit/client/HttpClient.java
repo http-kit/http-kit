@@ -26,7 +26,7 @@ import static org.httpkit.HttpUtils.getServerAddr;
 import static org.httpkit.client.State.ALL_READ;
 import static org.httpkit.client.State.READ_INITIAL;
 
-public final class HttpClient implements Runnable {
+public class HttpClient implements Runnable {
     private static final AtomicInteger ID = new AtomicInteger(0);
 
     public static final SSLContext DEFAULT_CONTEXT;
