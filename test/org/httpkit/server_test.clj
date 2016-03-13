@@ -152,7 +152,7 @@
     (is (= "127.0.0.1" (:remote-addr req)))
     (is (= "localhost" (:server-name req)))
     (is (= "/spec" (:uri req)))
-    (is (= "a=b" (:query-string req)))
+    (is (= "c=d&a=b" (:query-string req)))
     (is (= :http (:scheme req)))
     (is (= :get (:request-method  req)))
     (is (= "utf8" (:character-encoding req)))

@@ -5,8 +5,8 @@
 [CHANGELOG](https://github.com/http-kit/http-kit/blob/master/history.md) | Current [semantic](http://semver.org/) version/s:
 
 ```clojure
-[http-kit "2.1.19"]        ; Stable
-[http-kit "2.1.21-alpha2"] ; Dev
+[http-kit "2.1.19"]       ; Last release published by @shenfeng
+[http-kit "2.2.0-alpha1"] ; Dev release, published by contributors
 ```
 
 [![Build Status](https://travis-ci.org/http-kit/http-kit.svg?branch=master)](https://travis-ci.org/http-kit/http-kit)
