@@ -1,5 +1,5 @@
 (ns org.httpkit.client
-  (:refer-clojure :exclude [get])
+  (:refer-clojure :exclude [get proxy])
   (:require [clojure.string :as str])
   (:use [clojure.walk :only [prewalk]])
   (:import [org.httpkit.client HttpClient IResponseHandler RespListener
@@ -138,7 +138,7 @@
     :url :method :headers :timeout :query-params :form-params :as
     :client :body :basic-auth :user-agent :filter :worker-pool"
   [{:keys [client timeout filter worker-pool keepalive as follow-redirects max-redirects response
-           trace-redirects allow-unsafe-redirect-methods]
+           trace-redirects allow-unsafe-redirect-methods proxy]
     :as opts
     :or {client @default-client
          timeout 60000
@@ -148,7 +148,8 @@
          worker-pool default-pool
          response (promise)
          keepalive 120000
-         as :auto}}
+         as :auto
+         proxy nil}}
    & [callback]]
   (let [{:keys [url method headers body sslengine]} (coerce-req opts)
         deliver-resp #(deliver response ;; deliver the result
@@ -188,7 +189,7 @@
         listener (RespListener. handler filter worker-pool
                                 ;; only the 4 support now
                                 (case as :auto 1 :text 2 :stream 3 :byte-array 4))
-        cfg (RequestConfig. method headers body timeout keepalive)]
+        cfg (RequestConfig. method headers body timeout keepalive proxy)]
     (.exec ^HttpClient client url cfg sslengine listener)
     response))
 
