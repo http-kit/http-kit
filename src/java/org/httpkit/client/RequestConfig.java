@@ -12,17 +12,19 @@ public class RequestConfig {
     final Object body;
     final Map<String, Object> headers;
     final HttpMethod method;
+    final String proxy;
 
     public RequestConfig(HttpMethod method, Map<String, Object> headers, Object body,
-                         int timeoutMs, int keepAliveMs) {
+                         int timeoutMs, int keepAliveMs, String proxy) {
         this.timeout = timeoutMs;
         this.keepAlive = keepAliveMs;
         this.headers = headers;
         this.body = body;
         this.method = method;
+        this.proxy = proxy;
     }
 
     public RequestConfig() { // for easy test only
-        this(HttpMethod.GET, null, null, 40000, -1);
+        this(HttpMethod.GET, null, null, 40000, -1, null);
     }
 }
