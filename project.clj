@@ -32,7 +32,11 @@
    :all (fn [_] true)}
 
   :profiles
-  {:test {:java-source-paths ["test/java" "src/java"]}
+  {:test {:java-source-paths ["test/java" "src/java"]
+          :dependencies [[ring/ring-defaults "0.2.0"]
+                         [ring-request-proxy "0.1.3"]
+                         [ring-basic-authentication "1.0.5"]
+                         [org.clojure/data.codec "0.1.0"]]}
    :dev  {:dependencies
           [[junit/junit "4.12"]
            [org.clojure/tools.logging "0.3.1"]
