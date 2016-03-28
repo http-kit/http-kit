@@ -212,9 +212,12 @@ public class HttpClient implements Runnable {
     }
 
     public void exec(String url, RequestConfig cfg, SSLEngine engine, IRespListener cb) {
-        URI uri;
+        URI uri,proxyUri = null;
         try {
             uri = new URI(url);
+            if (cfg.proxy != null) {
+                proxyUri = new URI(cfg.proxy);
+            }
         } catch (URISyntaxException e) {
             cb.onThrowable(e);
             return;
@@ -234,7 +237,11 @@ public class HttpClient implements Runnable {
 
         InetSocketAddress addr;
         try {
-            addr = getServerAddr(uri);
+            if (proxyUri == null) {
+                addr = getServerAddr(uri);
+            } else {
+                addr = getServerAddr(proxyUri);
+            }
         } catch (UnknownHostException e) {
             cb.onThrowable(e);
             return;
@@ -257,7 +264,19 @@ public class HttpClient implements Runnable {
 
         ByteBuffer request[];
         try {
-            request = encode(cfg.method, headers, cfg.body, uri);
+            if (proxyUri == null) {
+                request = encode(cfg.method, headers, cfg.body, HttpUtils.getPath(uri));
+            } else {
+                String proxyScheme = proxyUri.getScheme();
+                if ("http".equals(proxyScheme) || "https".equals(proxyScheme)) {
+                    headers.put("Proxy-Connection","Keep-Alive");
+                    request = encode(cfg.method, headers, cfg.body, uri.toString());
+                } else {
+                    String message = (proxyScheme == null) ? "No proxy protocol specified" : proxyScheme + " for proxy is not supported";
+                    cb.onThrowable(new ProtocolException(message));
+                    return;
+                }
+            }
         } catch (IOException e) {
             cb.onThrowable(e);
             return;
@@ -279,7 +298,7 @@ public class HttpClient implements Runnable {
     }
 
     private ByteBuffer[] encode(HttpMethod method, HeaderMap headers, Object body,
-                                URI uri) throws IOException {
+                                String path) throws IOException {
         ByteBuffer bodyBuffer = HttpUtils.bodyBuffer(body);
 
         if (body != null) {
@@ -288,7 +307,7 @@ public class HttpClient implements Runnable {
             headers.putOrReplace("Content-Length", "0");
         }
         DynamicBytes bytes = new DynamicBytes(196);
-        bytes.append(method.toString()).append(SP).append(HttpUtils.getPath(uri));
+        bytes.append(method.toString()).append(SP).append(path);
         bytes.append(" HTTP/1.1\r\n");
         headers.encodeHeaders(bytes);
         ByteBuffer headBuffer = ByteBuffer.wrap(bytes.get(), 0, bytes.length());
