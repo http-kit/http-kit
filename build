@@ -1,0 +1,92 @@
+#!/bin/bash -e
+
+if [ "$1" == "quick" ];then
+        lein test
+        exit $?
+fi
+
+APP_NAME='http-kit'
+GROUP_ID='http-kit'
+APP_EXTENSION='jar'
+LOCAL_ARTIFACT="target/http-kit-2.2.0-alpha1-intuit.$APP_EXTENSION"
+NEXUS_RELEASE_API_URL="http://nexus-proxy/nexus/service/local/artifact/maven/content"
+NEXUS_GROUP_ID_URL=$(echo $GROUP_ID | sed 's@\.@\/@g')
+PUBLISH_ARTIFACT_URL='http://sdgctgdevrepo.corp.intuit.net/nexus/content/repositories'
+ARTIFACTID=$APP_NAME
+
+if [[ "$GIT_BRANCH" == "master" ]];then
+  echo "On branch ${GIT_BRANCH} using Nexus Releases repo"
+  NEXUS_REPOSITORY='ENG.CTG.Intuit-Releases'
+  SUFFIX=""
+else
+  echo "On branch '${GIT_BRANCH}' using Nexus Snapshot repo"
+  NEXUS_REPOSITORY='ENG.CTG.Intuit-Snapshots'
+  SUFFIX="-SNAPSHOT"
+fi
+
+
+# only in ci env
+if [ ! -z "$BUILD_ID" ]; then
+    # If lein is not found in the PATH, then download it and install it locally.  Make it
+    # executable and add it to the PATH.
+    LEIN_VERSION="2.5.1"
+    LEIN_NEXUS_PATH="$PUBLISH_ARTIFACT_URL/SCM.CTG.ThirdParty-Releases/org/clojars/leiningen/$LEIN_VERSION/lein"
+    type lein >/dev/null 2>&1 || {
+        echo "------------------"
+        echo "Installing lein..."
+        echo "------------------"
+        if [ ! -f lein ];then
+            wget --no-verbose $LEIN_NEXUS_PATH
+        fi
+        chmod +x lein
+        export PATH=.:$PATH
+    }
+fi
+
+lein clean
+
+echo ""
+echo "----------------"
+echo "Running tests..."
+echo "----------------"
+lein test
+if [ $? != 0 ];then
+  echo "Not creating artifacts due to unit test failures."
+  exit 5
+fi
+
+echo ""
+echo "------------------------"
+echo "Building app artifact..."
+echo "------------------------"
+lein jar
+if [ $? != 0 ];then
+  echo "Not creating artifacts due to jar build failures."
+  exit 15
+fi
+
+# only in ci env
+if [ ! -z "$BUILD_ID" ]; then
+    echo ""
+    echo "-------------------------"
+    echo "Uploading app artifact..."
+    echo "-------------------------"
+    CC=$(curl --silent \
+        -u "$NEXUS_RELEASE_REPO_USERNAME:$NEXUS_RELEASE_REPO_PASSWORD" \
+        --upload-file "$LOCAL_ARTIFACT" \
+        "${PUBLISH_ARTIFACT_URL}/${NEXUS_REPOSITORY}/${NEXUS_GROUP_ID_URL}/${ARTIFACTID}/${COMMIT}${SUFFIX}/${APP_RELEASE_ARTIFACT}" \
+        -w "%{http_code}")
+
+    if [[ $CC -eq 200 || $CC -eq 201 ]];then
+        echo "App artifact upload successful"
+    else
+        echo "Upload to release repository failed with a $CC HTTP status code"
+        exit 25
+    fi
+
+    rm -Rf lein
+fi
+
+echo ""
+echo "Build complete"
+echo ""
