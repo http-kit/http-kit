@@ -71,18 +71,8 @@ if [ ! -z "$BUILD_ID" ]; then
     echo "-------------------------"
     echo "Uploading app artifact..."
     echo "-------------------------"
-    CC=$(curl --silent \
-        -u "$NEXUS_RELEASE_REPO_USERNAME:$NEXUS_RELEASE_REPO_PASSWORD" \
-        --upload-file "$LOCAL_ARTIFACT" \
-        "${PUBLISH_ARTIFACT_URL}/${NEXUS_REPOSITORY}/${NEXUS_GROUP_ID_URL}/${ARTIFACTID}/${COMMIT}${SUFFIX}/${APP_RELEASE_ARTIFACT}" \
-        -w "%{http_code}")
-
-    if [[ $CC -eq 200 || $CC -eq 201 ]];then
-        echo "App artifact upload successful"
-    else
-        echo "Upload to release repository failed with a $CC HTTP status code"
-        exit 25
-    fi
+    lein pom
+    mvn deploy -s settings.xml -B
 
     rm -Rf lein
 fi
