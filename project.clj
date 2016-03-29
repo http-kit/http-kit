@@ -68,6 +68,10 @@
   ;; And https://wiki.intuit.com/pages/viewpage.action?pageId=213692346
   :repositories [["releases" {:id "scm.int.rel.repo"
                               :url "http://sdgsdsintrepo.corp.intuit.net:8081/nexus/content/groups/repo"
-                              :username :env/NEXUS_RELEASE_REPO_USERNAME
-                              :password :env/NEXUS_RELEASE_REPO_PASSWORD
-                              :sign-releases false}]])
+                              :sign-releases false}]]
+  :deploy-repositories [["releases" {:url "http://sdgsdsintrepo.corp.intuit.net:8081/nexus/content/groups/repo" 
+                                     :username :env/NEXUS_RELEASE_REPO_USERNAME 
+                                     :password :env/NEXUS_RELEASE_REPO_PASSWORD 
+                                     :sign-releases false}]])
+
+
