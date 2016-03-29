@@ -71,7 +71,7 @@ if [ ! -z "$BUILD_ID" ]; then
     echo "-------------------------"
     echo "Uploading app artifact..."
     echo "-------------------------"
-    lein deploy scm.int.rel.repo
+    lein deploy
 
     rm -Rf lein
 fi
