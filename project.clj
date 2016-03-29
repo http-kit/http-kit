@@ -69,7 +69,7 @@
   :repositories [["releases" {:id "scm.int.rel.repo"
                               :url "http://sdgsdsintrepo.corp.intuit.net:8081/nexus/content/groups/repo"
                               :sign-releases false}]]
-  :deploy-repositories [["releases" {:url "http://sdgsdsintrepo.corp.intuit.net:8081/nexus/content/groups/repo" 
+  :deploy-repositories [["releases" {:url "http://sdgctgdevrepo.corp.intuit.net/nexus/content/repositories/ENG.CTG.Intuit-Releases"
                                      :username :env/NEXUS_RELEASE_REPO_USERNAME 
                                      :password :env/NEXUS_RELEASE_REPO_PASSWORD 
                                      :sign-releases false}]])
