@@ -45,15 +45,15 @@ fi
 
 lein clean
 
-echo ""
-echo "----------------"
-echo "Running tests..."
-echo "----------------"
-lein test
-if [ $? != 0 ];then
-  echo "Not creating artifacts due to unit test failures."
-  exit 5
-fi
+#echo ""
+#echo "----------------"
+#echo "Running tests..."
+#echo "----------------"
+#lein test
+#if [ $? != 0 ];then
+#  echo "Not creating artifacts due to unit test failures."
+#  exit 5
+#fi
 
 echo ""
 echo "------------------------"
