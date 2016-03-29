@@ -48,4 +48,24 @@
            [compojure "1.4.0"]
            [org.clojure/tools.cli "0.3.3"]
            [ring/ring-jetty-adapter "1.4.0"]
-           [ring/ring-core "1.4.0"]]}})
+           [ring/ring-core "1.4.0"]]}}
+
+  ; pointing to internal nexus for dependencies
+  ; as per: https://books.sonatype.com/nexus-book/reference/leiningen.html
+  :mirrors {
+    "central" {
+      :name "Nexus"
+      :url "http://pprdnexusas301.corp.intuit.net/nexus/content/repositories/psd"
+      :repo-manager true
+    }
+    #"clojars" {
+      :name "Nexus"
+      :url "http://pprdnexusas301.corp.intuit.net/nexus/content/repositories/psd"
+      :repo-manager true}
+  }
+
+  ;; Adapted from http://stackoverflow.com/questions/22716492/how-to-configure-leiningen-to-use-a-corporate-repository
+  ;; And https://wiki.intuit.com/pages/viewpage.action?pageId=213692346
+  :repositories [["releases" {:id "scm.int.rel.repo"
+                              :url "http://sdgsdsintrepo.corp.intuit.net:8081/nexus/content/groups/repo"
+                              :sign-releases false}]])
