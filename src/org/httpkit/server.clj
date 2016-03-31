@@ -1,5 +1,6 @@
 (ns org.httpkit.server
   (:import [org.httpkit.server AsyncChannel HttpServer RingHandler ProxyProtocolOption]
+           [org.httpkit.logger ContextLogger EventLogger]
            javax.xml.bind.DatatypeConverter
            java.security.MessageDigest))
 
@@ -22,11 +23,15 @@
     :max-ws             ; Max websocket message size
     :max-line           ; Max http inital line length
     :proxy-protocol     ; Proxy protocol e/o #{:disable :enable :optional}
-    :worker-name-prefix ; Woker thread name prefix"
+    :worker-name-prefix ; Woker thread name prefix
+    :error-logger       ; Arity-2 fn (args: string text, exception) to log errors
+    :warn-logger        ; Arity-2 fn (args: string text, exception) to log warnings
+    :event-logger       ; Arity-1 fn (arg: string event name)"
 
   [handler
    & [{:keys [ip port thread queue-size max-body max-ws max-line
-              proxy-protocol worker-name-prefix]
+              proxy-protocol worker-name-prefix
+              error-logger warn-logger event-logger]
 
        :or   {ip         "0.0.0.0"
               port       8090
@@ -38,13 +43,33 @@
               proxy-protocol :disable
               worker-name-prefix "worker-"}}]]
 
-  (let [h (RingHandler. thread handler worker-name-prefix queue-size)
+  (let [h (RingHandler. thread handler worker-name-prefix queue-size
+            (if error-logger
+              (reify ContextLogger
+                (log [this message error] (error-logger message error)))
+              ContextLogger/ERROR_PRINTER)
+            (if event-logger
+              (reify EventLogger
+                (log [this event] (event-logger event)))
+              EventLogger/NOP))
         proxy-enum (case proxy-protocol
                      :enable   ProxyProtocolOption/ENABLED
                      :disable  ProxyProtocolOption/DISABLED
                      :optional ProxyProtocolOption/OPTIONAL)
 
-        s (HttpServer. ip port h max-body max-line max-ws proxy-enum)]
+        s (HttpServer. ip port h max-body max-line max-ws proxy-enum
+            (if error-logger
+              (reify ContextLogger
+                (log [this message error] (error-logger message error)))
+              ContextLogger/ERROR_PRINTER)
+            (if warn-logger
+              (reify ContextLogger
+                (log [this message error] (warn-logger message error)))
+              HttpServer/DEFAULT_WARN_LOGGER)
+            (if event-logger
+              (reify EventLogger
+                (log [this event] (event-logger event)))
+              EventLogger/NOP))]
 
     (.start s)
     (with-meta

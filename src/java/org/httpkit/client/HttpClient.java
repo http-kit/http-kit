@@ -2,6 +2,9 @@ package org.httpkit.client;
 
 import org.httpkit.*;
 import org.httpkit.ProtocolException;
+import org.httpkit.logger.ContextLogger;
+import org.httpkit.logger.Event;
+import org.httpkit.logger.EventLogger;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
@@ -52,7 +55,27 @@ public class HttpClient implements Runnable {
     private final ByteBuffer buffer = ByteBuffer.allocateDirect(1024 * 64);
     private final Selector selector;
 
+    private final ContextLogger<String, Throwable> errorLogger;
+    private final ContextLogger<String, Long> latencyLogger;
+    private final EventLogger<String> eventLogger;
+
+    public static final ContextLogger<String, Long> NOP_LATENCY_LOGGER = new ContextLogger<String, Long>() {
+        @Override
+        public void log(String event, Long latency) {
+            // nop
+        }
+    };
+
     public HttpClient() throws IOException {
+        this(NOP_LATENCY_LOGGER, ContextLogger.ERROR_PRINTER, EventLogger.NOP);
+    }
+
+    public HttpClient(ContextLogger<String, Long> latencyLogger,
+            ContextLogger<String, Throwable> errorLogger,
+            EventLogger<String> eventLogger) throws IOException {
+        this.latencyLogger = latencyLogger;
+        this.errorLogger = errorLogger;
+        this.eventLogger = eventLogger;
         int id = ID.incrementAndGet();
         String name = "client-loop";
         if (id > 1) {
@@ -167,7 +190,8 @@ public class HttpClient implements Runnable {
             } catch (Exception e) {
                 closeQuietly(key);
                 req.finish(e);
-                HttpUtils.printError("should not happen", e); // decoding
+                errorLogger.log("should not happen", e); // decoding
+                eventLogger.log(Event.CLIENT_IMPOSSIBLE);
             }
         }
     }
@@ -237,11 +261,13 @@ public class HttpClient implements Runnable {
 
         InetSocketAddress addr;
         try {
+            final long startNanos = System.nanoTime();
             if (proxyUri == null) {
                 addr = getServerAddr(uri);
             } else {
                 addr = getServerAddr(proxyUri);
             }
+            latencyLogger.log(Event.CLIENT_LATENCY_GET_SERVER_ADDR, System.nanoTime() - startNanos);
         } catch (UnknownHostException e) {
             cb.onThrowable(e);
             return;
@@ -412,7 +438,8 @@ public class HttpClient implements Runnable {
                 clearTimeout(now);
                 processPending();
             } catch (Throwable e) { // catch any exception (including OOM), print it: do not exits the loop
-                HttpUtils.printError("select exception, should not happen", e);
+                errorLogger.log("select exception, should not happen", e);
+                eventLogger.log(Event.CLIENT_IMPOSSIBLE);
             }
         }
     }

@@ -4,6 +4,7 @@
   (:use [clojure.walk :only [prewalk]])
   (:import [org.httpkit.client HttpClient IResponseHandler RespListener
             IFilter RequestConfig]
+           [org.httpkit.logger ContextLogger EventLogger]
            [org.httpkit HttpMethod PrefixThreadFactory HttpUtils]
            [java.util.concurrent ThreadPoolExecutor LinkedBlockingQueue TimeUnit]
            [java.net URI URLEncoder]
@@ -95,6 +96,29 @@
 
 ;;; "Get the default client. Normally, you only need one client per application. You can config parameter per request basic"
 (defonce default-client (delay (HttpClient.)))
+
+(defn make-client
+  "Make a client with specified options.
+  Options:
+    :latency-logger     ; Arity-2 fn (args: string event name, latency in nanoseconds) to log latency
+    :error-logger       ; Arity-2 fn (args: string text, exception) to log errors
+    :event-logger       ; Arity-1 fn (arg: string event name)"
+  [{:keys [latency-logger
+           error-logger
+           event-logger]}]
+  (HttpClient.
+    (if latency-logger
+      (reify ContextLogger
+        (log [this event latency] (latency-logger event latency)))
+      HttpClient/NOP_LATENCY_LOGGER)
+    (if error-logger
+      (reify ContextLogger
+        (log [this message error] (error-logger message error)))
+      ContextLogger/ERROR_PRINTER)
+    (if event-logger
+      (reify EventLogger
+        (log [this event] (event-logger event)))
+      EventLogger/NOP)))
 
 (defn request
   "Issues an async HTTP request and returns a promise object to which the value
