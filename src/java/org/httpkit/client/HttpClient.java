@@ -281,7 +281,8 @@ public class HttpClient implements Runnable {
             cb.onThrowable(e);
             return;
         }
-        if ("https".equals(scheme)) {
+        if ((proxyUri == null && "https".equals(scheme))
+            || (proxyUri != null && "https".equals(proxyUri.getScheme()))) {
             if (engine == null) {
                 engine = DEFAULT_CONTEXT.createSSLEngine();
             }

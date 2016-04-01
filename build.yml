@@ -1,0 +1,6 @@
+language: java
+notifications:
+  email:
+    recipients:
+      - jonathan_bristow@intuit.com
+
