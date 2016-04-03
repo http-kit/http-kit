@@ -38,7 +38,4 @@ public class Event {
     /** Code path not meant to be executed */
     public static final String CLIENT_IMPOSSIBLE              = "httpkit.client.impossible";
 
-    /** Latency for getServerAddr() call */
-    public static final String CLIENT_LATENCY_GET_SERVER_ADDR = "httpkit.client.latency.get.server.addr";
-
 }

@@ -2,7 +2,7 @@
   (:refer-clojure :exclude [get proxy])
   (:require [clojure.string :as str])
   (:use [clojure.walk :only [prewalk]])
-  (:import [org.httpkit.client HttpClient IResponseHandler RespListener
+  (:import [org.httpkit.client HttpClient HttpClient$AddressFinder IResponseHandler RespListener
             IFilter RequestConfig]
            [org.httpkit.logger ContextLogger EventLogger]
            [org.httpkit HttpMethod PrefixThreadFactory HttpUtils]
@@ -100,17 +100,17 @@
 (defn make-client
   "Make a client with specified options.
   Options:
-    :latency-logger     ; Arity-2 fn (args: string event name, latency in nanoseconds) to log latency
+    :address-finder     ; Arity-1 fn (arg: java.net.URI object) to return java.net.InetSocketAddress instance
     :error-logger       ; Arity-2 fn (args: string text, exception) to log errors
     :event-logger       ; Arity-1 fn (arg: string event name)"
-  [{:keys [latency-logger
+  [{:keys [address-finder
            error-logger
            event-logger]}]
   (HttpClient.
-    (if latency-logger
-      (reify ContextLogger
-        (log [this event latency] (latency-logger event latency)))
-      HttpClient/NOP_LATENCY_LOGGER)
+    (if address-finder
+      (reify HttpClient$AddressFinder
+        (findAddress [this uri] (address-finder uri)))
+      HttpClient/DEFAULT_ADDRESS_FINDER)
     (if error-logger
       (reify ContextLogger
         (log [this message error] (error-logger message error)))

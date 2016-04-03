@@ -56,24 +56,28 @@ public class HttpClient implements Runnable {
     private final Selector selector;
 
     private final ContextLogger<String, Throwable> errorLogger;
-    private final ContextLogger<String, Long> latencyLogger;
     private final EventLogger<String> eventLogger;
 
-    public static final ContextLogger<String, Long> NOP_LATENCY_LOGGER = new ContextLogger<String, Long>() {
-        @Override
-        public void log(String event, Long latency) {
-            // nop
+    public static interface AddressFinder {
+        InetSocketAddress findAddress(URI uri) throws UnknownHostException;
+    }
+
+    private final AddressFinder addressFinder;
+
+    public static final AddressFinder DEFAULT_ADDRESS_FINDER = new AddressFinder() {
+        public InetSocketAddress findAddress(URI uri) throws UnknownHostException {
+            return getServerAddr(uri);
         }
     };
 
     public HttpClient() throws IOException {
-        this(NOP_LATENCY_LOGGER, ContextLogger.ERROR_PRINTER, EventLogger.NOP);
+        this(DEFAULT_ADDRESS_FINDER, ContextLogger.ERROR_PRINTER, EventLogger.NOP);
     }
 
-    public HttpClient(ContextLogger<String, Long> latencyLogger,
+    public HttpClient(AddressFinder addressFinder,
             ContextLogger<String, Throwable> errorLogger,
             EventLogger<String> eventLogger) throws IOException {
-        this.latencyLogger = latencyLogger;
+        this.addressFinder = addressFinder;
         this.errorLogger = errorLogger;
         this.eventLogger = eventLogger;
         int id = ID.incrementAndGet();
@@ -261,13 +265,11 @@ public class HttpClient implements Runnable {
 
         InetSocketAddress addr;
         try {
-            final long startNanos = System.nanoTime();
             if (proxyUri == null) {
-                addr = getServerAddr(uri);
+                addr = addressFinder.findAddress(uri);
             } else {
-                addr = getServerAddr(proxyUri);
+                addr = addressFinder.findAddress(proxyUri);
             }
-            latencyLogger.log(Event.CLIENT_LATENCY_GET_SERVER_ADDR, System.nanoTime() - startNanos);
         } catch (UnknownHostException e) {
             cb.onThrowable(e);
             return;
