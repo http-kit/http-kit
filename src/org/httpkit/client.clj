@@ -164,8 +164,7 @@
   [{:keys [client timeout filter worker-pool keepalive as follow-redirects max-redirects response
            trace-redirects allow-unsafe-redirect-methods proxy]
     :as opts
-    :or {client @default-client
-         timeout 60000
+    :or {timeout 60000
          follow-redirects true
          max-redirects 10
          filter IFilter/ACCEPT_ALL
@@ -175,7 +174,8 @@
          as :auto
          proxy nil}}
    & [callback]]
-  (let [{:keys [url method headers body sslengine]} (coerce-req opts)
+  (let [client (or (:client opts) @default-client)  ; deref default-client ONLY when client not specified
+        {:keys [url method headers body sslengine]} (coerce-req opts)
         deliver-resp #(deliver response ;; deliver the result
                                (try ((or callback identity) %1)
                                     (catch Throwable e
