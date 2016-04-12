@@ -20,6 +20,8 @@ import org.httpkit.HttpUtils;
 import org.httpkit.LineTooLargeException;
 import org.httpkit.ProtocolException;
 import org.httpkit.RequestTooLargeException;
+import org.httpkit.HTTPExceptionFormatter;
+import org.httpkit.DefaultHTTPExceptionFormatter;
 
 import static java.nio.channels.SelectionKey.*;
 import static org.httpkit.HttpUtils.HttpEncode;
@@ -44,6 +46,7 @@ public class HttpServer implements Runnable {
     static final String THREAD_NAME = "server-loop";
 
     private final IHandler handler;
+    private final HTTPExceptionFormatter exceptionFormatter;
     private final int maxBody; // max http body size
     private final int maxLine; // max header line size
 
@@ -63,11 +66,13 @@ public class HttpServer implements Runnable {
     private final ByteBuffer buffer = ByteBuffer.allocateDirect(1024 * 64 - 1);
 
     public HttpServer(String ip, int port, IHandler handler, int maxBody, int maxLine, int maxWs,
-                      ProxyProtocolOption proxyProtocolOption)
+                      ProxyProtocolOption proxyProtocolOption,
+                      HTTPExceptionFormatter exceptionFormatter)
             throws IOException {
         this.handler = handler;
         this.maxLine = maxLine;
         this.maxBody = maxBody;
+        this.exceptionFormatter = exceptionFormatter;
         this.maxWs = maxWs;
         this.proxyProtocolOption = proxyProtocolOption;
 
@@ -76,6 +81,13 @@ public class HttpServer implements Runnable {
         serverChannel.configureBlocking(false);
         serverChannel.socket().bind(new InetSocketAddress(ip, port));
         serverChannel.register(selector, OP_ACCEPT);
+    }
+
+    public HttpServer(String ip, int port, IHandler handler, int maxBody, int maxLine, int maxWs,
+                      ProxyProtocolOption proxyProtocolOption)
+            throws IOException {
+        this(ip, port, handler, maxBody, maxLine, maxWs, proxyProtocolOption,
+             new DefaultHTTPExceptionFormatter());
     }
 
     void accept(SelectionKey key) {
@@ -135,10 +147,10 @@ public class HttpServer implements Runnable {
             closeKey(key, -1);
         } catch (RequestTooLargeException e) {
             atta.keepalive = false;
-            tryWrite(key, HttpEncode(413, new HeaderMap(), e.getMessage()));
+            tryWrite(key, HttpEncode(413, new HeaderMap(), exceptionFormatter.errorMessage(413, e)));
         } catch (LineTooLargeException e) {
             atta.keepalive = false; // close after write
-            tryWrite(key, HttpEncode(414, new HeaderMap(), e.getMessage()));
+            tryWrite(key, HttpEncode(414, new HeaderMap(), exceptionFormatter.errorMessage(414, e)));
         }
     }
 
