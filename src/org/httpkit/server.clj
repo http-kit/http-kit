@@ -1,5 +1,6 @@
 (ns org.httpkit.server
   (:import [org.httpkit.server AsyncChannel HttpServer RingHandler ProxyProtocolOption]
+           org.httpkit.DefaultHTTPExceptionFormatter
            javax.xml.bind.DatatypeConverter
            java.security.MessageDigest))
 
@@ -14,19 +15,20 @@
   for differences.
 
   Options:
-    :ip                 ; Which ip (if has many ips) to bind
-    :port               ; Which port listen incomming request
-    :thread             ; Http worker thread count
-    :queue-size         ; Max job queued before reject to project self
-    :max-body           ; Max http body: 8m
-    :max-ws             ; Max websocket message size
-    :max-line           ; Max http inital line length
-    :proxy-protocol     ; Proxy protocol e/o #{:disable :enable :optional}
-    :worker-name-prefix ; Woker thread name prefix"
+    :ip                  ; Which ip (if has many ips) to bind
+    :port                ; Which port listen incomming request
+    :thread              ; Http worker thread count
+    :queue-size          ; Max job queued before reject to project self
+    :max-body            ; Max http body: 8m
+    :max-ws              ; Max websocket message size
+    :max-line            ; Max http inital line length
+    :exception-formatter ; HTTP 413 and 414 error message formatter
+    :proxy-protocol      ; Proxy protocol e/o #{:disable :enable :optional}
+    :worker-name-prefix  ; Woker thread name prefix"
 
   [handler
    & [{:keys [ip port thread queue-size max-body max-ws max-line
-              proxy-protocol worker-name-prefix]
+              proxy-protocol worker-name-prefix exception-formatter]
 
        :or   {ip         "0.0.0.0"
               port       8090
@@ -35,6 +37,7 @@
               max-body   8388608
               max-ws     4194304
               max-line   4096
+              exception-formatter (DefaultHTTPExceptionFormatter.)
               proxy-protocol :disable
               worker-name-prefix "worker-"}}]]
 
@@ -44,7 +47,8 @@
                      :disable  ProxyProtocolOption/DISABLED
                      :optional ProxyProtocolOption/OPTIONAL)
 
-        s (HttpServer. ip port h max-body max-line max-ws proxy-enum)]
+        s (HttpServer. ip port h max-body max-line max-ws proxy-enum
+                       exception-formatter)]
 
     (.start s)
     (with-meta
