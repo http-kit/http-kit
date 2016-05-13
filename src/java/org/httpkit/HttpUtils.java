@@ -257,6 +257,14 @@ public class HttpUtils {
         }
         return host;
     }
+    
+    public static String getProxyHost(URI uri){
+        if (uri.getPort() == -1){
+            return uri.getHost();
+        }
+        
+        return uri.getHost() + ":" + uri.getPort();
+    }
 
     public static InetSocketAddress getServerAddr(URI uri) throws UnknownHostException {
         InetAddress host = getByName(uri.getHost());
