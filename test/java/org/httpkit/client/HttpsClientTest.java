@@ -40,7 +40,7 @@ public class HttpsClientTest {
             final CountDownLatch cd = new CountDownLatch(1);
             SSLEngine engine = SslContextFactory.getClientContext().createSSLEngine();
 //            engine = null;
-            RequestConfig cfg = new RequestConfig(HttpMethod.POST, null, null, 40000, -1, null);
+            RequestConfig cfg = new RequestConfig(HttpMethod.POST, null, null, 40000, -1, null,false);
             TreeMap<String, Object> headers = new TreeMap<String, Object>();
             for (int i = 0; i < 33; i++) {
                 headers.put("X-long-header" + i, AGENT + AGENT + AGENT + AGENT);

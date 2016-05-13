@@ -211,6 +211,8 @@ public class HttpClient implements Runnable {
         }
     }
 
+
+
     public void exec(String url, RequestConfig cfg, SSLEngine engine, IRespListener cb) {
         URI uri,proxyUri = null;
         try {
@@ -268,9 +270,14 @@ public class HttpClient implements Runnable {
                 request = encode(cfg.method, headers, cfg.body, HttpUtils.getPath(uri));
             } else {
                 String proxyScheme = proxyUri.getScheme();
-                if ("http".equals(proxyScheme) || "https".equals(proxyScheme)) {
-                    headers.put("Proxy-Connection","Keep-Alive");
+                headers.put("Proxy-Connection","Keep-Alive");
+                if (("http".equals(proxyScheme) && ! "https".equals(scheme)) || cfg.tunnel == false)  {
                     request = encode(cfg.method, headers, cfg.body, uri.toString());
+                } else if ( "https".equals(proxyScheme) || "https".equals(scheme) ){
+                    headers.put("Host", HttpUtils.getProxyHost(uri));
+                    headers.put("Protocol","https");
+                    HttpMethod https_method = cfg.tunnel == true ? HttpMethod.valueOf("CONNECT") : cfg.method;
+                    request = encode(https_method, headers, cfg.body, HttpUtils.getProxyHost(uri));
                 } else {
                     String message = (proxyScheme == null) ? "No proxy protocol specified" : proxyScheme + " for proxy is not supported";
                     cb.onThrowable(new ProtocolException(message));
@@ -281,6 +288,7 @@ public class HttpClient implements Runnable {
             cb.onThrowable(e);
             return;
         }
+
         if ((proxyUri == null && "https".equals(scheme))
             || (proxyUri != null && "https".equals(proxyUri.getScheme()))) {
             if (engine == null) {
