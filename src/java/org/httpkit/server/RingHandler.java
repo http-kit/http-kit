@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.httpkit.HeaderMap;
 import org.httpkit.PrefixThreadFactory;
 import org.httpkit.logger.ContextLogger;
-import org.httpkit.logger.Event;
+import org.httpkit.logger.EventNames;
 import org.httpkit.logger.EventLogger;
 import org.httpkit.server.Frame.TextFrame;
 
@@ -96,14 +96,16 @@ class HttpHandler implements Runnable {
 
     final ContextLogger<String, Throwable> errorLogger;
     final EventLogger<String> eventLogger;
+    final EventNames eventNames;
 
     public HttpHandler(HttpRequest req, RespCallback cb, IFn handler,
-            ContextLogger<String, Throwable> errorLogger, EventLogger<String> eventLogger) {
+            ContextLogger<String, Throwable> errorLogger, EventLogger<String> eventLogger, EventNames eventNames) {
         this.req = req;
         this.cb = cb;
         this.handler = handler;
         this.errorLogger = errorLogger;
         this.eventLogger = eventLogger;
+        this.eventNames = eventNames;
     }
 
     public void run() {
@@ -111,7 +113,7 @@ class HttpHandler implements Runnable {
             Map resp = (Map) handler.invoke(buildRequestMap(req));
             if (resp == null) { // handler return null
                 cb.run(HttpEncode(404, new HeaderMap(), null));
-                eventLogger.log(Event.SERVER_STATUS_404);
+                eventLogger.log(eventNames.serverStatus404);
             } else {
                 Object body = resp.get(BODY);
                 if (!(body instanceof AsyncChannel)) { // hijacked
@@ -121,13 +123,13 @@ class HttpHandler implements Runnable {
                     }
                     final int status = getStatus(resp);
                     cb.run(HttpEncode(status, headers, body));
-                    eventLogger.log(Event.SERVER_STATUS_PREFIX + status);
+                    eventLogger.log(eventNames.serverStatusPrefix + status);
                 }
             }
         } catch (Throwable e) {
             cb.run(HttpEncode(500, new HeaderMap(), e.getMessage()));
             errorLogger.log(req.method + " " + req.uri, e);
-            eventLogger.log(Event.SERVER_STATUS_500);
+            eventLogger.log(eventNames.serverStatus500);
         }
     }
 }
@@ -158,14 +160,16 @@ class WSHandler implements Runnable {
 
     private final ContextLogger<String, Throwable> errorLogger;
     private final EventLogger<String> eventLogger;
+    private final EventNames eventNames;
 
     protected WSHandler(AsyncChannel channel, Frame frame,
             ContextLogger<String, Throwable> errorLogger,
-            EventLogger<String> eventLogger) {
+            EventLogger<String> eventLogger, EventNames eventNames) {
         this.channel = channel;
         this.frame = frame;
         this.errorLogger = errorLogger;
         this.eventLogger = eventLogger;
+        this.eventNames = eventNames;
     }
 
     @Override
@@ -178,7 +182,7 @@ class WSHandler implements Runnable {
             }
         } catch (Throwable e) {
             errorLogger.log("handle websocket frame " + frame, e);
-            eventLogger.log(Event.SERVER_WS_FRAME_ERROR);
+            eventLogger.log(eventNames.serverWsFrameError);
         }
     }
 }
@@ -189,15 +193,17 @@ public class RingHandler implements IHandler {
 
     final ContextLogger<String, Throwable> errorLogger;
     final EventLogger<String> eventLogger;
+    final EventNames eventNames;
 
     public RingHandler(int thread, IFn handler, String prefix, int queueSize) {
-        this(thread, handler, prefix, queueSize, ContextLogger.ERROR_PRINTER, EventLogger.NOP);
+        this(thread, handler, prefix, queueSize, ContextLogger.ERROR_PRINTER, EventLogger.NOP, EventNames.DEFAULT);
     }
 
     public RingHandler(int thread, IFn handler, String prefix, int queueSize,
-            ContextLogger<String, Throwable> errorLogger, EventLogger<String> eventLogger) {
+            ContextLogger<String, Throwable> errorLogger, EventLogger<String> eventLogger, EventNames eventNames) {
         this.errorLogger = errorLogger;
         this.eventLogger = eventLogger;
+        this.eventNames = eventNames;
         PrefixThreadFactory factory = new PrefixThreadFactory(prefix);
         BlockingQueue<Runnable> queue = new ArrayBlockingQueue<Runnable>(queueSize);
         execs = new ThreadPoolExecutor(thread, thread, 0, TimeUnit.MILLISECONDS, queue, factory);
@@ -206,10 +212,10 @@ public class RingHandler implements IHandler {
 
     public void handle(HttpRequest req, RespCallback cb) {
         try {
-            execs.submit(new HttpHandler(req, cb, handler, errorLogger, eventLogger));
+            execs.submit(new HttpHandler(req, cb, handler, errorLogger, eventLogger, eventNames));
         } catch (RejectedExecutionException e) {
             errorLogger.log("increase :queue-size if this happens often", e);
-            eventLogger.log(Event.SERVER_STATUS_503);
+            eventLogger.log(eventNames.serverStatus503);
             cb.run(HttpEncode(503, new HeaderMap(), "Server is overloaded, please try later"));
         }
     }
@@ -231,7 +237,7 @@ public class RingHandler implements IHandler {
     }
 
     public void handle(AsyncChannel channel, Frame frame) {
-        WSHandler task = new WSHandler(channel, frame, errorLogger, eventLogger);
+        WSHandler task = new WSHandler(channel, frame, errorLogger, eventLogger, eventNames);
 
         // messages from the same client are handled orderly
         LinkingRunnable job = new LinkingRunnable(task);
@@ -249,7 +255,7 @@ public class RingHandler implements IHandler {
         } catch (RejectedExecutionException e) {
             // TODO notify client if server is overloaded
             errorLogger.log("increase :queue-size if this happens often", e);
-            eventLogger.log(Event.SERVER_STATUS_503_TODO);
+            eventLogger.log(eventNames.serverStatus503Todo);
         }
     }
 
@@ -265,7 +271,7 @@ public class RingHandler implements IHandler {
                                 channel.onClose(status);
                             } catch (Exception e) {
                                 errorLogger.log("on close handler", e);
-                                eventLogger.log(Event.SERVER_CHANNEL_CLOSE_ERROR);
+                                eventLogger.log(eventNames.serverChannelCloseError);
                             }
                         }
                     });
@@ -285,11 +291,11 @@ public class RingHandler implements IHandler {
                             channel.onClose(status);  // do it in current thread
                         } catch (Exception e1) {
                             errorLogger.log("on close handler", e);
-                            eventLogger.log(Event.SERVER_CHANNEL_CLOSE_ERROR);
+                            eventLogger.log(eventNames.serverChannelCloseError);
                         }
                     } else {
                         errorLogger.log("increase :queue-size if this happens often", e);
-                        eventLogger.log(Event.SERVER_STATUS_503_TODO);
+                        eventLogger.log(eventNames.serverStatus503Todo);
                     }
                 }
             } else {

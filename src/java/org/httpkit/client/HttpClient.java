@@ -3,7 +3,7 @@ package org.httpkit.client;
 import org.httpkit.*;
 import org.httpkit.ProtocolException;
 import org.httpkit.logger.ContextLogger;
-import org.httpkit.logger.Event;
+import org.httpkit.logger.EventNames;
 import org.httpkit.logger.EventLogger;
 
 import javax.net.ssl.SSLContext;
@@ -57,6 +57,7 @@ public class HttpClient implements Runnable {
 
     private final ContextLogger<String, Throwable> errorLogger;
     private final EventLogger<String> eventLogger;
+    private final EventNames eventNames;
 
     public static interface AddressFinder {
         InetSocketAddress findAddress(URI uri) throws UnknownHostException;
@@ -71,15 +72,16 @@ public class HttpClient implements Runnable {
     };
 
     public HttpClient() throws IOException {
-        this(DEFAULT_ADDRESS_FINDER, ContextLogger.ERROR_PRINTER, EventLogger.NOP);
+        this(DEFAULT_ADDRESS_FINDER, ContextLogger.ERROR_PRINTER, EventLogger.NOP, EventNames.DEFAULT);
     }
 
     public HttpClient(AddressFinder addressFinder,
             ContextLogger<String, Throwable> errorLogger,
-            EventLogger<String> eventLogger) throws IOException {
+            EventLogger<String> eventLogger, EventNames eventNames) throws IOException {
         this.addressFinder = addressFinder;
         this.errorLogger = errorLogger;
         this.eventLogger = eventLogger;
+        this.eventNames = eventNames;
         int id = ID.incrementAndGet();
         String name = "client-loop";
         if (id > 1) {
@@ -195,7 +197,7 @@ public class HttpClient implements Runnable {
                 closeQuietly(key);
                 req.finish(e);
                 errorLogger.log("should not happen", e); // decoding
-                eventLogger.log(Event.CLIENT_IMPOSSIBLE);
+                eventLogger.log(eventNames.clientImpossible);
             }
         }
     }
@@ -441,7 +443,7 @@ public class HttpClient implements Runnable {
                 processPending();
             } catch (Throwable e) { // catch any exception (including OOM), print it: do not exits the loop
                 errorLogger.log("select exception, should not happen", e);
-                eventLogger.log(Event.CLIENT_IMPOSSIBLE);
+                eventLogger.log(eventNames.clientImpossible);
             }
         }
     }

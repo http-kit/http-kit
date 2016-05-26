@@ -1,6 +1,6 @@
 (ns org.httpkit.server
   (:import [org.httpkit.server AsyncChannel HttpServer RingHandler ProxyProtocolOption]
-           [org.httpkit.logger ContextLogger EventLogger]
+           [org.httpkit.logger ContextLogger EventLogger EventNames]
            javax.xml.bind.DatatypeConverter
            java.security.MessageDigest))
 
@@ -26,12 +26,13 @@
     :worker-name-prefix ; Woker thread name prefix
     :error-logger       ; Arity-2 fn (args: string text, exception) to log errors
     :warn-logger        ; Arity-2 fn (args: string text, exception) to log warnings
-    :event-logger       ; Arity-1 fn (arg: string event name)"
+    :event-logger       ; Arity-1 fn (arg: string event name)
+    :event-names        ; map of HTTP-Kit event names to respective loggable event names"
 
   [handler
    & [{:keys [ip port thread queue-size max-body max-ws max-line
               proxy-protocol worker-name-prefix
-              error-logger warn-logger event-logger]
+              error-logger warn-logger event-logger event-names]
 
        :or   {ip         "0.0.0.0"
               port       8090
@@ -51,7 +52,15 @@
             (if event-logger
               (reify EventLogger
                 (log [this event] (event-logger event)))
-              EventLogger/NOP))
+              EventLogger/NOP)
+            (cond
+              (nil? event-names) EventNames/DEFAULT
+              (map? event-names) (EventNames. event-names)
+              (instance? EventNames
+                event-names)     event-names
+              :otherwise         (throw (IllegalArgumentException.
+                                          (format "Invalid event-names: (%s) %s"
+                                            (class event-names) (pr-str event-names))))))
         proxy-enum (case proxy-protocol
                      :enable   ProxyProtocolOption/ENABLED
                      :disable  ProxyProtocolOption/DISABLED
@@ -69,7 +78,15 @@
             (if event-logger
               (reify EventLogger
                 (log [this event] (event-logger event)))
-              EventLogger/NOP))]
+              EventLogger/NOP)
+            (cond
+              (nil? event-names) EventNames/DEFAULT
+              (map? event-names) (EventNames. event-names)
+              (instance? EventNames
+                event-names)     event-names
+              :otherwise         (throw (IllegalArgumentException.
+                                          (format "Invalid event-names: (%s) %s"
+                                            (class event-names) (pr-str event-names))))))]
 
     (.start s)
     (with-meta

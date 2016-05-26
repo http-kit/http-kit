@@ -4,7 +4,7 @@
   (:use [clojure.walk :only [prewalk]])
   (:import [org.httpkit.client HttpClient HttpClient$AddressFinder IResponseHandler RespListener
             IFilter RequestConfig]
-           [org.httpkit.logger ContextLogger EventLogger]
+           [org.httpkit.logger ContextLogger EventLogger EventNames]
            [org.httpkit HttpMethod PrefixThreadFactory HttpUtils]
            [java.util.concurrent ThreadPoolExecutor LinkedBlockingQueue TimeUnit]
            [java.net URI URLEncoder]
@@ -102,10 +102,12 @@
   Options:
     :address-finder     ; Arity-1 fn (arg: java.net.URI object) to return java.net.InetSocketAddress instance
     :error-logger       ; Arity-2 fn (args: string text, exception) to log errors
-    :event-logger       ; Arity-1 fn (arg: string event name)"
+    :event-logger       ; Arity-1 fn (arg: string event name)
+    :event-names        ; map of HTTP-Kit event names to respective loggable event names"
   [{:keys [address-finder
            error-logger
-           event-logger]}]
+           event-logger
+           event-names]}]
   (HttpClient.
     (if address-finder
       (reify HttpClient$AddressFinder
@@ -118,7 +120,15 @@
     (if event-logger
       (reify EventLogger
         (log [this event] (event-logger event)))
-      EventLogger/NOP)))
+      EventLogger/NOP)
+    (cond
+      (nil? event-names) EventNames/DEFAULT
+      (map? event-names) (EventNames. event-names)
+      (instance? EventNames
+        event-names)     event-names
+      :otherwise         (throw (IllegalArgumentException.
+                                  (format "Invalid event-names: (%s) %s"
+                                    (class event-names) (pr-str event-names)))))))
 
 (defn request
   "Issues an async HTTP request and returns a promise object to which the value

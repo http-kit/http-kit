@@ -29,7 +29,7 @@ import org.httpkit.LineTooLargeException;
 import org.httpkit.ProtocolException;
 import org.httpkit.RequestTooLargeException;
 import org.httpkit.logger.ContextLogger;
-import org.httpkit.logger.Event;
+import org.httpkit.logger.EventNames;
 import org.httpkit.logger.EventLogger;
 import org.httpkit.server.Frame.BinaryFrame;
 import org.httpkit.server.Frame.CloseFrame;
@@ -76,6 +76,7 @@ public class HttpServer implements Runnable {
     private final ContextLogger<String, Throwable> errorLogger;
     private final ContextLogger<String, Throwable> warnLogger;
     private final EventLogger<String> eventLogger;
+    private final EventNames eventNames;
 
     public static final ContextLogger<String, Throwable> DEFAULT_WARN_LOGGER = new ContextLogger<String, Throwable>() {
         @Override
@@ -88,18 +89,19 @@ public class HttpServer implements Runnable {
                       ProxyProtocolOption proxyProtocolOption)
             throws IOException {
         this(ip, port, handler, maxBody, maxLine, maxWs, proxyProtocolOption,
-                ContextLogger.ERROR_PRINTER, DEFAULT_WARN_LOGGER, EventLogger.NOP);
+                ContextLogger.ERROR_PRINTER, DEFAULT_WARN_LOGGER, EventLogger.NOP, EventNames.DEFAULT);
     }
 
     public HttpServer(String ip, int port, IHandler handler, int maxBody, int maxLine, int maxWs,
                       ProxyProtocolOption proxyProtocolOption,
                       ContextLogger<String, Throwable> errorLogger,
                       ContextLogger<String, Throwable> warnLogger,
-                      EventLogger<String> eventLogger)
+                      EventLogger<String> eventLogger, EventNames eventNames)
             throws IOException {
         this.errorLogger = errorLogger;
         this.warnLogger = warnLogger;
         this.eventLogger = eventLogger;
+        this.eventNames = eventNames;
         this.handler = handler;
         this.maxLine = maxLine;
         this.maxBody = maxBody;
@@ -126,7 +128,7 @@ public class HttpServer implements Runnable {
         } catch (Exception e) {
             // eg: too many open files. do not quit
             errorLogger.log("accept incoming request", e);
-            eventLogger.log(Event.SERVER_ACCEPT_ERROR);
+            eventLogger.log(eventNames.serverAcceptError);
         }
     }
 
@@ -171,11 +173,11 @@ public class HttpServer implements Runnable {
             closeKey(key, -1);
         } catch (RequestTooLargeException e) {
             atta.keepalive = false;
-            eventLogger.log(Event.SERVER_STATUS_413);
+            eventLogger.log(eventNames.serverStatus413);
             tryWrite(key, HttpEncode(413, new HeaderMap(), e.getMessage()));
         } catch (LineTooLargeException e) {
             atta.keepalive = false; // close after write
-            eventLogger.log(Event.SERVER_STATUS_414);
+            eventLogger.log(eventNames.serverStatus414);
             tryWrite(key, HttpEncode(414, new HeaderMap(), e.getMessage()));
         }
     }
@@ -203,7 +205,7 @@ public class HttpServer implements Runnable {
             } while (buffer.hasRemaining()); // consume all
         } catch (ProtocolException e) {
             warnLogger.log(null, e);
-            eventLogger.log(Event.SERVER_WS_DECODE_ERROR);
+            eventLogger.log(eventNames.serverWsDecodeError);
             closeKey(key, CLOSE_MESG_BIG); // TODO more specific error
         }
     }
@@ -348,7 +350,7 @@ public class HttpServer implements Runnable {
                 // jvm can catch any exception, including OOM
             } catch (Throwable e) { // catch any exception(including OOM), print it
                 errorLogger.log("http server loop error, should not happen", e);
-                eventLogger.log(Event.SERVER_LOOP_ERROR);
+                eventLogger.log(eventNames.serverLoopError);
             }
         }
     }
