@@ -9,8 +9,6 @@
 [http-kit "2.2.0-alpha1"] ; Dev release, published by contributors
 ```
 
-[![Build Status](https://travis-ci.org/http-kit/http-kit.svg?branch=master)](https://travis-ci.org/http-kit/http-kit)
-
 See [http-kit.org](http://http-kit.org) for documentation, examples, benchmarks, etc. (may be a little out of date).
 
 ## Project status
