@@ -1,3 +1,32 @@
+## 2.2.0-alpha2 (2016 Jun 8)
+
+```clojure
+[http-kit "2.2.0-alpha2"]
+```
+
+This should be a non-breaking upgrade from **2.2.0-alpha1** but **please evaluate before using in production**.
+
+Thank you to all [contributors for this release](https://github.com/http-kit/http-kit/commits/master)!
+
+\- Peter Taoussanis (@ptaoussanis)
+
+> Listed changes are relative to **2.2.0-alpha1**:
+
+#### New stuff
+
+* [#275] Client: add proxy support (@davidkazlauskas, @jbristow)
+* [#280 #281 #291] Client: allow https requests through proxy, tunneling (@jshaw86, @jbristow)
+* [#283] Server: allow overwriting "Server" response header (@skazhy)
+
+#### General improvements
+
+* [#274 #272] Make HttpClient class non-final (@kumarshantanu)
+
+#### Fixes
+
+* [#190] Transfer-Encoding is only supported in HTTP Version 1.1 (@jenshaase)
+
+
 ## 2.2.0-alpha1 (2016 Mar 3)
 
 ```clojure
@@ -6,11 +35,11 @@
 
 This is a **major release** that *should* be non-breaking but **may require testing**. Please evaluate before using in production (and **please report any problems!**).
 
-A big thank you to all the [contributors for this release][https://github.com/http-kit/http-kit/commits/master]!
+A big thank you to all the [contributors for this release](https://github.com/http-kit/http-kit/commits/master)!
 
 \- Peter Taoussanis (@ptaoussanis)
 
-> Listed changes are relative to last stable release (**2.1.19**)
+> Listed changes are relative to **2.1.19**:
 
 #### New stuff
 
