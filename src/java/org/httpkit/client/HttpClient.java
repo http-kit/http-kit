@@ -45,7 +45,8 @@ public class HttpClient implements Runnable {
     private final PriorityQueue<Request> requests = new PriorityQueue<Request>();
     // reuse TCP connection
     private final PriorityQueue<PersistentConn> keepalives = new PriorityQueue<PersistentConn>();
-
+    private final long maxConnections;
+    private volatile long numConnections = 0;
     private volatile boolean running = true;
 
     // shared, single thread
@@ -53,11 +54,16 @@ public class HttpClient implements Runnable {
     private final Selector selector;
 
     public HttpClient() throws IOException {
+        this(-1);
+    }
+
+    public HttpClient(long maxConnections) throws IOException {
         int id = ID.incrementAndGet();
         String name = "client-loop";
         if (id > 1) {
             name = name + "#" + id;
         }
+        this.maxConnections = maxConnections;
         selector = Selector.open();
         Thread t = new Thread(this, name);
         t.setDaemon(true);
@@ -178,6 +184,7 @@ public class HttpClient implements Runnable {
             key.channel().close();
         } catch (Exception ignore) {
         }
+        numConnections--;
     }
 
     private void doWrite(SelectionKey key) {
@@ -347,8 +354,8 @@ public class HttpClient implements Runnable {
     }
 
     private void processPending() {
-        Request job = null;
-        while ((job = pending.poll()) != null) {
+        Request job = pending.peek();
+        if (job != null) {
             if (job.cfg.keepAlive > 0) {
                 PersistentConn con = keepalives.remove(job.addr);
                 if (con != null) { // keep alive
@@ -361,7 +368,8 @@ public class HttpClient implements Runnable {
                             key.attach(job);
                             key.interestOps(OP_WRITE);
                             requests.offer(job);
-                            continue;
+                            pending.poll();
+                            return;
                         } catch (SSLException e) {
                             closeQuietly(key); // https wrap SSLException, start from fresh
                         }
@@ -371,22 +379,26 @@ public class HttpClient implements Runnable {
                     }
                 }
             }
-            try {
-                SocketChannel ch = SocketChannel.open();
-                ch.setOption(StandardSocketOptions.SO_KEEPALIVE, Boolean.TRUE);
-                ch.setOption(StandardSocketOptions.TCP_NODELAY, Boolean.TRUE);
-                ch.configureBlocking(false);
-                boolean connected = ch.connect(job.addr);
-                job.isConnected = connected;
-
-                // if connection is established immediatelly, should wait for write. Fix #98
-                job.key = ch.register(selector, connected ? OP_WRITE : OP_CONNECT, job);
-                // save key for timeout check
-                requests.offer(job);
-            } catch (IOException e) {
-                job.finish(e);
-                // HttpUtils.printError("Try to connect " + job.addr, e);
+            if (maxConnections == -1 || numConnections < maxConnections) {
+                try {
+                    pending.poll();
+                    SocketChannel ch = SocketChannel.open();
+                    ch.setOption(StandardSocketOptions.SO_KEEPALIVE, Boolean.TRUE);
+                    ch.setOption(StandardSocketOptions.TCP_NODELAY, Boolean.TRUE);
+                    ch.configureBlocking(false);
+                    boolean connected = ch.connect(job.addr);
+                    job.isConnected = connected;
+                    numConnections++;
+                    // if connection is established immediatelly, should wait for write. Fix #98
+                    job.key = ch.register(selector, connected ? OP_WRITE : OP_CONNECT, job);
+                    // save key for timeout check
+                    requests.offer(job);
+                } catch (IOException e) {
+                    job.finish(e);
+                    // HttpUtils.printError("Try to connect " + job.addr, e);
+                }
             }
+
         }
     }
 
