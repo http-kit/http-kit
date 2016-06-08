@@ -14,8 +14,8 @@
   :plugins
   [[lein-swank   "1.4.5"]
    [lein-pprint  "1.1.2"]
-   [lein-ancient "0.6.8"]
-   [lein-codox   "0.9.4"]]
+   [lein-ancient "0.6.10"]
+   [lein-codox   "0.9.5"]]
 
   :jvm-opts
   ["-Dclojure.compiler.disable-locals-clearing=true"
@@ -34,18 +34,19 @@
   :profiles
   {:test {:java-source-paths ["test/java" "src/java"]
           :dependencies [[ring/ring-defaults "0.2.0"]
-                         [ring-request-proxy "0.1.3"]
+                         [ring-request-proxy "0.1.4"]
                          [ring-basic-authentication "1.0.5"]
                          [org.clojure/data.codec "0.1.0"]]}
    :dev  {:dependencies
-          [[junit/junit "4.12"]
+          [[org.clojure/clojure "1.8.0"]
+           [junit/junit "4.12"]
            [org.clojure/tools.logging "0.3.1"]
-           [ch.qos.logback/logback-classic "1.1.6"]
-           [clj-http "2.1.0"]
+           [ch.qos.logback/logback-classic "1.1.7"]
+           [clj-http "2.1.0"] ; TODO Update (breaking?)
            [io.netty/netty "3.6.5.Final"] ; TODO Update (breaking)
            [org.clojure/data.json "0.2.6"]
            [http.async.client "0.5.2"] ; TODO Update (breaking)
-           [compojure "1.4.0"]
-           [org.clojure/tools.cli "0.3.3"]
+           [compojure "1.5.0"]
+           [org.clojure/tools.cli "0.3.3"] ; TODO Update (breaking)
            [ring/ring-jetty-adapter "1.4.0"]
            [ring/ring-core "1.4.0"]]}})
