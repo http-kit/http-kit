@@ -100,15 +100,18 @@
 (defn make-client
   "Make a client with specified options.
   Options:
+    :max-connections    ; max connection count, default is unlimited (-1)
     :address-finder     ; Arity-1 fn (arg: java.net.URI object) to return java.net.InetSocketAddress instance
     :error-logger       ; Arity-2 fn (args: string text, exception) to log errors
     :event-logger       ; Arity-1 fn (arg: string event name)
     :event-names        ; map of HTTP-Kit event names to respective loggable event names"
-  [{:keys [address-finder
+  [{:keys [max-connections
+           address-finder
            error-logger
            event-logger
            event-names]}]
   (HttpClient.
+    (or max-connections -1)
     (if address-finder
       (reify HttpClient$AddressFinder
         (findAddress [this uri] (address-finder uri)))
@@ -172,7 +175,7 @@
     :url :method :headers :timeout :query-params :form-params :as
     :client :body :basic-auth :user-agent :filter :worker-pool"
   [{:keys [client timeout filter worker-pool keepalive as follow-redirects max-redirects response
-           trace-redirects allow-unsafe-redirect-methods proxy]
+           trace-redirects allow-unsafe-redirect-methods proxy-host proxy-port tunnel?]
     :as opts
     :or {timeout 60000
          follow-redirects true
@@ -182,7 +185,9 @@
          response (promise)
          keepalive 120000
          as :auto
-         proxy nil}}
+         tunnel? false
+         proxy-host nil
+         proxy-port 3128}}
    & [callback]]
   (let [client (or (:client opts) @default-client)  ; deref default-client ONLY when client not specified
         {:keys [url method headers body sslengine]} (coerce-req opts)
@@ -223,7 +228,7 @@
         listener (RespListener. handler filter worker-pool
                                 ;; only the 4 support now
                                 (case as :auto 1 :text 2 :stream 3 :byte-array 4))
-        cfg (RequestConfig. method headers body timeout keepalive proxy)]
+        cfg (RequestConfig. method headers body timeout keepalive proxy-host proxy-port tunnel?)]
     (.exec ^HttpClient client url cfg sslengine listener)
     response))
 

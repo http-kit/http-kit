@@ -48,7 +48,8 @@ public class HttpClient implements Runnable {
     private final PriorityQueue<Request> requests = new PriorityQueue<Request>();
     // reuse TCP connection
     private final PriorityQueue<PersistentConn> keepalives = new PriorityQueue<PersistentConn>();
-
+    private final long maxConnections;
+    private volatile long numConnections = 0;
     private volatile boolean running = true;
 
     // shared, single thread
@@ -72,25 +73,31 @@ public class HttpClient implements Runnable {
     };
 
     public HttpClient() throws IOException {
-        this(DEFAULT_ADDRESS_FINDER, ContextLogger.ERROR_PRINTER, EventLogger.NOP, EventNames.DEFAULT);
+        this(-1);
     }
 
-    public HttpClient(AddressFinder addressFinder,
+    public HttpClient(long maxConnections, AddressFinder addressFinder,
             ContextLogger<String, Throwable> errorLogger,
             EventLogger<String> eventLogger, EventNames eventNames) throws IOException {
         this.addressFinder = addressFinder;
         this.errorLogger = errorLogger;
         this.eventLogger = eventLogger;
         this.eventNames = eventNames;
+
         int id = ID.incrementAndGet();
         String name = "client-loop";
         if (id > 1) {
             name = name + "#" + id;
         }
+        this.maxConnections = maxConnections;
         selector = Selector.open();
         Thread t = new Thread(this, name);
         t.setDaemon(true);
         t.start();
+    }
+
+    public HttpClient(long maxConnections) throws IOException {
+        this(maxConnections, DEFAULT_ADDRESS_FINDER, ContextLogger.ERROR_PRINTER, EventLogger.NOP, EventNames.DEFAULT);
     }
 
     private void clearTimeout(long now) {
@@ -208,6 +215,7 @@ public class HttpClient implements Runnable {
             key.channel().close();
         } catch (Exception ignore) {
         }
+        numConnections--;
     }
 
     private void doWrite(SelectionKey key) {
@@ -241,12 +249,14 @@ public class HttpClient implements Runnable {
         }
     }
 
+
+
     public void exec(String url, RequestConfig cfg, SSLEngine engine, IRespListener cb) {
         URI uri,proxyUri = null;
         try {
             uri = new URI(url);
-            if (cfg.proxy != null) {
-                proxyUri = new URI(cfg.proxy);
+            if (cfg.proxy_host != null) {
+                proxyUri = new URI(String.format("%s:%03d", cfg.proxy_host, cfg.proxy_port));
             }
         } catch (URISyntaxException e) {
             cb.onThrowable(e);
@@ -298,9 +308,14 @@ public class HttpClient implements Runnable {
                 request = encode(cfg.method, headers, cfg.body, HttpUtils.getPath(uri));
             } else {
                 String proxyScheme = proxyUri.getScheme();
-                if ("http".equals(proxyScheme) || "https".equals(proxyScheme)) {
-                    headers.put("Proxy-Connection","Keep-Alive");
+                headers.put("Proxy-Connection","Keep-Alive");
+                if (("http".equals(proxyScheme) && ! "https".equals(scheme)) || cfg.tunnel == false)  {
                     request = encode(cfg.method, headers, cfg.body, uri.toString());
+                } else if ( "https".equals(proxyScheme) || "https".equals(scheme) ){
+                    headers.put("Host", HttpUtils.getProxyHost(uri));
+                    headers.put("Protocol","https");
+                    HttpMethod https_method = cfg.tunnel == true ? HttpMethod.valueOf("CONNECT") : cfg.method;
+                    request = encode(https_method, headers, cfg.body, HttpUtils.getProxyHost(uri));
                 } else {
                     String message = (proxyScheme == null) ? "No proxy protocol specified" : proxyScheme + " for proxy is not supported";
                     cb.onThrowable(new ProtocolException(message));
@@ -311,7 +326,9 @@ public class HttpClient implements Runnable {
             cb.onThrowable(e);
             return;
         }
-        if ("https".equals(scheme)) {
+
+        if ((proxyUri == null && "https".equals(scheme))
+            || (proxyUri != null && "https".equals(proxyUri.getScheme()))) {
             if (engine == null) {
                 engine = DEFAULT_CONTEXT.createSSLEngine();
             }
@@ -368,8 +385,8 @@ public class HttpClient implements Runnable {
     }
 
     private void processPending() {
-        Request job = null;
-        while ((job = pending.poll()) != null) {
+        Request job = pending.peek();
+        if (job != null) {
             if (job.cfg.keepAlive > 0) {
                 PersistentConn con = keepalives.remove(job.addr);
                 if (con != null) { // keep alive
@@ -382,7 +399,8 @@ public class HttpClient implements Runnable {
                             key.attach(job);
                             key.interestOps(OP_WRITE);
                             requests.offer(job);
-                            continue;
+                            pending.poll();
+                            return;
                         } catch (SSLException e) {
                             closeQuietly(key); // https wrap SSLException, start from fresh
                         }
@@ -392,22 +410,26 @@ public class HttpClient implements Runnable {
                     }
                 }
             }
-            try {
-                SocketChannel ch = SocketChannel.open();
-                ch.setOption(StandardSocketOptions.SO_KEEPALIVE, Boolean.TRUE);
-                ch.setOption(StandardSocketOptions.TCP_NODELAY, Boolean.TRUE);
-                ch.configureBlocking(false);
-                boolean connected = ch.connect(job.addr);
-                job.isConnected = connected;
-
-                // if connection is established immediatelly, should wait for write. Fix #98
-                job.key = ch.register(selector, connected ? OP_WRITE : OP_CONNECT, job);
-                // save key for timeout check
-                requests.offer(job);
-            } catch (IOException e) {
-                job.finish(e);
-                // HttpUtils.printError("Try to connect " + job.addr, e);
+            if (maxConnections == -1 || numConnections < maxConnections) {
+                try {
+                    pending.poll();
+                    SocketChannel ch = SocketChannel.open();
+                    ch.setOption(StandardSocketOptions.SO_KEEPALIVE, Boolean.TRUE);
+                    ch.setOption(StandardSocketOptions.TCP_NODELAY, Boolean.TRUE);
+                    ch.configureBlocking(false);
+                    boolean connected = ch.connect(job.addr);
+                    job.isConnected = connected;
+                    numConnections++;
+                    // if connection is established immediatelly, should wait for write. Fix #98
+                    job.key = ch.register(selector, connected ? OP_WRITE : OP_CONNECT, job);
+                    // save key for timeout check
+                    requests.offer(job);
+                } catch (IOException e) {
+                    job.finish(e);
+                    // HttpUtils.printError("Try to connect " + job.addr, e);
+                }
             }
+
         }
     }
 
