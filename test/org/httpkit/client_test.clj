@@ -320,13 +320,16 @@
                                                        {:name     "file"
                                                         :content  (clojure.java.io/file "project.clj")
                                                         :filename "project.clj"}
+                                                       {:name    "bytes"
+                                                        :content (.getBytes "httpkit's project.clj" "UTF-8")}
                                                        {:name         "custom-content-type"
                                                         :content      (clojure.java.io/file "LICENSE.txt")
                                                         :filename     "LICENSE.txt"
                                                         :content-type "text/plain"}]})]
 
     (is (= 200 status))
-    (is (= {:comment             "httpkit's project.clj"
+    (is (= {:bytes               "httpkit's project.clj"
+            :comment             "httpkit's project.clj"
             :custom-content-type {:content-type "text/plain"
                                   :filename     "LICENSE.txt"}
             :file                {:content-type "application/octet-stream"
