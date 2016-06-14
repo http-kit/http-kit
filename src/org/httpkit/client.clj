@@ -71,9 +71,9 @@
             ;; :body ring body: null, String, seq, InputStream, File, ByteBuffer
                  :body      (if form-params (query-string form-params) body))]
     (if multipart
-      (let [entities (into (map (fn [{:keys [name content filename]}]
-                                  (MultipartEntity. name content filename)) multipart)
-                           (map (fn [[k v]] (MultipartEntity. k v nil)) form-params))
+      (let [entities (into (map (fn [{:keys [name content filename content-type]}]
+                                  (MultipartEntity. name content filename content-type)) multipart)
+                           (map (fn [[k v]] (MultipartEntity. k v nil nil)) form-params))
             boundary (MultipartEntity/genBoundary entities)]
         (-> r
             (assoc-in [:headers "Content-Type"]
