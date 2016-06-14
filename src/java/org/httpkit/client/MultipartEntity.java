@@ -14,10 +14,10 @@ import java.util.List;
  *         2014/1/1
  */
 public class MultipartEntity {
-    private String name;
-    private String filename;
-    private Object content;
-    private String contentType;
+    private final String name;
+    private final String filename;
+    private final Object content;
+    private final String contentType;
 
     public MultipartEntity(String name, Object content, String filename, String contentType) {
         this.name = name;
