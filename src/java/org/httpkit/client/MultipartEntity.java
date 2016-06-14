@@ -66,6 +66,9 @@ public class MultipartEntity {
                 while (((ByteBuffer) e.content).hasRemaining()) {
                     bytes.append(((ByteBuffer) e.content).get()); // copy
                 }
+            } else if (e.content instanceof byte[]) {
+                byte[] contentBytes = (byte[])e.content;
+                bytes.append(contentBytes, contentBytes.length);
             }
             bytes.append(HttpUtils.CR, HttpUtils.LF);
         }
