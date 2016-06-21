@@ -1,3 +1,19 @@
+## 2.2.0-beta1 (2016 Jun 21)
+
+```clojure
+[http-kit "2.2.0-beta1"]
+```
+
+**Feature freeze**: this is expected to be the final release before `v2.2.0-RC1`.
+
+> Changes since `*2.2.0-alpha2`:
+
+### New stuff
+
+* [#297] Client: allow multipart entity to support byte arrays (@vincentjames501)
+* [#297] Client: allow setting multipart content type (@vincentjames501)
+* [#293] Client: add max connections support (@ryfow)
+
 ## 2.2.0-alpha2 (2016 Jun 8)
 
 ```clojure

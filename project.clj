@@ -1,4 +1,4 @@
-(defproject http-kit "2.2.0-alpha2"
+(defproject http-kit "2.2.0-beta1"
   :author "Feng Shen (@shenfeng)"
   :description "High-performance event-driven HTTP client/server for Clojure"
   :url "http://http-kit.org/"
@@ -33,7 +33,7 @@
 
   :profiles
   {:test {:java-source-paths ["test/java" "src/java"]
-          :dependencies [[ring/ring-defaults "0.2.0"]
+          :dependencies [[ring/ring-defaults "0.2.1"]
                          [ring-request-proxy "0.1.4"]
                          [ring-basic-authentication "1.0.5"]
                          [org.clojure/data.codec "0.1.0"]]}
@@ -46,7 +46,7 @@
            [io.netty/netty "3.6.5.Final"] ; TODO Update (breaking)
            [org.clojure/data.json "0.2.6"]
            [http.async.client "0.5.2"] ; TODO Update (breaking)
-           [compojure "1.5.0"]
+           [compojure "1.5.1"]
            [org.clojure/tools.cli "0.3.3"] ; TODO Update (breaking)
-           [ring/ring-jetty-adapter "1.4.0"]
-           [ring/ring-core "1.4.0"]]}})
+           [ring/ring-jetty-adapter "1.5.0"]
+           [ring/ring-core "1.5.0"]]}})

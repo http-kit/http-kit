@@ -5,8 +5,8 @@
 [CHANGELOG][] | Current [semantic](http://semver.org/) version/s:
 
 ```clojure
-[http-kit "2.1.19"]       ; Last release published by @shenfeng
-[http-kit "2.2.0-alpha2"] ; Dev release, published by contributors
+[http-kit "2.2.0-beta1"] ; Dev release, published by contributors
+[http-kit "2.1.19"]      ; Legacy, last release published by @shenfeng
 ```
 
 See [http-kit.org](http://http-kit.org) for documentation, examples, benchmarks, etc. (may be a little out of date).
