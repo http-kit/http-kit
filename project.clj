@@ -1,4 +1,4 @@
-(defproject http-kit "2.2.0-beta1"
+(defproject http-kit "2.2.0"
   :author "Feng Shen (@shenfeng)"
   :description "High-performance event-driven HTTP client/server for Clojure"
   :url "http://http-kit.org/"
