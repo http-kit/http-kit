@@ -29,7 +29,15 @@
                             {:status code
                              :headers {"location" (str "redirect?total=" total "&n=" (inc n)
                                                        "&code=" code)}}))))
-  (POST "/multipart" [] (fn [req] {:status 200}))
+  (POST "/multipart" [] (fn [req]
+                          (->> req
+                               :params
+                               (reduce-kv
+                                 (fn [acc k v]
+                                   (let [updated (if (map? v) (dissoc v :tempfile :size) v)]
+                                     (assoc acc k updated)))
+                                 {})
+                               pr-str)))
   (PATCH "/patch" [] "hello world")
   (POST "/nested-param" [] (fn [req] (pr-str (:params req))))
   (ANY "/method" [] (fn [req]
@@ -306,9 +314,27 @@
 ))
 
 (deftest test-multipart
-  (is (= 200 (:status @(http/post "http://localhost:4347/multipart"
-                                  {:multipart [{:name "comment" :content "httpkit's project.clj"}
-                                               {:name "file" :content (clojure.java.io/file "project.clj") :filename "project.clj"}]})))))
+  (let [{:keys [status body]} @(http/post "http://localhost:4347/multipart"
+                                          {:multipart [{:name    "comment"
+                                                        :content "httpkit's project.clj"}
+                                                       {:name     "file"
+                                                        :content  (clojure.java.io/file "project.clj")
+                                                        :filename "project.clj"}
+                                                       {:name    "bytes"
+                                                        :content (.getBytes "httpkit's project.clj" "UTF-8")}
+                                                       {:name         "custom-content-type"
+                                                        :content      (clojure.java.io/file "LICENSE.txt")
+                                                        :filename     "LICENSE.txt"
+                                                        :content-type "text/plain"}]})]
+
+    (is (= 200 status))
+    (is (= {:bytes               "httpkit's project.clj"
+            :comment             "httpkit's project.clj"
+            :custom-content-type {:content-type "text/plain"
+                                  :filename     "LICENSE.txt"}
+            :file                {:content-type "application/octet-stream"
+                                  :filename     "project.clj"}}
+           (read-string body)))))
 
 (deftest test-coerce-req
   (testing "Headers should be the same regardless of multipart"

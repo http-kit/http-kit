@@ -156,16 +156,35 @@
   (on-close [ch callback] (.setCloseHandler ch callback)))
 
 ;;;; WebSocket
-(defn accept [key]
+
+(defn sec-websocket-accept [sec-websocket-key]
   (let [md (MessageDigest/getInstance "SHA1")
         websocket-13-guid "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"]
     (DatatypeConverter/printBase64Binary
-     (.digest md (.getBytes (str key websocket-13-guid))))))
+      (.digest md (.getBytes (str sec-websocket-key websocket-13-guid))))))
+
+(def accept "DEPRECATED for `sec-websocket-accept" sec-websocket-accept)
+
+(defn send-websocket-handshake!
+  "Returns true iff successfully upgraded a valid WebSocket request."
+  [^AsyncChannel ch ring-req]
+  (when-let [sec-ws-key (get-in ring-req [:headers "sec-websocket-key"])]
+    (when-let [sec-ws-accept (try (sec-websocket-accept sec-ws-key)
+                                  (catch Exception _))]
+      (.sendHandshake ch
+        {"Upgrade" "websocket"
+         "Connection" "Upgrade"
+         "Sec-WebSocket-Accept" sec-ws-accept})
+      true)))
+
+;; (defn websocket-req? [ring-req] (:websocket?    ring-req))
+;; (defn async-channel  [ring-req] (:async-channel ring-req))
+;; (defn async-response [ring-req] {:body (:async-channel ring-req)})
 
 (defmacro with-channel
-  "Evaluates body with `ch-name` bound to the request's underlying asynchronous
-  HTTP or WebSocket channel, and returns {:body AsyncChannel} as an
-  implementation detail.
+  "Evaluates body with `ch-name` bound to the request's underlying
+  asynchronous HTTP or WebSocket channel, and returns {:body AsyncChannel}
+  as an implementation detail.
 
   ;; Asynchronous HTTP response (with optional streaming)
   (defn my-async-handler [request]
@@ -200,16 +219,12 @@
     (on-close [ch callback])
 
   See org.httpkit.timer ns for optional timeout facilities."
-  [request ch-name & body]
-  `(let [~ch-name (:async-channel ~request)]
-     (if (:websocket? ~request)
-       (if-let [key# (get-in ~request [:headers "sec-websocket-key"])]
-         (do (.sendHandshake ~(with-meta ch-name {:tag `AsyncChannel})
-                             {"Upgrade"    "websocket"
-                              "Connection" "Upgrade"
-                              "Sec-WebSocket-Accept" (accept key#)})
-             ~@body
-             {:body ~ch-name})
+  [ring-req ch-name & body]
+  `(let [ring-req# ~ring-req
+         ~ch-name (:async-channel ring-req#)]
+
+     (if (:websocket? ring-req#)
+       (if (send-websocket-handshake! ~ch-name ring-req#)
+         (do ~@body {:body ~ch-name})
          {:status 400 :body "Bad Sec-WebSocket-Key header"})
-       (do ~@body
-           {:body ~ch-name}))))
+       (do ~@body {:body ~ch-name}))))
