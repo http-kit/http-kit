@@ -80,4 +80,8 @@ public class BytesInputStream extends InputStream {
     public void reset() {
         pos = mark;
     }
+
+    public int getCount() {
+        return count;
+    }
 }
