@@ -118,8 +118,12 @@ class LinkingRunnable implements Runnable {
 
     public void run() {
         impl.run();
-        if (!next.compareAndSet(null, this)) { // has more job to run
-            next.get().run();
+
+        // Run all jobs in this chain without consuming extra call stack
+        LinkingRunnable r = this;
+        while (!r.next.compareAndSet(null, r)) {
+            r = r.next.get();
+            r.impl.run();
         }
     }
 }

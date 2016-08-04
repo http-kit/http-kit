@@ -29,7 +29,15 @@
                             {:status code
                              :headers {"location" (str "redirect?total=" total "&n=" (inc n)
                                                        "&code=" code)}}))))
-  (POST "/multipart" [] (fn [req] {:status 200}))
+  (POST "/multipart" [] (fn [req]
+                          (->> req
+                               :params
+                               (reduce-kv
+                                 (fn [acc k v]
+                                   (let [updated (if (map? v) (dissoc v :tempfile :size) v)]
+                                     (assoc acc k updated)))
+                                 {})
+                               pr-str)))
   (PATCH "/patch" [] "hello world")
   (POST "/nested-param" [] (fn [req] (pr-str (:params req))))
   (ANY "/method" [] (fn [req]
@@ -50,8 +58,8 @@
   (GET "/p" [] (fn [req] (pr-str (:params req))))
   (ANY "/params" [] (fn [req] (-> req :params :param1)))
   (PUT "/body" [] (fn [req] {:body (:body req)
-                            :status 200
-                            :headers {"content-type" "text/plain"}}))
+                             :status 200
+                             :headers {"content-type" "text/plain"}}))
   (GET "/test-header" [] (fn [{:keys [headers]}] (str (get headers "test-header")))))
 
 (use-fixtures :once
@@ -120,8 +128,16 @@
           (doseq [r requests]
             (is (= 200 (:status @r))))))
       (doseq [_ (range 0 200)]
-        (is (= 200 (:status @(http/get url))))))))
+        (is (= 200 (:status @(http/get url))))))
 
+    (testing "callback exception handling"
+      (let [{^Exception error :error} @(http/get (str host "/get")
+                                                 (fn [_] (throw (Exception. "Exception"))))]
+        (is (= "Exception" (.getMessage error))))
+
+      (let [{^Throwable error :error} @(http/get (str host "/get")
+                                                 (fn [_] (throw (Throwable. "Throwable"))))]
+        (is (= "Throwable" (.getMessage error)))))))
 
 (deftest test-unicode-encoding
   (let [u "高性能HTTPServer和Client"
@@ -225,7 +241,7 @@
                                 identity)
                  :headers :x-method read-string)))))
 
-(deftest test-string-file-inputstream-body []
+(deftest test-string-file-inputstream-body
   (let [length (+ (rand-int (* 1024 1024 5)) 100)
         file (gen-tempfile length ".txt")
         bodys [(subs const-string 0 length)    ;string
@@ -233,7 +249,7 @@
                (java.io.FileInputStream. file) ; inputstream
                [(subs const-string 0 100) (subs const-string 100 length)] ; seqable
                (ByteBuffer/wrap (.getBytes (subs const-string 0 length))) ; byteBuffer
-               ]]
+]]
     (doseq [body bodys]
       (is (= length (count (:body @(http/put "http://127.0.0.1:4347/body"
                                              {:body body}))))))))
@@ -257,7 +273,7 @@
       (is (string? body)))
     (let [body (:body @(http/get url {:as :stream}))]
       (is (instance? java.io.InputStream body)))
-    (let [body (:body @(http/get url {:as :byte-array}))]
+    (let [^bytes body (:body @(http/get url {:as :byte-array}))]
       (is (= 1024 (alength body))))))
 
 (deftest test-https
@@ -265,7 +281,7 @@
     (doseq [i (range 0 2)]
       (doseq [length (repeatedly 40 (partial rand-int (* 4 1024 1024)))]
         (let [{:keys [body error status]} @(http/get (get-url length) {:insecure? true})]
-          (if error (.printStackTrace error))
+          (if error (.printStackTrace ^Throwable error))
           (is (= length (count body)))))
       (doseq [length (repeatedly 40 (partial rand-int (* 4 1024 1024)))]
         (is (= length (-> @(http/get (get-url length)
@@ -293,23 +309,40 @@
     (is (= 200 (:status @(http/get url {:max-redirects 6}))))
     (is (= 302 (:status @(http/get url {:follow-redirects false}))))
     (is (= "get" (:body @(http/post url {:as :text})))) ; should switch to get method
+    (is (= "post" (:body @(http/post url {:as :text :allow-unsafe-redirect-methods true})))) ; should not change method
     (is (= "post" (:body @(http/post (str url "&code=307") {:as :text})))) ; should not change method
-    ))
+))
 
 (deftest test-multipart
-  (is (= 200 (:status @(http/post "http://localhost:4347/multipart"
-                                  {:multipart [{:name "comment" :content "httpkit's project.clj"}
-                                               {:name "file" :content (clojure.java.io/file "project.clj") :filename "project.clj"}]})))))
+  (let [{:keys [status body]} @(http/post "http://localhost:4347/multipart"
+                                          {:multipart [{:name    "comment"
+                                                        :content "httpkit's project.clj"}
+                                                       {:name     "file"
+                                                        :content  (clojure.java.io/file "project.clj")
+                                                        :filename "project.clj"}
+                                                       {:name    "bytes"
+                                                        :content (.getBytes "httpkit's project.clj" "UTF-8")}
+                                                       {:name         "custom-content-type"
+                                                        :content      (clojure.java.io/file "LICENSE.txt")
+                                                        :filename     "LICENSE.txt"
+                                                        :content-type "text/plain"}]})]
 
+    (is (= 200 status))
+    (is (= {:bytes               "httpkit's project.clj"
+            :comment             "httpkit's project.clj"
+            :custom-content-type {:content-type "text/plain"
+                                  :filename     "LICENSE.txt"}
+            :file                {:content-type "application/octet-stream"
+                                  :filename     "project.clj"}}
+           (read-string body)))))
 
 (deftest test-coerce-req
-  "Headers should be the same regardless of multipart"
-  (let [coerce-req #'org.httpkit.client/coerce-req
-        request {:basic-auth ["user" "pass"]}]
-    (is (= (keys (:headers (coerce-req request)))
-           (remove #(= % "Content-Type")
-                   (keys (:headers (coerce-req (assoc request :multipart [{:name "foo" :content "bar"}])))))))))
-
+  (testing "Headers should be the same regardless of multipart"
+    (let [coerce-req #'org.httpkit.client/coerce-req
+          request {:basic-auth ["user" "pass"]}]
+      (is (= (keys (:headers (coerce-req request)))
+             (remove #(= % "Content-Type")
+                     (keys (:headers (coerce-req (assoc request :multipart [{:name "foo" :content "bar"}]))))))))))
 
 (deftest test-header-multiple-values
   (let [resp @(http/get "http://localhost:4347/multi-header" {:headers {"foo" ["bar" "baz"], "eggplant" "quux"}})
@@ -325,10 +358,10 @@
                            ['(0) "0"]
                            ['("a" "b") "a,b"]]]
     (let [received (:body @(http/get "http://localhost:4347/test-header"
-                             {:headers {"test-header" sent}}))]
-        (is (= received expected)))))
+                                     {:headers {"test-header" sent}}))]
+      (is (= received expected)))))
 
-(defn- utf8 [s] (ByteBuffer/wrap (.getBytes s "UTF-8")))
+(defn- utf8 [^String s] (ByteBuffer/wrap (.getBytes s "UTF-8")))
 
 (defn- decode
   [method buffer]
@@ -380,9 +413,7 @@
     ;; One header.
     HttpMethod/GET "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"
     [[:init HttpVersion/HTTP_1_1 HttpStatus/OK]
-     [:headers {"content-length" "0"}]]
-
-    ))
+     [:headers {"content-length" "0"}]]))
 
 (deftest test-decode-body
   (are [method resp events] (= (decode method (utf8 resp)) events)
@@ -397,23 +428,21 @@
      [:headers {"content-length" "1"}]]
 
      ;; One byte.
-     HttpMethod/GET "HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\n."
-     [[:init HttpVersion/HTTP_1_1 HttpStatus/OK]
-      [:headers {"content-length" "1"}]
-      [:body [46]]]
+    HttpMethod/GET "HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\n."
+    [[:init HttpVersion/HTTP_1_1 HttpStatus/OK]
+     [:headers {"content-length" "1"}]
+     [:body [46]]]
 
      ;; One byte. The rest is ignored.
-     HttpMethod/GET "HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\n..."
-     [[:init HttpVersion/HTTP_1_1 HttpStatus/OK]
-      [:headers {"content-length" "1"}]
-      [:body [46]]]
+    HttpMethod/GET "HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\n..."
+    [[:init HttpVersion/HTTP_1_1 HttpStatus/OK]
+     [:headers {"content-length" "1"}]
+     [:body [46]]]
 
     ;; The body is omitted for HEAD requests.
     HttpMethod/HEAD "HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\n..."
     [[:init HttpVersion/HTTP_1_1 HttpStatus/OK]
-     [:headers {"content-length" "3"}]]
-
-    ))
+     [:headers {"content-length" "3"}]]))
 
 ;; @(http/get "http://127.0.0.1:4348" {:headers {"Connection" "Close"}})
 

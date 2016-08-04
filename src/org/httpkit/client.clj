@@ -1,5 +1,5 @@
 (ns org.httpkit.client
-  (:refer-clojure :exclude [get])
+  (:refer-clojure :exclude [get proxy])
   (:require [clojure.string :as str])
   (:use [clojure.walk :only [prewalk]])
   (:import [org.httpkit.client HttpClient IResponseHandler RespListener
@@ -59,20 +59,21 @@
 (defn- coerce-req
   [{:keys [url method body insecure? query-params form-params multipart] :as req}]
   (let [r (assoc req
-            :url (if query-params
-                   (if (neg? (.indexOf ^String url (int \?)))
-                     (str url "?" (query-string query-params))
-                     (str url "&" (query-string query-params)))
-                   url)
-            :sslengine (or (:sslengine req)
-                           (when (:insecure? req) (SslContextFactory/trustAnybody)))
-            :method    (HttpMethod/fromKeyword (or method :get))
-            :headers   (prepare-request-headers req)
+                 :url (if query-params
+                        (if (neg? (.indexOf ^String url (int \?)))
+                          (str url "?" (query-string query-params))
+                          (str url "&" (query-string query-params)))
+                        url)
+                 :sslengine (or (:sslengine req)
+                                (when (:insecure? req) (SslContextFactory/trustAnybody)))
+                 :method    (HttpMethod/fromKeyword (or method :get))
+                 :headers   (prepare-request-headers req)
             ;; :body ring body: null, String, seq, InputStream, File, ByteBuffer
-            :body      (if form-params (query-string form-params) body))]
+                 :body      (if form-params (query-string form-params) body))]
     (if multipart
-      (let [entities (map (fn [{:keys [name content filename]}]
-                            (MultipartEntity. name content filename)) multipart)
+      (let [entities (into (map (fn [{:keys [name content filename content-type]}]
+                                  (MultipartEntity. name content filename content-type)) multipart)
+                           (map (fn [[k v]] (MultipartEntity. k v nil nil)) form-params))
             boundary (MultipartEntity/genBoundary entities)]
         (-> r
             (assoc-in [:headers "Content-Type"]
@@ -99,6 +100,8 @@
   "Issues an async HTTP request and returns a promise object to which the value
   of `(callback {:opts _ :status _ :headers _ :body _})` or
      `(callback {:opts _ :error _})` will be delivered.
+  The latter will be delivered on client errors only, not on http errors which will be
+  contained in the :status of the first.
 
   When unspecified, `callback` is the identity
 
@@ -134,7 +137,8 @@
   Request options:
     :url :method :headers :timeout :query-params :form-params :as
     :client :body :basic-auth :user-agent :filter :worker-pool"
-  [{:keys [client timeout filter worker-pool keepalive as follow-redirects max-redirects response]
+  [{:keys [client timeout filter worker-pool keepalive as follow-redirects max-redirects response
+           trace-redirects allow-unsafe-redirect-methods proxy-host proxy-port tunnel?]
     :as opts
     :or {client @default-client
          timeout 60000
@@ -144,12 +148,15 @@
          worker-pool default-pool
          response (promise)
          keepalive 120000
-         as :auto}}
+         as :auto
+         tunnel? false
+         proxy-host nil
+         proxy-port 3128}}
    & [callback]]
   (let [{:keys [url method headers body sslengine]} (coerce-req opts)
         deliver-resp #(deliver response ;; deliver the result
                                (try ((or callback identity) %1)
-                                    (catch Exception e
+                                    (catch Throwable e
                                       ;; dump stacktrace to stderr
                                       (HttpUtils/printError (str method " " url "'s callback") e)
                                       ;; return the error
@@ -158,19 +165,23 @@
                   (onSuccess [this status headers body]
                     (if (and follow-redirects
                              (#{301 302 303 307 308} status)) ; should follow redirect
-                      (if (>= max-redirects (count (:trace-redirects opts)))
-                        (request (assoc opts ; follow 301 and 302 redirect
-                                   :url (.toString ^URI (.resolve (URI. url) ^String
-                                                                  (.get headers "location")))
-                                   :response response
-                                   :method (if (#{301 302 303} status)
-                                             :get ;; change to :GET
-                                             (:method opts))  ;; do not change
-                                   :trace-redirects (conj (:trace-redirects opts) url))
-                                 callback)
+                      (if (>= max-redirects (count trace-redirects))
+                        (let [location (str (.resolve (URI. url) ^String (.get headers "location")))
+                              change-to-get (and (not allow-unsafe-redirect-methods)
+                                                 (#{301 302 303} status))]
+                          (request (assoc opts ; follow 301 and 302 redirect
+                                     :url location
+                                     :response response
+                                     :query-params (if change-to-get nil (:query-params opts))
+                                     :form-params (if change-to-get nil (:form-params opts))
+                                     :method (if change-to-get
+                                               :get ;; change to :GET
+                                               (:method opts))  ;; do not change
+                                     :trace-redirects (conj trace-redirects url))
+                                   callback))
                         (deliver-resp {:opts (dissoc opts :response)
                                        :error (Exception. (str "too many redirects: "
-                                                               (count (:trace-redirects opts))))}))
+                                                               (count trace-redirects)))}))
                       (deliver-resp {:opts    (dissoc opts :response)
                                      :body    body
                                      :headers (prepare-response-headers headers)
@@ -180,7 +191,7 @@
         listener (RespListener. handler filter worker-pool
                                 ;; only the 4 support now
                                 (case as :auto 1 :text 2 :stream 3 :byte-array 4))
-        cfg (RequestConfig. method headers body timeout keepalive)]
+        cfg (RequestConfig. method headers body timeout keepalive proxy-host proxy-port tunnel?)]
     (.exec ^HttpClient client url cfg sslengine listener)
     response))
 

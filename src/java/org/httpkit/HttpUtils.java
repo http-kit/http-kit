@@ -85,6 +85,11 @@ public class HttpUtils {
     // space ' '
     public static final byte SP = 32;
 
+    public static final String EXPECT = "expect";
+
+    public static final String CONTINUE = "100-continue";
+
+
     public static ByteBuffer bodyBuffer(Object body) throws IOException {
         if (body == null) {
             return null;
@@ -99,13 +104,17 @@ public class HttpUtils {
             return readAll((File) body);
         } else if (body instanceof Seqable) {
             ISeq seq = ((Seqable) body).seq();
-            DynamicBytes b = new DynamicBytes(seq.count() * 512);
-            while (seq != null) {
-                b.append(seq.first().toString(), UTF_8);
-                seq = seq.next();
+            if (seq == null) {
+                return null;
+            } else {
+                DynamicBytes b = new DynamicBytes(seq.count() * 512);
+                while (seq != null) {
+                    b.append(seq.first().toString(), UTF_8);
+                    seq = seq.next();
+                }
+                return ByteBuffer.wrap(b.get(), 0, b.length());
             }
-            return ByteBuffer.wrap(b.get(), 0, b.length());
-            // makes ultimate optimization possible: no copy
+        // makes ultimate optimization possible: no copy
         } else if (body instanceof ByteBuffer) {
             return (ByteBuffer) body;
         } else {
@@ -247,6 +256,14 @@ public class HttpUtils {
             host += ":" + port;
         }
         return host;
+    }
+
+    public static String getProxyHost(URI uri){
+        if (uri.getPort() == -1){
+            return uri.getHost();
+        }
+
+        return uri.getHost() + ":" + uri.getPort();
     }
 
     public static InetSocketAddress getServerAddr(URI uri) throws UnknownHostException {
@@ -439,7 +456,9 @@ public class HttpUtils {
             headers.put(CL, Integer.toString(b.length));
             bodyBuffer = ByteBuffer.wrap(b);
         }
-        headers.put("Server", "http-kit");
+        if (!headers.containsKey("Server")) {
+          headers.put("Server", "http-kit");
+        }
         headers.put("Date", DateFormatter.getDate()); // rfc says the Date is needed
 
         DynamicBytes bytes = new DynamicBytes(196);

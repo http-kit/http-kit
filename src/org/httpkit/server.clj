@@ -1,35 +1,62 @@
 (ns org.httpkit.server
-  (:import [org.httpkit.server AsyncChannel HttpServer RingHandler]
+  (:import [org.httpkit.server AsyncChannel HttpServer RingHandler ProxyProtocolOption]
            javax.xml.bind.DatatypeConverter
            java.security.MessageDigest))
 
 ;;;; Ring server
 
 (defn run-server
-  "Starts (mostly*) Ring-compatible HTTP server and returns a function that stops
-  the server, which can take an optional timeout(ms)
-  param to wait existing requests to be finished, like (f :timeout 100).
+  "Starts HTTP server and returns
+    (fn [& {:keys [timeout] ; Timeout (msecs) to wait on existing reqs to complete
+           :or   {timeout 100}}])
 
-  * See http://http-kit.org/migration.html for differences."
-  [handler {:keys [port thread ip max-body max-line worker-name-prefix queue-size max-ws]
-            :or   {ip "0.0.0.0"  ; which ip (if has many ips) to bind
-                   port 8090     ; which port listen incomming request
-                   thread 4      ; http worker thread count
-                   queue-size 20480 ; max job queued before reject to project self
-                   worker-name-prefix "worker-" ; woker thread name prefix
-                   max-body 8388608             ; max http body: 8m
-                   max-ws  4194304              ; max websocket message size: 4m
-                   max-line 4096}}]  ; max http inital line length: 4K
+  Server is mostly Ring compatible, see http://http-kit.org/migration.html
+  for differences.
+
+  Options:
+    :ip                 ; Which ip (if has many ips) to bind
+    :port               ; Which port listen incomming request
+    :thread             ; Http worker thread count
+    :queue-size         ; Max job queued before reject to project self
+    :max-body           ; Max http body: 8m
+    :max-ws             ; Max websocket message size
+    :max-line           ; Max http inital line length
+    :proxy-protocol     ; Proxy protocol e/o #{:disable :enable :optional}
+    :worker-name-prefix ; Woker thread name prefix"
+
+  [handler
+   & [{:keys [ip port thread queue-size max-body max-ws max-line
+              proxy-protocol worker-name-prefix]
+
+       :or   {ip         "0.0.0.0"
+              port       8090
+              thread     4
+              queue-size 20480
+              max-body   8388608
+              max-ws     4194304
+              max-line   4096
+              proxy-protocol :disable
+              worker-name-prefix "worker-"}}]]
+
   (let [h (RingHandler. thread handler worker-name-prefix queue-size)
-        s (HttpServer. ip port h max-body max-line max-ws)]
+        proxy-enum (case proxy-protocol
+                     :enable   ProxyProtocolOption/ENABLED
+                     :disable  ProxyProtocolOption/DISABLED
+                     :optional ProxyProtocolOption/OPTIONAL)
+
+        s (HttpServer. ip port h max-body max-line max-ws proxy-enum)]
+
     (.start s)
-    (with-meta (fn stop-server [& {:keys [timeout] :or {timeout 100}}]
-                 ;; graceful shutdown:
-                 ;; 1. server stop accept new request
-                 ;; 2. wait for existing requests to finish
-                 ;; 3. close the server
-                 (.stop s timeout))
-      {:local-port (.getPort s)})))
+    (with-meta
+      (fn stop-server [& {:keys [timeout] :or {timeout 100}}]
+        ;; graceful shutdown:
+        ;; 1. server stop accept new request
+        ;; 2. wait for existing requests to finish
+        ;; 3. close the server
+        (.stop s timeout))
+
+      {:local-port (.getPort s)
+       :server s})))
 
 ;;;; Asynchronous extension
 
@@ -87,16 +114,35 @@
   (on-close [ch callback] (.setCloseHandler ch callback)))
 
 ;;;; WebSocket
-(defn accept [key]
+
+(defn sec-websocket-accept [sec-websocket-key]
   (let [md (MessageDigest/getInstance "SHA1")
         websocket-13-guid "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"]
     (DatatypeConverter/printBase64Binary
-     (.digest md (.getBytes (str key websocket-13-guid))))))
+      (.digest md (.getBytes (str sec-websocket-key websocket-13-guid))))))
+
+(def accept "DEPRECATED for `sec-websocket-accept" sec-websocket-accept)
+
+(defn send-websocket-handshake!
+  "Returns true iff successfully upgraded a valid WebSocket request."
+  [^AsyncChannel ch ring-req]
+  (when-let [sec-ws-key (get-in ring-req [:headers "sec-websocket-key"])]
+    (when-let [sec-ws-accept (try (sec-websocket-accept sec-ws-key)
+                                  (catch Exception _))]
+      (.sendHandshake ch
+        {"Upgrade" "websocket"
+         "Connection" "Upgrade"
+         "Sec-WebSocket-Accept" sec-ws-accept})
+      true)))
+
+;; (defn websocket-req? [ring-req] (:websocket?    ring-req))
+;; (defn async-channel  [ring-req] (:async-channel ring-req))
+;; (defn async-response [ring-req] {:body (:async-channel ring-req)})
 
 (defmacro with-channel
-  "Evaluates body with `ch-name` bound to the request's underlying asynchronous
-  HTTP or WebSocket channel, and returns {:body AsyncChannel} as an
-  implementation detail.
+  "Evaluates body with `ch-name` bound to the request's underlying
+  asynchronous HTTP or WebSocket channel, and returns {:body AsyncChannel}
+  as an implementation detail.
 
   ;; Asynchronous HTTP response (with optional streaming)
   (defn my-async-handler [request]
@@ -131,16 +177,12 @@
     (on-close [ch callback])
 
   See org.httpkit.timer ns for optional timeout facilities."
-  [request ch-name & body]
-  `(let [~ch-name (:async-channel ~request)]
-     (if (:websocket? ~request)
-       (if-let [key# (get-in ~request [:headers "sec-websocket-key"])]
-         (do (.sendHandshake ~(with-meta ch-name {:tag `AsyncChannel})
-                             {"Upgrade"    "websocket"
-                              "Connection" "Upgrade"
-                              "Sec-WebSocket-Accept" (accept key#)})
-             ~@body
-             {:body ~ch-name})
+  [ring-req ch-name & body]
+  `(let [ring-req# ~ring-req
+         ~ch-name (:async-channel ring-req#)]
+
+     (if (:websocket? ring-req#)
+       (if (send-websocket-handshake! ~ch-name ring-req#)
+         (do ~@body {:body ~ch-name})
          {:status 400 :body "Bad Sec-WebSocket-Key header"})
-       (do ~@body
-           {:body ~ch-name}))))
+       (do ~@body {:body ~ch-name}))))

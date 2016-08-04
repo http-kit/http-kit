@@ -118,8 +118,8 @@
                             "\nreceive:\n" r))
               (is false))))
         (let [d (subs const-string 0 120)]
-          (= d (.ping client d))
-          (= d (.pong client d)))))
+          (is (= d (.ping client d)))
+          (is (= d (.pong client d))))))
     (.close client)))
 
 (deftest test-sent-message-in-body      ; issue #14
@@ -152,9 +152,9 @@
     (dotimes [_ 5]
       (let [length (min 1024 (rand-int 10024))
             data (byte-array length (take length (repeatedly #(byte (rand-int 126)))))
-            sorted-data (doto (aclone data) (java.util.Arrays/sort))]
+            ^bytes sorted-data (doto (aclone data) (java.util.Arrays/sort))]
         (.sendBinaryData client data)
-        (let [output (.getMessage client)]
+        (let [^bytes output (.getMessage client)]
           (is (java.util.Arrays/equals sorted-data output)))))
     (.close client)))
 
@@ -205,10 +205,10 @@
                                   (deliver latch true))
                           :close (fn [con status]
                                    ;; (println "close:" con status)
-                                   )
+)
                           :open (fn [con]
                                   ;; (println "opened:" con)
-                                  ))]
+))]
       ;; (h/send ws :byte (byte-array 10)) not implemented yet
       (let [msg "testing12"]
         (h/send ws :text msg)
