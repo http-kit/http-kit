@@ -67,11 +67,17 @@
                                                      :throw-exceptions false
                                                      :proxy-ignore-hosts #{}})
 
-          {kit-status :status kit-body :body error :error :as resp-kit}
+          {kit-status :status kit-body :body}
           @(http/get "http://127.0.0.1:4347/get"
-                     {:proxy-url "http://127.0.0.1:4348"})]
+                     {:proxy-url "http://127.0.0.1:4348"})
+          {kit-status-backcompat :status kit-body-backcompat :body}
+          @(http/get "http://127.0.0.1:4347/get"
+                     {:proxy-host "http://127.0.0.1"
+                      :proxy-port 4348})]
       (is (= clj-status kit-status))
-      (is (= clj-body kit-body)))))
+      (is (= clj-body kit-body))
+      (is (= clj-status kit-status-backcompat))
+      (is (= clj-body kit-body-backcompat)))))
 
 (deftest proxy-nonexistent
   (testing "test call nonexistent proxy and fail"
