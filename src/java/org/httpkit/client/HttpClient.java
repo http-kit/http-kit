@@ -224,8 +224,8 @@ public class HttpClient implements Runnable {
         URI uri,proxyUri = null;
         try {
             uri = new URI(url);
-            if (cfg.proxy_host != null) {
-                proxyUri = new URI(String.format("%s:%03d", cfg.proxy_host, cfg.proxy_port));
+            if (cfg.proxy_url != null) {
+                proxyUri = new URI(cfg.proxy_url);
             }
         } catch (URISyntaxException e) {
             cb.onThrowable(e);
