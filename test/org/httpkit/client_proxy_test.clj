@@ -67,48 +67,48 @@
                                                      :throw-exceptions false
                                                      :proxy-ignore-hosts #{}})
 
-          {kit-status :status kit-body :body error :error :as resp-kit}
+          {kit-status :status kit-body :body}
+          @(http/get "http://127.0.0.1:4347/get"
+                     {:proxy-url "http://127.0.0.1:4348"})
+          {kit-status-backcompat :status kit-body-backcompat :body}
           @(http/get "http://127.0.0.1:4347/get"
                      {:proxy-host "http://127.0.0.1"
                       :proxy-port 4348})]
       (is (= clj-status kit-status))
-      (is (= clj-body kit-body)))))
+      (is (= clj-body kit-body))
+      (is (= clj-status kit-status-backcompat))
+      (is (= clj-body kit-body-backcompat)))))
 
 (deftest proxy-nonexistent
   (testing "test call nonexistent proxy and fail"
     (let [{:keys [error]} @(http/get "http://127.0.0.1:4347/get"
-                                     {:proxy-host "http://127.0.0.1"
-                                      :proxy-port 4346})]
+                                     {:proxy-url "http://127.0.0.1:4346"})]
       (is (= (type (java.net.ConnectException.)) (type error)))
       (is (= "Connection refused"
              (.getMessage ^java.net.ConnectException error))))))
 (deftest http-to-http-proxy
   (testing "test call proxy successfully"
     (let [{:keys [status body]} @(http/get "http://127.0.0.1:4347/get"
-                                           {:proxy-host "http://127.0.0.1"
-                                            :proxy-port 4348})]
+                                           {:proxy-url "http://127.0.0.1:4348"})]
       (is (= 200 status))
       (is (= "hello world" body)))))
 (deftest https-to-http-proxy
   (testing "test ssl call proxy successfully"
     (let [{:keys [status body]} @(http/get "https://127.0.0.1:9898/get"
-                                           {:proxy-host "http://127.0.0.1"
-                                            :proxy-port 4348})]
+                                           {:proxy-url "http://127.0.0.1:4348"})]
       (is (= 200 status))
       (is (= "hello world" body)))))
 (deftest http-to-https-proxy
   (testing "test call ssl proxy successfully"
     (let [{:keys [status body]} @(http/get "http://127.0.0.1:4347/get"
-                                           {:proxy-host "https://127.0.0.1"
-                                            :proxy-port 9899
+                                           {:proxy-url "https://127.0.0.1:9899"
                                             :insecure? true})]
       (is (= 200 status))
       (is (= "hello world" body)))))
 (deftest https-to-https-proxy
   (testing "test ssl call ssl proxy successfully"
     (let [{:keys [status body]} @(http/get "https://127.0.0.1:9898/get"
-                                           {:proxy-host "https://127.0.0.1"
-                                            :proxy-port 9899
+                                           {:proxy-url "https://127.0.0.1:9899"
                                             :insecure? true})]
       (is (= 200 status))
       (is (= "hello world" body)))))
@@ -123,8 +123,7 @@
   (testing "test proxy with successful auth"
     (let [{:keys [status body]}
           @(http/get "http://127.0.0.1:4347/get"
-                     {:proxy-host "http://127.0.0.1"
-                      :proxy-port 4349
+                     {:proxy-url "http://127.0.0.1:4349"
                       :headers {"Authorization" auth-header-value}})]
       (is (= 200 status))
       (is (= "hello world" body))))
@@ -132,8 +131,7 @@
   (testing "test proxy with unsuccessful auth"
     (let [{:keys [status body]}
           @(http/get "http://127.0.0.1:4347/get"
-                     {:proxy-host "http://127.0.0.1"
-                      :proxy-port 4349
+                     {:proxy-url "http://127.0.0.1:4349"
                       :headers {"Authorization" bad-auth-header-value}})]
       (is (= 401 status))
       (is (= "access denied" body)))))
