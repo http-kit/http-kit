@@ -22,11 +22,13 @@
     :max-ws             ; Max websocket message size
     :max-line           ; Max http inital line length
     :proxy-protocol     ; Proxy protocol e/o #{:disable :enable :optional}
-    :worker-name-prefix ; Woker thread name prefix"
+    :worker-name-prefix ; Woker thread name prefix
+    :worker-pool        ; ExecutorService to use for request-handling (:thread,
+                          :worker-name-prefix, :queue-size are ignored if set)"
 
   [handler
    & [{:keys [ip port thread queue-size max-body max-ws max-line
-              proxy-protocol worker-name-prefix]
+              proxy-protocol worker-name-prefix worker-pool]
 
        :or   {ip         "0.0.0.0"
               port       8090
@@ -38,7 +40,9 @@
               proxy-protocol :disable
               worker-name-prefix "worker-"}}]]
 
-  (let [h (RingHandler. thread handler worker-name-prefix queue-size)
+  (let [h (if worker-pool
+            (RingHandler. handler worker-pool)
+            (RingHandler. thread handler worker-name-prefix queue-size))
         proxy-enum (case proxy-protocol
                      :enable   ProxyProtocolOption/ENABLED
                      :disable  ProxyProtocolOption/DISABLED

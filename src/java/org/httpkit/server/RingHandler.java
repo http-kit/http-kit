@@ -155,6 +155,11 @@ public class RingHandler implements IHandler {
     final ExecutorService execs;
     final IFn handler;
 
+    public RingHandler(IFn handler, ExecutorService execs) {
+        this.execs = execs;
+        this.handler = handler;
+    }
+
     public RingHandler(int thread, IFn handler, String prefix, int queueSize) {
         PrefixThreadFactory factory = new PrefixThreadFactory(prefix);
         BlockingQueue<Runnable> queue = new ArrayBlockingQueue<Runnable>(queueSize);
