@@ -161,6 +161,8 @@ public class WSDecoder {
                                     return new Frame.PongFrame(content);
                                 case OPCODE_CLOSE:
                                     return new Frame.CloseFrame(content);
+                                case OPCODE_PONG:
+                                    return new Frame.PingFrame(content);
                                 default:
                                     throw new ProtocolException("not impl for opcode: " + opcode);
                             }
