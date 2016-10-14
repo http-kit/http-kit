@@ -3,9 +3,12 @@ package org.httpkit.client;
 import org.httpkit.*;
 import org.httpkit.ProtocolException;
 
+import javax.net.ssl.SNIHostName;
+import javax.net.ssl.SNIServerName;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLException;
+import javax.net.ssl.SSLParameters;
 import java.io.IOException;
 import java.net.*;
 import java.nio.ByteBuffer;
@@ -13,7 +16,9 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -303,6 +308,13 @@ public class HttpClient implements Runnable {
             }
             if(!engine.getUseClientMode())
                 engine.setUseClientMode(true);
+
+            SSLParameters sslParameters = engine.getSSLParameters();
+            SNIServerName hostName = new SNIHostName(uri.getHost());
+            List<SNIServerName> list = new ArrayList<SNIServerName>();
+            list.add(hostName);
+            sslParameters.setServerNames(list);
+            engine.setSSLParameters(sslParameters);
 
             pending.offer(new HttpsRequest(addr, request, cb, requests, cfg, engine));
         } else {
