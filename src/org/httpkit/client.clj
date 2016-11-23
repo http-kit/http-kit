@@ -195,8 +195,8 @@
                                 ;; only the 4 support now
                                 (case as :auto 1 :text 2 :stream 3 :byte-array 4))
         effective-proxy-url (if proxy-host (str proxy-host ":" proxy-port) proxy-url)
-        conn-timeout (if timeout timeout conn-timeout)
-        read-timeout (if timeout timeout read-timeout)
+        conn-timeout (or timeout conn-timeout)
+        read-timeout (or timeout read-timeout)
         cfg (RequestConfig. method headers body conn-timeout read-timeout keepalive effective-proxy-url tunnel?)]
     (.exec ^HttpClient client url cfg sslengine listener)
     response))
