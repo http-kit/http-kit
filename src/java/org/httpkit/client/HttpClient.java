@@ -74,12 +74,10 @@ public class HttpClient implements Runnable {
         Request r;
         while ((r = requests.peek()) != null) {
             if (r.isTimeout(now)) {
-                String msg = "connect timeout: ";
-                if (r.isConnected) {
-                    msg = "read timeout: ";
-                }
+                String msg = r.isConnected() ? "read timeout: " : "connect timeout: ";
+                long timeout = r.isConnected() ? r.cfg.readTimeout : r.cfg.connTimeout;
                 // will remove it from queue
-                r.finish(new TimeoutException(msg + r.cfg.timeout + "ms"));
+                r.finish(new TimeoutException(msg + timeout + "ms"));
                 if (r.key != null) {
                     closeQuietly(r.key);
                 }
@@ -340,7 +338,7 @@ public class HttpClient implements Runnable {
         Request req = (Request) key.attachment();
         try {
             if (ch.finishConnect()) {
-                req.isConnected = true;
+                req.setConnected(true);
                 req.onProgress(now);
                 key.interestOps(OP_WRITE);
                 if (req instanceof HttpsRequest) {
@@ -387,7 +385,7 @@ public class HttpClient implements Runnable {
                     ch.setOption(StandardSocketOptions.TCP_NODELAY, Boolean.TRUE);
                     ch.configureBlocking(false);
                     boolean connected = ch.connect(job.addr);
-                    job.isConnected = connected;
+                    job.setConnected(connected);
                     numConnections++;
                     // if connection is established immediatelly, should wait for write. Fix #98
                     job.key = ch.register(selector, connected ? OP_WRITE : OP_CONNECT, job);
