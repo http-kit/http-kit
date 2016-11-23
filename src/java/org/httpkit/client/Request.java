@@ -19,7 +19,7 @@ public class Request implements Comparable<Request> {
     private boolean isDone = false;
 
     boolean isReuseConn = false; // a reused socket sent the request
-    boolean isConnected = false;
+    private boolean isConnected = false;
     SelectionKey key; // for timeout, close connection
 
     private long timeoutTs; // future time this request timeout, ms
@@ -31,14 +31,28 @@ public class Request implements Comparable<Request> {
         this.request = request;
         this.clients = clients;
         this.addr = addr;
-        this.timeoutTs = config.timeout + System.currentTimeMillis();
+        this.timeoutTs = config.connTimeout + System.currentTimeMillis();
+    }
+
+    public boolean isConnected() {
+        return isConnected;
+    }
+
+    public void setConnected(boolean isConnected) {
+        this.isConnected = isConnected;
+        // update timeout
+        long timeout = isConnected ? cfg.readTimeout : cfg.connTimeout;
+        clients.remove(this);
+        timeoutTs = cfg.readTimeout + System.currentTimeMillis();
+        clients.offer(this);
     }
 
     public void onProgress(long now) {
-        if (cfg.timeout + now - timeoutTs > 800) {
+        long timeout = isConnected ? cfg.readTimeout : cfg.connTimeout;
+        if (timeout + now - timeoutTs > 800) {
             // update time
             clients.remove(this);
-            timeoutTs = cfg.timeout + now;
+            timeoutTs = timeout + now;
             clients.offer(this);
         }
     }
