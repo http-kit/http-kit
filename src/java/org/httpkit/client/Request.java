@@ -43,7 +43,7 @@ public class Request implements Comparable<Request> {
         // update timeout
         long timeout = isConnected ? cfg.readTimeout : cfg.connTimeout;
         clients.remove(this);
-        timeoutTs = cfg.readTimeout + System.currentTimeMillis();
+        timeoutTs = timeout + System.currentTimeMillis();
         clients.offer(this);
     }
 
