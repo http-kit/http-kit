@@ -24,6 +24,8 @@
     :max-line           ; Max http inital line length
     :proxy-protocol     ; Proxy protocol e/o #{:disable :enable :optional}
     :worker-name-prefix ; Woker thread name prefix
+    :worker-pool        ; ExecutorService to use for request-handling (:thread,
+                          :worker-name-prefix, :queue-size are ignored if set)
     :error-logger       ; Arity-2 fn (args: string text, exception) to log errors
     :warn-logger        ; Arity-2 fn (args: string text, exception) to log warnings
     :event-logger       ; Arity-1 fn (arg: string event name)
@@ -31,7 +33,7 @@
 
   [handler
    & [{:keys [ip port thread queue-size max-body max-ws max-line
-              proxy-protocol worker-name-prefix
+              proxy-protocol worker-name-prefix worker-pool
               error-logger warn-logger event-logger event-names]
 
        :or   {ip         "0.0.0.0"
@@ -44,23 +46,25 @@
               proxy-protocol :disable
               worker-name-prefix "worker-"}}]]
 
-  (let [h (RingHandler. thread handler worker-name-prefix queue-size
-            (if error-logger
-              (reify ContextLogger
-                (log [this message error] (error-logger message error)))
-              ContextLogger/ERROR_PRINTER)
-            (if event-logger
-              (reify EventLogger
-                (log [this event] (event-logger event)))
-              EventLogger/NOP)
-            (cond
-              (nil? event-names) EventNames/DEFAULT
-              (map? event-names) (EventNames. event-names)
-              (instance? EventNames
-                event-names)     event-names
-              :otherwise         (throw (IllegalArgumentException.
-                                          (format "Invalid event-names: (%s) %s"
-                                            (class event-names) (pr-str event-names))))))
+  (let [cl (if error-logger
+             (reify ContextLogger
+               (log [this message error] (error-logger message error)))
+             ContextLogger/ERROR_PRINTER)
+        el (if event-logger
+             (reify EventLogger
+               (log [this event] (event-logger event)))
+             EventLogger/NOP)
+        en (cond
+             (nil? event-names) EventNames/DEFAULT
+             (map? event-names) (EventNames. event-names)
+             (instance? EventNames
+               event-names)     event-names
+             :otherwise         (throw (IllegalArgumentException.
+                                         (format "Invalid event-names: (%s) %s"
+                                           (class event-names) (pr-str event-names)))))
+        h (if worker-pool
+            (RingHandler. handler worker-pool cl el en)
+            (RingHandler. thread handler worker-name-prefix queue-size cl el en))
         proxy-enum (case proxy-protocol
                      :enable   ProxyProtocolOption/ENABLED
                      :disable  ProxyProtocolOption/DISABLED

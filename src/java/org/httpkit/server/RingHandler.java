@@ -195,6 +195,10 @@ public class RingHandler implements IHandler {
     final EventLogger<String> eventLogger;
     final EventNames eventNames;
 
+    public RingHandler(IFn handler, ExecutorService execs) {
+        this(handler, execs, ContextLogger.ERROR_PRINTER, EventLogger.NOP, EventNames.DEFAULT);
+    }
+
     public RingHandler(int thread, IFn handler, String prefix, int queueSize) {
         this(thread, handler, prefix, queueSize, ContextLogger.ERROR_PRINTER, EventLogger.NOP, EventNames.DEFAULT);
     }
@@ -208,6 +212,15 @@ public class RingHandler implements IHandler {
         BlockingQueue<Runnable> queue = new ArrayBlockingQueue<Runnable>(queueSize);
         execs = new ThreadPoolExecutor(thread, thread, 0, TimeUnit.MILLISECONDS, queue, factory);
         this.handler = handler;
+    }
+
+    public RingHandler(IFn handler, ExecutorService execs,
+            ContextLogger<String, Throwable> errorLogger, EventLogger<String> eventLogger, EventNames eventNames) {
+        this.handler = handler;
+        this.execs = execs;
+        this.errorLogger = errorLogger;
+        this.eventLogger = eventLogger;
+        this.eventNames = eventNames;
     }
 
     public void handle(HttpRequest req, RespCallback cb) {

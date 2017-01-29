@@ -13,7 +13,8 @@
             [org.httpkit.client :as client]
             [clj-http.util :as u])
   (:import [java.io File FileOutputStream FileInputStream]
-           org.httpkit.SpecialHttpClient))
+           org.httpkit.SpecialHttpClient
+           (java.util.concurrent ThreadPoolExecutor TimeUnit ArrayBlockingQueue)))
 
 (defn file-handler [req]
   {:status 200
@@ -380,4 +381,15 @@
                           (catch Exception e {:status "fail"})))]
     (Thread/sleep 100)
     (server :timeout 3000)
+    (is (= 200 (:status @resp)))))
+
+(deftest test-use-external-thread-pool
+  (let [test-pool (ThreadPoolExecutor. 1, 1, 0, TimeUnit/MILLISECONDS, (ArrayBlockingQueue. 1))
+        server (run-server (site test-routes) {:worker-pool test-pool
+                                               :port 3474})
+        resp (future (try (http/get "http://localhost:3474/")
+                          (catch Exception e {:status "fail"})))]
+    (Thread/sleep 100)
+    (server)
+    (is (= "hello world" (:body @resp)))
     (is (= 200 (:status @resp)))))
