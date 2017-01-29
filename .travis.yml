@@ -1,3 +1,0 @@
-language: clojure
-lein: lein
-script: lein test :travis

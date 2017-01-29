@@ -1,3 +1,97 @@
+## 2.2.0 (2016 Jul 12)
+
+```clojure
+[http-kit "2.2.0"]
+```
+
+This is the big one; the first **stable** http-kit release published by [contributors](https://github.com/http-kit/http-kit/commits/master)!
+
+This should be a **non-breaking upgrade from 2.1.19** but, as always, please report any unexpected problems. Thanks!
+
+\- Peter Taoussanis (@ptaoussanis)
+
+> Changes since **2.1.19** (the last stable release published by @shenfeng)
+
+#### New stuff
+
+* [#236] Server: add proxy protocol support (@tendant)
+* [#283] Server: allow overwriting "Server" response header (@skazhy)
+* [#285] Server: add `send-websocket-handshake!` util for pre-handshake auth, etc.
+* [#201] Client: add support for optional unsafe redirects (@dzaharee)
+* [#275] Client: add proxy support (@davidkazlauskas, @jbristow)
+* [#280 #281 #291] Client: allow https requests through proxy, tunneling (@jshaw86, @jbristow)
+* [#297] Client: allow multipart entity to support byte arrays (@vincentjames501)
+* [#297] Client: allow setting multipart content type (@vincentjames501)
+* [#293] Client: add max connections support (@ryfow)
+
+#### General improvements
+
+* [#130] Server: can now respond to `HTTP_1.1/Expect: 100-continue` headers (@valentini)
+* [#216] Server: optimization, remove an unnecessary operation (@songsd)
+* [#217] Client: more accurate timeout handling (@mbarbon)
+* [#234] Client: catch Throwable when delivering client response (@msassak)
+* [#185] Client: do not set client mode on SSLEngine if already set (@izarov)
+* [#261 #203] Client: updated documentation on request function (@javahippie)
+* [#274 #272] Client: make HttpClient class non-final (@kumarshantanu)
+* [#266] Project: fix #189 - include Java source files in the JAR (@kumarshantanu)
+
+#### Fixes
+
+* [#259 #227] Server: reset decoder after starting the close handshake for the websocket server (@venantius)
+* [#258 #148] Server: remind the selector to wake up (@venantius)
+* [#248] Server: correctly reset fragmentedOpCode on WS frame completion (@daviesian)
+* [#250] Server: omit invalid headers and prevent possible exceptions (e.g., NullPointerException) (@Chienlung)
+* [#255] Server: fixed empty sequence NPE, added test (@leblowl)
+* [#264 #219] Client: set SO_KEEPALIVE and TCP_NODELAY for client socket (@jruthe)
+* [#264 #209] Client: clear query and form params on 301-303 redirects (@jruthe)
+* [#254] Server: byteBuffer is 0-based (@Thingographist)
+* [#190] Server: transfer-Encoding is only supported in HTTP Version 1.1 (@jenshaase)
+
+## 2.2.0-beta1 (2016 Jun 21)
+
+```clojure
+[http-kit "2.2.0-beta1"]
+```
+
+**Feature freeze**: this is expected to be the final release before `v2.2.0-RC1`.
+
+> Changes since `*2.2.0-alpha2`:
+
+### New stuff
+
+* [#297] Client: allow multipart entity to support byte arrays (@vincentjames501)
+* [#297] Client: allow setting multipart content type (@vincentjames501)
+* [#293] Client: add max connections support (@ryfow)
+
+## 2.2.0-alpha2 (2016 Jun 8)
+
+```clojure
+[http-kit "2.2.0-alpha2"]
+```
+
+This should be a non-breaking upgrade from **2.2.0-alpha1** but **please evaluate before using in production**.
+
+Thank you to all [contributors for this release](https://github.com/http-kit/http-kit/commits/master)!
+
+\- Peter Taoussanis (@ptaoussanis)
+
+> Listed changes are relative to **2.2.0-alpha1**:
+
+#### New stuff
+
+* [#275] Client: add proxy support (@davidkazlauskas, @jbristow)
+* [#280 #281 #291] Client: allow https requests through proxy, tunneling (@jshaw86, @jbristow)
+* [#283] Server: allow overwriting "Server" response header (@skazhy)
+
+#### General improvements
+
+* [#274 #272] Make HttpClient class non-final (@kumarshantanu)
+
+#### Fixes
+
+* [#190] Transfer-Encoding is only supported in HTTP Version 1.1 (@jenshaase)
+
+
 ## 2.2.0-alpha1 (2016 Mar 3)
 
 ```clojure
@@ -6,11 +100,11 @@
 
 This is a **major release** that *should* be non-breaking but **may require testing**. Please evaluate before using in production (and **please report any problems!**).
 
-A big thank you to all the [contributors for this release][https://github.com/http-kit/http-kit/commits/master]!
+A big thank you to all the [contributors for this release](https://github.com/http-kit/http-kit/commits/master)!
 
 \- Peter Taoussanis (@ptaoussanis)
 
-> Listed changes are relative to last stable release (**2.1.19**)
+> Listed changes are relative to **2.1.19**:
 
 #### New stuff
 

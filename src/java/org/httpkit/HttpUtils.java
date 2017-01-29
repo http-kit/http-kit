@@ -258,6 +258,14 @@ public class HttpUtils {
         return host;
     }
 
+    public static String getProxyHost(URI uri){
+        if (uri.getPort() == -1){
+            return uri.getHost();
+        }
+
+        return uri.getHost() + ":" + uri.getPort();
+    }
+
     public static InetSocketAddress getServerAddr(URI uri) throws UnknownHostException {
         InetAddress host = getByName(uri.getHost());
         return new InetSocketAddress(host, getPort(uri));
@@ -448,7 +456,9 @@ public class HttpUtils {
             headers.put(CL, Integer.toString(b.length));
             bodyBuffer = ByteBuffer.wrap(b);
         }
-        headers.put("Server", "http-kit");
+        if (!headers.containsKey("Server")) {
+          headers.put("Server", "http-kit");
+        }
         headers.put("Date", DateFormatter.getDate()); // rfc says the Date is needed
 
         DynamicBytes bytes = new DynamicBytes(196);
