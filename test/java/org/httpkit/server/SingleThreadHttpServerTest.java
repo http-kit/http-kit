@@ -30,7 +30,7 @@ class SingleThreadHandler implements IHandler {
 
     }
 
-    public void clientClose(AsyncChannel channel, int status) {
+    public void clientClose(AsyncChannel channel, int status, boolean currentThread) {
     }
 }
 
