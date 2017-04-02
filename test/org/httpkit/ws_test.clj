@@ -119,7 +119,7 @@
               (is false))))
         (let [d (subs const-string 0 120)]
           (is (= d (.ping client d)))
-          (is (= d (.pong client d))))))
+          (.pong client d))))
     (.close client)))
 
 (deftest test-sent-message-in-body      ; issue #14
