@@ -39,18 +39,21 @@ public class Request implements Comparable<Request> {
     }
 
     public void setConnected(boolean isConnected) {
-        this.isConnected = isConnected;
-        // update timeout
-        long timeout = isConnected ? cfg.readTimeout : cfg.connTimeout;
-        clients.remove(this);
-        timeoutTs = timeout + System.currentTimeMillis();
-        clients.offer(this);
+        if (this.isConnected != isConnected) {
+          this.isConnected = isConnected;
+
+          // update timeout
+          long timeout = isConnected ? cfg.readTimeout : cfg.connTimeout;
+          clients.remove(this);
+          timeoutTs = timeout + System.currentTimeMillis();
+          clients.offer(this);
+        }
     }
 
     public void onProgress(long now) {
         long timeout = isConnected ? cfg.readTimeout : cfg.connTimeout;
         if (timeout + now - timeoutTs > 800) {
-            // update time
+            // update timeout
             clients.remove(this);
             timeoutTs = timeout + now;
             clients.offer(this);

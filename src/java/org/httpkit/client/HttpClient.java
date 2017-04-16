@@ -74,8 +74,9 @@ public class HttpClient implements Runnable {
         Request r;
         while ((r = requests.peek()) != null) {
             if (r.isTimeout(now)) {
-                String msg = r.isConnected() ? "read timeout: " : "connect timeout: ";
-                long timeout = r.isConnected() ? r.cfg.readTimeout : r.cfg.connTimeout;
+                boolean connected = r.isConnected();
+                String msg = connected ? "read timeout: " : "connect timeout: ";
+                long timeout = connected ? r.cfg.readTimeout : r.cfg.connTimeout;
                 // will remove it from queue
                 r.finish(new TimeoutException(msg + timeout + "ms"));
                 if (r.key != null) {
