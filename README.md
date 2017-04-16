@@ -9,7 +9,7 @@
 [http-kit "2.1.19"] ; Legacy, last release published by @shenfeng
 ```
 
-See [http-kit.org](http://http-kit.org) for documentation, examples, benchmarks, etc. (may be a little out of date).
+See [http-kit.org](http://http-kit.org) for documentation, examples, benchmarks, etc. (no longer maintained, some examples may contain minor bugs).
 
 ## Project status
 
