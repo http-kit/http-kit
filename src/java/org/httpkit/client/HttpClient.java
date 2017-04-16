@@ -75,8 +75,8 @@ public class HttpClient implements Runnable {
         while ((r = requests.peek()) != null) {
             if (r.isTimeout(now)) {
                 boolean connected = r.isConnected();
-                String msg = connected ? "read timeout: " : "connect timeout: ";
-                long timeout = connected ? r.cfg.readTimeout : r.cfg.connTimeout;
+                String msg = connected ? "idle timeout: " : "connect timeout: ";
+                long timeout = connected ? r.cfg.idleTimeout : r.cfg.connTimeout;
                 // will remove it from queue
                 r.finish(new TimeoutException(msg + timeout + "ms"));
                 if (r.key != null) {
@@ -186,7 +186,8 @@ public class HttpClient implements Runnable {
         numConnections--;
     }
 
-    private void doWrite(SelectionKey key) {
+    private void doWrite(SelectionKey key, long now) {
+        // TODO [#327]: call `onProgress(now)` on write progress?
         Request req = (Request) key.attachment();
         SocketChannel ch = (SocketChannel) key.channel();
         try {
@@ -424,7 +425,7 @@ public class HttpClient implements Runnable {
                         } else if (key.isReadable()) {
                             doRead(key, now);
                         } else if (key.isWritable()) {
-                            doWrite(key);
+                            doWrite(key, now);
                         }
                         ite.remove();
                     }

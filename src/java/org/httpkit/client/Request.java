@@ -42,8 +42,8 @@ public class Request implements Comparable<Request> {
         if (this.isConnected != isConnected) {
           this.isConnected = isConnected;
 
-          // update timeout
-          long timeout = isConnected ? cfg.readTimeout : cfg.connTimeout;
+          // Switch timeout type
+          long timeout = isConnected ? cfg.idleTimeout : cfg.connTimeout;
           clients.remove(this);
           timeoutTs = timeout + System.currentTimeMillis();
           clients.offer(this);
@@ -51,9 +51,9 @@ public class Request implements Comparable<Request> {
     }
 
     public void onProgress(long now) {
-        long timeout = isConnected ? cfg.readTimeout : cfg.connTimeout;
+        long timeout = isConnected ? cfg.idleTimeout : cfg.connTimeout;
         if (timeout + now - timeoutTs > 800) {
-            // update timeout
+            // Extend timeout on activity
             clients.remove(this);
             timeoutTs = timeout + now;
             clients.offer(this);

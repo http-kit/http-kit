@@ -135,15 +135,15 @@
   (request {:url \"http://site.com/string.txt\" :as :auto})
 
   Request options:
-    :url :method :headers :timeout :conn-timeout :read-timeout :query-params :as
-    :form-params :client :body :basic-auth :user-agent :filter :worker-pool"
-  [{:keys [client timeout conn-timeout read-timeout filter worker-pool keepalive as follow-redirects
+    :url :method :headers :timeout :connect-timeout :idle-timeout :query-params
+    :as :form-params :client :body :basic-auth :user-agent :filter :worker-pool"
+  [{:keys [client timeout connect-timeout idle-timeout filter worker-pool keepalive as follow-redirects
            max-redirects response trace-redirects allow-unsafe-redirect-methods proxy-host proxy-port
            proxy-url tunnel?]
     :as opts
     :or {client @default-client
-         conn-timeout 60000
-         read-timeout 60000
+         connect-timeout 60000
+         idle-timeout 60000
          follow-redirects true
          max-redirects 10
          filter IFilter/ACCEPT_ALL
@@ -195,9 +195,10 @@
                                 ;; only the 4 support now
                                 (case as :auto 1 :text 2 :stream 3 :byte-array 4))
         effective-proxy-url (if proxy-host (str proxy-host ":" proxy-port) proxy-url)
-        conn-timeout (or timeout conn-timeout)
-        read-timeout (or timeout read-timeout)
-        cfg (RequestConfig. method headers body conn-timeout read-timeout keepalive effective-proxy-url tunnel?)]
+        connect-timeout (or timeout connect-timeout)
+        idle-timeout    (or timeout idle-timeout)
+        cfg (RequestConfig. method headers body connect-timeout idle-timeout
+              keepalive effective-proxy-url tunnel?)]
     (.exec ^HttpClient client url cfg sslengine listener)
     response))
 
