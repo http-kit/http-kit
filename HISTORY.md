@@ -1,3 +1,29 @@
+## 2.3.0-alpha2 (2017 Apr 16)
+
+```clojure
+[http-kit "2.3.0-alpha2"]
+```
+
+> This is a major **feature and maintenance release**. Please test carefully and report any bugs!
+
+#### New stuff
+
+* [#315] Client: now have separate `:connect-timeout` and `:idle-timeout` opts (@kmate)
+* [#307 #231] Server: add :worker-pool opt (@kaibra)
+* [#309 #310] Server: add missing 'MKCOL' http method enum (@zilti)
+* [#329] Client: support numbers in multipart messages, and throw on unkown multipart params types (@dmichulke)
+* [#300] Server: add getCount method to BytesInputStream (@MysteryMachine)
+
+#### General improvements
+
+* [#330] Server: don't override Date header if it's been set by application (@ryfow)
+* [#303] Client: replace :proxy-host, :proxy-port -> :proxy-url (@taso42)
+
+#### Fixes
+
+* [#332 #322] Server: do not respond to unsolicited pong frames (@mikkosuonio)
+* [#319] Server: fix the 'Close received after close' issue for WS implementation (@zhming0)
+
 ## 2.2.0 (2016 Jul 12)
 
 ```clojure
