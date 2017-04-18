@@ -1,5 +1,14 @@
 package org.httpkit.server;
 
+import static java.nio.channels.SelectionKey.OP_ACCEPT;
+import static java.nio.channels.SelectionKey.OP_READ;
+import static java.nio.channels.SelectionKey.OP_WRITE;
+import static org.httpkit.HttpUtils.HttpEncode;
+import static org.httpkit.HttpUtils.WsEncode;
+import static org.httpkit.server.Frame.CloseFrame.CLOSE_AWAY;
+import static org.httpkit.server.Frame.CloseFrame.CLOSE_MESG_BIG;
+import static org.httpkit.server.Frame.CloseFrame.CLOSE_NORMAL;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -16,15 +25,17 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.httpkit.HeaderMap;
-import org.httpkit.HttpUtils;
 import org.httpkit.LineTooLargeException;
 import org.httpkit.ProtocolException;
 import org.httpkit.RequestTooLargeException;
-
-import static java.nio.channels.SelectionKey.*;
-import static org.httpkit.HttpUtils.HttpEncode;
-import static org.httpkit.HttpUtils.WsEncode;
-import static org.httpkit.server.Frame.CloseFrame.*;
+import org.httpkit.logger.ContextLogger;
+import org.httpkit.logger.EventNames;
+import org.httpkit.logger.EventLogger;
+import org.httpkit.server.Frame.BinaryFrame;
+import org.httpkit.server.Frame.CloseFrame;
+import org.httpkit.server.Frame.PingFrame;
+import org.httpkit.server.Frame.PongFrame;
+import org.httpkit.server.Frame.TextFrame;
 
 class PendingKey {
     public final SelectionKey key;
@@ -62,9 +73,35 @@ public class HttpServer implements Runnable {
     // shared, single thread
     private final ByteBuffer buffer = ByteBuffer.allocateDirect(1024 * 64 - 1);
 
+    private final ContextLogger<String, Throwable> errorLogger;
+    private final ContextLogger<String, Throwable> warnLogger;
+    private final EventLogger<String> eventLogger;
+    private final EventNames eventNames;
+
+    public static final ContextLogger<String, Throwable> DEFAULT_WARN_LOGGER = new ContextLogger<String, Throwable>() {
+        @Override
+        public void log(String event, Throwable e) {
+            System.err.printf("%s [%s] WARN - %s\n", new Date(), THREAD_NAME, e.getMessage());
+        }
+    };
+
     public HttpServer(String ip, int port, IHandler handler, int maxBody, int maxLine, int maxWs,
                       ProxyProtocolOption proxyProtocolOption)
             throws IOException {
+        this(ip, port, handler, maxBody, maxLine, maxWs, proxyProtocolOption,
+                ContextLogger.ERROR_PRINTER, DEFAULT_WARN_LOGGER, EventLogger.NOP, EventNames.DEFAULT);
+    }
+
+    public HttpServer(String ip, int port, IHandler handler, int maxBody, int maxLine, int maxWs,
+                      ProxyProtocolOption proxyProtocolOption,
+                      ContextLogger<String, Throwable> errorLogger,
+                      ContextLogger<String, Throwable> warnLogger,
+                      EventLogger<String> eventLogger, EventNames eventNames)
+            throws IOException {
+        this.errorLogger = errorLogger;
+        this.warnLogger = warnLogger;
+        this.eventLogger = eventLogger;
+        this.eventNames = eventNames;
         this.handler = handler;
         this.maxLine = maxLine;
         this.maxBody = maxBody;
@@ -90,7 +127,8 @@ public class HttpServer implements Runnable {
             }
         } catch (Exception e) {
             // eg: too many open files. do not quit
-            HttpUtils.printError("accept incoming request", e);
+            errorLogger.log("accept incoming request", e);
+            eventLogger.log(eventNames.serverAcceptError);
         }
     }
 
@@ -135,9 +173,11 @@ public class HttpServer implements Runnable {
             closeKey(key, -1);
         } catch (RequestTooLargeException e) {
             atta.keepalive = false;
+            eventLogger.log(eventNames.serverStatus413);
             tryWrite(key, HttpEncode(413, new HeaderMap(), e.getMessage()));
         } catch (LineTooLargeException e) {
             atta.keepalive = false; // close after write
+            eventLogger.log(eventNames.serverStatus414);
             tryWrite(key, HttpEncode(414, new HeaderMap(), e.getMessage()));
         }
     }
@@ -171,7 +211,8 @@ public class HttpServer implements Runnable {
                 }
             } while (buffer.hasRemaining()); // consume all
         } catch (ProtocolException e) {
-            System.err.printf("%s [%s] WARN - %s\n", new Date(), THREAD_NAME, e.getMessage());
+            warnLogger.log(null, e);
+            eventLogger.log(eventNames.serverWsDecodeError);
             closeKey(key, CLOSE_MESG_BIG); // TODO more specific error
         }
     }
@@ -315,7 +356,8 @@ public class HttpServer implements Runnable {
                 // do not exits the while IO event loop. if exits, then will not process any IO event
                 // jvm can catch any exception, including OOM
             } catch (Throwable e) { // catch any exception(including OOM), print it
-                HttpUtils.printError("http server loop error, should not happen", e);
+                errorLogger.log("http server loop error, should not happen", e);
+                eventLogger.log(eventNames.serverLoopError);
             }
         }
     }

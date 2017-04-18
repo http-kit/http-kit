@@ -1,20 +1,34 @@
 package org.httpkit.server;
 
-import clojure.lang.*;
-import org.httpkit.HeaderMap;
-import org.httpkit.HttpUtils;
-import org.httpkit.PrefixThreadFactory;
-
-import java.util.Map;
-import java.util.TreeMap;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicReference;
-
 import static clojure.lang.Keyword.intern;
 import static org.httpkit.HttpUtils.HttpEncode;
 import static org.httpkit.HttpVersion.HTTP_1_0;
-import static org.httpkit.server.ClojureRing.*;
-import static org.httpkit.server.Frame.TextFrame;
+import static org.httpkit.server.ClojureRing.BODY;
+import static org.httpkit.server.ClojureRing.HEADERS;
+import static org.httpkit.server.ClojureRing.buildRequestMap;
+import static org.httpkit.server.ClojureRing.getStatus;
+
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+
+import org.httpkit.HeaderMap;
+import org.httpkit.PrefixThreadFactory;
+import org.httpkit.logger.ContextLogger;
+import org.httpkit.logger.EventNames;
+import org.httpkit.logger.EventLogger;
+import org.httpkit.server.Frame.TextFrame;
+
+import clojure.lang.IFn;
+import clojure.lang.IPersistentMap;
+import clojure.lang.Keyword;
+import clojure.lang.PersistentArrayMap;
 
 @SuppressWarnings({"rawtypes", "unchecked"})
 class ClojureRing {
@@ -80,10 +94,18 @@ class HttpHandler implements Runnable {
     final RespCallback cb;
     final IFn handler;
 
-    public HttpHandler(HttpRequest req, RespCallback cb, IFn handler) {
+    final ContextLogger<String, Throwable> errorLogger;
+    final EventLogger<String> eventLogger;
+    final EventNames eventNames;
+
+    public HttpHandler(HttpRequest req, RespCallback cb, IFn handler,
+            ContextLogger<String, Throwable> errorLogger, EventLogger<String> eventLogger, EventNames eventNames) {
         this.req = req;
         this.cb = cb;
         this.handler = handler;
+        this.errorLogger = errorLogger;
+        this.eventLogger = eventLogger;
+        this.eventNames = eventNames;
     }
 
     public void run() {
@@ -91,6 +113,7 @@ class HttpHandler implements Runnable {
             Map resp = (Map) handler.invoke(buildRequestMap(req));
             if (resp == null) { // handler return null
                 cb.run(HttpEncode(404, new HeaderMap(), null));
+                eventLogger.log(eventNames.serverStatus404);
             } else {
                 Object body = resp.get(BODY);
                 if (!(body instanceof AsyncChannel)) { // hijacked
@@ -98,12 +121,15 @@ class HttpHandler implements Runnable {
                     if (req.version == HTTP_1_0 && req.isKeepAlive) {
                         headers.put("Connection", "Keep-Alive");
                     }
-                    cb.run(HttpEncode(getStatus(resp), headers, body));
+                    final int status = getStatus(resp);
+                    cb.run(HttpEncode(status, headers, body));
+                    eventLogger.log(eventNames.serverStatusPrefix + status);
                 }
             }
         } catch (Throwable e) {
             cb.run(HttpEncode(500, new HeaderMap(), e.getMessage()));
-            HttpUtils.printError(req.method + " " + req.uri, e);
+            errorLogger.log(req.method + " " + req.uri, e);
+            eventLogger.log(eventNames.serverStatus500);
         }
     }
 }
@@ -132,9 +158,18 @@ class WSHandler implements Runnable {
     private Frame frame;
     private AsyncChannel channel;
 
-    protected WSHandler(AsyncChannel channel, Frame frame) {
+    private final ContextLogger<String, Throwable> errorLogger;
+    private final EventLogger<String> eventLogger;
+    private final EventNames eventNames;
+
+    protected WSHandler(AsyncChannel channel, Frame frame,
+            ContextLogger<String, Throwable> errorLogger,
+            EventLogger<String> eventLogger, EventNames eventNames) {
         this.channel = channel;
         this.frame = frame;
+        this.errorLogger = errorLogger;
+        this.eventLogger = eventLogger;
+        this.eventNames = eventNames;
     }
 
     @Override
@@ -146,7 +181,8 @@ class WSHandler implements Runnable {
                 channel.messageReceived(frame.data);
             }
         } catch (Throwable e) {
-            HttpUtils.printError("handle websocket frame " + frame, e);
+            errorLogger.log("handle websocket frame " + frame, e);
+            eventLogger.log(eventNames.serverWsFrameError);
         }
     }
 }
@@ -155,23 +191,44 @@ public class RingHandler implements IHandler {
     final ExecutorService execs;
     final IFn handler;
 
+    final ContextLogger<String, Throwable> errorLogger;
+    final EventLogger<String> eventLogger;
+    final EventNames eventNames;
+
     public RingHandler(IFn handler, ExecutorService execs) {
-        this.execs = execs;
-        this.handler = handler;
+        this(handler, execs, ContextLogger.ERROR_PRINTER, EventLogger.NOP, EventNames.DEFAULT);
     }
 
     public RingHandler(int thread, IFn handler, String prefix, int queueSize) {
+        this(thread, handler, prefix, queueSize, ContextLogger.ERROR_PRINTER, EventLogger.NOP, EventNames.DEFAULT);
+    }
+
+    public RingHandler(int thread, IFn handler, String prefix, int queueSize,
+            ContextLogger<String, Throwable> errorLogger, EventLogger<String> eventLogger, EventNames eventNames) {
+        this.errorLogger = errorLogger;
+        this.eventLogger = eventLogger;
+        this.eventNames = eventNames;
         PrefixThreadFactory factory = new PrefixThreadFactory(prefix);
         BlockingQueue<Runnable> queue = new ArrayBlockingQueue<Runnable>(queueSize);
         execs = new ThreadPoolExecutor(thread, thread, 0, TimeUnit.MILLISECONDS, queue, factory);
         this.handler = handler;
     }
 
+    public RingHandler(IFn handler, ExecutorService execs,
+            ContextLogger<String, Throwable> errorLogger, EventLogger<String> eventLogger, EventNames eventNames) {
+        this.handler = handler;
+        this.execs = execs;
+        this.errorLogger = errorLogger;
+        this.eventLogger = eventLogger;
+        this.eventNames = eventNames;
+    }
+
     public void handle(HttpRequest req, RespCallback cb) {
         try {
-            execs.submit(new HttpHandler(req, cb, handler));
+            execs.submit(new HttpHandler(req, cb, handler, errorLogger, eventLogger, eventNames));
         } catch (RejectedExecutionException e) {
-            HttpUtils.printError("increase :queue-size if this happens often", e);
+            errorLogger.log("increase :queue-size if this happens often", e);
+            eventLogger.log(eventNames.serverStatus503);
             cb.run(HttpEncode(503, new HeaderMap(), "Server is overloaded, please try later"));
         }
     }
@@ -193,7 +250,7 @@ public class RingHandler implements IHandler {
     }
 
     public void handle(AsyncChannel channel, Frame frame) {
-        WSHandler task = new WSHandler(channel, frame);
+        WSHandler task = new WSHandler(channel, frame, errorLogger, eventLogger, eventNames);
 
         // messages from the same client are handled orderly
         LinkingRunnable job = new LinkingRunnable(task);
@@ -210,7 +267,8 @@ public class RingHandler implements IHandler {
             }
         } catch (RejectedExecutionException e) {
             // TODO notify client if server is overloaded
-            HttpUtils.printError("increase :queue-size if this happens often", e);
+            errorLogger.log("increase :queue-size if this happens often", e);
+            eventLogger.log(eventNames.serverStatus503Todo);
         }
     }
 
@@ -225,7 +283,8 @@ public class RingHandler implements IHandler {
                             try {
                                 channel.onClose(status);
                             } catch (Exception e) {
-                                HttpUtils.printError("on close handler", e);
+                                errorLogger.log("on close handler", e);
+                                eventLogger.log(eventNames.serverChannelCloseError);
                             }
                         }
                     });
@@ -244,10 +303,12 @@ public class RingHandler implements IHandler {
                         try {
                             channel.onClose(status);  // do it in current thread
                         } catch (Exception e1) {
-                            HttpUtils.printError("on close handler", e);
+                            errorLogger.log("on close handler", e);
+                            eventLogger.log(eventNames.serverChannelCloseError);
                         }
                     } else {
-                        HttpUtils.printError("increase :queue-size if this happens often", e);
+                        errorLogger.log("increase :queue-size if this happens often", e);
+                        eventLogger.log(eventNames.serverStatus503Todo);
                     }
                 }
             } else {
