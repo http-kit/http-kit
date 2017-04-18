@@ -98,13 +98,12 @@
 (defonce default-client (delay (HttpClient.)))
 
 (defn make-client
-  "Make a client with specified options.
-  Options:
-    :max-connections    ; max connection count, default is unlimited (-1)
-    :address-finder     ; Arity-1 fn (arg: java.net.URI object) to return java.net.InetSocketAddress instance
-    :error-logger       ; Arity-2 fn (args: string text, exception) to log errors
-    :event-logger       ; Arity-1 fn (arg: string event name)
-    :event-names        ; map of HTTP-Kit event names to respective loggable event names"
+  "Returns an HttpClient with specified options:
+    :max-connections    ; Max connection count, default is unlimited (-1)
+    :address-finder     ; (fn [java.net.uri]) -> java.net.InetSocketAddress
+    :error-logger       ; (fn [text ex])
+    :event-logger       ; (fn [event-name])
+    :event-names        ; {<http-kit-event-name> <loggable-event-name}"
   [{:keys [max-connections
            address-finder
            error-logger
