@@ -1,5 +1,6 @@
 (ns org.httpkit.server
   (:import [org.httpkit.server AsyncChannel HttpServer RingHandler ProxyProtocolOption]
+           [org.httpkit.logger ContextLogger EventLogger EventNames]
            javax.xml.bind.DatatypeConverter
            java.security.MessageDigest))
 
@@ -24,11 +25,16 @@
     :proxy-protocol     ; Proxy protocol e/o #{:disable :enable :optional}
     :worker-name-prefix ; Woker thread name prefix
     :worker-pool        ; ExecutorService to use for request-handling (:thread,
-                          :worker-name-prefix, :queue-size are ignored if set)"
+                          :worker-name-prefix, :queue-size are ignored if set)
+    :error-logger       ; Arity-2 fn (args: string text, exception) to log errors
+    :warn-logger        ; Arity-2 fn (args: string text, exception) to log warnings
+    :event-logger       ; Arity-1 fn (arg: string event name)
+    :event-names        ; map of HTTP-Kit event names to respective loggable event names"
 
   [handler
    & [{:keys [ip port thread queue-size max-body max-ws max-line
-              proxy-protocol worker-name-prefix worker-pool]
+              proxy-protocol worker-name-prefix worker-pool
+              error-logger warn-logger event-logger event-names]
 
        :or   {ip         "0.0.0.0"
               port       8090
@@ -40,15 +46,38 @@
               proxy-protocol :disable
               worker-name-prefix "worker-"}}]]
 
-  (let [h (if worker-pool
-            (RingHandler. handler worker-pool)
-            (RingHandler. thread handler worker-name-prefix queue-size))
+  (let [err-logger (if error-logger
+                     (reify ContextLogger
+                       (log [this message error] (error-logger message error)))
+                     ContextLogger/ERROR_PRINTER)
+        evt-logger (if event-logger
+                     (reify EventLogger
+                       (log [this event] (event-logger event)))
+                     EventLogger/NOP)
+        evt-names  (cond
+                     (nil? event-names) EventNames/DEFAULT
+                     (map? event-names) (EventNames. event-names)
+                     (instance? EventNames
+                       event-names)     event-names
+                     :otherwise         (throw (IllegalArgumentException.
+                                                 (format "Invalid event-names: (%s) %s"
+                                                   (class event-names) (pr-str event-names)))))
+        h (if worker-pool
+            (RingHandler. handler worker-pool err-logger evt-logger evt-names)
+            (RingHandler. thread handler worker-name-prefix queue-size err-logger evt-logger evt-names))
         proxy-enum (case proxy-protocol
                      :enable   ProxyProtocolOption/ENABLED
                      :disable  ProxyProtocolOption/DISABLED
                      :optional ProxyProtocolOption/OPTIONAL)
 
-        s (HttpServer. ip port h max-body max-line max-ws proxy-enum)]
+        s (HttpServer. ip port h max-body max-line max-ws proxy-enum
+            err-logger
+            (if warn-logger
+              (reify ContextLogger
+                (log [this message error] (warn-logger message error)))
+              HttpServer/DEFAULT_WARN_LOGGER)
+            evt-logger
+            evt-names)]
 
     (.start s)
     (with-meta
