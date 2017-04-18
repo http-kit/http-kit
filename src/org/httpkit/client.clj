@@ -141,8 +141,7 @@
            max-redirects response trace-redirects allow-unsafe-redirect-methods proxy-host proxy-port
            proxy-url tunnel?]
     :as opts
-    :or {client @default-client
-         connect-timeout 60000
+    :or {connect-timeout 60000
          idle-timeout 60000
          follow-redirects true
          max-redirects 10
@@ -156,7 +155,8 @@
          proxy-port -1
          proxy-url nil}}
    & [callback]]
-  (let [{:keys [url method headers body sslengine]} (coerce-req opts)
+  (let [client (or (:client opts) @default-client)
+        {:keys [url method headers body sslengine]} (coerce-req opts)
         deliver-resp #(deliver response ;; deliver the result
                                (try ((or callback identity) %1)
                                     (catch Throwable e
