@@ -2,6 +2,9 @@ package org.httpkit.client;
 
 import org.httpkit.*;
 import org.httpkit.ProtocolException;
+import org.httpkit.logger.ContextLogger;
+import org.httpkit.logger.EventNames;
+import org.httpkit.logger.EventLogger;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
@@ -53,11 +56,34 @@ public class HttpClient implements Runnable {
     private final ByteBuffer buffer = ByteBuffer.allocateDirect(1024 * 64);
     private final Selector selector;
 
+    private final ContextLogger<String, Throwable> errorLogger;
+    private final EventLogger<String> eventLogger;
+    private final EventNames eventNames;
+
+    public static interface AddressFinder {
+        InetSocketAddress findAddress(URI uri) throws UnknownHostException;
+    }
+
+    private final AddressFinder addressFinder;
+
+    public static final AddressFinder DEFAULT_ADDRESS_FINDER = new AddressFinder() {
+        public InetSocketAddress findAddress(URI uri) throws UnknownHostException {
+            return getServerAddr(uri);
+        }
+    };
+
     public HttpClient() throws IOException {
         this(-1);
     }
 
-    public HttpClient(long maxConnections) throws IOException {
+    public HttpClient(long maxConnections, AddressFinder addressFinder,
+            ContextLogger<String, Throwable> errorLogger,
+            EventLogger<String> eventLogger, EventNames eventNames) throws IOException {
+        this.addressFinder = addressFinder;
+        this.errorLogger = errorLogger;
+        this.eventLogger = eventLogger;
+        this.eventNames = eventNames;
+
         int id = ID.incrementAndGet();
         String name = "client-loop";
         if (id > 1) {
@@ -68,6 +94,10 @@ public class HttpClient implements Runnable {
         Thread t = new Thread(this, name);
         t.setDaemon(true);
         t.start();
+    }
+
+    public HttpClient(long maxConnections) throws IOException {
+        this(maxConnections, DEFAULT_ADDRESS_FINDER, ContextLogger.ERROR_PRINTER, EventLogger.NOP, EventNames.DEFAULT);
     }
 
     private void clearTimeout(long now) {
@@ -172,7 +202,8 @@ public class HttpClient implements Runnable {
             } catch (Exception e) {
                 closeQuietly(key);
                 req.finish(e);
-                HttpUtils.printError("should not happen", e); // decoding
+                errorLogger.log("should not happen", e); // decoding
+                eventLogger.log(eventNames.clientImpossible);
             }
         }
     }
@@ -247,9 +278,9 @@ public class HttpClient implements Runnable {
         InetSocketAddress addr;
         try {
             if (proxyUri == null) {
-                addr = getServerAddr(uri);
+                addr = addressFinder.findAddress(uri);
             } else {
-                addr = getServerAddr(proxyUri);
+                addr = addressFinder.findAddress(proxyUri);
             }
         } catch (UnknownHostException e) {
             cb.onThrowable(e);
@@ -433,7 +464,8 @@ public class HttpClient implements Runnable {
                 clearTimeout(now);
                 processPending();
             } catch (Throwable e) { // catch any exception (including OOM), print it: do not exits the loop
-                HttpUtils.printError("select exception, should not happen", e);
+                errorLogger.log("select exception, should not happen", e);
+                eventLogger.log(eventNames.clientImpossible);
             }
         }
     }

@@ -2,8 +2,9 @@
   (:refer-clojure :exclude [get proxy])
   (:require [clojure.string :as str])
   (:use [clojure.walk :only [prewalk]])
-  (:import [org.httpkit.client HttpClient IResponseHandler RespListener
+  (:import [org.httpkit.client HttpClient HttpClient$AddressFinder IResponseHandler RespListener
             IFilter RequestConfig]
+           [org.httpkit.logger ContextLogger EventLogger EventNames]
            [org.httpkit HttpMethod PrefixThreadFactory HttpUtils]
            [java.util.concurrent ThreadPoolExecutor LinkedBlockingQueue TimeUnit]
            [java.net URI URLEncoder]
@@ -96,6 +97,42 @@
 ;;; "Get the default client. Normally, you only need one client per application. You can config parameter per request basic"
 (defonce default-client (delay (HttpClient.)))
 
+(defn make-client
+  "Make a client with specified options.
+  Options:
+    :max-connections    ; max connection count, default is unlimited (-1)
+    :address-finder     ; Arity-1 fn (arg: java.net.URI object) to return java.net.InetSocketAddress instance
+    :error-logger       ; Arity-2 fn (args: string text, exception) to log errors
+    :event-logger       ; Arity-1 fn (arg: string event name)
+    :event-names        ; map of HTTP-Kit event names to respective loggable event names"
+  [{:keys [max-connections
+           address-finder
+           error-logger
+           event-logger
+           event-names]}]
+  (HttpClient.
+    (or max-connections -1)
+    (if address-finder
+      (reify HttpClient$AddressFinder
+        (findAddress [this uri] (address-finder uri)))
+      HttpClient/DEFAULT_ADDRESS_FINDER)
+    (if error-logger
+      (reify ContextLogger
+        (log [this message error] (error-logger message error)))
+      ContextLogger/ERROR_PRINTER)
+    (if event-logger
+      (reify EventLogger
+        (log [this event] (event-logger event)))
+      EventLogger/NOP)
+    (cond
+      (nil? event-names) EventNames/DEFAULT
+      (map? event-names) (EventNames. event-names)
+      (instance? EventNames
+        event-names)     event-names
+      :otherwise         (throw (IllegalArgumentException.
+                                  (format "Invalid event-names: (%s) %s"
+                                    (class event-names) (pr-str event-names)))))))
+
 (defn request
   "Issues an async HTTP request and returns a promise object to which the value
   of `(callback {:opts _ :status _ :headers _ :body _})` or
@@ -141,8 +178,7 @@
            max-redirects response trace-redirects allow-unsafe-redirect-methods proxy-host proxy-port
            proxy-url tunnel?]
     :as opts
-    :or {client @default-client
-         connect-timeout 60000
+    :or {connect-timeout 60000
          idle-timeout 60000
          follow-redirects true
          max-redirects 10
@@ -156,7 +192,8 @@
          proxy-port -1
          proxy-url nil}}
    & [callback]]
-  (let [{:keys [url method headers body sslengine]} (coerce-req opts)
+  (let [client (or client @default-client)  ; deref default-client ONLY when client not specified
+        {:keys [url method headers body sslengine]} (coerce-req opts)
         deliver-resp #(deliver response ;; deliver the result
                                (try ((or callback identity) %1)
                                     (catch Throwable e
