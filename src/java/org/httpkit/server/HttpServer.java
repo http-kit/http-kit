@@ -153,14 +153,21 @@ public class HttpServer implements Runnable {
                     atta.decoder.reset();
                     tryWrite(key, WsEncode(WSDecoder.OPCODE_PONG, frame.data));
                 } else if (frame instanceof PongFrame) {
+                    // ignored as unsolicited pong frame from client
                     atta.decoder.reset();
-                    tryWrite(key, WsEncode(WSDecoder.OPCODE_PING, frame.data));
                 } else if (frame instanceof CloseFrame) {
+                    // A snapshot
+                    boolean closed = atta.channel.isClosed();
                     handler.clientClose(atta.channel, ((CloseFrame) frame).getStatus());
                     // close the TCP connection after sent
                     atta.keepalive = false;
                     atta.decoder.reset();
-                    tryWrite(key, WsEncode(WSDecoder.OPCODE_CLOSE, frame.data));
+
+                    // Follow RFC6455 5.5.1 
+                    // Do not send CLOSE frame again if it has been sent.
+                    if (!closed) { 
+                        tryWrite(key, WsEncode(WSDecoder.OPCODE_CLOSE, frame.data));
+                    }
                 }
             } while (buffer.hasRemaining()); // consume all
         } catch (ProtocolException e) {

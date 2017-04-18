@@ -105,16 +105,9 @@ public class WebSocketClient {
         return frame;
     }
 
-    public String pong(String data) throws Exception {
+    public void pong(String data) throws Exception {
         byte[] bytes = data.getBytes();
         ch.write(new PongWebSocketFrame(ChannelBuffers.copiedBuffer(bytes)));
-        WebSocketFrame frame = queue.poll(5, TimeUnit.SECONDS);
-        if (frame instanceof PingWebSocketFrame) {
-            ChannelBuffer d = frame.getBinaryData();
-            return new String(d.array(), 0, d.readableBytes());
-        } else {
-            throw new Exception("pong frame expected, instead of " + frame);
-        }
     }
 
     public String ping(String data) throws Exception {

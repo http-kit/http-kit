@@ -459,8 +459,9 @@ public class HttpUtils {
         if (!headers.containsKey("Server")) {
           headers.put("Server", "http-kit");
         }
-        headers.put("Date", DateFormatter.getDate()); // rfc says the Date is needed
-
+        if (!headers.containsKey("Date")) {
+          headers.put("Date", DateFormatter.getDate()); // rfc says the Date is needed
+        }
         DynamicBytes bytes = new DynamicBytes(196);
         byte[] bs = HttpStatus.valueOf(status).getInitialLineBytes();
         bytes.append(bs, bs.length);
