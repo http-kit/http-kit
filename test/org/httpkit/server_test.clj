@@ -138,6 +138,9 @@
   (GET "/streaming" [] streaming-handler)
   (GET "/async-response" [] async-response-handler)
   (GET "/async-just-body" [] async-just-body)
+  (GET "/i-set-date" [] (fn [req] {:status 200
+                                   :headers {"Date" "Tue, 7 Mar 2017 19:52:50 GMT"}
+                                   :body ""}))
   (ANY "*" [] (fn [req] (pr-str (dissoc req :async-channel)))))
 
 (use-fixtures :once (fn [f]
@@ -357,6 +360,14 @@
 (deftest test-get-local-port
   (let [server (run-server (site test-routes) {:port 0})]
     (is (> (:local-port (meta server)) 0))
+    (server)))
+
+(deftest test-application-gets-to-set-date
+  (let [server (run-server (site test-routes) {:port 9090})]
+    (is (= "Tue, 7 Mar 2017 19:52:50 GMT"
+           (-> (http/get "http://localhost:9090/i-set-date")
+               :headers
+               (get "Date"))))
     (server)))
 
 (deftest test-immediate-close-kills-inflight-requests

@@ -172,12 +172,14 @@
   (request {:url \"http://site.com/string.txt\" :as :auto})
 
   Request options:
-    :url :method :headers :timeout :query-params :form-params :as
-    :client :body :basic-auth :user-agent :filter :worker-pool"
-  [{:keys [client timeout filter worker-pool keepalive as follow-redirects max-redirects response
-           trace-redirects allow-unsafe-redirect-methods proxy-host proxy-port proxy-url tunnel?]
+    :url :method :headers :timeout :connect-timeout :idle-timeout :query-params
+    :as :form-params :client :body :basic-auth :user-agent :filter :worker-pool"
+  [{:keys [client timeout connect-timeout idle-timeout filter worker-pool keepalive as follow-redirects
+           max-redirects response trace-redirects allow-unsafe-redirect-methods proxy-host proxy-port
+           proxy-url tunnel?]
     :as opts
-    :or {timeout 60000
+    :or {connect-timeout 60000
+         idle-timeout 60000
          follow-redirects true
          max-redirects 10
          filter IFilter/ACCEPT_ALL
@@ -190,7 +192,7 @@
          proxy-port -1
          proxy-url nil}}
    & [callback]]
-  (let [client (or (:client opts) @default-client)  ; deref default-client ONLY when client not specified
+  (let [client (or client @default-client)  ; deref default-client ONLY when client not specified
         {:keys [url method headers body sslengine]} (coerce-req opts)
         deliver-resp #(deliver response ;; deliver the result
                                (try ((or callback identity) %1)
@@ -230,7 +232,10 @@
                                 ;; only the 4 support now
                                 (case as :auto 1 :text 2 :stream 3 :byte-array 4))
         effective-proxy-url (if proxy-host (str proxy-host ":" proxy-port) proxy-url)
-        cfg (RequestConfig. method headers body timeout keepalive effective-proxy-url tunnel?)]
+        connect-timeout (or timeout connect-timeout)
+        idle-timeout    (or timeout idle-timeout)
+        cfg (RequestConfig. method headers body connect-timeout idle-timeout
+              keepalive effective-proxy-url tunnel?)]
     (.exec ^HttpClient client url cfg sslengine listener)
     response))
 
