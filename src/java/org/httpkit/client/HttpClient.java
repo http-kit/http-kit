@@ -61,25 +61,33 @@ public class HttpClient implements Runnable {
     private final EventNames eventNames;
 
     public static interface AddressFinder {
+        public static final AddressFinder DEFAULT = new AddressFinder() {
+            public InetSocketAddress findAddress(URI uri) throws UnknownHostException {
+                return getServerAddr(uri);
+            }
+        };
         InetSocketAddress findAddress(URI uri) throws UnknownHostException;
     }
 
-    private final AddressFinder addressFinder;
+    public static interface SSLEngineURIConfigurer {
+        public static final SSLEngineURIConfigurer NOP = new SSLEngineURIConfigurer() {
+            public void configure(SSLEngine sslEngine, URI uri) { /* do nothing */ }
+        };
+        void configure(SSLEngine sslEngine, URI uri);
+    }
 
-    public static final AddressFinder DEFAULT_ADDRESS_FINDER = new AddressFinder() {
-        public InetSocketAddress findAddress(URI uri) throws UnknownHostException {
-            return getServerAddr(uri);
-        }
-    };
+    private final AddressFinder addressFinder;
+    private final SSLEngineURIConfigurer sslEngineUriConfigurer;
 
     public HttpClient() throws IOException {
         this(-1);
     }
 
-    public HttpClient(long maxConnections, AddressFinder addressFinder,
+    public HttpClient(long maxConnections, AddressFinder addressFinder, SSLEngineURIConfigurer sslEngineUriConfigurer,
             ContextLogger<String, Throwable> errorLogger,
             EventLogger<String> eventLogger, EventNames eventNames) throws IOException {
         this.addressFinder = addressFinder;
+        this.sslEngineUriConfigurer = sslEngineUriConfigurer;
         this.errorLogger = errorLogger;
         this.eventLogger = eventLogger;
         this.eventNames = eventNames;
@@ -97,7 +105,8 @@ public class HttpClient implements Runnable {
     }
 
     public HttpClient(long maxConnections) throws IOException {
-        this(maxConnections, DEFAULT_ADDRESS_FINDER, ContextLogger.ERROR_PRINTER, EventLogger.NOP, EventNames.DEFAULT);
+        this(maxConnections, AddressFinder.DEFAULT, SSLEngineURIConfigurer.NOP,
+                ContextLogger.ERROR_PRINTER, EventLogger.NOP, EventNames.DEFAULT);
     }
 
     private void clearTimeout(long now) {
@@ -334,6 +343,9 @@ public class HttpClient implements Runnable {
             }
             if(!engine.getUseClientMode())
                 engine.setUseClientMode(true);
+
+            // configure SSLEngine with URI
+            sslEngineUriConfigurer.configure(engine, uri);
 
             pending.offer(new HttpsRequest(addr, request, cb, requests, cfg, engine));
         } else {
