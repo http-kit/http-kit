@@ -7,7 +7,7 @@
 /bin/
 /classes/
 /lib/
-pom.xml
+pom.xml*
 /.settings/
 /target
 /.idea
