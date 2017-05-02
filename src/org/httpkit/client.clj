@@ -2,8 +2,8 @@
   (:refer-clojure :exclude [get proxy])
   (:require [clojure.string :as str])
   (:use [clojure.walk :only [prewalk]])
-  (:import [org.httpkit.client HttpClient HttpClient$AddressFinder IResponseHandler RespListener
-            IFilter RequestConfig]
+  (:import [org.httpkit.client HttpClient HttpClient$AddressFinder HttpClient$SSLEngineURIConfigurer
+            IResponseHandler RespListener IFilter RequestConfig]
            [org.httpkit.logger ContextLogger EventLogger EventNames]
            [org.httpkit HttpMethod PrefixThreadFactory HttpUtils]
            [java.util.concurrent ThreadPoolExecutor LinkedBlockingQueue TimeUnit]
@@ -100,12 +100,14 @@
 (defn make-client
   "Returns an HttpClient with specified options:
     :max-connections    ; Max connection count, default is unlimited (-1)
-    :address-finder     ; (fn [java.net.uri]) -> java.net.InetSocketAddress
+    :address-finder     ; (fn [java.net.URI]) -> java.net.InetSocketAddress
+    :ssl-configurer     ; (fn [javax.net.ssl.SSLEngine java.net.URI])
     :error-logger       ; (fn [text ex])
     :event-logger       ; (fn [event-name])
-    :event-names        ; {<http-kit-event-name> <loggable-event-name}"
+    :event-names        ; {<http-kit-event-name> <loggable-event-name>}"
   [{:keys [max-connections
            address-finder
+           ssl-configurer
            error-logger
            event-logger
            event-names]}]
@@ -114,7 +116,11 @@
     (if address-finder
       (reify HttpClient$AddressFinder
         (findAddress [this uri] (address-finder uri)))
-      HttpClient/DEFAULT_ADDRESS_FINDER)
+      HttpClient$AddressFinder/DEFAULT)
+    (if ssl-configurer
+      (reify HttpClient$SSLEngineURIConfigurer
+        (configure [this ssl-engine uri] (ssl-configurer ssl-engine uri)))
+      HttpClient$SSLEngineURIConfigurer/NOP)
     (if error-logger
       (reify ContextLogger
         (log [this message error] (error-logger message error)))
