@@ -42,7 +42,7 @@
               queue-size 20480
               max-body   8388608
               max-ws     4194304
-              max-line   4096
+              max-line   8192
               proxy-protocol :disable
               worker-name-prefix "worker-"}}]]
 

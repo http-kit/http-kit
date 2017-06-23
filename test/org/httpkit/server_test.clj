@@ -289,12 +289,12 @@
 
 (deftest test-uri-len
   (doseq [_ (range 0 50)]
-    (let [path (str "/abc" (subs const-string 0 (rand-int 4000)))
+    (let [path (str "/abc" (subs const-string 0 (rand-int 8000)))
           resp @(client/get (str "http://localhost:4347" path))]
       (is (= 200 (:status resp)))
       (is (= path (-> resp :body read-string :uri)))))
   (doseq [_ (range 0 20)]
-    (let [path (str "/abc" (subs const-string 0 (+ (rand-int 4000) 4096)))
+    (let [path (str "/abc" (subs const-string 0 (+ (rand-int 4000) 8192)))
           resp @(client/get (str "http://localhost:4347" path))]
       (is (= 414 (:status resp))))))
 
