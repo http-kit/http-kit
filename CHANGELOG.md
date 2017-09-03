@@ -1,3 +1,21 @@
+## 2.3.0-alpha4 (2017 Sep 3)
+
+```clojure
+[http-kit "2.3.0-alpha4"]
+```
+
+> This is a minor **feature release**. Please test carefully and report any bugs!
+
+#### New stuff
+
+* [#335] Make way for fixing #187 (@kumarshantanu)
+* [#323 333] Metrics/logging instrumentation (@kumarshantanu)
+
+#### General improvements
+
+* [#341 #196] Server: increase max-line default value to conform to nginx defaults (@Kjir)
+* Client: deref default-client ONLY-when client not specified (@kumarshantanu)
+
 ## 2.3.0-alpha2 (2017 Apr 16)
 
 ```clojure
