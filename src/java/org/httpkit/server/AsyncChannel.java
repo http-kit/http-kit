@@ -227,6 +227,8 @@ public class AsyncChannel {
                 server.tryWrite(key, WsEncode(OPCODE_TEXT, ((String) data).getBytes(UTF_8)));
             } else if (data instanceof byte[]) {
                 server.tryWrite(key, WsEncode(OPCODE_BINARY, (byte[]) data));
+            } else if (data instanceof ByteBuffer) {
+                server.tryWrite(key, (ByteBuffer) data);
             } else if (data instanceof InputStream) {
                 DynamicBytes bytes = readAll((InputStream) data);
                 server.tryWrite(key, WsEncode(OPCODE_BINARY, bytes.get(), bytes.length()));

@@ -175,11 +175,7 @@ class WSHandler implements Runnable {
     @Override
     public void run() {
         try {
-            if (frame instanceof TextFrame) {
-                channel.messageReceived(((TextFrame) frame).getText());
-            } else {
-                channel.messageReceived(frame.data);
-            }
+            channel.messageReceived(frame);
         } catch (Throwable e) {
             errorLogger.log("handle websocket frame " + frame, e);
             eventLogger.log(eventNames.serverWsFrameError);
