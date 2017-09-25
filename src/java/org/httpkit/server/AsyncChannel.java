@@ -26,6 +26,7 @@ public class AsyncChannel {
     static final long closedRanOffset;
     static final long closeHandlerOffset;
     static final long receiveHandlerOffset;
+    static final long pingHandlerOffset;
     static final long headerSentOffset;
 
     private final SelectionKey key;
@@ -38,6 +39,7 @@ public class AsyncChannel {
     private volatile int isHeaderSent = 0;
 
     private volatile IFn receiveHandler = null;
+    private volatile IFn pingHandler = null;
     volatile IFn closeHandler = null;
 
     static {
@@ -53,6 +55,8 @@ public class AsyncChannel {
                     AsyncChannel.class.getDeclaredField("closeHandler"));
             receiveHandlerOffset = unsafe.objectFieldOffset(
                     AsyncChannel.class.getDeclaredField("receiveHandler"));
+            pingHandlerOffset = unsafe.objectFieldOffset(
+                    AsyncChannel.class.getDeclaredField("pingHandler"));
             headerSentOffset = unsafe.objectFieldOffset(
                     AsyncChannel.class.getDeclaredField("isHeaderSent"));
         } catch (Exception e) {
@@ -78,6 +82,7 @@ public class AsyncChannel {
 
         unsafe.putOrderedObject(this, closeHandlerOffset, null); // lazySet to null
         unsafe.putOrderedObject(this, receiveHandlerOffset, null); // lazySet to null
+        unsafe.putOrderedObject(this, pingHandlerOffset, null); // lazySet to null
     }
 
     private static final byte[] finalChunkBytes = "0\r\n\r\n".getBytes();
@@ -162,8 +167,21 @@ public class AsyncChannel {
         }
     }
 
+    public void setPingHandler(IFn fn) {
+        if (!unsafe.compareAndSwapObject(this, pingHandlerOffset, null, fn)) {
+            throw new IllegalStateException("ping handler exist: " + pingHandler);
+        }
+    }
+
     public void messageReceived(final Object mesg) {
         IFn f = receiveHandler;
+        if (f != null) {
+            f.invoke(mesg); // byte[] or String
+        }
+    }
+
+    public void pingReceived(final Object mesg) {
+        IFn f = pingHandler;
         if (f != null) {
             f.invoke(mesg); // byte[] or String
         }

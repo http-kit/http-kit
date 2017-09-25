@@ -46,6 +46,10 @@
                                    retdata)]
                         (send! con data))))))
 
+(defn ping-ws-handler [req]
+  (with-channel req con
+    (on-ping con (fn [data] (send! con (str "ECHO: " (String. data "UTF-8")))))))
+
 (defn messg-order-handler [req]
   (with-channel req con
     (let [mesg-idx (atom 0)
@@ -78,7 +82,8 @@
   (GET "/http-async-client" [] ws-handler-async-client)
   (GET "/binary" [] binary-ws-handler)
   (GET "/interleaved" [] not-interleave-handler)
-  (GET "/order" [] messg-order-handler))
+  (GET "/order" [] messg-order-handler)
+  (GET "/ping-pong" [] ping-ws-handler))
 
 (use-fixtures :once (fn [f]
                       (let [server (run-server
@@ -120,6 +125,12 @@
         (let [d (subs const-string 0 120)]
           (is (= d (.ping client d)))
           (.pong client d))))
+    (.close client)))
+
+(deftest test-websocket-ping-handler
+  (let [client (WebSocketClient. "ws://localhost:4348/ping-pong")]
+    (.ping client "TEST")
+    (is (= "ECHO: TEST" (.getMessage client)))
     (.close client)))
 
 (deftest test-sent-message-in-body      ; issue #14
