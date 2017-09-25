@@ -183,7 +183,7 @@ public class AsyncChannel {
     public void pingReceived(final Object mesg) {
         IFn f = pingHandler;
         if (f != null) {
-            f.invoke(mesg); // byte[] or String
+            f.invoke(mesg); // byte[]
         }
     }
 
