@@ -180,10 +180,10 @@ public class AsyncChannel {
         }
     }
 
-    public void pingReceived(final Object mesg) {
+    public void pingReceived(final byte[] mesg) {
         IFn f = pingHandler;
         if (f != null) {
-            f.invoke(mesg); // byte[]
+            f.invoke(mesg);
         }
     }
 
