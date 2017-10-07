@@ -14,8 +14,6 @@ import static org.httpkit.HttpUtils.TRANSFER_ENCODING;
 
 public class HttpClientDecoderTest {
 
-    boolean onCompleteCallded = false;
-
     @Test
     public void testDecodeChunkedResponse() throws IOException, LineTooLargeException,
             ProtocolException, AbortException {
@@ -35,7 +33,6 @@ public class HttpClientDecoderTest {
             }
 
             public void onCompleted() {
-                onCompleteCallded = true;
             }
 
             public void onBodyReceived(byte[] buf, int length) throws AbortException {
@@ -46,7 +43,6 @@ public class HttpClientDecoderTest {
         ByteBuffer buffer = ByteBuffer.wrap(Utils.readAll("beta_shield_chunked"));
         State s = decoder.decode(buffer);
         Assert.assertEquals("state should be ALL_READ", s, State.ALL_READ);
-        Assert.assertTrue(onCompleteCallded);
     }
 
     @Test

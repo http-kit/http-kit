@@ -21,6 +21,24 @@ information:
  - Which version of http-kit you're using
  - A full stacktrace, if you have one available
 
+## Building and Testing Locally
+
+The project uses Rake to wrap build and testing tools. To build and execute tests
+(if you have Rake installed) at the root of the project simply type:
+
+```rake```
+
+This will build the java source and test files, it will then execute 'lein test'
+
+To run the java junit tests, at the root of the project type:
+
+```rake junit```
+
+To run a set of benchmarks, at the root of the project type:
+
+```rake benchmark```
+
+
 ## Filing Pull Requests
 
 When filing a pull request, please make sure you've run the test suite on your

@@ -5,6 +5,11 @@ task :test do
   sh './scripts/javac with-test && lein test'
 end
 
+desc "Run java unit tests"
+task :junit do
+  sh './scripts/junit'
+end
+
 desc "Run some benchmark test"
 task :benchmark do
   sh './scripts/javac with-test && lein test :benchmark'
