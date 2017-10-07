@@ -26,9 +26,13 @@ information:
 The project uses Rake to wrap build and testing tools. To build and execute tests
 (if you have Rake installed) at the root of the project simply type:
 
-```rake````
+```rake```
 
 This will build the java source and test files, it will then execute 'lein test'
+
+To run the java junit tests, at the root of the project type:
+
+```rake junit```
 
 To run a set of benchmarks, at the root of the project type:
 
