@@ -34,20 +34,12 @@ public class TextClientTest {
                 "http://blog.jjgod.org/feed/", "http://www.lostleon.com/blog/feed/",
                 "http://feed.feedsky.com/hellodb"};
 
-        // urls = new String[] {
-        // "http://finance.sina.com.cn/stock/jsy/20120709/183612517402.shtml" };
-
         runIt(urls);
 
     }
 
-    public static void main(String[] args) {
-        System.out.println(HttpMethod.valueOf("GET1"));
-    }
-
     private void runIt(String[] urls) throws URISyntaxException, UnknownHostException,
             InterruptedException {
-        CountDownLatch latch = new CountDownLatch(urls.length);
         ExecutorService pool = Executors.newCachedThreadPool();
         for (String url : urls) {
             IResponseHandler handler = new IResponseHandler() {
@@ -64,6 +56,5 @@ public class TextClientTest {
                     IFilter.ACCEPT_ALL, pool, 1));
         }
 
-        latch.await();
     }
 }
