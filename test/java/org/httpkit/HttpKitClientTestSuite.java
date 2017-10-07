@@ -21,7 +21,7 @@ import org.httpkit.client.*;
  */
 @RunWith(Suite.class)
 @Suite.SuiteClasses({
-  // HttpClientDecoderTest.class,
+  HttpClientDecoderTest.class,
   // TextClientTest.class,
   HttpClientTest.class,
 })
