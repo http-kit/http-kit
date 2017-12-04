@@ -1,6 +1,7 @@
 package org.httpkit.client;
 
 import org.httpkit.PriorityQueue;
+import org.httpkit.logger.EventLogger;
 
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
@@ -16,8 +17,9 @@ public class HttpsRequest extends Request {
     private static final ByteBuffer EMPTY_BUFFER = ByteBuffer.allocate(0);
 
     public HttpsRequest(InetSocketAddress addr, ByteBuffer[] request, IRespListener handler,
-                        PriorityQueue<Request> clients, RequestConfig config, SSLEngine engine) {
-        super(addr, request, handler, clients, config);
+                        PriorityQueue<Request> clients, RequestConfig config, SSLEngine engine,
+                        EventLogger<String> eventLogger, Object logMDC) {
+        super(addr, request, handler, clients, config, eventLogger, logMDC);
         this.engine = engine;
     }
 

@@ -21,6 +21,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -81,6 +82,11 @@ public class HttpServer implements Runnable {
     public static final ContextLogger<String, Throwable> DEFAULT_WARN_LOGGER = new ContextLogger<String, Throwable>() {
         @Override
         public void log(String event, Throwable e) {
+            System.err.printf("%s [%s] WARN - %s\n", new Date(), THREAD_NAME, e.getMessage());
+        }
+
+        @Override
+        public void log(Object logMDC, Map<String, String> logContext, String event, Throwable e) {
             System.err.printf("%s [%s] WARN - %s\n", new Date(), THREAD_NAME, e.getMessage());
         }
     };

@@ -1,11 +1,14 @@
 package org.httpkit.client;
 
 import org.httpkit.PriorityQueue;
+import org.httpkit.logger.EventLogger;
 
 import javax.net.ssl.SSLException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
+import java.util.HashMap;
+import java.util.Map;
 
 public class Request implements Comparable<Request> {
 
@@ -23,15 +26,21 @@ public class Request implements Comparable<Request> {
     SelectionKey key; // for timeout, close connection
 
     private long timeoutTs; // future time this request timeout, ms
+	private EventLogger<String> eventLogger;
+	Object logMDC;
 
     public Request(InetSocketAddress addr, ByteBuffer[] request, IRespListener handler,
-                   PriorityQueue<Request> clients, RequestConfig config) {
+                   PriorityQueue<Request> clients, RequestConfig config,
+                   EventLogger<String> eventLogger,
+                   Object logMDC) {
         this.cfg = config;
         this.decoder = new Decoder(handler, config.method);
         this.request = request;
         this.clients = clients;
         this.addr = addr;
         this.timeoutTs = config.connTimeout + System.currentTimeMillis();
+        this.eventLogger = eventLogger;
+        this.logMDC = logMDC;
     }
 
     public boolean isConnected() {
@@ -89,7 +98,18 @@ public class Request implements Comparable<Request> {
     }
 
     public void recycle(Request old) throws SSLException {
+        Map<String, String> context = getLogContext();
+        context.put("old_request", old.toString());
+        context.put("old_key", String.valueOf(old.key));
+        eventLogger.log(this.logMDC, context, "Recycling channel selection key");
         this.key = old.key;
+    }
+
+    public Map<String, String> getLogContext() {
+        Map<String, String> context = new HashMap<String, String>();
+        context.put("request", this.toString());
+        context.put("key", String.valueOf(this.key));
+        return context;
     }
 }
 
