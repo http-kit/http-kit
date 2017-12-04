@@ -102,8 +102,8 @@
     :max-connections    ; Max connection count, default is unlimited (-1)
     :address-finder     ; (fn [java.net.URI]) -> java.net.InetSocketAddress
     :ssl-configurer     ; (fn [javax.net.ssl.SSLEngine java.net.URI])
-    :error-logger       ; (fn [text ex])
-    :event-logger       ; (fn [event-name])
+    :error-logger       ; (fn [mdc context text ex])
+    :event-logger       ; (fn [mdc context event-name])
     :event-names        ; {<http-kit-event-name> <loggable-event-name>}"
   [{:keys [max-connections
            address-finder
@@ -123,11 +123,13 @@
       HttpClient$SSLEngineURIConfigurer/NOP)
     (if error-logger
       (reify ContextLogger
-        (log [this message error] (error-logger message error)))
+        (log [this message error] (error-logger nil nil message error))
+        (log [this mdc context message error] (error-logger mdc context message error)))
       ContextLogger/ERROR_PRINTER)
     (if event-logger
       (reify EventLogger
-        (log [this event] (event-logger event)))
+        (log [this event] (event-logger nil nil event))
+        (log [this mdc context event] (event-logger mdc context event)))
       EventLogger/NOP)
     (cond
       (nil? event-names) EventNames/DEFAULT
@@ -181,7 +183,7 @@
     :as :form-params :client :body :basic-auth :user-agent :filter :worker-pool"
   [{:keys [client timeout connect-timeout idle-timeout filter worker-pool keepalive as follow-redirects
            max-redirects response trace-redirects allow-unsafe-redirect-methods proxy-host proxy-port
-           proxy-url tunnel?]
+           proxy-url tunnel? log-mdc]
     :as opts
     :or {connect-timeout 60000
          idle-timeout 60000
@@ -195,7 +197,8 @@
          tunnel? false
          proxy-host nil
          proxy-port -1
-         proxy-url nil}}
+         proxy-url nil
+         log-mdc nil}}
    & [callback]]
   (let [client (or client @default-client)
         {:keys [url method headers body sslengine]} (coerce-req opts)
@@ -241,7 +244,7 @@
         idle-timeout    (or timeout idle-timeout)
         cfg (RequestConfig. method headers body connect-timeout idle-timeout
               keepalive effective-proxy-url tunnel?)]
-    (.exec ^HttpClient client url cfg sslengine listener)
+    (.exec ^HttpClient client url cfg sslengine listener log-mdc)
     response))
 
 (defmacro ^:private defreq [method]
