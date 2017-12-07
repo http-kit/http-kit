@@ -3,6 +3,8 @@ package org.httpkit.codec;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Utils {
 
@@ -15,5 +17,12 @@ public class Utils {
         }
         is.close();
         return bos.toByteArray();
+    }
+
+    public static List<byte[]> readAll(String... resources) throws IOException {
+        List<byte[]> bytes = new ArrayList<byte[]>();
+       for (String resource : resources)
+           bytes.add(readAll(resource));
+       return bytes;
     }
 }
