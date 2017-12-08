@@ -11,20 +11,24 @@ public class LineReader {
     byte[] lineBuffer = new byte[1024];
     int lineBufferIdx = 0;
     private final int maxLine;
+    private boolean readCR = false;
 
     public LineReader(int maxLine) {
         this.maxLine = maxLine;
     }
 
-    public String readLine(ByteBuffer buffer) throws LineTooLargeException {
+    public String readLine(ByteBuffer buffer) throws LineTooLargeException, ProtocolException {
         byte b;
         boolean more = true;
         while (buffer.hasRemaining() && more) {
             b = buffer.get();
+
+            if (readCR && b != LF) {
+                throw new ProtocolException("Expected LF after CR, but found " + b);
+            }
+
             if (b == CR) {
-                if (buffer.hasRemaining() && buffer.get() == LF) {
-                    more = false;
-                }
+                readCR = true;
             } else if (b == LF) {
                 more = false;
             } else {
@@ -41,12 +45,13 @@ public class LineReader {
         String line = null;
         if (!more) {
             line = new String(lineBuffer, 0, lineBufferIdx);
-            lineBufferIdx = 0;
+            reset();
         }
         return line;
     }
 
     public final void reset() {
         this.lineBufferIdx = 0;
+        this.readCR = false;
     }
 }
