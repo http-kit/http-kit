@@ -60,7 +60,10 @@
   (PUT "/body" [] (fn [req] {:body (:body req)
                              :status 200
                              :headers {"content-type" "text/plain"}}))
-  (GET "/test-header" [] (fn [{:keys [headers]}] (str (get headers "test-header")))))
+  (GET "/test-header" [] (fn [{:keys [headers]}] (str (get headers "test-header"))))
+  (GET "/echo-headers" [] (fn [{:keys [headers]}] {:status 200
+                                                   :headers headers}))
+           )
 
 (use-fixtures :once
   (fn [f]
@@ -72,6 +75,10 @@
                                                :key-password "123456"
                                                :keystore "test/ssl_keystore"})]
       (try (f) (finally (server) (.stop jetty))))))
+
+(use-fixtures :each
+  (fn [f]
+    (try (f) (finally (http/set-request-interceptor nil)))))
 
 (comment
   (defonce server1 (run-server (site test-routes) {:port 4347})))
@@ -443,6 +450,14 @@
     HttpMethod/HEAD "HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\n..."
     [[:init HttpVersion/HTTP_1_1 HttpStatus/OK]
      [:headers {"content-length" "3"}]]))
+
+(deftest test-global-interceptor
+  (let [header-value "header-value"
+        headers {"header-name" header-value}
+        interceptor (fn [request] (assoc request :headers headers))
+        _ (http/set-request-interceptor interceptor)
+        received (:headers @(http/get "http://localhost:4347/echo-headers"))]
+    (is (= (:header-name received) header-value))))
 
 ;; @(http/get "http://127.0.0.1:4348" {:headers {"Connection" "Close"}})
 

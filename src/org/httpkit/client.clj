@@ -23,6 +23,13 @@
                      (str (first basic-auth) ":" (second basic-auth)))]
     (str "Basic " (base64-encode (utf8-bytes basic-auth)))))
 
+(def request-interceptor (atom nil))
+
+(defn set-request-interceptor
+  "sets a global interceptor for outgoing requests"
+  [new-interceptor]
+  (reset! request-interceptor new-interceptor))
+
 (defn- prepare-request-headers
   [{:keys [headers form-params basic-auth oauth-token user-agent] :as req}]
   (merge headers
@@ -59,8 +66,11 @@
 
 (defn- coerce-req
   [{:keys [url method body insecure? query-params form-params multipart] :as req}]
-  (let [r (assoc req
-                 :url (if query-params
+  (let [intercepted-req (if (nil? @request-interceptor)
+                          req
+                          (@request-interceptor req))
+        r (assoc intercepted-req
+            :url (if query-params
                         (if (neg? (.indexOf ^String url (int \?)))
                           (str url "?" (query-string query-params))
                           (str url "&" (query-string query-params)))
@@ -68,7 +78,7 @@
                  :sslengine (or (:sslengine req)
                                 (when (:insecure? req) (SslContextFactory/trustAnybody)))
                  :method    (HttpMethod/fromKeyword (or method :get))
-                 :headers   (prepare-request-headers req)
+                 :headers   (prepare-request-headers intercepted-req)
             ;; :body ring body: null, String, seq, InputStream, File, ByteBuffer
                  :body      (if form-params (query-string form-params) body))]
     (if multipart
