@@ -190,6 +190,7 @@ public class HttpServer implements Runnable {
                     handler.handle(atta.channel, frame);
                     atta.decoder.reset();
                 } else if (frame instanceof PingFrame) {
+                    handler.handle(atta.channel, frame);
                     atta.decoder.reset();
                     tryWrite(key, WsEncode(WSDecoder.OPCODE_PONG, frame.data));
                 } else if (frame instanceof PongFrame) {

@@ -24,6 +24,8 @@ import org.httpkit.logger.ContextLogger;
 import org.httpkit.logger.EventNames;
 import org.httpkit.logger.EventLogger;
 import org.httpkit.server.Frame.TextFrame;
+import org.httpkit.server.Frame.BinaryFrame;
+import org.httpkit.server.Frame.PingFrame;
 
 import clojure.lang.IFn;
 import clojure.lang.IPersistentMap;
@@ -177,8 +179,12 @@ class WSHandler implements Runnable {
         try {
             if (frame instanceof TextFrame) {
                 channel.messageReceived(((TextFrame) frame).getText());
-            } else {
+            } else if (frame instanceof BinaryFrame) {
                 channel.messageReceived(frame.data);
+            } else if (frame instanceof PingFrame) {
+                channel.pingReceived(frame.data);
+            } else {
+                errorLogger.log("Unknown frame received in websocket handler " + frame, null);
             }
         } catch (Throwable e) {
             errorLogger.log("handle websocket frame " + frame, e);

@@ -122,6 +122,9 @@
     messages. Message ordering is guaranteed by server.
 
     The message argument could be a string or a byte[].")
+  (on-ping [ch callback]
+    "Sets handler (fn [data]) for notification of client WebSocket pings. The
+    data param represents application data and will by a byte[].")
   (on-close [ch callback]
     "Sets handler (fn [status]) for notification of channel being closed by the
     server or client. Handler will be invoked at most once. Useful for clean-up.
@@ -144,6 +147,7 @@
     ([ch data] (.send ch data (not (websocket? ch))))
     ([ch data close-after-send?] (.send ch data (boolean close-after-send?))))
   (on-receive [ch callback] (.setReceiveHandler ch callback))
+  (on-ping [ch callback] (.setPingHandler ch callback))
   (on-close [ch callback] (.setCloseHandler ch callback)))
 
 ;;;; WebSocket
