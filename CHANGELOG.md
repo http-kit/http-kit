@@ -1,3 +1,13 @@
+## 2.3.0-alpha5 (2018 Feb 2)
+
+```clojure
+[http-kit "2.3.0-alpha5"]
+```
+
+> This is a minor **hotfix release**. Please test carefully and report any bugs!
+
+**Hotfix**: [#361 #362] Client: fix bug in parsing logic for chunked responses (@rkaippully)
+
 ## 2.3.0-alpha4 (2017 Sep 3)
 
 ```clojure
