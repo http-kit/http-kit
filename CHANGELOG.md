@@ -1,3 +1,36 @@
+## 2.3.0-beta1 (2018 Mar 11)
+
+```clojure
+[http-kit "2.3.0-beta1"]
+```
+
+> This is a major **feature and maintenance release**. Please test carefully and report any bugs!
+
+Changes since **2.2.0**:
+
+#### New stuff
+
+* [#315] Client: now have separate `:connect-timeout` and `:idle-timeout` opts (@kmate)
+* [#307 #231] Server: add :worker-pool opt (@kaibra)
+* [#309 #310] Server: add missing 'MKCOL' http method enum (@zilti)
+* [#329] Client: support numbers in multipart messages, and throw on unkown multipart params types (@dmichulke)
+* [#300] Server: add getCount method to BytesInputStream (@MysteryMachine)
+* [#335] Make way for fixing #187 (@kumarshantanu)
+* [#323 333] Metrics/logging instrumentation (@kumarshantanu)
+
+#### General improvements
+
+* [#330] Server: don't override Date header if it's been set by application (@ryfow)
+* [#303] Client: replace :proxy-host, :proxy-port -> :proxy-url (@taso42)
+* [#341 #196] Server: increase max-line default value to conform to nginx defaults (@Kjir)
+* Client: deref default-client ONLY-when client not specified (@kumarshantanu)
+
+#### Fixes
+
+* [#332 #322] Server: do not respond to unsolicited pong frames (@mikkosuonio)
+* [#319] Server: fix the 'Close received after close' issue for WS implementation (@zhming0)
+* [#361 #362] Client: fix bug in parsing logic for chunked responses (@rkaippully)
+
 ## 2.3.0-alpha5 (2018 Feb 2)
 
 ```clojure
@@ -6,7 +39,7 @@
 
 > This is a minor **hotfix release**. Please test carefully and report any bugs!
 
-**Hotfix**: [#361 #362] Client: fix bug in parsing logic for chunked responses (@rkaippully)
+* **Hotfix**: [#361 #362] Client: fix bug in parsing logic for chunked responses (@rkaippully)
 
 ## 2.3.0-alpha4 (2017 Sep 3)
 
