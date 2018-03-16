@@ -1,6 +1,7 @@
 (ns org.httpkit.client
   (:refer-clojure :exclude [get proxy])
-  (:require [clojure.string :as str])
+  (:require [clojure.string :as str]
+            [org.httpkit.encode :refer [base64-encode]])
   (:use [clojure.walk :only [prewalk]])
   (:import [org.httpkit.client HttpClient HttpClient$AddressFinder HttpClient$SSLEngineURIConfigurer
             IResponseHandler RespListener IFilter RequestConfig]
@@ -8,14 +9,12 @@
            [org.httpkit HttpMethod PrefixThreadFactory HttpUtils]
            [java.util.concurrent ThreadPoolExecutor LinkedBlockingQueue TimeUnit]
            [java.net URI URLEncoder]
-           [org.httpkit.client SslContextFactory MultipartEntity]
-           javax.xml.bind.DatatypeConverter))
+           [org.httpkit.client SslContextFactory MultipartEntity]))
 
 ;;;; Utils
 
 (defn- utf8-bytes    [s]     (.getBytes         (str s) "utf8"))
 (defn url-encode     [s]     (URLEncoder/encode (str s) "utf8"))
-(defn- base64-encode [bytes] (DatatypeConverter/printBase64Binary bytes))
 
 (defn- basic-auth-value [basic-auth]
   (let [basic-auth (if (string? basic-auth)
