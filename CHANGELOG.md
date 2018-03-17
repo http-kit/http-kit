@@ -1,3 +1,13 @@
+## 2.3.0-beta2 (2018 Mar 17)
+
+```clojure
+[http-kit "2.3.0-beta2"]
+```
+
+> This is a minor **hotfix release**
+
+* [#356 #370] Fix `base64-encoder` for Java 9 (@claj @benalbrecht)
+
 ## 2.3.0-beta1 (2018 Mar 11)
 
 ```clojure
