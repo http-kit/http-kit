@@ -1,3 +1,11 @@
+## 2.3.0-RC1 (2018 Apr 9)
+
+```clojure
+[http-kit "2.3.0-RC1"]
+```
+
+> Identical to `2.3.0-beta2`.
+
 ## 2.3.0-beta2 (2018 Mar 17)
 
 ```clojure
