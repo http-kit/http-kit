@@ -444,6 +444,22 @@
     [[:init HttpVersion/HTTP_1_1 HttpStatus/OK]
      [:headers {"content-length" "3"}]]))
 
+(deftest deadlock-guard
+  (let [loop-depth 2
+        bad-callback
+        (fn bad-callback [n disable?]
+          (when (pos? n)
+            @(http/get "badurl"
+                       (when disable?
+                         {:disable-deadlock-guard true})
+                       (fn [res] (bad-callback (dec n) disable?)))))]
+    (let [{:keys [error] :as resp} (bad-callback loop-depth false)]
+      (is (and error (re-find #"deadlock-guard" (.getMessage error)))))
+    (if (< loop-depth (.getMaximumPoolSize http/default-pool))
+      (let [{:keys [error]} (bad-callback loop-depth true)]
+        (is (= nil error)))
+      (println "Skipping disabled-deadlock-guard test due to low CPU count."))))
+
 ;; @(http/get "http://127.0.0.1:4348" {:headers {"Connection" "Close"}})
 
 ;; run many HTTP request to detect any error. urls are in file /tmp/urls, one per line
