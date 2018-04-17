@@ -137,6 +137,18 @@
                                   (format "Invalid event-names: (%s) %s"
                                     (class event-names) (pr-str event-names)))))))
 
+(def ^:dynamic ^:private *in-callback* false)
+
+(defn ^:private deadlock-guard [response]
+  (let [e #(Exception. "deadlock-guard: refusing to deref a callback from inside a callback")]
+    (reify
+      clojure.lang.IPending
+      (isRealized [_] (realized? response))
+      clojure.lang.IDeref
+      (deref [_] (when *in-callback* (throw (e))) (deref response))
+      clojure.lang.IBlockingDeref
+      (deref [_ ms value] (when *in-callback* (throw (e))) (deref response ms value)))))
+
 (defn request
   "Issues an async HTTP request and returns a promise object to which the value
   of `(callback {:opts _ :status _ :headers _ :body _})` or
@@ -180,7 +192,7 @@
     :as :form-params :client :body :basic-auth :user-agent :filter :worker-pool"
   [{:keys [client timeout connect-timeout idle-timeout filter worker-pool keepalive as follow-redirects
            max-redirects response trace-redirects allow-unsafe-redirect-methods proxy-host proxy-port
-           proxy-url tunnel?]
+           proxy-url tunnel? disable-deadlock-guard]
     :as opts
     :or {connect-timeout 60000
          idle-timeout 60000
@@ -192,6 +204,7 @@
          keepalive 120000
          as :auto
          tunnel? false
+         disable-deadlock-guard false
          proxy-host nil
          proxy-port -1
          proxy-url nil}}
@@ -199,12 +212,14 @@
   (let [client (or client @default-client)
         {:keys [url method headers body sslengine]} (coerce-req opts)
         deliver-resp #(deliver response ;; deliver the result
-                               (try ((or callback identity) %1)
-                                    (catch Throwable e
-                                      ;; dump stacktrace to stderr
-                                      (HttpUtils/printError (str method " " url "'s callback") e)
-                                      ;; return the error
-                                      {:opts opts :error e})))
+                               (try
+                                 (binding [*in-callback* true]
+                                   ((or callback identity) %1))
+                                 (catch Throwable e
+                                   ;; dump stacktrace to stderr
+                                   (HttpUtils/printError (str method " " url "'s callback") e)
+                                   ;; return the error
+                                   {:opts opts :error e})))
         handler (reify IResponseHandler
                   (onSuccess [this status headers body]
                     (if (and follow-redirects
@@ -241,7 +256,9 @@
         cfg (RequestConfig. method headers body connect-timeout idle-timeout
               keepalive effective-proxy-url tunnel?)]
     (.exec ^HttpClient client url cfg sslengine listener)
-    response))
+    (if disable-deadlock-guard
+      response
+      (deadlock-guard response))))
 
 (defmacro ^:private defreq [method]
   `(defn ~method
