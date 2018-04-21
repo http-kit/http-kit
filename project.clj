@@ -37,7 +37,8 @@
                          [ring-request-proxy "0.1.4"]
                          [ring-basic-authentication "1.0.5"]
                          [org.clojure/data.codec "0.1.0"]]}
-   :dev  {:dependencies
+   :dev  {:resource-paths ["test/resources"]
+          :dependencies
           [[org.clojure/clojure "1.8.0"]
            [junit/junit "4.12"]
            [org.clojure/tools.logging "0.3.1"]
