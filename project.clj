@@ -13,8 +13,8 @@
 
   :plugins
   [[lein-swank   "1.4.5"]
-   [lein-pprint  "1.1.2"]
-   [lein-ancient "0.6.10"]
+   [lein-pprint  "1.2.0"]
+   [lein-ancient "0.6.15"]
    [lein-codox   "0.10.3"]]
 
   :jvm-opts
@@ -32,22 +32,27 @@
    :all (fn [_] true)}
 
   :profiles
-  {:test {:java-source-paths ["test/java" "src/java"]
-          :dependencies [[ring/ring-defaults "0.2.3"]
-                         [ring-request-proxy "0.1.4"]
-                         [ring-basic-authentication "1.0.5"]
-                         [org.clojure/data.codec "0.1.0"]]}
-   :dev  {:resource-paths ["test/resources"]
-          :dependencies
-          [[org.clojure/clojure "1.8.0"]
-           [junit/junit "4.12"]
-           [org.clojure/tools.logging "0.3.1"]
-           [ch.qos.logback/logback-classic "1.2.3"]
-           [clj-http "2.1.0"] ; TODO Update (breaking?)
-           [io.netty/netty "3.6.5.Final"] ; TODO Update (breaking)
-           [org.clojure/data.json "0.2.6"]
-           [http.async.client "0.5.2"] ; TODO Update (breaking)
-           [compojure "1.5.2"]
-           [org.clojure/tools.cli "0.3.3"] ; TODO Update (breaking)
-           [ring/ring-jetty-adapter "1.5.1"]
-           [ring/ring-core "1.5.1"]]}})
+  {:test
+   {:java-source-paths ["test/java" "src/java"]
+    :dependencies
+    [[ring/ring-defaults        "0.2.3"] ; TODO Update (causes tests to hang)
+     [ring-request-proxy       "0.1.11"]
+     [ring-basic-authentication "1.0.5"]
+     [org.clojure/data.codec    "0.1.1"]]}
+
+   :dev
+   {:resource-paths ["test/resources"]
+    :dependencies
+    [[org.clojure/clojure            "1.8.0"] ; TODO Update (breaks clj-http)
+     [junit/junit                     "4.12"]
+     [org.clojure/tools.logging      "0.4.0"]
+     [ch.qos.logback/logback-classic "1.2.3"]
+     [clj-http                       "2.1.0"] ; TODO Update (breaking?)
+     [io.netty/netty           "3.6.5.Final"] ; TODO Update (breaking)
+     [org.clojure/data.json          "0.2.6"]
+     [http.async.client              "0.5.2"] ; TODO Update (breaking)
+     [compojure                      "1.5.2"] ; TODO Update (breaking)
+     [org.clojure/tools.cli          "0.3.3"] ; TODO Update (breaking)
+     [ring/ring-jetty-adapter        "1.5.1"] ; TODO Update (breaking)
+     [ring/ring-core                 "1.5.1"] ; TODO Update (breaking)
+     ]}})
