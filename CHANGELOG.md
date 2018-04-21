@@ -1,3 +1,43 @@
+## 2.3.0 (2018 Apr 21)
+
+```clojure
+[http-kit "2.3.0"]
+```
+
+This is a **major release** that *should* be non-breaking but **may require testing**. Please evaluate before using in production (and **please report any problems!**).
+
+A big thank you to all the [contributors for this release](https://github.com/http-kit/http-kit/commits/master)!
+
+\- Peter Taoussanis (@ptaoussanis)
+
+> Listed changes are relative to **2.2.0**:
+
+#### New stuff
+
+* [#315] Client: now have separate `:connect-timeout` and `:idle-timeout` opts (@kmate)
+* [#307 #231] Server: add :worker-pool opt (@kaibra)
+* [#309 #310] Server: add missing 'MKCOL' http method enum (@zilti)
+* [#329] Client: support numbers in multipart messages, and throw on unkown multipart params types (@dmichulke)
+* [#300] Server: add getCount method to BytesInputStream (@MysteryMachine)
+* [#335] Make way for fixing #187 (@kumarshantanu)
+* [#323 333] Metrics/logging instrumentation (@kumarshantanu)
+
+#### General improvements
+
+* [#345 #372] Client: add deadlock-guard for callbacks (@Chouser), enabled by default (could be **BREAKING**, disable using `:deadlock-guard?` option).
+* [#330] Server: don't override Date header if it's been set by application (@ryfow)
+* [#303] Client: replace :proxy-host, :proxy-port -> :proxy-url (@taso42)
+* [#341 #196] Server: increase max-line default value to conform to nginx defaults (@Kjir)
+* Client: deref default-client ONLY-when client not specified (@kumarshantanu)
+* [#353] Tidy up some tests (@glenford)
+
+#### Fixes
+
+* [#332 #322] Server: do not respond to unsolicited pong frames (@mikkosuonio)
+* [#319] Server: fix the 'Close received after close' issue for WS implementation (@zhming0)
+* [#361 #362] Client: fix bug in parsing logic for chunked responses (@rkaippully)
+* [#356 #370] Fix `base64-encoder` for Java 9 (@claj @benalbrecht)
+
 ## 2.3.0-RC1 (2018 Apr 9)
 
 ```clojure
