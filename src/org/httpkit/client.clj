@@ -140,14 +140,14 @@
 (def ^:dynamic ^:private *in-callback* false)
 
 (defn ^:private deadlock-guard [response]
-  (let [e #(Exception. "deadlock-guard: refusing to deref a callback from inside a callback")]
+  (let [e #(Exception. "http-kit client deadlock-guard: refusing to deref a request callback from inside a callback. This feature can be disabled with the request's `:deadlock-guard?` option.")]
     (reify
       clojure.lang.IPending
       (isRealized [_] (realized? response))
       clojure.lang.IDeref
-      (deref [_] (when *in-callback* (throw (e))) (deref response))
+      (deref [_] (if *in-callback* (throw (e)) (deref response)))
       clojure.lang.IBlockingDeref
-      (deref [_ ms value] (when *in-callback* (throw (e))) (deref response ms value)))))
+      (deref [_ ms value] (if *in-callback* (throw (e)) (deref response ms value))))))
 
 (defn request
   "Issues an async HTTP request and returns a promise object to which the value
@@ -192,7 +192,7 @@
     :as :form-params :client :body :basic-auth :user-agent :filter :worker-pool"
   [{:keys [client timeout connect-timeout idle-timeout filter worker-pool keepalive as follow-redirects
            max-redirects response trace-redirects allow-unsafe-redirect-methods proxy-host proxy-port
-           proxy-url tunnel? disable-deadlock-guard]
+           proxy-url tunnel? deadlock-guard?]
     :as opts
     :or {connect-timeout 60000
          idle-timeout 60000
@@ -204,7 +204,7 @@
          keepalive 120000
          as :auto
          tunnel? false
-         disable-deadlock-guard false
+         deadlock-guard? true
          proxy-host nil
          proxy-port -1
          proxy-url nil}}
@@ -256,9 +256,9 @@
         cfg (RequestConfig. method headers body connect-timeout idle-timeout
               keepalive effective-proxy-url tunnel?)]
     (.exec ^HttpClient client url cfg sslengine listener)
-    (if disable-deadlock-guard
-      response
-      (deadlock-guard response))))
+    (if deadlock-guard?
+      (deadlock-guard response)
+      response)))
 
 (defmacro ^:private defreq [method]
   `(defn ~method

@@ -451,7 +451,7 @@
           (when (pos? n)
             @(http/get "badurl"
                        (when disable?
-                         {:disable-deadlock-guard true})
+                         {:deadlock-guard? false})
                        (fn [res] (bad-callback (dec n) disable?)))))]
     (let [{:keys [error] :as resp} (bad-callback loop-depth false)]
       (is (and error (re-find #"deadlock-guard" (.getMessage error)))))
