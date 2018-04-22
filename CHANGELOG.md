@@ -14,19 +14,19 @@ A big thank you to all the [contributors for this release](https://github.com/ht
 
 #### New stuff
 
+* [#345 #372] Client: add deadlock-guard for callbacks (@Chouser), enabled by default (could be **BREAKING**, disable using `:deadlock-guard?` option).
 * [#315] Client: now have separate `:connect-timeout` and `:idle-timeout` opts (@kmate)
+* [#329] Client: support numbers in multipart messages, and throw on unkown multipart params types (@dmichulke)
+* [#303] Client: replace :proxy-host, :proxy-port -> :proxy-url (@taso42)
+* [#335] Client: allow custom SSLEngine config, make way for fixing #187 (@kumarshantanu)
+* [#323 #333] Client, server: add metrics/logging instrumentation (@kumarshantanu)
 * [#307 #231] Server: add :worker-pool opt (@kaibra)
 * [#309 #310] Server: add missing 'MKCOL' http method enum (@zilti)
-* [#329] Client: support numbers in multipart messages, and throw on unkown multipart params types (@dmichulke)
 * [#300] Server: add getCount method to BytesInputStream (@MysteryMachine)
-* [#335] Make way for fixing #187 (@kumarshantanu)
-* [#323 333] Metrics/logging instrumentation (@kumarshantanu)
 
 #### General improvements
 
-* [#345 #372] Client: add deadlock-guard for callbacks (@Chouser), enabled by default (could be **BREAKING**, disable using `:deadlock-guard?` option).
 * [#330] Server: don't override Date header if it's been set by application (@ryfow)
-* [#303] Client: replace :proxy-host, :proxy-port -> :proxy-url (@taso42)
 * [#341 #196] Server: increase max-line default value to conform to nginx defaults (@Kjir)
 * Client: deref default-client ONLY-when client not specified (@kumarshantanu)
 * [#353] Tidy up some tests (@glenford)
@@ -35,8 +35,8 @@ A big thank you to all the [contributors for this release](https://github.com/ht
 
 * [#332 #322] Server: do not respond to unsolicited pong frames (@mikkosuonio)
 * [#319] Server: fix the 'Close received after close' issue for WS implementation (@zhming0)
+* [#356 #370] Client, server: fix `base64-encoder` for Java 9 (@claj @benalbrecht)
 * [#361 #362] Client: fix bug in parsing logic for chunked responses (@rkaippully)
-* [#356 #370] Fix `base64-encoder` for Java 9 (@claj @benalbrecht)
 
 ## 2.3.0-RC1 (2018 Apr 9)
 
