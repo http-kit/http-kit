@@ -26,6 +26,7 @@ public class Decoder {
     int readRemaining = 0;
     State state = READ_INITIAL;
     private final HttpMethod method;
+    public HttpStatus status;
 
     private boolean emptyBodyExpected = false;
 
@@ -60,15 +61,18 @@ public class Decoder {
                 int status = Integer.parseInt(sb.substring(bStart, bEnd));
                 // status is not 1xx, 204 or 304, then the body is unbounded.
                 // RFC2616, section 4.4
-                emptyBodyExpected = status / 100 == 1 || status == 204 || status == 304;
-                HttpStatus s = HttpStatus.valueOf(status);
+                emptyBodyExpected = status / 100 == 1
+                        || status == 204
+                        || status == 304
+                        || sb.indexOf("Connection established") != -1;
+                this.status = HttpStatus.valueOf(status);
 
                 HttpVersion version = HTTP_1_1;
                 if ("HTTP/1.0".equals(sb.substring(aStart, aEnd))) {
                     version = HTTP_1_0;
                 }
 
-                listener.onInitialLineReceived(version, s);
+                listener.onInitialLineReceived(version, this.status);
                 state = READ_HEADER;
             } catch (NumberFormatException e) {
                 throw new ProtocolException("not http protocol? " + sb);

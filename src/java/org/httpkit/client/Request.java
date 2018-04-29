@@ -1,37 +1,46 @@
 package org.httpkit.client;
 
+import javafx.util.Pair;
 import org.httpkit.PriorityQueue;
 
 import javax.net.ssl.SSLException;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 
 public class Request implements Comparable<Request> {
-
     final InetSocketAddress addr;
+    final InetSocketAddress realAddr;
     final Decoder decoder;
     final ByteBuffer[] request; // HTTP request
     final RequestConfig cfg;
-    private final PriorityQueue<Request> clients; // update timeout
+    protected final PriorityQueue<Request> clients; // update timeout
 
     // is modify from the loop thread. ensure only called once
-    private boolean isDone = false;
+    public boolean isDone = false;
 
     boolean isReuseConn = false; // a reused socket sent the request
     private boolean isConnected = false;
     SelectionKey key; // for timeout, close connection
-
+    public URI uri;
     private long timeoutTs; // future time this request timeout, ms
 
-    public Request(InetSocketAddress addr, ByteBuffer[] request, IRespListener handler,
-                   PriorityQueue<Request> clients, RequestConfig config) {
+    public Pair<InetSocketAddress, InetSocketAddress> addrKey() {
+        return new Pair<InetSocketAddress, InetSocketAddress>(addr, realAddr);
+    }
+
+    public Request(InetSocketAddress addr, InetSocketAddress realAddr,
+                   ByteBuffer[] request, IRespListener handler,
+                   PriorityQueue<Request> clients, RequestConfig config, URI uri) {
         this.cfg = config;
         this.decoder = new Decoder(handler, config.method);
         this.request = request;
         this.clients = clients;
         this.addr = addr;
+        this.realAddr = realAddr;
         this.timeoutTs = config.connTimeout + System.currentTimeMillis();
+        this.uri = uri;
     }
 
     public boolean isConnected() {

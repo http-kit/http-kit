@@ -52,16 +52,23 @@
       (println request)
       (let [request-key (identifier-fn request)
             host (server-mapping request-key)
-            stripped-headers (dissoc (:headers request) "content-length")]
-        (if host
+            stripped-headers (dissoc (:headers request) "content-length")
+            method (:request-method request)]
+        (cond
+          (= method :connect)
+          {:status 200}
+
+          host
           (select-keys (clj-http/request {:url              (build-url host (:uri request) (:query-string request))
-                                          :method           (:request-method request)
+                                          :method           method
                                           :body             (:body request)
                                           :headers          stripped-headers
                                           :throw-exceptions false
                                           :as               :stream
                                           :insecure?        insecure})
                        [:status :headers :body])
+
+          :else
           (handler request))))))
 
 (defn proxy-request

@@ -8,6 +8,7 @@ import org.httpkit.logger.EventLogger;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLEngineResult;
 import javax.net.ssl.SSLException;
 import java.io.IOException;
 import java.net.*;
@@ -16,6 +17,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.security.NoSuchAlgorithmException;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Queue;
 import java.util.Set;
@@ -48,6 +50,7 @@ public class HttpClient implements Runnable {
     private final PriorityQueue<Request> requests = new PriorityQueue<Request>();
     // reuse TCP connection
     private final PriorityQueue<PersistentConn> keepalives = new PriorityQueue<PersistentConn>();
+    private final HashMap<SocketChannel,SSLEngine> handshookEngines = new HashMap<SocketChannel,SSLEngine>();
     private final long maxConnections;
     private volatile long numConnections = 0;
     private volatile boolean running = true;
@@ -109,6 +112,38 @@ public class HttpClient implements Runnable {
                 ContextLogger.ERROR_PRINTER, EventLogger.NOP, EventNames.DEFAULT);
     }
 
+    void closeHttpsConnection(SocketChannel channel) {
+        ByteBuffer myNetData = ByteBuffer.allocate(40 * 1024);
+        ByteBuffer EMPTY_BUFFER = ByteBuffer.allocate(0);
+        try {
+            SSLEngine engine = handshookEngines.remove(channel);
+            if (engine != null) {
+                engine.closeOutbound();
+
+                while (!engine.isOutboundDone()) {
+                    // Get close message
+                    myNetData.clear();
+                    SSLEngineResult res = engine.wrap(EMPTY_BUFFER, myNetData);
+
+                    // Check res statuses
+
+                    // Send close message to peer
+                    while(myNetData.hasRemaining() && !engine.isOutboundDone()) {
+                        int num = channel.write(myNetData);
+                        if (num == 0) {
+                            // no bytes written; try again later
+                        }
+                        myNetData.compact();
+                    }
+                }
+
+                channel.close();
+            }
+        } catch (IOException e) {
+            errorLogger.log("exception closing ssl connection", e);
+        }
+    }
+
     private void clearTimeout(long now) {
         Request r;
         while ((r = requests.peek()) != null) {
@@ -162,6 +197,22 @@ public class HttpClient implements Runnable {
         return false;
     }
 
+    private boolean handleConnectRequest(Request req, SelectionKey key) throws SSLException{
+        if (req instanceof ConnectRequest && req.decoder.status == HttpStatus.OK) {
+            Request nextRequest = ((ConnectRequest) req).nextRequest;
+            req.key.attach(nextRequest);
+            nextRequest.key = req.key;
+            if (nextRequest instanceof HttpsRequest) {
+                nextRequest = resolveSSLEngine(nextRequest, (SocketChannel)nextRequest.key.channel());
+                ((HttpsRequest) nextRequest).engine.beginHandshake();
+            }
+            key.interestOps(OP_WRITE);
+            return true;
+        }
+
+        return false;
+    }
+
     private void doRead(SelectionKey key, long now) {
         Request req = (Request) key.attachment();
         SocketChannel ch = (SocketChannel) key.channel();
@@ -200,14 +251,20 @@ public class HttpClient implements Runnable {
                 State oldState = req.decoder.state;
                 if (req.decoder.decode(buffer) == ALL_READ) {
                     req.finish();
+                    boolean connectionEstablished = handleConnectRequest(req, key);
                     if (req.cfg.keepAlive > 0) {
                         // Ensure that the key is added to keepalives exactly once on a state transition. There could be cases where decoder reaches
                         // ALL_READ state multiple times.
                         if (oldState != ALL_READ) {
-                            keepalives.offer(new PersistentConn(now + req.cfg.keepAlive, req.addr, key));
+                            keepalives.offer(new PersistentConn(now + req.cfg.keepAlive, req.addr, req.realAddr, key));
+                            if (req instanceof HttpsRequest) {
+                                handshookEngines.put((SocketChannel)key.channel(), ((HttpsRequest) req).engine);
+                            }
                         }
                     } else {
-                        closeQuietly(key);
+                        if (!connectionEstablished) {
+                            closeQuietly(key);
+                        }
                     }
                 }
             } catch (HTTPException e) {
@@ -224,6 +281,8 @@ public class HttpClient implements Runnable {
 
     private void closeQuietly(SelectionKey key) {
         try {
+            closeHttpsConnection((SocketChannel) key.channel());
+
             // TODO engine.closeInbound
             key.channel().close();
         } catch (Exception ignore) {
@@ -263,8 +322,6 @@ public class HttpClient implements Runnable {
         }
     }
 
-
-
     public void exec(String url, RequestConfig cfg, SSLEngine engine, IRespListener cb) {
         URI uri,proxyUri = null;
         try {
@@ -289,10 +346,11 @@ public class HttpClient implements Runnable {
             return;
         }
 
-        InetSocketAddress addr;
+        InetSocketAddress addr, realAddr;
         try {
+            realAddr = addressFinder.findAddress(uri);
             if (proxyUri == null) {
-                addr = addressFinder.findAddress(uri);
+                addr = realAddr;
             } else {
                 addr = addressFinder.findAddress(proxyUri);
             }
@@ -316,20 +374,25 @@ public class HttpClient implements Runnable {
         if (!headers.containsKey("Accept-Encoding"))
             headers.put("Accept-Encoding", "gzip, deflate"); // compression is good
 
+        ByteBuffer connectRequest[] = null;
         ByteBuffer request[];
         try {
             if (proxyUri == null) {
                 request = encode(cfg.method, headers, cfg.body, HttpUtils.getPath(uri));
             } else {
                 String proxyScheme = proxyUri.getScheme();
-                headers.put("Proxy-Connection","Keep-Alive");
-                if (("http".equals(proxyScheme) && ! "https".equals(scheme)) || cfg.tunnel == false)  {
+                if ("http".equals(proxyScheme) && ! "https".equals(scheme))  {
+                    headers.put("Proxy-Connection","Keep-Alive");
                     request = encode(cfg.method, headers, cfg.body, uri.toString());
                 } else if ( "https".equals(proxyScheme) || "https".equals(scheme) ){
-                    headers.put("Host", HttpUtils.getProxyHost(uri));
+
+                    headers.put("Proxy-Connection","Keep-Alive");
+                    headers.putOrReplace("Host", HttpUtils.getProxyHost(uri));
                     headers.put("Protocol","https");
-                    HttpMethod https_method = cfg.tunnel == true ? HttpMethod.valueOf("CONNECT") : cfg.method;
-                    request = encode(https_method, headers, cfg.body, HttpUtils.getProxyHost(uri));
+                    if (cfg.tunnel == true || proxyUri != null) {
+                        connectRequest = encode(HttpMethod.CONNECT, headers, null, HttpUtils.getProxyHost(uri));
+                    }
+                    request = encode(cfg.method, headers, cfg.body, HttpUtils.getPath(uri));
                 } else {
                     String message = (proxyScheme == null) ? "No proxy protocol specified" : proxyScheme + " for proxy is not supported";
                     cb.onThrowable(new ProtocolException(message));
@@ -341,23 +404,22 @@ public class HttpClient implements Runnable {
             return;
         }
 
+        Request r;
         if ((proxyUri == null && "https".equals(scheme))
-            || (proxyUri != null && "https".equals(proxyUri.getScheme()))) {
-            if (engine == null) {
-                engine = DEFAULT_CONTEXT.createSSLEngine();
-            }
-            if(!engine.getUseClientMode())
-                engine.setUseClientMode(true);
+                || (proxyUri != null && "https".equals(proxyUri.getScheme()))
+                || (connectRequest != null && "https".equals(scheme))) {
 
-            // configure SSLEngine with URI
-            sslEngineUriConfigurer.configure(engine, uri);
-
-            pending.offer(new HttpsRequest(addr, request, cb, requests, cfg, engine));
+            r = new HttpsRequest(addr, realAddr, request, cb, requests, cfg, engine, uri);
         } else {
-            pending.offer(new Request(addr, request, cb, requests, cfg));
+            r = new Request(addr, realAddr, request, cb, requests, cfg, uri);
         }
 
-//        pending.offer(new Request(addr, request, cb, requests, cfg));
+        if (connectRequest == null) {
+            pending.offer(r);
+        } else {
+            pending.offer(new ConnectRequest(addr, realAddr, connectRequest, cb, requests, cfg, r));
+        }
+
         selector.wakeup();
     }
 
@@ -392,6 +454,7 @@ public class HttpClient implements Runnable {
                 req.onProgress(now);
                 key.interestOps(OP_WRITE);
                 if (req instanceof HttpsRequest) {
+                    req = resolveSSLEngine(req, ch);
                     ((HttpsRequest) req).engine.beginHandshake();
                 }
             }
@@ -401,14 +464,43 @@ public class HttpClient implements Runnable {
         }
     }
 
+    private Request resolveSSLEngine(Request req, SocketChannel channel) {
+        if (req instanceof  HttpsRequest) {
+            HttpsRequest hr = (HttpsRequest)req;
+            SSLEngine engine = hr.engine;
+            if (engine == null) {
+                engine = handshookEngines.get(channel);
+
+                if (engine == null) {
+                    engine = DEFAULT_CONTEXT.createSSLEngine();
+                } else {
+                    hr.handshaken = true;
+                }
+
+                ((HttpsRequest) req).engine = engine;
+            }
+            if(!hr.engine.getUseClientMode())
+                hr.engine.setUseClientMode(true);
+
+            // configure SSLEngine with URI
+            sslEngineUriConfigurer.configure(hr.engine, hr.uri);
+        }
+
+        return req;
+    }
+
     private void processPending() {
         Request job = pending.peek();
         if (job != null) {
             if (job.cfg.keepAlive > 0) {
-                PersistentConn con = keepalives.remove(job.addr);
+                PersistentConn con = keepalives.remove(job.addrKey());
                 if (con != null) { // keep alive
                     SelectionKey key = con.key;
                     if (key.isValid()) {
+                        if (job instanceof ConnectRequest) {
+                            job = ((ConnectRequest) job).nextRequest;
+                        }
+                        job = resolveSSLEngine(job, (SocketChannel)key.channel());
                         job.isReuseConn = true;
                         // reuse key, engine
                         try {

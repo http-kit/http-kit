@@ -8,16 +8,19 @@ import javax.net.ssl.SSLEngineResult.Status;
 import javax.net.ssl.SSLException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.nio.ByteBuffer;
+import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 
 public class HttpsRequest extends Request {
     private static final ByteBuffer EMPTY_BUFFER = ByteBuffer.allocate(0);
 
-    public HttpsRequest(InetSocketAddress addr, ByteBuffer[] request, IRespListener handler,
-                        PriorityQueue<Request> clients, RequestConfig config, SSLEngine engine) {
-        super(addr, request, handler, clients, config);
+    public HttpsRequest(InetSocketAddress addr, InetSocketAddress realAddr,
+                        ByteBuffer[] request, IRespListener handler,
+                        PriorityQueue<Request> clients, RequestConfig config, SSLEngine engine, URI uri) {
+        super(addr, realAddr, request, handler, clients, config, uri);
         this.engine = engine;
     }
 
@@ -58,6 +61,8 @@ public class HttpsRequest extends Request {
         SSLEngineResult res = engine.wrap(request, myNetData);
         if (res.getStatus() != Status.OK) {
             // TODO larger buffer, uberflow?
+        } else {
+
         }
         myNetData.flip();
     }
@@ -68,6 +73,7 @@ public class HttpsRequest extends Request {
         } else if (request[request.length - 1].hasRemaining()) {
             wrapRequest();
             ((SocketChannel) key.channel()).write(myNetData);
+            request[request.length - 1].flip();
         }
         if (myNetData.hasRemaining() || request[request.length - 1].hasRemaining()) {
             // need more write
@@ -84,9 +90,9 @@ public class HttpsRequest extends Request {
         while (!handshaken) {
             switch (hs) {
                 case NEED_TASK:
-                    Runnable runnable;
-                    while ((runnable = engine.getDelegatedTask()) != null) {
-                        runnable.run();
+                    Runnable task;
+                    while ((task = engine.getDelegatedTask()) != null) {
+                        new Thread(task).start();
                     }
                     break;
                 case NEED_UNWRAP:
@@ -109,15 +115,23 @@ public class HttpsRequest extends Request {
                     }
                     break;
                 case NEED_WRAP:
-                    SSLEngineResult res = engine.wrap(EMPTY_BUFFER, myNetData);
-                    myNetData.flip();
-                    ((SocketChannel) key.channel()).write(myNetData);
-                    if (myNetData.hasRemaining()) {
-                        // TODO, make sure data get written
-                    } else {
-                        myNetData.clear();
-                        if (res.getHandshakeStatus() != SSLEngineResult.HandshakeStatus.NEED_WRAP)
-                            key.interestOps(SelectionKey.OP_READ);
+                    myNetData.clear();
+                    SSLEngineResult res = engine.wrap(request, myNetData);
+                    hs = res.getHandshakeStatus();
+
+                    // Check status
+                    switch (res.getStatus()) {
+                        case OK :
+                            myNetData.flip();
+
+                            // Send the handshaking data to peer
+                            while (myNetData.hasRemaining()) {
+                                ((SocketChannel) key.channel()).write(myNetData);
+                            }
+                            break;
+
+                        // Handle other status:  BUFFER_OVERFLOW, BUFFER_UNDERFLOW, CLOSED
+
                     }
                     break;
             }
