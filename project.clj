@@ -44,6 +44,7 @@
    {:resource-paths ["test/resources"]
     :dependencies
     [[org.clojure/clojure            "1.8.0"] ; TODO Update (breaks clj-http)
+     [org.littleshoot/littleproxy "1.1.2"]
      [junit/junit                     "4.12"]
      [org.clojure/tools.logging      "0.4.0"]
      [ch.qos.logback/logback-classic "1.2.3"]
