@@ -80,19 +80,28 @@ public class HttpClient implements Runnable {
 
     private final AddressFinder addressFinder;
     private final SSLEngineURIConfigurer sslEngineUriConfigurer;
+    private final SocketAddress bindAddress;
 
     public HttpClient() throws IOException {
         this(-1);
     }
 
+
     public HttpClient(long maxConnections, AddressFinder addressFinder, SSLEngineURIConfigurer sslEngineUriConfigurer,
             ContextLogger<String, Throwable> errorLogger,
             EventLogger<String> eventLogger, EventNames eventNames) throws IOException {
+      this(maxConnections, addressFinder, sslEngineUriConfigurer, errorLogger, eventLogger, eventNames, null);
+    }
+
+    public HttpClient(long maxConnections, AddressFinder addressFinder, SSLEngineURIConfigurer sslEngineUriConfigurer,
+            ContextLogger<String, Throwable> errorLogger,
+            EventLogger<String> eventLogger, EventNames eventNames, SocketAddress bindAddress) throws IOException {
         this.addressFinder = addressFinder;
         this.sslEngineUriConfigurer = sslEngineUriConfigurer;
         this.errorLogger = errorLogger;
         this.eventLogger = eventLogger;
         this.eventNames = eventNames;
+        this.bindAddress = bindAddress;
 
         int id = ID.incrementAndGet();
         String name = "client-loop";
@@ -435,6 +444,9 @@ public class HttpClient implements Runnable {
                     SocketChannel ch = SocketChannel.open();
                     ch.setOption(StandardSocketOptions.SO_KEEPALIVE, Boolean.TRUE);
                     ch.setOption(StandardSocketOptions.TCP_NODELAY, Boolean.TRUE);
+                    if (bindAddress != null) {
+                      ch.bind(bindAddress);
+                    }
                     ch.configureBlocking(false);
                     boolean connected = ch.connect(job.addr);
                     job.setConnected(connected);
