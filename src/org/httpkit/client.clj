@@ -103,13 +103,15 @@
     :ssl-configurer     ; (fn [javax.net.ssl.SSLEngine java.net.URI])
     :error-logger       ; (fn [text ex])
     :event-logger       ; (fn [event-name])
-    :event-names        ; {<http-kit-event-name> <loggable-event-name>}"
+    :event-names        ; {<http-kit-event-name> <loggable-event-name>}
+    :bind-address       ; when present will pass local address to SocketChannel.bind()"
   [{:keys [max-connections
            address-finder
            ssl-configurer
            error-logger
            event-logger
-           event-names]}]
+           event-names
+           bind-address]}]
   (HttpClient.
     (or max-connections -1)
     (if address-finder
@@ -135,7 +137,8 @@
         event-names)     event-names
       :otherwise         (throw (IllegalArgumentException.
                                   (format "Invalid event-names: (%s) %s"
-                                    (class event-names) (pr-str event-names)))))))
+                                    (class event-names) (pr-str event-names)))))
+    bind-address))
 
 (def ^:dynamic ^:private *in-callback* false)
 
