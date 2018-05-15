@@ -352,6 +352,13 @@
     (is (= 2 (count (split (-> resp :headers :x-method) #","))))
     (is (= 200 (:status resp2)))))
 
+(deftest test-header-multiple-values-as-seq
+  (let [resp @(http/get "http://localhost:4347/multi-header" {:headers {"foo" ["bar" "baz"], "eggplant" "quux"}
+                                                              :duplicated-headers-as-seq? true})]
+    (is (= 200 (:status resp)))
+    (is (= 3 (count (-> resp :headers :x-method2))))
+    (is (= 2 (count (-> resp :headers :x-method))))))
+
 (deftest test-headers-stringified
   (doseq [[sent expected] [["test" "test"]
                            [0 "0"]
@@ -372,7 +379,7 @@
                    (onBodyReceived [_ buf n]      (swap! out conj [:body (into [] (take n buf))]))
                    (onCompleted [_]               (swap! out conj [:completed]))
                    (onThrowable [_ t]             (swap! out conj [:error t])))]
-    (.decode (Decoder. listener method) buffer)
+    (.decode (Decoder. listener method) buffer false)
     @out))
 
 (deftest test-decode-partial-status-line

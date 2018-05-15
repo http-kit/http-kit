@@ -149,7 +149,7 @@ public class HttpDecoder {
             expect != null && CONTINUE.equalsIgnoreCase(expect));
     }
 
-    public HttpRequest decode(ByteBuffer buffer) throws LineTooLargeException,
+    public HttpRequest decode(ByteBuffer buffer, boolean duplicatedHeadersAsSeq) throws LineTooLargeException,
             ProtocolException, RequestTooLargeException {
         String line;
         while (buffer.hasRemaining()) {
@@ -183,7 +183,7 @@ public class HttpDecoder {
                     }
                     break;
                 case READ_HEADER:
-                    readHeaders(buffer);
+                    readHeaders(buffer, duplicatedHeadersAsSeq);
                     break;
                 case READ_CHUNK_SIZE:
                     line = lineReader.readLine(buffer);
@@ -248,7 +248,7 @@ public class HttpDecoder {
         readCount += toRead;
     }
 
-    private void readHeaders(ByteBuffer buffer) throws LineTooLargeException,
+    private void readHeaders(ByteBuffer buffer, boolean duplicatedHeadersAsSeq) throws LineTooLargeException,
             RequestTooLargeException, ProtocolException {
         if (proxyProtocolOption == ProxyProtocolOption.OPTIONAL
             || proxyProtocolOption == ProxyProtocolOption.ENABLED) {
@@ -258,7 +258,7 @@ public class HttpDecoder {
         }
         String line = lineReader.readLine(buffer);
         while (line != null && !line.isEmpty()) {
-            HttpUtils.splitAndAddHeader(line, headers);
+            HttpUtils.splitAndAddHeader(line, headers, duplicatedHeadersAsSeq);
             line = lineReader.readLine(buffer);
         }
 

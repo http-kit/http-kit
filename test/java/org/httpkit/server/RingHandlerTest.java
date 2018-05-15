@@ -72,7 +72,7 @@ public class RingHandlerTest {
     private HttpRequest asHttpRequest(String... requestLines) throws ProtocolException, LineTooLargeException, RequestTooLargeException {
         httpDecoder.reset();
         String joinedRequest = String.join("\n", requestLines);
-        return httpDecoder.decode(ByteBuffer.wrap((joinedRequest + "\n\n").getBytes()));
+        return httpDecoder.decode(ByteBuffer.wrap((joinedRequest + "\n\n").getBytes()), false);
     }
 
     private IPersistentMap aDummyResponse() {

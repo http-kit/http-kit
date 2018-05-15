@@ -41,7 +41,7 @@ public class HttpClientDecoderTest {
         }, HttpMethod.GET);
 
         ByteBuffer buffer = ByteBuffer.wrap(Utils.readAll("beta_shield_chunked"));
-        State s = decoder.decode(buffer);
+        State s = decoder.decode(buffer, false);
         Assert.assertEquals("state should be ALL_READ", s, State.ALL_READ);
     }
 
@@ -73,11 +73,11 @@ public class HttpClientDecoderTest {
         List<byte[]> chunks = Utils.readAll("chunk_split_1", "chunk_split_2", "chunk_split_3");
         int i = 0;
         while (i < chunks.size() - 1) {
-            State state = decoder.decode(ByteBuffer.wrap(chunks.get(i)));
+            State state = decoder.decode(ByteBuffer.wrap(chunks.get(i)), false);
             Assert.assertNotSame(State.ALL_READ, state);
             i++;
         }
-        State state = decoder.decode(ByteBuffer.wrap(chunks.get(i)));
+        State state = decoder.decode(ByteBuffer.wrap(chunks.get(i)), false);
         Assert.assertEquals(State.ALL_READ, state);
     }
 }

@@ -192,7 +192,7 @@
     :as :form-params :client :body :basic-auth :user-agent :filter :worker-pool"
   [{:keys [client timeout connect-timeout idle-timeout filter worker-pool keepalive as follow-redirects
            max-redirects response trace-redirects allow-unsafe-redirect-methods proxy-host proxy-port
-           proxy-url tunnel? deadlock-guard?]
+           proxy-url tunnel? deadlock-guard? duplicated-headers-as-seq?]
     :as opts
     :or {connect-timeout 60000
          idle-timeout 60000
@@ -207,7 +207,8 @@
          deadlock-guard? true
          proxy-host nil
          proxy-port -1
-         proxy-url nil}}
+         proxy-url nil
+         duplicated-headers-as-seq? false}}
    & [callback]]
   (let [client (or client @default-client)
         {:keys [url method headers body sslengine]} (coerce-req opts)
@@ -229,14 +230,14 @@
                               change-to-get (and (not allow-unsafe-redirect-methods)
                                                  (#{301 302 303} status))]
                           (request (assoc opts ; follow 301 and 302 redirect
-                                     :url location
-                                     :response response
-                                     :query-params (if change-to-get nil (:query-params opts))
-                                     :form-params (if change-to-get nil (:form-params opts))
-                                     :method (if change-to-get
-                                               :get ;; change to :GET
-                                               (:method opts))  ;; do not change
-                                     :trace-redirects (conj trace-redirects url))
+                                          :url location
+                                          :response response
+                                          :query-params (if change-to-get nil (:query-params opts))
+                                          :form-params (if change-to-get nil (:form-params opts))
+                                          :method (if change-to-get
+                                                    :get ;; change to :GET
+                                                    (:method opts))  ;; do not change
+                                          :trace-redirects (conj trace-redirects url))
                                    callback))
                         (deliver-resp {:opts (dissoc opts :response)
                                        :error (Exception. (str "too many redirects: "
@@ -254,7 +255,7 @@
         connect-timeout (or timeout connect-timeout)
         idle-timeout    (or timeout idle-timeout)
         cfg (RequestConfig. method headers body connect-timeout idle-timeout
-              keepalive effective-proxy-url tunnel?)]
+                            keepalive effective-proxy-url tunnel? duplicated-headers-as-seq?)]
     (.exec ^HttpClient client url cfg sslengine listener)
     (if deadlock-guard?
       (deadlock-guard response)

@@ -198,7 +198,7 @@ public class HttpClient implements Runnable {
             buffer.flip();
             try {
                 State oldState = req.decoder.state;
-                if (req.decoder.decode(buffer) == ALL_READ) {
+                if (req.decoder.decode(buffer,req.cfg.duplicatedHeadersAsSeq) == ALL_READ) {
                     req.finish();
                     if (req.cfg.keepAlive > 0) {
                         // Ensure that the key is added to keepalives exactly once on a state transition. There could be cases where decoder reaches

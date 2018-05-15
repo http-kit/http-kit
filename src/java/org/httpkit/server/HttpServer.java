@@ -151,7 +151,7 @@ public class HttpServer implements Runnable {
             boolean sentContinue = false;
             do {
                 AsyncChannel channel = atta.channel;
-                HttpRequest request = atta.decoder.decode(buffer);
+                HttpRequest request = atta.decoder.decode(buffer,false);
                 if (request != null) {
                     channel.reset(request);
                     if (request.isWebSocket) {
@@ -204,9 +204,9 @@ public class HttpServer implements Runnable {
                     atta.keepalive = false;
                     atta.decoder.reset();
 
-                    // Follow RFC6455 5.5.1 
+                    // Follow RFC6455 5.5.1
                     // Do not send CLOSE frame again if it has been sent.
-                    if (!closed) { 
+                    if (!closed) {
                         tryWrite(key, WsEncode(WSDecoder.OPCODE_CLOSE, frame.data));
                     }
                 }
@@ -379,34 +379,34 @@ public class HttpServer implements Runnable {
 
         // close socket, notify on-close handlers
         if (selector.isOpen()) {
-	    //            Set<SelectionKey> keys = selector.keys();
-	    //            SelectionKey[] keys = t.toArray(new SelectionKey[t.size()]);
-	    boolean cmex = false;
-	    do {
-		cmex = false;
-		try{
-		    for (SelectionKey k : selector.keys()) {
-			/**
-			 * 1. t.toArray will fill null if given array is larger.
-			 * 2. compute t.size(), then try to fill the array, if in the mean time, another
-			 *    thread close one SelectionKey, will result a NPE
-			 *
-			 * https://github.com/http-kit/http-kit/issues/125
-			 */
-			if (k != null)
-			    closeKey(k, 0); // 0 => close by server
-		    }
-		} catch(java.util.ConcurrentModificationException ex) {
-		    /**
-		     * The iterator will throw a CMEx as soon as we close an open connection. Since there
-		     * seems to be no other way to safely iterate over all keys we just catch the exception
-		     * and try again until we manage to notify all open connections.
-		     *
-		     * https://github.com/http-kit/http-kit/issues/355
-		     */
-		        cmex = true;
-		}		
-	    } while(cmex);
+      //            Set<SelectionKey> keys = selector.keys();
+      //            SelectionKey[] keys = t.toArray(new SelectionKey[t.size()]);
+      boolean cmex = false;
+      do {
+    cmex = false;
+    try{
+        for (SelectionKey k : selector.keys()) {
+      /**
+       * 1. t.toArray will fill null if given array is larger.
+       * 2. compute t.size(), then try to fill the array, if in the mean time, another
+       *    thread close one SelectionKey, will result a NPE
+       *
+       * https://github.com/http-kit/http-kit/issues/125
+       */
+      if (k != null)
+          closeKey(k, 0); // 0 => close by server
+        }
+    } catch(java.util.ConcurrentModificationException ex) {
+        /**
+         * The iterator will throw a CMEx as soon as we close an open connection. Since there
+         * seems to be no other way to safely iterate over all keys we just catch the exception
+         * and try again until we manage to notify all open connections.
+         *
+         * https://github.com/http-kit/http-kit/issues/355
+         */
+            cmex = true;
+    }
+      } while(cmex);
 
             try {
                 selector.close();

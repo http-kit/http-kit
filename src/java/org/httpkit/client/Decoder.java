@@ -78,7 +78,7 @@ public class Decoder {
         }
     }
 
-    public State decode(ByteBuffer buffer) throws LineTooLargeException, ProtocolException,
+    public State decode(ByteBuffer buffer, boolean duplicatedHeadersAsSeq) throws LineTooLargeException, ProtocolException,
             AbortException {
         String line;
         while (buffer.hasRemaining() && state != State.ALL_READ) {
@@ -89,7 +89,7 @@ public class Decoder {
                     }
                     break;
                 case READ_HEADER:
-                    readHeaders(buffer);
+                    readHeaders(buffer, duplicatedHeadersAsSeq);
                     break;
                 case READ_CHUNK_SIZE:
                     line = lineReader.readLine(buffer);
@@ -146,10 +146,10 @@ public class Decoder {
         }
     }
 
-    private void readHeaders(ByteBuffer buffer) throws LineTooLargeException, AbortException, ProtocolException {
+    private void readHeaders(ByteBuffer buffer, boolean duplicatedHeadersAsSeq) throws LineTooLargeException, AbortException, ProtocolException {
         String line = lineReader.readLine(buffer);
         while (line != null && !line.isEmpty()) {
-            HttpUtils.splitAndAddHeader(line, headers);
+            HttpUtils.splitAndAddHeader(line, headers, duplicatedHeadersAsSeq);
             line = lineReader.readLine(buffer);
         }
         if (line == null)

@@ -332,7 +332,7 @@ public class HttpUtils {
         System.err.print(str.getBuffer().toString());
     }
 
-    public static void splitAndAddHeader(String sb, Map<String, Object> headers) {
+    public static void splitAndAddHeader(String sb, Map<String, Object> headers, boolean duplicatedHeadersAsSeq) {
         final int length = sb.length();
         int nameStart;
         int nameEnd;
@@ -365,11 +365,20 @@ public class HttpUtils {
             String value = sb.substring(valueStart, valueEnd);
             key = key.toLowerCase();
             Object v = headers.get(key);
-            if (v != null) {
-                // https://github.com/http-kit/http-kit/issues/108
-                value = v.toString() + "," + value;
+            if (v == null) {
+                headers.put(key,value);
+            } else {
+                if (v instanceof String) {
+                    if (duplicatedHeadersAsSeq) {
+                        headers.put(key, PersistentList.create(Arrays.asList((String) v, value)));
+                    } else {
+                        headers.put(key,v.toString() + "," + value);
+                    }
+                } else {
+                    // v is a Cons
+                    headers.put(key, ((ISeq)v).cons(value));
+                }
             }
-            headers.put(key, value);
         }
     }
 
