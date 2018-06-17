@@ -14,6 +14,7 @@
             [clj-http.util :as u])
   (:import [java.io File FileOutputStream FileInputStream]
            org.httpkit.SpecialHttpClient
+           (java.nio.file Files)
            (java.util.concurrent ThreadPoolExecutor TimeUnit ArrayBlockingQueue)))
 
 (defn file-handler [req]
@@ -26,6 +27,12 @@
         file (gen-tempfile l ".txt")]
     {:status 200
      :body (FileInputStream. file)}))
+
+(defn bytearray-handler [req]
+  (let [l (-> req :params :l to-int)
+        file (gen-tempfile l ".txt")]
+    {:status 200
+     :body (Files/readAllBytes (.toPath file))}))
 
 (defn many-headers-handler [req]
   (let [count (or (-> req :params :count to-int) 20)]
@@ -121,6 +128,7 @@
                     (on-receive con (fn [mesg] (send! con mesg))))))
   (context "/ws2" [] ws/test-routes)
   (GET "/inputstream" [] inputstream-handler)
+  (GET "/bytearray" [] bytearray-handler)
   (POST "/multipart" [] multipart-handler)
   (POST "/chunked-input" [] (fn [req] {:status 200
                                        :body (str (:content-length req))}))
@@ -205,6 +213,13 @@
 (deftest test-body-inputstream
   (doseq [length (range 1 (* 1024 1024 5) 1439987)] ; max 5m, many files
     (let [uri (str "http://localhost:4347/inputstream?l=" length)
+          resp (http/get uri)]
+      (is (= (:status resp) 200))
+      (is (= length (count (:body resp)))))))
+
+(deftest test-body-bytearray
+  (doseq [length (range 1 (* 1024 1024 5) 1439987)] ; max 5m, many files
+    (let [uri (str "http://localhost:4347/bytearray?l=" length)
           resp (http/get uri)]
       (is (= (:status resp) 200))
       (is (= length (count (:body resp)))))))
