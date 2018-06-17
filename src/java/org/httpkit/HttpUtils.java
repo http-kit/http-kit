@@ -99,6 +99,8 @@ public class HttpUtils {
         } else if (body instanceof InputStream) {
             DynamicBytes b = readAll((InputStream) body);
             return ByteBuffer.wrap(b.get(), 0, b.length());
+        } else if (body instanceof byte[]) {
+            return ByteBuffer.wrap((byte[]) body);
         } else if (body instanceof File) {
             // serving file is better be done by Nginx
             return readAll((File) body);
