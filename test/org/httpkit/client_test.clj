@@ -297,11 +297,19 @@
   (let [url "http://localhost:4347/nested-param"
         params {:card {:number "4242424242424242" :exp_month "12"}}]
     (is (= params (read-string (:body @(http/post url {:form-params params})))))
+
+    (is (= params (read-string (:body @(http/post
+                                        url
+                                        {:query-params {"card[number]" 4242424242424242
+                                                       "card[exp_month]" 12}})))))
+    (is (= params (read-string (:body (clj-http/post url {:query-params params})))))
+
+    ;; clj-http doesn't actually process these as nested params anymore. Leaving
+    ;; to maintain backward compatibility
     (is (= params (read-string (:body @(http/post
                                         url
                                         {:form-params {"card[number]" 4242424242424242
-                                                       "card[exp_month]" 12}})))))
-    (is (= params (read-string (:body (clj-http/post url {:form-params params})))))))
+                                                       "card[exp_month]" 12}})))))))
 
 (deftest test-redirect
   (let [url "http://localhost:4347/redirect?total=5&n=0"]

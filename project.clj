@@ -47,7 +47,7 @@
      [junit/junit                     "4.12"]
      [org.clojure/tools.logging      "0.4.0"]
      [ch.qos.logback/logback-classic "1.2.3"]
-     [clj-http                       "2.1.0"] ; TODO Update (breaking?)
+     [clj-http                       "3.9.1"]
      [io.netty/netty           "3.6.5.Final"] ; TODO Update (breaking)
      [org.clojure/data.json          "0.2.6"]
      [http.async.client              "0.5.2"] ; TODO Update (breaking)
