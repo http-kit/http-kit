@@ -292,6 +292,14 @@
                                      (assoc (rand-keep-alive) :insecure? true))
                           :body count)))))))
 
+(deftest test-misc-https-certs
+  ;; Check to make sure an https connection works using the default trust store.
+  (is (contains? @(http/get "https://status.github.com/api/status.json") :status))
+  (is (contains? @(http/get "https://google.com") :status))
+  (is (contains? @(http/get "https://apple.com") :status))
+  (is (contains? @(http/get "https://microsoft.com") :status))
+  (is (contains? @(http/get "https://letsencrypt.org") :status)))
+
 ;; https://github.com/http-kit/http-kit/issues/54
 (deftest test-nested-param
   (let [url "http://localhost:4347/nested-param"
