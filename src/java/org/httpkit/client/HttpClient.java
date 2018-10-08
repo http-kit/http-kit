@@ -16,6 +16,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.security.NoSuchAlgorithmException;
+import java.security.KeyManagementException;
 import java.util.Iterator;
 import java.util.Queue;
 import java.util.Set;
@@ -36,8 +37,9 @@ public class HttpClient implements Runnable {
 
     static {
         try {
-            DEFAULT_CONTEXT = SSLContext.getDefault();
-        } catch (NoSuchAlgorithmException e) {
+            DEFAULT_CONTEXT = SSLContext.getInstance("TLS");
+            DEFAULT_CONTEXT.init(null, TrustManagerFactory.getTrustManagers() ,null);
+        } catch (Exception e) {
             throw new Error("Failed to initialize SSLContext", e);
         }
     }
