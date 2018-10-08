@@ -70,8 +70,8 @@ public class HttpClient implements Runnable {
     }
 
     public static interface SSLEngineURIConfigurer {
-        public static final SSLEngineURIConfigurer NOP = new SSLEngineURIConfigurer() {
-            public void configure(SSLEngine sslEngine, URI uri) { /* do nothing */ }
+        public static final SSLEngineURIConfigurer CLIENT_MODE = new SSLEngineURIConfigurer() {
+            public void configure(SSLEngine sslEngine, URI uri) { sslEngine.setUseClientMode(true); }
         };
         void configure(SSLEngine sslEngine, URI uri);
     }
@@ -105,7 +105,7 @@ public class HttpClient implements Runnable {
     }
 
     public HttpClient(long maxConnections) throws IOException {
-        this(maxConnections, AddressFinder.DEFAULT, SSLEngineURIConfigurer.NOP,
+        this(maxConnections, AddressFinder.DEFAULT, SSLEngineURIConfigurer.CLIENT_MODE,
                 ContextLogger.ERROR_PRINTER, EventLogger.NOP, EventNames.DEFAULT);
     }
 
