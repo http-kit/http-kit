@@ -1,3 +1,20 @@
+## 2.4.0-alpha1 (2018 Dec 2)
+
+```clojure
+[http-kit "2.4.0-alpha1"]
+```
+
+> As usual, please evaluate before using in production (and **please report any problems!**).
+
+#### New stuff
+
+* [#383 #388] Java 11 support (@ryfow)
+
+#### Fixes
+
+* [#384] [Server] Fix typo in `run-server` doc-string (@dsdolzhenko)
+
+
 ## 2.3.0 (2018 Apr 21)
 
 ```clojure
