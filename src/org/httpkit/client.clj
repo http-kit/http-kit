@@ -119,7 +119,7 @@
     (if ssl-configurer
       (reify HttpClient$SSLEngineURIConfigurer
         (configure [this ssl-engine uri] (ssl-configurer ssl-engine uri)))
-      HttpClient$SSLEngineURIConfigurer/NOP)
+      HttpClient$SSLEngineURIConfigurer/CLIENT_MODE)
     (if error-logger
       (reify ContextLogger
         (log [this message error] (error-logger message error)))

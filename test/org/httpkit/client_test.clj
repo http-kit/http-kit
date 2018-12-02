@@ -292,16 +292,32 @@
                                      (assoc (rand-keep-alive) :insecure? true))
                           :body count)))))))
 
+(deftest test-misc-https-certs
+  ;; Check to make sure an https connection works using the default trust store.
+  (is (contains? @(http/get "https://status.github.com/api/status.json") :status))
+  (is (contains? @(http/get "https://google.com") :status))
+  (is (contains? @(http/get "https://apple.com") :status))
+  (is (contains? @(http/get "https://microsoft.com") :status))
+  (is (contains? @(http/get "https://letsencrypt.org") :status)))
+
 ;; https://github.com/http-kit/http-kit/issues/54
 (deftest test-nested-param
   (let [url "http://localhost:4347/nested-param"
         params {:card {:number "4242424242424242" :exp_month "12"}}]
     (is (= params (read-string (:body @(http/post url {:form-params params})))))
+
+    (is (= params (read-string (:body @(http/post
+                                        url
+                                        {:query-params {"card[number]" 4242424242424242
+                                                       "card[exp_month]" 12}})))))
+    (is (= params (read-string (:body (clj-http/post url {:query-params params})))))
+
+    ;; clj-http doesn't actually process these as nested params anymore. Leaving
+    ;; to maintain backward compatibility
     (is (= params (read-string (:body @(http/post
                                         url
                                         {:form-params {"card[number]" 4242424242424242
-                                                       "card[exp_month]" 12}})))))
-    (is (= params (read-string (:body (clj-http/post url {:form-params params})))))))
+                                                       "card[exp_month]" 12}})))))))
 
 (deftest test-redirect
   (let [url "http://localhost:4347/redirect?total=5&n=0"]
