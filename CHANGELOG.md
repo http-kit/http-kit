@@ -1,7 +1,7 @@
-## 2.4.0-alpha1 (2018 Dec 2)
+## 2.4.0-alpha2 (2018 Dec 2)
 
 ```clojure
-[http-kit "2.4.0-alpha1"]
+[http-kit "2.4.0-alpha2"]
 ```
 
 > As usual, please evaluate before using in production (and **please report any problems!**).
@@ -9,6 +9,8 @@
 #### New stuff
 
 * [#383 #388] Java 11 support (@ryfow)
+* [#374] [Client] Allow specification of local address when making requests (@snoe)
+* [#379] [Server] Support byte[] responses (@ikitommi)
 
 #### Fixes
 
