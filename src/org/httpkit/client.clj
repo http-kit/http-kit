@@ -44,7 +44,7 @@
                d))
            params))
 
-(defn- query-string
+(defn query-string
   "Returns URL-encoded query string for given params map."
   [m]
   (let [m (nested-param m)
