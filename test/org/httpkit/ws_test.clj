@@ -24,15 +24,6 @@
                           (println e)
                           (send! con msg)))))))
 
-;; HY: removed to address #46
-#_(defn ws-handler-sent-on-connect [req]
-  (with-channel req con
-    (send! con "hello") ;; should sendable when on-connet
-    (send! con "world")
-    (on-receive con (fn [mesg]
-                      ;; only :body is picked
-                      (send! con {:body mesg}))))) ; echo back
-
 (defn ws-handler-async-client [req] ;; test with http.async.client, echo back
   (with-channel req con
     (on-receive con (fn [mesg]
@@ -78,7 +69,6 @@
 
 (defroutes test-routes
   (GET "/ws" [] ws-handler)
-  ;(GET "/sent-on-connect" [] ws-handler-sent-on-connect)
   (GET "/echo" [] ws-handler-async-client)
   (GET "/http-async-client" [] ws-handler-async-client)
   (GET "/binary" [] binary-ws-handler)
@@ -132,16 +122,6 @@
   (let [client (WebSocketClient. "ws://localhost:4348/ping-pong")]
     (.ping client "TEST")
     (is (= "ECHO: TEST" (.getMessage client)))
-    (.close client)))
-
-#_(deftest test-sent-message-in-body      ; issue #14
-  (let [client (WebSocketClient. "ws://localhost:4348/sent-on-connect")]
-    (is (= "hello" (.getMessage client)))
-    (is (= "world" (.getMessage client)))
-    (doseq [idx (range 0 3)]
-      (let [mesg (str "message#" idx)]
-        (.sendMessage client mesg)
-        (is (= mesg (.getMessage client))))) ;; echo expected
     (.close client)))
 
 (deftest test-tcp-segmented-frame-does-right  ; issue #47

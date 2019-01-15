@@ -161,7 +161,7 @@
 (def accept "DEPRECATED for `sec-websocket-accept" sec-websocket-accept)
 
 (defn websocket-handshake-check
-  "Returns true iff received a valid WebSocket request."
+  "Returns sec-ws-accept iff received a valid WebSocket request."
   [^AsyncChannel ch ring-req]
   (when-let [sec-ws-key (get-in ring-req [:headers "sec-websocket-key"])]
     (when-let [sec-ws-accept (try (sec-websocket-accept sec-ws-key)
@@ -169,12 +169,12 @@
       sec-ws-accept)))
 
 (defn send-websocket-handshake!
-  "Upgraded to  WebSocket request."
+  "Upgrade to WebSocket connection."
   [^AsyncChannel ch ^String sec-ws-accept]
   (.sendHandshake ch 
-                  {"Upgrade" "websocket"
-                   "Connection" "Upgrade"
-                   "Sec-WebSocket-Accept" sec-ws-accept}))
+    {"Upgrade" "websocket" 
+     "Connection" "Upgrade" 
+     "Sec-WebSocket-Accept" sec-ws-accept}))
 
 ;; (defn websocket-req? [ring-req] (:websocket?    ring-req))
 ;; (defn async-channel  [ring-req] (:async-channel ring-req))
@@ -206,8 +206,7 @@
       (with-channel request ch
         (println \"New WebSocket channel:\" ch)
         (on-receive ch (fn [msg]    (println \"on-receive:\" msg)))
-        (on-close   ch (fn [status] (println \"on-close:\" status)))
-        (send! ch \"First chat message!\"))))
+        (on-close   ch (fn [status] (println \"on-close:\" status))))))
 
   Channel API (see relevant docstrings for more info):
     (open? [ch])
