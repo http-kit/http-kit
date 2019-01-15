@@ -24,7 +24,8 @@
                           (println e)
                           (send! con msg)))))))
 
-(defn ws-handler-sent-on-connect [req]
+;; HY: removed to address #46
+#_(defn ws-handler-sent-on-connect [req]
   (with-channel req con
     (send! con "hello") ;; should sendable when on-connet
     (send! con "world")
@@ -77,7 +78,7 @@
 
 (defroutes test-routes
   (GET "/ws" [] ws-handler)
-  (GET "/sent-on-connect" [] ws-handler-sent-on-connect)
+  ;(GET "/sent-on-connect" [] ws-handler-sent-on-connect)
   (GET "/echo" [] ws-handler-async-client)
   (GET "/http-async-client" [] ws-handler-async-client)
   (GET "/binary" [] binary-ws-handler)
@@ -133,7 +134,7 @@
     (is (= "ECHO: TEST" (.getMessage client)))
     (.close client)))
 
-(deftest test-sent-message-in-body      ; issue #14
+#_(deftest test-sent-message-in-body      ; issue #14
   (let [client (WebSocketClient. "ws://localhost:4348/sent-on-connect")]
     (is (= "hello" (.getMessage client)))
     (is (= "world" (.getMessage client)))

@@ -160,17 +160,21 @@
 
 (def accept "DEPRECATED for `sec-websocket-accept" sec-websocket-accept)
 
-(defn send-websocket-handshake!
-  "Returns true iff successfully upgraded a valid WebSocket request."
+(defn websocket-handshake-check
+  "Returns true iff received a valid WebSocket request."
   [^AsyncChannel ch ring-req]
   (when-let [sec-ws-key (get-in ring-req [:headers "sec-websocket-key"])]
     (when-let [sec-ws-accept (try (sec-websocket-accept sec-ws-key)
                                   (catch Exception _))]
-      (.sendHandshake ch
-        {"Upgrade" "websocket"
-         "Connection" "Upgrade"
-         "Sec-WebSocket-Accept" sec-ws-accept})
-      true)))
+      sec-ws-accept)))
+
+(defn send-websocket-handshake!
+  "Upgraded to  WebSocket request."
+  [^AsyncChannel ch ^String sec-ws-accept]
+  (.sendHandshake ch 
+                  {"Upgrade" "websocket"
+                   "Connection" "Upgrade"
+                   "Sec-WebSocket-Accept" sec-ws-accept}))
 
 ;; (defn websocket-req? [ring-req] (:websocket?    ring-req))
 ;; (defn async-channel  [ring-req] (:async-channel ring-req))
@@ -219,7 +223,9 @@
          ~ch-name (:async-channel ring-req#)]
 
      (if (:websocket? ring-req#)
-       (if (send-websocket-handshake! ~ch-name ring-req#)
-         (do ~@body {:body ~ch-name})
+       (if-let [sec-ws-accept# (websocket-handshake-check ~ch-name ring-req#)]
+         (do (send-websocket-handshake! ~ch-name sec-ws-accept#) 
+             ~@body
+             {:body ~ch-name})
          {:status 400 :body "Bad Sec-WebSocket-Key header"})
        (do ~@body {:body ~ch-name}))))
