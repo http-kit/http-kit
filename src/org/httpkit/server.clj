@@ -161,20 +161,29 @@
 (def accept "DEPRECATED for `sec-websocket-accept" sec-websocket-accept)
 
 (defn websocket-handshake-check
-  "Returns sec-ws-accept iff received a valid WebSocket request."
+  "Returns `sec-ws-accept` string iff given Ring request is a valid
+  WebSocket handshake."
   [^AsyncChannel ch ring-req]
   (when-let [sec-ws-key (get-in ring-req [:headers "sec-websocket-key"])]
-    (when-let [sec-ws-accept (try (sec-websocket-accept sec-ws-key)
-                                  (catch Exception _))]
-      sec-ws-accept)))
+    (try
+      (sec-websocket-accept sec-ws-key)
+      (catch Exception _ nil))))
+
+(defn send-checked-websocket-handshake!
+  "Given an AsyncChannel and `sec-ws-accept` string, unconditionally
+  sends handshake to upgrade given AsyncChannel to a WebSocket.
+  See also `websocket-handshake-check`."
+  [^AsyncChannel ch ^String sec-ws-accept]
+  (.sendHandshake ch
+    {"Upgrade" "websocket"
+     "Connection" "Upgrade"
+     "Sec-WebSocket-Accept" sec-ws-accept}))
 
 (defn send-websocket-handshake!
-  "Upgrade to WebSocket connection."
-  [^AsyncChannel ch ^String sec-ws-accept]
-  (.sendHandshake ch 
-    {"Upgrade" "websocket" 
-     "Connection" "Upgrade" 
-     "Sec-WebSocket-Accept" sec-ws-accept}))
+  "Returns true iff successfully upgraded a valid WebSocket request."
+  [^AsyncChannel ch ring-req]
+  (when-let [sec-ws-accept (websocket-handshake-check ch ring-req)]
+    (send-checked-websocket-handshake! ch sec-ws-accept)))
 
 ;; (defn websocket-req? [ring-req] (:websocket?    ring-req))
 ;; (defn async-channel  [ring-req] (:async-channel ring-req))
@@ -184,6 +193,9 @@
   "Evaluates body with `ch-name` bound to the request's underlying
   asynchronous HTTP or WebSocket channel, and returns {:body AsyncChannel}
   as an implementation detail.
+
+  Note: for WebSocket requests, WebSocket handshake will be sent *after*
+  body is evaluated. I.e. body cannot call `send!`.
 
   ;; Asynchronous HTTP response (with optional streaming)
   (defn my-async-handler [request]
@@ -223,8 +235,9 @@
 
      (if (:websocket? ring-req#)
        (if-let [sec-ws-accept# (websocket-handshake-check ~ch-name ring-req#)]
-         (do (send-websocket-handshake! ~ch-name sec-ws-accept#) 
-             ~@body
-             {:body ~ch-name})
+         (do
+           ~@body ; Eval body before handshake to allow hooks to be established, Ref. #318
+           (send-checked-websocket-handshake! ~ch-name sec-ws-accept#)
+           {:body ~ch-name})
          {:status 400 :body "Bad Sec-WebSocket-Key header"})
        (do ~@body {:body ~ch-name}))))
