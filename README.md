@@ -6,7 +6,7 @@
 
 ```clojure
 [http-kit "2.3.0"]         ; Stable, published by contributors, see CHANGELOG for details
-[http-kit "2.4.0-alpha2"]  ; Dev,    published by contributors, see CHANGELOG for details
+[http-kit "2.4.0-alpha3"]  ; Dev,    published by contributors, see CHANGELOG for details
 [http-kit "2.1.19"]        ; Legacy, published by @shenfeng
 ```
 

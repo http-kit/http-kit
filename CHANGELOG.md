@@ -1,10 +1,14 @@
-## 2.4.0-alpha2 (2018 Dec 2)
+## 2.4.0-alpha3 (2019 Jan 19)
 
 ```clojure
-[http-kit "2.4.0-alpha2"]
+[http-kit "2.4.0-alpha3"]
 ```
 
 > As usual, please evaluate before using in production (and **please report any problems!**).
+
+#### Changes
+
+* [#391 #318 #46] [Server] BREAKING: ensure WS on-receive is ready before first message arrives (@huahaiy)
 
 #### New stuff
 
