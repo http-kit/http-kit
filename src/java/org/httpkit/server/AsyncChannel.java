@@ -290,6 +290,16 @@ public class AsyncChannel {
     static Keyword K_WS_1001 = Keyword.intern("going-away");
     static Keyword K_WS_1002 = Keyword.intern("protocol-error");
     static Keyword K_WS_1003 = Keyword.intern("unsupported");
+    // 1004 is Reserved
+    static Keyword K_WS_1005 = Keyword.intern("no-status-received");
+    static Keyword K_WS_1006 = Keyword.intern("abnormal");
+    static Keyword K_WS_1007 = Keyword.intern("invalid-payload-data");
+    static Keyword K_WS_1008 = Keyword.intern("policy-violation");
+    static Keyword K_WS_1009 = Keyword.intern("message-too-big");
+    static Keyword K_WS_1010 = Keyword.intern("mandatory-extension");
+    static Keyword K_WS_1011 = Keyword.intern("internal-server-error");
+    // 1012 - 1014 are undefined
+    static Keyword K_WS_1015 = Keyword.intern("tls-handshake");
     static Keyword K_UNKNOWN = Keyword.intern("unknown");
 
     private static Keyword readable(int status) {
@@ -306,6 +316,22 @@ public class AsyncChannel {
                 return K_WS_1002;
             case 1003:
                 return K_WS_1003;
+            case 1005:
+                return K_WS_1005;
+            case 1006:
+                return K_WS_1006;
+            case 1007:
+                return K_WS_1007;
+            case 1008:
+                return K_WS_1008;
+            case 1009:
+                return K_WS_1009;
+            case 1010:
+                return K_WS_1010;
+            case 1011:
+                return K_WS_1011;
+            case 1015:
+                return K_WS_1015;
             default:
                 return K_UNKNOWN;
         }
