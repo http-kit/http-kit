@@ -37,6 +37,7 @@ lein test :benchmark
 
 ### Enabling http-kit client SNI support
 
+> Requires JVM >= 8, http-kit >= 2.4.0-alpha5.
 > Common cause of: `javax.net.ssl.SSLHandshakeException: Received fatal alert: handshake_failure`
 
 To retain backwards-compatibility with JVMs < 8, the http-kit client currently **does not have SNI support enabled by default**.
