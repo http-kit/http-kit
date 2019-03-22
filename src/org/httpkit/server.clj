@@ -97,11 +97,12 @@
   "Unified asynchronous channel interface for HTTP (streaming or long-polling)
    and WebSocket."
 
-  (open? [ch] "Returns true iff channel is open.")
-  (close [ch]
+  (open?      [ch] "Returns true iff channel is open.")
+  (websocket? [ch] "Returns true iff channel is a WebSocket.")
+  (close      [ch]
     "Closes the channel. Idempotent: returns true if the channel was actually
     closed, or false if it was already closed.")
-  (websocket? [ch] "Returns true iff channel is a WebSocket.")
+
   (send! [ch data] [ch data close-after-send?]
     "Sends data to client and returns true if the data was successfully sent,
     or false if the channel is closed. Data is sent directly to the client,
@@ -117,14 +118,17 @@
     For WebSocket, a text frame is sent to client if data is String,
     a binary frame when data is byte[] or InputStream. For for HTTP streaming
     responses, data can be one of the type defined by Ring spec")
+
   (on-receive [ch callback]
     "Sets handler (fn [message]) for notification of client WebSocket
     messages. Message ordering is guaranteed by server.
 
     The message argument could be a string or a byte[].")
+
   (on-ping [ch callback]
     "Sets handler (fn [data]) for notification of client WebSocket pings. The
     data param represents application data and will by a byte[].")
+
   (on-close [ch callback]
     "Sets handler (fn [status]) for notification of channel being closed by the
     server or client. Handler will be invoked at most once. Useful for clean-up.
@@ -140,17 +144,19 @@
 
 (extend-type AsyncChannel
   Channel
-  (open? [ch] (not (.isClosed ch)))
-  (close [ch] (.serverClose ch 1000))
-  (websocket? [ch] (.isWebSocket ch))
-  (send!
-    ([ch data] (.send ch data (not (websocket? ch))))
-    ([ch data close-after-send?] (.send ch data (boolean close-after-send?))))
-  (on-receive [ch callback] (.setReceiveHandler ch callback))
-  (on-ping [ch callback] (.setPingHandler ch callback))
-  (on-close [ch callback] (.setCloseHandler ch callback)))
+  (open?      [ch] (not (.isClosed ch)))
+  (websocket? [ch] (.isWebSocket   ch))
 
-;;;; WebSocket
+  (close      [ch] (.serverClose   ch 1000))
+  (send!
+    ([ch data                  ] (.send ch data (not (websocket? ch))))
+    ([ch data close-after-send?] (.send ch data (boolean close-after-send?))))
+
+  (on-receive [ch callback] (.setReceiveHandler ch callback))
+  (on-ping    [ch callback] (.setPingHandler    ch callback))
+  (on-close   [ch callback] (.setCloseHandler   ch callback)))
+
+;;;; WebSockets
 
 (defn sec-websocket-accept [sec-websocket-key]
   (let [md (MessageDigest/getInstance "SHA1")
@@ -163,7 +169,7 @@
 (defn websocket-handshake-check
   "Returns `sec-ws-accept` string iff given Ring request is a valid
   WebSocket handshake."
-  [^AsyncChannel ch ring-req]
+  [ring-req]
   (when-let [sec-ws-key (get-in ring-req [:headers "sec-websocket-key"])]
     (try
       (sec-websocket-accept sec-ws-key)
@@ -182,12 +188,10 @@
 (defn send-websocket-handshake!
   "Returns true iff successfully upgraded a valid WebSocket request."
   [^AsyncChannel ch ring-req]
-  (when-let [sec-ws-accept (websocket-handshake-check ch ring-req)]
+  (when-let [sec-ws-accept (websocket-handshake-check ring-req)]
     (send-checked-websocket-handshake! ch sec-ws-accept)))
 
-;; (defn websocket-req? [ring-req] (:websocket?    ring-req))
-;; (defn async-channel  [ring-req] (:async-channel ring-req))
-;; (defn async-response [ring-req] {:body (:async-channel ring-req)})
+;;;;
 
 (defmacro with-channel
   "Evaluates body with `ch-name` bound to the request's underlying
@@ -206,8 +210,8 @@
   (doseq [ch @clients]
     (swap! clients disj ch)
     (send! ch {:status  200
-                 :headers {\"Content-Type\" \"text/html\"}
-                 :body your-async-response}
+               :headers {\"Content-Type\" \"text/html\"}
+               :body your-async-response}
              ;; false ; Uncomment to use chunk encoding for HTTP streaming
              )))
 
@@ -221,12 +225,14 @@
         (on-close   ch (fn [status] (println \"on-close:\" status))))))
 
   Channel API (see relevant docstrings for more info):
-    (open? [ch])
-    (close [ch])
-    (websocket? [ch])
-    (send! [ch data] [ch data close-after-send?])
+    (open?       [ch])
+    (websocket?  [ch])
+
+    (close       [ch])
+    (send!       [ch data] [ch data close-after-send?])
+
     (on-receieve [ch callback])
-    (on-close [ch callback])
+    (on-close    [ch callback])
 
   See org.httpkit.timer ns for optional timeout facilities."
   [ring-req ch-name & body]
@@ -234,7 +240,7 @@
          ~ch-name (:async-channel ring-req#)]
 
      (if (:websocket? ring-req#)
-       (if-let [sec-ws-accept# (websocket-handshake-check ~ch-name ring-req#)]
+       (if-let [sec-ws-accept# (websocket-handshake-check ring-req#)]
          (do
            ~@body ; Eval body before handshake to allow hooks to be established, Ref. #318
            (send-checked-websocket-handshake! ~ch-name sec-ws-accept#)
