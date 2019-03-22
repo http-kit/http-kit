@@ -198,9 +198,6 @@
   asynchronous HTTP or WebSocket channel, and returns {:body AsyncChannel}
   as an implementation detail.
 
-  Note: for WebSocket requests, WebSocket handshake will be sent *after*
-  body is evaluated. I.e. body cannot call `send!`.
-
   ;; Asynchronous HTTP response (with optional streaming)
   (defn my-async-handler [request]
     (with-channel request ch ; Request's channel
@@ -242,8 +239,8 @@
      (if (:websocket? ring-req#)
        (if-let [sec-ws-accept# (websocket-handshake-check ring-req#)]
          (do
-           ~@body ; Eval body before handshake to allow hooks to be established, Ref. #318
            (send-checked-websocket-handshake! ~ch-name sec-ws-accept#)
+           ~@body
            {:body ~ch-name})
          {:status 400 :body "Bad Sec-WebSocket-Key header"})
        (do ~@body {:body ~ch-name}))))
