@@ -91,7 +91,42 @@
       {:local-port (.getPort s)
        :server s})))
 
-;;;; Asynchronous extension
+;;;; WebSockets
+
+(defn sec-websocket-accept [sec-websocket-key]
+  (let [md (MessageDigest/getInstance "SHA1")
+        websocket-13-guid "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"]
+    (base64-encode
+     (.digest md (.getBytes (str sec-websocket-key websocket-13-guid))))))
+
+(def accept "DEPRECATED: prefer `sec-websocket-accept`" sec-websocket-accept)
+
+(defn websocket-handshake-check
+  "Returns `sec-ws-accept` string iff given Ring request is a valid
+  WebSocket handshake."
+  [ring-req]
+  (when-let [sec-ws-key (get-in ring-req [:headers "sec-websocket-key"])]
+    (try
+      (sec-websocket-accept sec-ws-key)
+      (catch Exception _ nil))))
+
+(defn send-checked-websocket-handshake!
+  "Given an AsyncChannel and `sec-ws-accept` string, unconditionally
+  sends handshake to upgrade given AsyncChannel to a WebSocket.
+  See also `websocket-handshake-check`."
+  [^AsyncChannel ch ^String sec-ws-accept]
+  (.sendHandshake ch
+    {"Upgrade" "websocket"
+     "Connection" "Upgrade"
+     "Sec-WebSocket-Accept" sec-ws-accept}))
+
+(defn send-websocket-handshake!
+  "Returns true iff successfully upgraded a valid WebSocket request."
+  [^AsyncChannel ch ring-req]
+  (when-let [sec-ws-accept (websocket-handshake-check ring-req)]
+    (send-checked-websocket-handshake! ch sec-ws-accept)))
+
+;;;; Channel API
 
 (defprotocol Channel
   "Unified asynchronous channel interface for HTTP (streaming or long-polling)
@@ -156,82 +191,9 @@
   (on-ping    [ch callback] (.setPingHandler    ch callback))
   (on-close   [ch callback] (.setCloseHandler   ch callback)))
 
-;;;; WebSockets
-
-(defn sec-websocket-accept [sec-websocket-key]
-  (let [md (MessageDigest/getInstance "SHA1")
-        websocket-13-guid "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"]
-    (base64-encode
-     (.digest md (.getBytes (str sec-websocket-key websocket-13-guid))))))
-
-(def accept "DEPRECATED for `sec-websocket-accept" sec-websocket-accept)
-
-(defn websocket-handshake-check
-  "Returns `sec-ws-accept` string iff given Ring request is a valid
-  WebSocket handshake."
-  [ring-req]
-  (when-let [sec-ws-key (get-in ring-req [:headers "sec-websocket-key"])]
-    (try
-      (sec-websocket-accept sec-ws-key)
-      (catch Exception _ nil))))
-
-(defn send-checked-websocket-handshake!
-  "Given an AsyncChannel and `sec-ws-accept` string, unconditionally
-  sends handshake to upgrade given AsyncChannel to a WebSocket.
-  See also `websocket-handshake-check`."
-  [^AsyncChannel ch ^String sec-ws-accept]
-  (.sendHandshake ch
-    {"Upgrade" "websocket"
-     "Connection" "Upgrade"
-     "Sec-WebSocket-Accept" sec-ws-accept}))
-
-(defn send-websocket-handshake!
-  "Returns true iff successfully upgraded a valid WebSocket request."
-  [^AsyncChannel ch ring-req]
-  (when-let [sec-ws-accept (websocket-handshake-check ring-req)]
-    (send-checked-websocket-handshake! ch sec-ws-accept)))
-
-;;;;
-
 (defmacro with-channel
-  "Evaluates body with `ch-name` bound to the request's underlying
-  asynchronous HTTP or WebSocket channel, and returns {:body AsyncChannel}
-  as an implementation detail.
-
-  ;; Asynchronous HTTP response (with optional streaming)
-  (defn my-async-handler [request]
-    (with-channel request ch ; Request's channel
-      ;; Make ch available to whoever can deliver the response to it; ex.:
-      (swap! clients conj ch)))   ; given (def clients (atom #{}))
-  ;; Some place later:
-  (doseq [ch @clients]
-    (swap! clients disj ch)
-    (send! ch {:status  200
-               :headers {\"Content-Type\" \"text/html\"}
-               :body your-async-response}
-             ;; false ; Uncomment to use chunk encoding for HTTP streaming
-             )))
-
-  ;; WebSocket response
-  (defn my-chatroom-handler [request]
-    (if-not (:websocket? request)
-      {:status 200 :body \"Welcome to the chatroom! JS client connecting...\"}
-      (with-channel request ch
-        (println \"New WebSocket channel:\" ch)
-        (on-receive ch (fn [msg]    (println \"on-receive:\" msg)))
-        (on-close   ch (fn [status] (println \"on-close:\" status))))))
-
-  Channel API (see relevant docstrings for more info):
-    (open?       [ch])
-    (websocket?  [ch])
-
-    (close       [ch])
-    (send!       [ch data] [ch data close-after-send?])
-
-    (on-receieve [ch callback])
-    (on-close    [ch callback])
-
-  See org.httpkit.timer ns for optional timeout facilities."
+  "DEPRECATED: this macro has potential race conditions, Ref. #318.
+  Prefer `as-channel` instead."
   [ring-req ch-name & body]
   `(let [ring-req# ~ring-req
          ~ch-name (:async-channel ring-req#)]
@@ -244,3 +206,68 @@
            {:body ~ch-name})
          {:status 400 :body "Bad Sec-WebSocket-Key header"})
        (do ~@body {:body ~ch-name}))))
+
+(defn as-channel
+  "Returns `{:body ch}`, where `ch` is the request's underlying
+  asynchronous HTTP or WebSocket `AsyncChannel`.
+
+  Main options:
+    :on-receive - (fn [ch message]) called for client WebSocket messages.
+    :on-ping    - (fn [ch data])    called for client WebSocket pings.
+    :on-close   - (fn [ch status])  called when AsyncChannel is closed.
+    :on-open    - (fn [ch])         called when AsyncChannel is ready for `send!`, etc.
+
+  See `Channel` protocol for more info on handlers and `AsyncChannel`s.
+  See `org.httpkit.timer` ns for optional timeout utils.
+
+  ---
+
+  Example - Async HTTP response:
+
+    (def clients_ (atom #{}))
+    (defn my-async-handler [ring-req]
+      (as-channel ring-req
+        {:on-open (fn [ch] (swap! clients_ conj ch))}))
+
+    ;; Somewhere else in your code
+    (doseq [ch @clients_]
+      (swap! clients_ disj ch)
+      (send! ch {:status 200 :headers {\"Content-Type\" \"text/html\"}
+                 :body \"Your async response\"}
+        ;; false ; Uncomment to use chunk encoding for HTTP streaming
+        ))
+
+  Example - WebSocket response:
+
+    (defn my-chatroom-handler [ring-req]
+      (if-not (:websocket? ring-req)
+        {:status 200 :body \"Welcome to the chatroom! JS client connecting...\"}
+        (as-channel ring-req
+          {:on-receive (fn [ch message] (println \"on-receive:\" message))
+           :on-close   (fn [ch status]  (println \"on-close:\"   status))
+           :on-open    (fn [ch]         (println \"on-open:\"    ch))})))"
+
+  [ring-req {:keys [on-receive on-ping on-close on-open on-handshake-error]
+             :or   {on-handshake-error
+                    (fn [ch]
+                      (send! ch
+                        {:status 400
+                         :headers {"Content-Type" "text/plain"}
+                         :body "Bad Sec-Websocket-Key header"}
+                        true))}}]
+
+  (when-let [ch (:async-channel ring-req)]
+
+    (when-let [f on-close] (org.httpkit.server/on-close ch (partial f ch)))
+
+    (if (:websocket? ring-req)
+      (if-let [sec-ws-accept (websocket-handshake-check ring-req)]
+        (do
+          (when-let [f on-receive] (org.httpkit.server/on-receive ch (partial f ch)))
+          (when-let [f on-ping]    (org.httpkit.server/on-ping    ch (partial f ch)))
+          (send-checked-websocket-handshake! ch sec-ws-accept)
+          (when-let [f on-open] (f ch)))
+        (when-let [f on-handshake-error] (f ch)))
+      (when-let [f on-open] (f ch)))
+
+    {:body ch}))
