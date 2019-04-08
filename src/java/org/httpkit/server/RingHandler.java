@@ -233,9 +233,9 @@ public class RingHandler implements IHandler {
         try {
             execs.submit(new HttpHandler(req, cb, handler, errorLogger, eventLogger, eventNames));
         } catch (RejectedExecutionException e) {
-            errorLogger.log("increase :queue-size if this happens often", e);
+            errorLogger.log("failed to submit task to executor service", e);
             eventLogger.log(eventNames.serverStatus503);
-            cb.run(HttpEncode(503, new HeaderMap(), "Server is overloaded, please try later"));
+            cb.run(HttpEncode(503, new HeaderMap(), "Server unavailable, please try again"));
         }
     }
 

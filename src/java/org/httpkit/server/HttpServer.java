@@ -10,6 +10,7 @@ import static org.httpkit.server.Frame.CloseFrame.CLOSE_MESG_BIG;
 import static org.httpkit.server.Frame.CloseFrame.CLOSE_NORMAL;
 
 import java.io.IOException;
+import java.io.Closeable;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedSelectorException;
@@ -22,6 +23,8 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.httpkit.HeaderMap;
@@ -69,6 +72,13 @@ public class HttpServer implements Runnable {
 
     // queue operations from worker threads to the IO thread
     private final ConcurrentLinkedQueue<PendingKey> pending = new ConcurrentLinkedQueue<PendingKey>();
+
+    private final ConcurrentHashMap<SelectionKey, Boolean> keptAlive = new ConcurrentHashMap<SelectionKey, Boolean>();
+
+    // Keep track of when the server has been told to shut down.
+    // When this flag is true, the server will no longer set keep alive headers
+    // on responses. This allows the server to drain requests.
+    private final AtomicBoolean isShuttingDown = new AtomicBoolean(false);
 
     // shared, single thread
     private final ByteBuffer buffer = ByteBuffer.allocateDirect(1024 * 64 - 1);
@@ -133,9 +143,13 @@ public class HttpServer implements Runnable {
     }
 
     private void closeKey(final SelectionKey key, int status) {
+
+        keptAlive.remove(key);
+
         try {
             key.channel().close();
-        } catch (Exception ignore) {
+        } catch (Exception ex) {
+            warnLogger.log("failed to close key", ex);
         }
 
         ServerAtta att = (ServerAtta) key.attachment();
@@ -152,7 +166,13 @@ public class HttpServer implements Runnable {
             do {
                 AsyncChannel channel = atta.channel;
                 HttpRequest request = atta.decoder.decode(buffer);
+
                 if (request != null) {
+
+                    if (isShuttingDown.get()) {
+                        request.isKeepAlive = false;
+                    }
+
                     channel.reset(request);
                     if (request.isWebSocket) {
                         key.attach(new WsAtta(channel, maxWs));
@@ -204,9 +224,9 @@ public class HttpServer implements Runnable {
                     atta.keepalive = false;
                     atta.decoder.reset();
 
-                    // Follow RFC6455 5.5.1 
+                    // Follow RFC6455 5.5.1
                     // Do not send CLOSE frame again if it has been sent.
-                    if (!closed) { 
+                    if (!closed) {
                         tryWrite(key, WsEncode(WSDecoder.OPCODE_CLOSE, frame.data));
                     }
                 }
@@ -268,6 +288,7 @@ public class HttpServer implements Runnable {
                 if (toWrites.size() == 0) {
                     if (atta.isKeepAlive()) {
                         key.interestOps(OP_READ);
+                        keptAlive.put(key, true);
                     } else {
                         closeKey(key, CLOSE_NORMAL);
                     }
@@ -337,6 +358,9 @@ public class HttpServer implements Runnable {
                 }
                 Set<SelectionKey> selectedKeys = selector.selectedKeys();
                 for (SelectionKey key : selectedKeys) {
+
+                    keptAlive.remove(key);
+
                     // TODO I do not know if this is needed
                     // if !valid, isAcceptable, isReadable.. will Exception
                     // run hours happily after commented, but not sure.
@@ -369,10 +393,19 @@ public class HttpServer implements Runnable {
     }
 
     public void stop(int timeout) {
-        try {
-            serverChannel.close(); // stop accept any request
-        } catch (IOException ignore) {
+
+        this.isShuttingDown.set(true);
+
+        // stop accepting new requests
+        closeAndWarn(serverChannel);
+
+        // Shutdown idle connections
+        for (SelectionKey key : keptAlive.keySet()) {
+            closeKey(key, 0);
         }
+
+        // From this point, no new connections should be entering the system.
+        // this.warnLogger.log("Idle connections closed", new Exception("dummy"));
 
         // wait all requests to finish, at most timeout milliseconds
         handler.close(timeout);
@@ -405,17 +438,22 @@ public class HttpServer implements Runnable {
 		     * https://github.com/http-kit/http-kit/issues/355
 		     */
 		        cmex = true;
-		}		
-	    } while(cmex);
+		}
+    } while(cmex);
 
-            try {
-                selector.close();
-            } catch (IOException ignore) {
-            }
-        }
+    closeAndWarn(selector);
+    }
     }
 
     public int getPort() {
         return this.serverChannel.socket().getLocalPort();
+    }
+
+    void closeAndWarn(Closeable closable) {
+        try {
+            closable.close();
+        } catch (IOException ex) {
+            warnLogger.log(String.format("failed to close %s", closable.getClass().getName()), ex);
+        }
     }
 }
