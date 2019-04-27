@@ -189,6 +189,8 @@
   (request {:url \"http://site.com/string.txt\" :as :text})
   ;; Try to automatically coerce the output based on the content-type header, currently supports :text :stream, (with automatic charset detection)
   (request {:url \"http://site.com/string.txt\" :as :auto})
+  ;; return the body as is with no unzipping or coercion whatsoever. returns as org.httpkit.DynamicBytes
+  (request {:url \"http://site.com/favicon.ico\" :as :none})
 
   Request options:
     :url :method :headers :timeout :connect-timeout :idle-timeout :query-params
@@ -251,8 +253,9 @@
                   (onThrowable [this t]
                     (deliver-resp {:opts opts :error t})))
         listener (RespListener. handler filter worker-pool
-                                ;; only the 4 support now
-                                (case as :auto 1 :text 2 :stream 3 :byte-array 4))
+                                ;; 0 will return as DynamicBytes - i.e. you will need to handle unzip yourself
+                                ;; otherwise, there are 4 coercions supported for now
+                                (case as :none 0 :auto 1 :text 2 :stream 3 :byte-array 4))
         effective-proxy-url (if proxy-host (str proxy-host ":" proxy-port) proxy-url)
         connect-timeout (or timeout connect-timeout)
         idle-timeout    (or timeout idle-timeout)
