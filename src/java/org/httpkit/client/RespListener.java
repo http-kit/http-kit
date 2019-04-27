@@ -127,6 +127,10 @@ public class RespListener implements IRespListener {
             return;
         }
         try {
+            if (coercion == 0) {
+                pool.submit(new Handler(handler, status.getCode(), headers, body));
+                return;
+            }
             DynamicBytes bytes = unzipBody();
             // 1=> auto, 2=>text, 3=>stream, 4=>byte-array
             if (coercion == 2 || (coercion == 1 && isText())) {

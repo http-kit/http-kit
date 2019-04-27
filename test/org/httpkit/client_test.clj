@@ -13,7 +13,7 @@
             [clojure.java.io :as io]
             [clj-http.client :as clj-http])
   (:import java.nio.ByteBuffer
-           [org.httpkit HttpMethod HttpStatus HttpVersion]
+           [org.httpkit HttpMethod HttpStatus HttpVersion DynamicBytes]
            [org.httpkit.client Decoder IRespListener]))
 
 (defroutes test-routes
@@ -63,7 +63,8 @@
   (PUT "/body" [] (fn [req] {:body (:body req)
                              :status 200
                              :headers {"content-type" "text/plain"}}))
-  (GET "/test-header" [] (fn [{:keys [headers]}] (str (get headers "test-header")))))
+  (GET "/test-header" [] (fn [{:keys [headers]}] (str (get headers "test-header"))))
+  (GET "/zip" [] (fn [req] {:body "hello world"})))
 
 (use-fixtures :once
   (fn [f]
@@ -482,6 +483,9 @@
       (let [{:keys [error]} (bad-callback loop-depth true)]
         (is (= nil error)))
       (println "Skipping disabled-deadlock-guard test due to low CPU count."))))
+
+(deftest zip
+  (is (instance? DynamicBytes (:body @(http/get "http://localhost:4347/zip" {:as :none})))))
 
 ;; @(http/get "http://127.0.0.1:4348" {:headers {"Connection" "Close"}})
 
