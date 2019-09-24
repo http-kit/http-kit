@@ -8,7 +8,7 @@ import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 
 
-public class SslContextFactory {
+public class ClientSslEngineFactory {
 
     private static final String PROTOCOL = "TLS";
     private static final SSLContext CLIENT_CONTEXT;
@@ -28,12 +28,10 @@ public class SslContextFactory {
         CLIENT_CONTEXT = clientContext;
     }
 
-    public static SSLContext getClientContext() {
-        return CLIENT_CONTEXT;
-    }
-
     public static SSLEngine trustAnybody() {
-        return CLIENT_CONTEXT.createSSLEngine();
+        SSLEngine engine = CLIENT_CONTEXT.createSSLEngine();
+        engine.setUseClientMode(true);
+        return engine;
     }
 }
 

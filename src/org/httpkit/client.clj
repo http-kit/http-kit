@@ -9,7 +9,7 @@
            [org.httpkit HttpMethod PrefixThreadFactory HttpUtils]
            [java.util.concurrent ThreadPoolExecutor LinkedBlockingQueue TimeUnit]
            [java.net URI URLEncoder]
-           [org.httpkit.client SslContextFactory MultipartEntity]))
+           [org.httpkit.client ClientSslEngineFactory MultipartEntity]))
 
 ;;;; Utils
 
@@ -65,7 +65,7 @@
                           (str url "&" (query-string query-params)))
                         url)
                  :sslengine (or (:sslengine req)
-                                (when (:insecure? req) (SslContextFactory/trustAnybody)))
+                                (when (:insecure? req) (ClientSslEngineFactory/trustAnybody)))
                  :method    (HttpMethod/fromKeyword (or method :get))
                  :headers   (prepare-request-headers req)
             ;; :body ring body: null, String, seq, InputStream, File, ByteBuffer
@@ -121,7 +121,7 @@
     (if ssl-configurer
       (reify HttpClient$SSLEngineURIConfigurer
         (configure [this ssl-engine uri] (ssl-configurer ssl-engine uri)))
-      HttpClient$SSLEngineURIConfigurer/CLIENT_MODE)
+      HttpClient$SSLEngineURIConfigurer/NOP)
     (if error-logger
       (reify ContextLogger
         (log [this message error] (error-logger message error)))
