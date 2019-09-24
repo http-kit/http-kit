@@ -14,7 +14,7 @@
             [clj-http.client :as clj-http])
   (:import java.nio.ByteBuffer
            [org.httpkit HttpMethod HttpStatus HttpVersion DynamicBytes]
-           [org.httpkit.client Decoder IRespListener]))
+           [org.httpkit.client Decoder IRespListener ClientSslEngineFactory]))
 
 (defroutes test-routes
   (GET "/get" [] "hello world")
@@ -303,6 +303,12 @@
   (is (contains? @(http/get "https://apple.com") :status))
   (is (contains? @(http/get "https://microsoft.com") :status))
   (is (contains? @(http/get "https://letsencrypt.org") :status)))
+
+(deftest test-multiple-https-calls-with-same-engine
+  (let [opts {:sslengine (ClientSslEngineFactory/trustAnybody)}]
+    (is (contains? @(http/get "https://localhost:9898" opts) :status))
+    (is (contains? @(http/get "https://localhost:9898" opts) :status))
+    (is (contains? @(http/get "https://localhost:9898" opts) :status))))
 
 ;; https://github.com/http-kit/http-kit/issues/54
 (deftest test-nested-param

@@ -72,8 +72,8 @@ public class HttpClient implements Runnable {
     }
 
     public static interface SSLEngineURIConfigurer {
-        public static final SSLEngineURIConfigurer CLIENT_MODE = new SSLEngineURIConfigurer() {
-            public void configure(SSLEngine sslEngine, URI uri) { sslEngine.setUseClientMode(true); }
+        public static final SSLEngineURIConfigurer NOP = new SSLEngineURIConfigurer() {
+            public void configure(SSLEngine sslEngine, URI uri) { /* do nothing */ }
         };
         void configure(SSLEngine sslEngine, URI uri);
     }
@@ -116,7 +116,7 @@ public class HttpClient implements Runnable {
     }
 
     public HttpClient(long maxConnections) throws IOException {
-        this(maxConnections, AddressFinder.DEFAULT, SSLEngineURIConfigurer.CLIENT_MODE,
+        this(maxConnections, AddressFinder.DEFAULT, SSLEngineURIConfigurer.NOP,
                 ContextLogger.ERROR_PRINTER, EventLogger.NOP, EventNames.DEFAULT);
     }
 
@@ -356,6 +356,7 @@ public class HttpClient implements Runnable {
             || (proxyUri != null && "https".equals(proxyUri.getScheme()))) {
             if (engine == null) {
                 engine = DEFAULT_CONTEXT.createSSLEngine();
+                engine.setUseClientMode(true);
             }
             if(!engine.getUseClientMode())
                 engine.setUseClientMode(true);
