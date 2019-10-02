@@ -80,25 +80,25 @@ Options:
 
 `run-server` returns a function that stops the server, which can take an optional timeout(ms) param to wait for existing requests to be finished.
 
-`(defn app [req]
-  {:status  200
-   :headers {"Content-Type" "text/html"}
-   :body    "hello HTTP!"})
+    (defn app [req]
+      {:status  200
+       :headers {"Content-Type" "text/html"}
+       :body    "hello HTTP!"})
 
-(defonce server (atom nil))
+    (defonce server (atom nil))
 
-(defn stop-server []
-  (when-not (nil? @server)
-    ;; graceful shutdown: wait 100ms for existing requests to be finished
-    ;; :timeout is optional, when no timeout, stop immediately
-    (@server :timeout 100)
-    (reset! server nil)))
+    (defn stop-server []
+      (when-not (nil? @server)
+        ;; graceful shutdown: wait 100ms for existing requests to be finished
+        ;; :timeout is optional, when no timeout, stop immediately
+        (@server :timeout 100)
+        (reset! server nil)))
 
 (defn -main [& args]
   ;; The #' is useful when you want to hot-reload code
   ;; You may want to take a look: https://github.com/clojure/tools.namespace
   ;; and http://http-kit.org/migration.html#reload
-  (reset! server (server/run-server #'app {:port 8080})))`
+  (reset! server (run-server #'app {:port 8080})))
 
 ### Unified Async/Websocket API
 
@@ -111,11 +111,7 @@ Channel defines the following contract:
    * `open?`: Returns true iff channel is open.
    * `close`: Closes the channel. Idempotent: returns true if the channel was actually closed, or false if it was already closed.
    * `websocket?`: Returns true iff channel is a WebSocket.
-   * `send!`: Sends data to client and returns true if the data was successfully written to the output queue, or false if the channel is closed. Normally, checking the returned value is not needed. This function returns immediately (does not block).
-
-    *Data is sent directly to the client, NO RING MIDDLEWARE IS APPLIED.*
-
-    Data form: {:headers _ :status _ :body _} or just body. Note that :headers and :status will be stripped for WebSockets and for HTTP streaming responses after the first.
+   * `send!`: Sends data to client and returns true if the data was successfully written to the output queue, or false if the channel is closed. Normally, checking the returned value is not needed. This function returns immediately (does not block).   *Data is sent directly to the client, NO RING MIDDLEWARE IS APPLIED.* Data form: {:headers _ :status _ :body _} or just body. Note that :headers and :status will be stripped for WebSockets and for HTTP streaming responses after the first.
    * `on-receive`: Sets handler (fn [message-string || byte[]) for notification of client WebSocket messages. Message ordering is guaranteed by server.
    * `on-close`: Sets handler (fn [status]) for notification of channel being closed by the server or client. Handler will be invoked at most once. Useful for clean-up. Status can be `:normal`, `:going-away`, `:protocol-error`, `:unsupported`, `:unknown`, `:server-close`, `:client-close`
 
@@ -136,26 +132,26 @@ Channel defines the following contract:
 
 ### HTTP Streaming example
 
-    First call of `send!`, sends HTTP status and Headers to client
-    After the first, `send!` sends a chunk to client
-    `close` sends an empty chunk to client, marking the end of the response
-    Client close notification printed via `on-close
+   * First call of `send!`, sends HTTP status and Headers to client
+   * After the first, `send!` sends a chunk to client
+   * `close` sends an empty chunk to client, marking the end of the response
+   * Client close notification printed via `on-close
     
 
-`(require '[org.httpkit.timer :as timer]) ; Make the org.httpkit.timer namespace accesible via timer
+    (require '[org.httpkit.timer :as timer]) ; Make the org.httpkit.timer namespace accesible via timer
 
-(defn handler [request]
-  (server/with-channel request channel
-    (on-close channel (fn [status] (println "channel closed, " status)))
-    (loop [id 0]
-      (when (< id 10)
-        (timer/schedule-task (* id 200) ;; send a message every 200ms
-                       (send! channel (str "message from server #" id) false)) ; false => don't close after send
-        (recur (inc id))))
-    (timer/schedule-task 10000 (close channel)))) ;; close in 10s.
+    (defn handler [request]
+      (server/with-channel request channel
+        (on-close channel (fn [status] (println "channel closed, " status)))
+        (loop [id 0]
+          (when (< id 10)
+            (timer/schedule-task (* id 200) ;; send a message every 200ms
+                           (send! channel (str "message from server #" id) false)) ; false => don't close after send
+            (recur (inc id))))
+        (timer/schedule-task 10000 (close channel)))) ;; close in 10s.
 
-;;; open you browser http://127.0.0.1:9090, a new message show up every 200ms
-(server/run-server handler {:port 9090})
+    ;;; open you browser http://127.0.0.1:9090, a new message show up every 200ms
+    (server/run-server handler {:port 9090})
 
 ### Long polling example
 
@@ -163,23 +159,23 @@ Long polling is very much like streaming
 
 [chat-polling](https://github.com/http-kit/chat-polling) is a realtime chat example of using polling
 
-(def channel-hub (atom {}))
+    (def channel-hub (atom {}))
 
-(defn handler [request]
-  (server/with-channel request channel
-    ;; Store the channel somewhere, and use it to send response to client when interesting event happens
-    (swap! channel-hub assoc channel request)
-    (on-close channel (fn [status]
-                        ;; remove from hub when channel get closed
-                        (swap! channel-hub dissoc channel)))))
+    (defn handler [request]
+      (server/with-channel request channel
+        ;; Store the channel somewhere, and use it to send response to client when interesting event happens
+        (swap! channel-hub assoc channel request)
+        (on-close channel (fn [status]
+                            ;; remove from hub when channel get closed
+                            (swap! channel-hub dissoc channel)))))
 
-(on-some-event                          ;; send data to client
- (doseq [channel (keys @channel-hub)]
-   (send! channel {:status 200
-                   :headers {"Content-Type" "application/json; charset=utf-8"}
-                   :body data})))
+    (on-some-event                          ;; send data to client
+     (doseq [channel (keys @channel-hub)]
+       (send! channel {:status 200
+                       :headers {"Content-Type" "application/json; charset=utf-8"}
+                       :body data})))
 
-(server/run-server handler {:port 9090})`
+    (server/run-server handler {:port 9090})
 
 ### WebSocket example
 
@@ -205,7 +201,7 @@ The `with-channel` does the WebSocket handshake automatically. In case if you wa
 
 [Compojure](https://github.com/weavejester/compojure) can be used to do the routing, based on uri and method
 
-`(:use [compojure.route :only [files not-found]]
+(:use [compojure.route :only [files not-found]]
       [compojure.core :only [defroutes GET POST DELETE ANY context]]
       org.httpkit.server)
 
@@ -222,17 +218,17 @@ The `with-channel` does the WebSocket handshake automatically. In case if you wa
     ....
     ))
 
-(defroutes all-routes
-  (GET "/" [] show-landing-page)
-  (GET "/ws" [] chat-handler)     ;; websocket
-  (GET "/async" [] async-handler) ;; asynchronous(long polling)
-  (context "/user/:id" []
-           (GET / [] get-user-by-id)
-           (POST / [] update-userinfo))
-  (files "/static/") ;; static file url prefix /static, in `public` folder
-  (not-found "<p>Page not found.</p>")) ;; all other, return 404
+    (defroutes all-routes
+      (GET "/" [] show-landing-page)
+      (GET "/ws" [] chat-handler)     ;; websocket
+      (GET "/async" [] async-handler) ;; asynchronous(long polling)
+      (context "/user/:id" []
+               (GET / [] get-user-by-id)
+               (POST / [] update-userinfo))
+      (files "/static/") ;; static file url prefix /static, in `public` folder
+      (not-found "<p>Page not found.</p>")) ;; all other, return 404
 
-(server/run-server all-routes {:port 8080})`
+    (server/run-server all-routes {:port 8080})
   
 
 ### Recommended server deployment
@@ -244,27 +240,27 @@ http-kit runs alone happily, handy for development and quick deployment. Use of 
 
 Sample Nginx configration:
 
-`upstream http_backend {
-    server 127.0.0.1:8090;  # http-kit listen on 8090
-    # put more servers here for load balancing
-    # keepalive(resue TCP connection) improves performance
-    keepalive 32;  # both http-kit and nginx are good at concurrency
-}
-
-server {
-    location /static/ {  # static content
-        alias   /var/www/xxxx/public/;
+    upstream http_backend {
+        server 127.0.0.1:8090;  # http-kit listen on 8090
+        # put more servers here for load balancing
+        # keepalive(resue TCP connection) improves performance
+        keepalive 32;  # both http-kit and nginx are good at concurrency
     }
-    location / {
-        proxy_pass  http://http_backend;
 
-        # tell http-kit to keep the connection
-        proxy_http_version 1.1;
-        proxy_set_header Connection "";
+    server {
+        location /static/ {  # static content
+            alias   /var/www/xxxx/public/;
+        }
+        location / {
+            proxy_pass  http://http_backend;
 
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header Host $http_host;
+            # tell http-kit to keep the connection
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
 
-        access_log  /var/log/nginx/xxxx.access.log;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header Host $http_host;
+
+            access_log  /var/log/nginx/xxxx.access.log;
+        }
     }
-}`
