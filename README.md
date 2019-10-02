@@ -116,7 +116,7 @@ Channel defines the following contract:
    * `on-close`: Sets handler (fn [status]) for notification of channel being closed by the server or client. Handler will be invoked at most once. Useful for clean-up. Status can be `:normal`, `:going-away`, `:protocol-error`, `:unsupported`, `:unknown`, `:server-close`, `:client-close`
 
     (defn handler [req]
-      (with-channel req channel              ; get the channel
+      (server/with-channel req channel              ; get the channel
         ;; communicate with client using method defined above
         (on-close channel (fn [status]
                             (println "channel closed")))
@@ -128,7 +128,7 @@ Channel defines the following contract:
                ;; When unspecified, `close-after-send?` defaults to true for HTTP channels
                ;; and false for WebSocket.  (send! channel data close-after-send?)
                               (send! channel data))))) ; data is sent directly to the client
-    (run-server handler {:port 8080})
+    (server/run-server handler {:port 8080})
 
 ### HTTP Streaming example
 
