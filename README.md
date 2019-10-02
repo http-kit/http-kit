@@ -47,37 +47,40 @@ Copyright &copy; 2012-2018 [Feng Shen](http://shenfeng.me/). Distributed under t
 [@shenfeng]: https://github.com/shenfeng
 [@ptaoussanis]: https://github.com/ptaoussanis
 
+# Usage
 
-Ring adapter(HTTP server) with async and websocket extension
+## Ring adapter(HTTP server) with async and websocket extension
 
-(:use org.httpkit.server)
+`(require '[org.httpkit.server :as server]) ; Make the org.httpkit.server namespace accesible via server`
 
 The server uses an event-driven, non-blocking I/O model that makes it lightweight and scalable. It's written to conform to the standard Clojure web server Ring spec, with asynchronous and websocket extension. HTTP Kit is (almost) drop-in replacement of ring-jetty-adapter
 Hello, Clojure HTTP server
 
+### Hello, Clojure HTTP server
+
 run-server starts a Ring-compatible HTTP server. You may want to do routing with compojure
 
-(defn app [req]
+`(defn app [req]
   {:status  200
    :headers {"Content-Type" "text/html"}
    :body    "hello HTTP!"})
-(run-server app {:port 8080})
+(server/run-server app {:port 8080})`
 
 Options:
 
-    :ip: which IP to bind, default to 0.0.0.0
-    :port: which port listens for incoming requests, default to 8090
-    :thread: How many threads to compute response from request, default to 4
-    :worker-name-prefix: worker thread name prefix, default to worker-: worker-1 worker-2....
-    :queue-size: max requests queued waiting for thread pool to compute response before rejecting, 503(Service Unavailable) is returned to client if queue is full, default to 20K
-    :max-body: length limit for request body in bytes, 413(Request Entity Too Large) is returned if request exceeds this limit, default to 8388608(8M)
-    :max-line: length limit for HTTP initial line and per header, 414(Request-URI Too Long) will be returned if exceeding this limit, default to 8192(8K), relevant discussion on Stack Overflow
+   * `:ip:` which IP to bind, default `to 0.0.0.0`
+   * `:port:` which port listens for incoming requests, default to 8090
+   * `:thread:` How many threads to compute response from request, default to 4
+   * `:worker-name-prefix:` worker thread name prefix, default to `worker-`: `worker-1` `worker-2`....
+   * `:queue-size:` max requests queued waiting for thread pool to compute response before rejecting, 503(Service Unavailable) is returned to client if queue is full, default to 20K
+   * `:max-body:` length limit for request body in bytes, 413(Request Entity Too Large) is returned if request exceeds this limit, default to 8388608(8M)
+   * `:max-line:` length limit for HTTP initial line and per header, 414(Request-URI Too Long) will be returned if exceeding this limit, default to 8192(8K), relevant discussion on Stack Overflow
 
-Stop/Restart Server
+### Stop/Restart Server
 
-run-server returns a function that stops the server, which can take an optional timeout(ms) param to wait for existing requests to be finished.
+`run-server` returns a function that stops the server, which can take an optional timeout(ms) param to wait for existing requests to be finished.
 
-(defn app [req]
+`(defn app [req]
   {:status  200
    :headers {"Content-Type" "text/html"}
    :body    "hello HTTP!"})
@@ -95,9 +98,9 @@ run-server returns a function that stops the server, which can take an optional 
   ;; The #' is useful when you want to hot-reload code
   ;; You may want to take a look: https://github.com/clojure/tools.namespace
   ;; and http://http-kit.org/migration.html#reload
-  (reset! server (run-server #'app {:port 8080})))
+  (reset! server (server/run-server #'app {:port 8080})))`
 
-Unified Async/Websocket API
+### Unified Async/Websocket API
 
 The with-channel API is not compatible with the RC releases. The new one is better and much easier to understand and use. The old documentation is here
 
@@ -115,8 +118,8 @@ Channel defines the following contract:
     on-receive: Sets handler (fn [message-string || byte[]) for notification of client WebSocket messages. Message ordering is guaranteed by server.
     on-close: Sets handler (fn [status]) for notification of channel being closed by the server or client. Handler will be invoked at most once. Useful for clean-up. Status can be `:normal`, `:going-away`, `:protocol-error`, `:unsupported`, `:unknown`, `:server-close`, `:client-close`
 
-(defn handler [req]
-  (with-channel req channel              ; get the channel
+`(defn handler [req]
+  (server/with-channel req channel              ; get the channel
     ;; communicate with client using method defined above
     (on-close channel (fn [status]
                         (println "channel closed")))
@@ -128,31 +131,31 @@ Channel defines the following contract:
            ;; When unspecified, `close-after-send?` defaults to true for HTTP channels
            ;; and false for WebSocket.  (send! channel data close-after-send?)
                           (send! channel data))))) ; data is sent directly to the client
-(run-server handler {:port 8080})
+(server/run-server handler {:port 8080})`
 
-HTTP Streaming example
+### HTTP Streaming example
 
     First call of send!, sends HTTP status and Headers to client
     After the first, send! sends a chunk to client
     close sends an empty chunk to client, marking the end of the response
     Client close notification printed via on-close
 
-(use 'org.httpkit.timer)
+`(require '[org.httpkit.timer :as timer]) ; Make the org.httpkit.timer namespace accesible via timer
 
 (defn handler [request]
-  (with-channel request channel
+  (server/with-channel request channel
     (on-close channel (fn [status] (println "channel closed, " status)))
     (loop [id 0]
       (when (< id 10)
-        (schedule-task (* id 200) ;; send a message every 200ms
+        (timer/schedule-task (* id 200) ;; send a message every 200ms
                        (send! channel (str "message from server #" id) false)) ; false => don't close after send
         (recur (inc id))))
-    (schedule-task 10000 (close channel)))) ;; close in 10s.
+    (timer/schedule-task 10000 (close channel)))) ;; close in 10s.
 
 ;;; open you browser http://127.0.0.1:9090, a new message show up every 200ms
-(run-server handler {:port 9090})
+(server/run-server handler {:port 9090})
 
-Long polling example
+### Long polling example
 
 Long polling is very much like streaming
 
@@ -161,7 +164,7 @@ chat-polling is a realtime chat example of using polling
 (def channel-hub (atom {}))
 
 (defn handler [request]
-  (with-channel request channel
+  (server/with-channel request channel
     ;; Store the channel somewhere, and use it to send response to client when interesting event happens
     (swap! channel-hub assoc channel request)
     (on-close channel (fn [status]
@@ -174,9 +177,9 @@ chat-polling is a realtime chat example of using polling
                    :headers {"Content-Type" "application/json; charset=utf-8"}
                    :body data})))
 
-(run-server handler {:port 9090})
+(server/run-server handler {:port 9090})`
 
-WebSocket example
+### WebSocket example
 
     Two-way communication between client and server
     Can easily degrade to HTTP long polling/streaming, due to the unified API
@@ -184,22 +187,23 @@ WebSocket example
     send! with java.io.InputStream or byte[], a binary frame assembled and sent to client
     For WebSocket Secure connection, one option is stud (self-signed certificate may not work with websocket). Nginx can do it, too.
 
-(defn handler [request]
-  (with-channel request channel
+`(defn handler [request]
+  (server/with-channel request channel
     (on-close channel (fn [status] (println "channel closed: " status)))
     (on-receive channel (fn [data] ;; echo it back
                           (send! channel data)))))
 
-(run-server handler {:port 9090})
+(server/run-server handler {:port 9090})`
 
-Control WebSocket handshake
+### Control WebSocket handshake
 
-The with-channel does the WebSocket handshake automatically. In case if you want to control it, e.g., to support WebSocket subprotocol, here is a workaround. cgmartin's gist is a good place to get inspired.
-Routing with Compojure
+The `with-channel` does the WebSocket handshake automatically. In case if you want to control it, e.g., to support WebSocket subprotocol, here is a workaround. cgmartin's gist is a good place to get inspired.
+
+### Routing with Compojure
 
 Compojure can be used to do the routing, based on uri and method
 
-(:use [compojure.route :only [files not-found]]
+`(:use [compojure.route :only [files not-found]]
       [compojure.core :only [defroutes GET POST DELETE ANY context]]
       org.httpkit.server)
 
@@ -226,10 +230,10 @@ Compojure can be used to do the routing, based on uri and method
   (files "/static/") ;; static file url prefix /static, in `public` folder
   (not-found "<p>Page not found.</p>")) ;; all other, return 404
 
-(run-server all-routes {:port 8080})
+(server/run-server all-routes {:port 8080})`
   
 
-Recommended server deployment
+### Recommended server deployment
 
 http-kit runs alone happily, handy for development and quick deployment. Use of a reverse proxy like Nginx, Lighthttpd, etc in serious production is encouraged. They can also be used to add https support.
 
@@ -238,7 +242,7 @@ http-kit runs alone happily, handy for development and quick deployment. Use of 
 
 Sample Nginx configration:
 
-upstream http_backend {
+`upstream http_backend {
     server 127.0.0.1:8090;  # http-kit listen on 8090
     # put more servers here for load balancing
     # keepalive(resue TCP connection) improves performance
@@ -261,4 +265,4 @@ server {
 
         access_log  /var/log/nginx/xxxx.access.log;
     }
-}
+}`
