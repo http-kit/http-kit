@@ -115,20 +115,20 @@ Channel defines the following contract:
    * `on-receive`: Sets handler (fn [message-string || byte[]) for notification of client WebSocket messages. Message ordering is guaranteed by server.
    * `on-close`: Sets handler (fn [status]) for notification of channel being closed by the server or client. Handler will be invoked at most once. Useful for clean-up. Status can be `:normal`, `:going-away`, `:protocol-error`, `:unsupported`, `:unknown`, `:server-close`, `:client-close`
 
-`(defn handler [req]
-  (server/with-channel req channel              ; get the channel
-    ;; communicate with client using method defined above
-    (on-close channel (fn [status]
-                        (println "channel closed")))
-    (if (websocket? channel)
-      (println "WebSocket channel")
-      (println "HTTP channel"))
-    (on-receive channel (fn [data]       ; data received from client
-           ;; An optional param can pass to send!: close-after-send?
-           ;; When unspecified, `close-after-send?` defaults to true for HTTP channels
-           ;; and false for WebSocket.  (send! channel data close-after-send?)
-                          (send! channel data))))) ; data is sent directly to the client
-(server/run-server handler {:port 8080})`
+    (defn handler [req]
+      (with-channel req channel              ; get the channel
+        ;; communicate with client using method defined above
+        (on-close channel (fn [status]
+                            (println "channel closed")))
+        (if (websocket? channel)
+          (println "WebSocket channel")
+          (println "HTTP channel"))
+        (on-receive channel (fn [data]       ; data received from client
+               ;; An optional param can pass to send!: close-after-send?
+               ;; When unspecified, `close-after-send?` defaults to true for HTTP channels
+               ;; and false for WebSocket.  (send! channel data close-after-send?)
+                              (send! channel data))))) ; data is sent directly to the client
+    (run-server handler {:port 8080})
 
 ### HTTP Streaming example
 
