@@ -53,12 +53,12 @@ Copyright &copy; 2012-2018 [Feng Shen](http://shenfeng.me/). Distributed under t
 
 `(require '[org.httpkit.server :as server]) ; Make the org.httpkit.server namespace accesible via server`
 
-The server uses an event-driven, non-blocking I/O model that makes it lightweight and scalable. It's written to conform to the standard Clojure web server Ring spec, with asynchronous and websocket extension. HTTP Kit is (almost) drop-in replacement of ring-jetty-adapter
+The server uses an event-driven, non-blocking I/O model that makes it lightweight and scalable. It's written to conform to the standard Clojure web server [Ring spec](https://github.com/ring-clojure/ring), with asynchronous and websocket extension. HTTP Kit is ([almost](http://www.http-kit.org/migration.html)) drop-in replacement of ring-jetty-adapter
 Hello, Clojure HTTP server
 
 ### Hello, Clojure HTTP server
 
-run-server starts a Ring-compatible HTTP server. You may want to do routing with compojure
+`run-server` starts a Ring-compatible HTTP server. You may want to do [routing with compojure](http://www.http-kit.org/server.html#routing)
 
 `(defn app [req]
   {:status  200
@@ -74,7 +74,7 @@ Options:
    * `:worker-name-prefix:` worker thread name prefix, default to `worker-`: `worker-1` `worker-2`....
    * `:queue-size:` max requests queued waiting for thread pool to compute response before rejecting, 503(Service Unavailable) is returned to client if queue is full, default to 20K
    * `:max-body:` length limit for request body in bytes, 413(Request Entity Too Large) is returned if request exceeds this limit, default to 8388608(8M)
-   * `:max-line:` length limit for HTTP initial line and per header, 414(Request-URI Too Long) will be returned if exceeding this limit, default to 8192(8K), relevant discussion on Stack Overflow
+   * `:max-line:` length limit for HTTP initial line and per header, 414(Request-URI Too Long) will be returned if exceeding this limit, default to 8192(8K), [relevant discussion on Stack Overflow](http://stackoverflow.com/questions/417142/what-is-the-maximum-length-of-a-url)
 
 ### Stop/Restart Server
 
@@ -102,21 +102,22 @@ Options:
 
 ### Unified Async/Websocket API
 
-The with-channel API is not compatible with the RC releases. The new one is better and much easier to understand and use. The old documentation is here
+*The with-channel API is not compatible with the RC releases. The new one is better and much easier to understand and use. The old documentation is [here](http://www.http-kit.org/server_old.html)*
 
 Unified asynchronous channel interface for HTTP (streaming or long-polling) and WebSocket.
+
 Channel defines the following contract:
 
-    open?: Returns true iff channel is open.
-    close: Closes the channel. Idempotent: returns true if the channel was actually closed, or false if it was already closed.
-    websocket?: Returns true iff channel is a WebSocket.
-    send!: Sends data to client and returns true if the data was successfully written to the output queue, or false if the channel is closed. Normally, checking the returned value is not needed. This function returns immediately (does not block).
+   * `open?`: Returns true iff channel is open.
+   * `close`: Closes the channel. Idempotent: returns true if the channel was actually closed, or false if it was already closed.
+   * `websocket?`: Returns true iff channel is a WebSocket.
+   * `send!`: Sends data to client and returns true if the data was successfully written to the output queue, or false if the channel is closed. Normally, checking the returned value is not needed. This function returns immediately (does not block).
 
-    Data is sent directly to the client, NO RING MIDDLEWARE IS APPLIED.
+    *Data is sent directly to the client, NO RING MIDDLEWARE IS APPLIED.*
 
     Data form: {:headers _ :status _ :body _} or just body. Note that :headers and :status will be stripped for WebSockets and for HTTP streaming responses after the first.
-    on-receive: Sets handler (fn [message-string || byte[]) for notification of client WebSocket messages. Message ordering is guaranteed by server.
-    on-close: Sets handler (fn [status]) for notification of channel being closed by the server or client. Handler will be invoked at most once. Useful for clean-up. Status can be `:normal`, `:going-away`, `:protocol-error`, `:unsupported`, `:unknown`, `:server-close`, `:client-close`
+   * `on-receive`: Sets handler (fn [message-string || byte[]) for notification of client WebSocket messages. Message ordering is guaranteed by server.
+   * `on-close`: Sets handler (fn [status]) for notification of channel being closed by the server or client. Handler will be invoked at most once. Useful for clean-up. Status can be `:normal`, `:going-away`, `:protocol-error`, `:unsupported`, `:unknown`, `:server-close`, `:client-close`
 
 `(defn handler [req]
   (server/with-channel req channel              ; get the channel
@@ -135,10 +136,11 @@ Channel defines the following contract:
 
 ### HTTP Streaming example
 
-    First call of send!, sends HTTP status and Headers to client
-    After the first, send! sends a chunk to client
-    close sends an empty chunk to client, marking the end of the response
-    Client close notification printed via on-close
+    First call of `send!`, sends HTTP status and Headers to client
+    After the first, `send!` sends a chunk to client
+    `close` sends an empty chunk to client, marking the end of the response
+    Client close notification printed via `on-close
+    
 
 `(require '[org.httpkit.timer :as timer]) ; Make the org.httpkit.timer namespace accesible via timer
 
@@ -159,7 +161,7 @@ Channel defines the following contract:
 
 Long polling is very much like streaming
 
-chat-polling is a realtime chat example of using polling
+[chat-polling](https://github.com/http-kit/chat-polling) is a realtime chat example of using polling
 
 (def channel-hub (atom {}))
 
@@ -181,11 +183,11 @@ chat-polling is a realtime chat example of using polling
 
 ### WebSocket example
 
-    Two-way communication between client and server
-    Can easily degrade to HTTP long polling/streaming, due to the unified API
-    send! with java.lang.String, a text frame assembled and sent to client
-    send! with java.io.InputStream or byte[], a binary frame assembled and sent to client
-    For WebSocket Secure connection, one option is stud (self-signed certificate may not work with websocket). Nginx can do it, too.
+   * Two-way communication between client and server
+   * Can easily degrade to HTTP long polling/streaming, due to the unified API
+   * `send!` with `java.lang.String`, a text frame assembled and sent to client
+   * `send!` with `java.io.InputStream` or `byte[]`, a binary frame assembled and sent to client
+   * For WebSocket Secure connection, one option is [stud](https://github.com/bumptech/stud) (self-signed certificate may not work with websocket). [Nginx](http://nginx.com/news/nginx-websockets.html) can do it, too.
 
 `(defn handler [request]
   (server/with-channel request channel
@@ -197,11 +199,11 @@ chat-polling is a realtime chat example of using polling
 
 ### Control WebSocket handshake
 
-The `with-channel` does the WebSocket handshake automatically. In case if you want to control it, e.g., to support WebSocket subprotocol, here is a workaround. cgmartin's gist is a good place to get inspired.
+The `with-channel` does the WebSocket handshake automatically. In case if you want to control it, e.g., to support WebSocket subprotocol, [here](https://github.com/http-kit/http-kit/issues/64) is a workaround. cgmartin's [gist](https://gist.github.com/cgmartin/5880732) is a good place to get inspired.
 
 ### Routing with Compojure
 
-Compojure can be used to do the routing, based on uri and method
+[Compojure](https://github.com/weavejester/compojure) can be used to do the routing, based on uri and method
 
 `(:use [compojure.route :only [files not-found]]
       [compojure.core :only [defroutes GET POST DELETE ANY context]]
@@ -235,7 +237,7 @@ Compojure can be used to do the routing, based on uri and method
 
 ### Recommended server deployment
 
-http-kit runs alone happily, handy for development and quick deployment. Use of a reverse proxy like Nginx, Lighthttpd, etc in serious production is encouraged. They can also be used to add https support.
+http-kit runs alone happily, handy for development and quick deployment. Use of a reverse proxy like [Nginx](http://wiki.nginx.org/Main), [Lighthttpd](http://www.lighttpd.net/), etc in serious production is encouraged. They can also be used to [add https support](http://www.http-kit.org/migration.html#https).
 
     They are fast and heavily optimized for static content.
     They can be configured to compress the content sent to browsers
