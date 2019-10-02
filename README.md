@@ -235,8 +235,8 @@ The `with-channel` does the WebSocket handshake automatically. In case if you wa
 
 http-kit runs alone happily, handy for development and quick deployment. Use of a reverse proxy like [Nginx](http://wiki.nginx.org/Main), [Lighthttpd](http://www.lighttpd.net/), etc in serious production is encouraged. They can also be used to [add https support](http://www.http-kit.org/migration.html#https).
 
-    They are fast and heavily optimized for static content.
-    They can be configured to compress the content sent to browsers
+   * They are fast and heavily optimized for static content.
+   * They can be configured to compress the content sent to browsers
 
 Sample Nginx configration:
 
