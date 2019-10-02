@@ -60,11 +60,11 @@ Hello, Clojure HTTP server
 
 `run-server` starts a Ring-compatible HTTP server. You may want to do [routing with compojure](http://www.http-kit.org/server.html#routing)
 
-`(defn app [req]
-  {:status  200
-   :headers {"Content-Type" "text/html"}
-   :body    "hello HTTP!"})
-(server/run-server app {:port 8080})`
+    (defn app [req]
+      {:status  200
+       :headers {"Content-Type" "text/html"}
+       :body    "hello HTTP!"})
+    (server/run-server app {:port 8080})
 
 Options:
 
@@ -185,13 +185,13 @@ Long polling is very much like streaming
    * `send!` with `java.io.InputStream` or `byte[]`, a binary frame assembled and sent to client
    * For WebSocket Secure connection, one option is [stud](https://github.com/bumptech/stud) (self-signed certificate may not work with websocket). [Nginx](http://nginx.com/news/nginx-websockets.html) can do it, too.
 
-`(defn handler [request]
-  (server/with-channel request channel
-    (on-close channel (fn [status] (println "channel closed: " status)))
-    (on-receive channel (fn [data] ;; echo it back
-                          (send! channel data)))))
+    (defn handler [request]
+      (server/with-channel request channel
+        (on-close channel (fn [status] (println "channel closed: " status)))
+        (on-receive channel (fn [data] ;; echo it back
+                              (send! channel data)))))
 
-(server/run-server handler {:port 9090})`
+    (server/run-server handler {:port 9090})
 
 ### Control WebSocket handshake
 
