@@ -28,7 +28,10 @@
                             {:status 200 :body (-> req :request-method name)}
                             {:status code
                              :headers {"location" (str "redirect?total=" total "&n=" (inc n)
-                                                       "&code=" code)}}))))
+                                                    "&code=" code)}}))))
+  (ANY "/redirect-nil" [] (fn [req]
+                            {:status 302
+                             :headers nil}))
   (POST "/multipart" [] (fn [req]
                           (->> req
                                :params
@@ -320,14 +323,18 @@
                                                        "card[exp_month]" 12}})))))))
 
 (deftest test-redirect
-  (let [url "http://localhost:4347/redirect?total=5&n=0"]
-    (is (:error @(http/get url {:max-redirects 3}))) ;; too many redirects
-    (is (= 200 (:status @(http/get url {:max-redirects 6}))))
-    (is (= 302 (:status @(http/get url {:follow-redirects false}))))
-    (is (= "get" (:body @(http/post url {:as :text})))) ; should switch to get method
-    (is (= "post" (:body @(http/post url {:as :text :allow-unsafe-redirect-methods true})))) ; should not change method
-    (is (= "post" (:body @(http/post (str url "&code=307") {:as :text})))) ; should not change method
-))
+  (testing "When location header is"
+    (testing "present"
+      (let [url "http://localhost:4347/redirect?total=5&n=0"]
+        (is (:error @(http/get url {:max-redirects 3})))        ;; too many redirects
+        (is (= 200 (:status @(http/get url {:max-redirects 6}))))
+        (is (= 302 (:status @(http/get url {:follow-redirects false}))))
+        (is (= "get" (:body @(http/post url {:as :text}))))     ; should switch to get method
+        (is (= "post" (:body @(http/post url {:as :text :allow-unsafe-redirect-methods true})))) ; should not change method
+        (is (= "post" (:body @(http/post (str url "&code=307") {:as :text})))))) ; should not change method
+    (testing "nil"
+      (let [url "http://localhost:4347/redirect-nil"]
+           (is (:error  @(http/get url)))))))
 
 (deftest test-multipart
   (let [{:keys [status body]} @(http/post "http://localhost:4347/multipart"
