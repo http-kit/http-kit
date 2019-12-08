@@ -72,9 +72,13 @@ public class HttpRequest {
 
     public void setHeaders(Map<String, Object> headers) {
         String h = getStringValue(headers, "host");
-        if (h != null) {
+        if (h != null && !h.equals("")) {
+            // the port is an integer following the last ':'
+            // *unless* the last : is prior to the last ] which marks the end of an ipv6 address
+            // https://en.wikipedia.org/wiki/IPv6_address#Literal_IPv6_addresses_in_network_resource_identifiers
+            int ipv6end = (h.charAt(0) == '[') ? h.lastIndexOf(']') : 0;
             int idx = h.lastIndexOf(':');
-            if (idx != -1) {
+            if (idx != -1 && idx > ipv6end) {
                 this.serverName = h.substring(0, idx);
                 serverPort = Integer.valueOf(h.substring(idx + 1));
             } else {
