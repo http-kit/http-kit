@@ -248,6 +248,11 @@
                        {:headers {"host" "[::ffff:a9fe:a9fe]"}})]
     (is (= 200 (:status resp)))))
 
+(deftest ipv6-host-header-with-port
+  (let [resp (http/get "http://localhost:4347/"
+                       {:headers {"host" "[::ffff:a9fe:a9fe]:80"}})]
+    (is (= 200 (:status resp)))))
+
 ;;;;; async
 
 (deftest test-timer
