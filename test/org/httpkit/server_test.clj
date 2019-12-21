@@ -253,6 +253,11 @@
                        {:headers {"host" "[::ffff:a9fe:a9fe]:80"}})]
     (is (= 200 (:status resp)))))
 
+(deftest ipv6-blank-host-header
+  (let [resp (http/get "http://localhost:4347/"
+                       {:headers {"host" ""}})]
+    (is (= 200 (:status resp)))))
+
 ;;;;; async
 
 (deftest test-timer

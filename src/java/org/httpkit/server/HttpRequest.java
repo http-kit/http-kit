@@ -72,7 +72,7 @@ public class HttpRequest {
 
     public void setHeaders(Map<String, Object> headers) {
         String h = getStringValue(headers, "host");
-        if (h != null) {
+        if (h != null && !h.equals("")) {
             // the port is an integer following the last ':'
             // *unless* the last : is prior to the last ] which marks the end of an ipv6 address
             // https://en.wikipedia.org/wiki/IPv6_address#Literal_IPv6_addresses_in_network_resource_identifiers
