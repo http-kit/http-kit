@@ -20,6 +20,40 @@ A big thank you to the **[current contributors](https://github.com/http-kit/http
 
 \- [@ptaoussanis][]
 
+### Issue [SNI support to be enabled by default?](https://github.com/http-kit/http-kit/issues/393)
+
+There is still an open discussion on how to address the fix that will not
+break users' setup; the [most accepted workaround](https://github.com/http-kit/http-kit/issues/393#issuecomment-563820823) is to provide a custom
+ssl-configurer when creating a client, here is the suggested code example:
+
+``` clojure
+(ns foo.core
+  (:require [org.httpkit.client :as http-client])
+  (:import java.net.URI
+           [javax.net.ssl SNIHostName SSLEngine]))
+
+(defn ssl-configurer [^SSLEngine eng, ^URI uri]
+  (let [host-name (SNIHostName. (.getHost uri))
+        params (doto (.getSSLParameters eng)
+                 (.setServerNames [host-name]))]
+    (doto eng
+      (.setUseClientMode true) ;; required for JDK12/13 but not for JDK1.8
+      (.setSSLParameters params))))
+
+(comment
+
+  (def client (http-client/make-client {:ssl-configurer ssl-configurer}))
+
+  @(http-client/request {:method :get
+                         :url "https://www.google.com/"
+                         :client client})
+  )
+```
+
+Since this is very common, http-kit provides a special namespace with the
+workaround already in place; it will still be possible to rollout a custom
+solution if needed.
+
 ### Hack locally
 
 Hacker friendly: zero dependencies, written from the ground-up with only ~3.5k lines of code (including java), clean and tidy.
@@ -34,6 +68,7 @@ lein test
 # Some numbers on how fast can http-kit's client can run:
 lein test :benchmark
 ```
+
 
 ### Contact & Contribution
 
