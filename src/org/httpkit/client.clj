@@ -96,6 +96,12 @@
 ;;; "Get the default client. Normally, you only need one client per application. You can config parameter per request basic"
 (defonce default-client (delay (HttpClient.)))
 
+(defonce
+  ^{:dynamic true
+    :doc "Specifies the default HttpClient used by the `request` function.
+Value may be a delay. See also `make-client`."}
+  *default-client* default-client)
+
 (defn make-client
   "Returns an HttpClient with specified options:
     :max-connections    ; Max connection count, default is unlimited (-1)
@@ -212,7 +218,7 @@
          proxy-port -1
          proxy-url nil}}
    & [callback]]
-  (let [client (or client @default-client)
+  (let [client (or client (force *default-client*))
         {:keys [url method headers body sslengine]} (coerce-req opts)
         deliver-resp #(deliver response ;; deliver the result
                                (try
