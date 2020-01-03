@@ -20,39 +20,30 @@ A big thank you to the **[current contributors](https://github.com/http-kit/http
 
 \- [@ptaoussanis][]
 
-### Issue [SNI support to be enabled by default?](https://github.com/http-kit/http-kit/issues/393)
+### Debugging SSLHandshakeException [SNI support to be enabled by default?](http)s://github.com/http-kit/http-kit/issues/393)
 
-There is still an open discussion on how to address the fix that will not
-break users' setup; the [most accepted workaround](https://github.com/http-kit/http-kit/issues/393#issuecomment-563820823) is to provide a custom
-ssl-configurer when creating a client, here is the suggested code example:
+If you just use http-kit client and you get an exception:
+
+`javax.net.ssl.SSLHandshakeException: Received fatal alert: handshake_failure`
+
+it means that you are trying to contact a website which uses SNI during
+the SSL handshake but the default client does not handle SNI properly and
+this generates the handshake exception.
+
+Since this is a common source of confusion, a new namespace have been
+introduced (`org.http-kit.sni-client`) which provides a pre configured
+client with a :sni-configurer in the var `default-sni-client`.
+
+The new default-sni-client can be used as is (just remenber to deref it),
+passing it to `request` function via the :client option, or can be set as
+the default one for the whole application:
 
 ``` clojure
-(ns foo.core
-  (:require [org.httpkit.client :as http-client])
-  (:import java.net.URI
-           [javax.net.ssl SNIHostName SSLEngine]))
-
-(defn ssl-configurer [^SSLEngine eng, ^URI uri]
-  (let [host-name (SNIHostName. (.getHost uri))
-        params (doto (.getSSLParameters eng)
-                 (.setServerNames [host-name]))]
-    (doto eng
-      (.setUseClientMode true) ;; required for JDK12/13 but not for JDK1.8
-      (.setSSLParameters params))))
-
-(comment
-
-  (def client (http-client/make-client {:ssl-configurer ssl-configurer}))
-
-  @(http-client/request {:method :get
-                         :url "https://www.google.com/"
-                         :client client})
-  )
+(alter-var-root #'org.http-kit.client/*default-client* default-sni-client)
 ```
 
-Since this is very common, http-kit provides a special namespace with the
-workaround already in place; it will still be possible to rollout a custom
-solution if needed.
+Please refer to `org.http-kit.sni-client` and `org.http-kit.client`
+namespaces for further details.
 
 ### Hack locally
 
