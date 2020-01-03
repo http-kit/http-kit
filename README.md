@@ -35,6 +35,27 @@ lein test
 lein test :benchmark
 ```
 
+### Enabling http-kit client SNI support
+
+> Common cause of: `javax.net.ssl.SSLHandshakeException: Received fatal alert: handshake_failure`
+
+To retain backwards-compatibility with JVMs < 8, the http-kit client currently **does not have SNI support enabled by default**.
+
+This default may be changed in a future breaking release. But in the meantime, manually enabling SNI support is easy:
+
+```clojure
+  (:require [org.httpkit.sni-client :as sni-client]) ; Needs Java >= 8
+
+  ;; Change default client for your whole application:
+  (alter-var-root #'org.httpkit.client/*default-client* (fn [_] sni-client/default-client))
+
+  ;; or temporarily change default client for a particular thread context:
+  (binding [org.httpkit.client/*default-client* sni-client/default-client]
+    <...>)
+```
+
+See `org.httpkit.client/*default-client*` docstring for more details.
+
 ### Contact & Contribution
 
 Please use the [GitHub issues page](https://github.com/http-kit/http-kit/issues) for feature suggestions, bug reports, or general discussions. Current contributors are listed [here](https://github.com/http-kit/http-kit/graphs/contributors). The http-kit.org website is also on GitHub [here](https://github.com/http-kit/http-kit.github.com).
