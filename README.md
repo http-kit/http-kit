@@ -20,6 +20,31 @@ A big thank you to the **[current contributors](https://github.com/http-kit/http
 
 \- [@ptaoussanis][]
 
+### Debugging SSLHandshakeException [SNI support to be enabled by default?](http)s://github.com/http-kit/http-kit/issues/393)
+
+If you just use http-kit client and you get an exception:
+
+`javax.net.ssl.SSLHandshakeException: Received fatal alert: handshake_failure`
+
+it means that you are trying to contact a website which uses SNI during
+the SSL handshake but the default client does not handle SNI properly and
+this generates the handshake exception.
+
+Since this is a common source of confusion, a new namespace have been
+introduced (`org.httpkit.sni-client`) which provides a pre configured
+client with a :sni-configurer in the var `default-sni-client`.
+
+The new default-sni-client can be used as is (just remenber to deref it),
+passing it to `request` function via the :client option, or can be set as
+the default one for the whole application:
+
+``` clojure
+(alter-var-root #'org.httpkit.client/*default-client* default-sni-client)
+```
+
+Please refer to `org.httpkit.sni-client` and `org.httpkit.client`
+namespaces for further details.
+
 ### Hack locally
 
 Hacker friendly: zero dependencies, written from the ground-up with only ~3.5k lines of code (including java), clean and tidy.
