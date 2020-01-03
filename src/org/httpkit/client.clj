@@ -99,7 +99,21 @@
 (defonce
   ^{:dynamic true
     :doc "Specifies the default HttpClient used by the `request` function.
-Value may be a delay. See also `make-client`."}
+Value may be a delay.
+
+A common use case is to replace the default (non-SNI-capable) client with
+an SNI-capable one, e.g.:
+
+  (:require [org.httpkit.sni-client :as sni-client]) ; Needs Java >= 8
+
+  ;; Change default client for your whole application:
+  (alter-var-root #'org.httpkit.client/*default-client* (fn [_] sni-client/default-client))
+
+  ;; or temporarily change default client for a particular thread context:
+  (binding [org.httpkit.client/*default-client* sni-client/default-client]
+    <...>)
+
+ See also `make-client`."}
   *default-client* default-client)
 
 (defn make-client
