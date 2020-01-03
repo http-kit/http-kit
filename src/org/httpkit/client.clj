@@ -96,6 +96,22 @@
 ;;; "Get the default client. Normally, you only need one client per application. You can config parameter per request basic"
 (defonce default-client (delay (HttpClient.)))
 
+(defonce
+  ^{:dynamic true
+    :doc "
+This var provides a way for the user to customize the default-client,
+used by `request` function when :client option is not provided; the var
+can be re-bound by using `alter-var-root` or by wrapping a form with a
+`binding`; subsequent calls to `request` will pickup the right default
+client depending on the context of the call.
+Possible use cases:
+- `alter-var-root` : user defined default client to be used across the whole application.
+- `binding` : user defined default client per thread.
+
+It is worth noting that it is still possibile to pass a client
+object to `request` function via the options map as it was before."}
+  *default-client* default-client)
+
 (defn make-client
   "Returns an HttpClient with specified options:
     :max-connections    ; Max connection count, default is unlimited (-1)
@@ -212,7 +228,7 @@
          proxy-port -1
          proxy-url nil}}
    & [callback]]
-  (let [client (or client @default-client)
+  (let [client (or client (force *default-client*))
         {:keys [url method headers body sslengine]} (coerce-req opts)
         deliver-resp #(deliver response ;; deliver the result
                                (try
