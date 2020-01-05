@@ -57,12 +57,6 @@
 
 (comment (query-string {:k1 "v1" :k2 "v2" :k3 nil :k4 ["v4a" "v4b"] :k5 []}))
 
-(defn https-engine
-  ^SSLEngine [^SSLContext ssl-ctx url]
-  (let [addr (-> HttpClient$AddressFinder/DEFAULT
-                 (.findAddress (URI. url)))]
-    (.createSSLEngine  ssl-ctx (.getHostName addr) (.getPort addr))))
-
 (def ^:private sni? (partial = :sni))
 (def ^:private hv?  (partial = :hostname-verification))
 
@@ -88,7 +82,8 @@
                           (str url "&" (query-string query-params)))
                         url)
                  :sslengine (or sslengine
-                                (some-> ssl-context (https-engine url))
+                                ;; allow for SSLContext param
+                                (some-> ssl-context .createSSLEngine)
                                 (when insecure?
                                   (ClientSslEngineFactory/trustAnybody)))
                  :method    (HttpMethod/fromKeyword (or method :get))
