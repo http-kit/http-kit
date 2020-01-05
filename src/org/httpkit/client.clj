@@ -73,7 +73,7 @@
      (.setSSLParameters ssl-engine ssl-params))))
 
 (defn- coerce-req
-  [{:keys [url method body insecure? sslengine query-params form-params multipart]
+  [{:keys [url method body sslengine query-params form-params multipart]
     :as req}]
   (let [r (assoc req
                  :url (if query-params
@@ -82,7 +82,7 @@
                           (str url "&" (query-string query-params)))
                         url)
                  :sslengine (or sslengine
-                                (when insecure?
+                                (when (:insecure? req)
                                   (ClientSslEngineFactory/trustAnybody)))
                  :method    (HttpMethod/fromKeyword (or method :get))
                  :headers   (prepare-request-headers req)
@@ -146,7 +146,7 @@ an SNI-capable one, e.g.:
   "Returns an HttpClient with specified options:
     :max-connections    ; Max connection count, default is unlimited (-1)
     :address-finder     ; (fn [java.net.URI]) -> java.net.InetSocketAddress
-    :ssl-configurer     ; (fn [javax.net.ssl.SSLEngine java.net.URI & flags])
+    :ssl-configurer     ; (fn [javax.net.ssl.SSLEngine java.net.URI])
     :error-logger       ; (fn [text ex])
     :event-logger       ; (fn [event-name])
     :event-names        ; {<http-kit-event-name> <loggable-event-name>}
