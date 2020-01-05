@@ -57,7 +57,7 @@
 
 (comment (query-string {:k1 "v1" :k2 "v2" :k3 nil :k4 ["v4a" "v4b"] :k5 []}))
 
-(defn- https-engine
+(defn https-engine
   ^SSLEngine [^SSLContext ssl-ctx url]
   (let [addr (-> HttpClient$AddressFinder/DEFAULT
                  (.findAddress (URI. url)))]
@@ -71,7 +71,6 @@
    (https-configurer engine uri :hostname-verification))
   ([^SSLEngine ssl-engine ^URI uri & opts]
    (let [^SSLParameters ssl-params (.getSSLParameters ssl-engine)]
-     (println (vec opts))
      (when (some hv? opts)
        (.setEndpointIdentificationAlgorithm ssl-params "HTTPS"))
      (when (some sni? opts)
@@ -154,8 +153,6 @@ an SNI-capable one, e.g.:
   [{:keys [max-connections
            address-finder
            ssl-configurer
-           sni                   ;; server-name-indication flag - optional
-           hostname-verification ;; hostname verification flag  - optional
            error-logger
            event-logger
            event-names
