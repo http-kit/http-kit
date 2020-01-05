@@ -4,12 +4,13 @@
             [org.httpkit.encode :refer [base64-encode]])
   (:use [clojure.walk :only [prewalk]])
   (:import [org.httpkit.client HttpClient HttpClient$AddressFinder HttpClient$SSLEngineURIConfigurer
-            IResponseHandler RespListener IFilter RequestConfig]
+                               IResponseHandler RespListener IFilter RequestConfig]
            [org.httpkit.logger ContextLogger EventLogger EventNames]
            [org.httpkit HttpMethod PrefixThreadFactory HttpUtils]
            [java.util.concurrent ThreadPoolExecutor LinkedBlockingQueue TimeUnit]
            [java.net URI URLEncoder]
-           [org.httpkit.client ClientSslEngineFactory MultipartEntity]))
+           [org.httpkit.client ClientSslEngineFactory MultipartEntity]
+           (javax.net.ssl SSLContext SSLEngine SSLParameters SNIHostName)))
 
 ;;;; Utils
 
@@ -56,16 +57,40 @@
 
 (comment (query-string {:k1 "v1" :k2 "v2" :k3 nil :k4 ["v4a" "v4b"] :k5 []}))
 
+(defn- url-engine
+  ^SSLEngine [^SSLContext ssl-ctx url]
+  (let [addr (-> HttpClient$AddressFinder/DEFAULT
+                 (.findAddress (URI. url)))]
+    (.createSSLEngine  ssl-ctx (.getHostName addr) (.getPort addr))))
+
+(def ^:private sni? (partial = :sni))
+(def ^:private hv?  (partial = :hostname-verification))
+
+(defn url-ssl-configurer
+  ([engine uri]
+   (url-ssl-configurer engine uri :hostname-verification))
+  ([^SSLEngine ssl-engine ^URI uri & opts]
+   (let [^SSLParameters ssl-params (.getSSLParameters ssl-engine)]
+     (when (some hv? opts)
+       (.setEndpointIdentificationAlgorithm ssl-params "HTTPS"))
+     (when (some sni? opts)
+       (.setServerNames ssl-params [(SNIHostName. (.getHost uri))]))
+     (.setUseClientMode ssl-engine true)
+     (.setSSLParameters ssl-engine ssl-params))))
+
 (defn- coerce-req
-  [{:keys [url method body insecure? query-params form-params multipart] :as req}]
+  [{:keys [url method body insecure? sslengine ssl-context query-params form-params multipart]
+    :as req}]
   (let [r (assoc req
                  :url (if query-params
                         (if (neg? (.indexOf ^String url (int \?)))
                           (str url "?" (query-string query-params))
                           (str url "&" (query-string query-params)))
                         url)
-                 :sslengine (or (:sslengine req)
-                                (when (:insecure? req) (ClientSslEngineFactory/trustAnybody)))
+                 :sslengine (or sslengine
+                                (some-> ssl-context (url-engine url))
+                                (when insecure?
+                                  (ClientSslEngineFactory/trustAnybody)))
                  :method    (HttpMethod/fromKeyword (or method :get))
                  :headers   (prepare-request-headers req)
             ;; :body ring body: null, String, seq, InputStream, File, ByteBuffer
@@ -120,7 +145,7 @@ an SNI-capable one, e.g.:
   "Returns an HttpClient with specified options:
     :max-connections    ; Max connection count, default is unlimited (-1)
     :address-finder     ; (fn [java.net.URI]) -> java.net.InetSocketAddress
-    :ssl-configurer     ; (fn [javax.net.ssl.SSLEngine java.net.URI])
+    :ssl-configurer     ; (fn [javax.net.ssl.SSLEngine java.net.URI & flags])
     :error-logger       ; (fn [text ex])
     :event-logger       ; (fn [event-name])
     :event-names        ; {<http-kit-event-name> <loggable-event-name>}
@@ -128,6 +153,8 @@ an SNI-capable one, e.g.:
   [{:keys [max-connections
            address-finder
            ssl-configurer
+           sni                   ;; server-name-indication flag - optional
+           hostname-verification ;; hostname verification flag  - optional
            error-logger
            event-logger
            event-names
@@ -140,7 +167,8 @@ an SNI-capable one, e.g.:
       HttpClient$AddressFinder/DEFAULT)
     (if ssl-configurer
       (reify HttpClient$SSLEngineURIConfigurer
-        (configure [this ssl-engine uri] (ssl-configurer ssl-engine uri)))
+        (configure [this ssl-engine uri]
+          (ssl-configurer ssl-engine uri sni hostname-verification)))
       HttpClient$SSLEngineURIConfigurer/NOP)
     (if error-logger
       (reify ContextLogger
@@ -159,6 +187,12 @@ an SNI-capable one, e.g.:
                                   (format "Invalid event-names: (%s) %s"
                                     (class event-names) (pr-str event-names)))))
     bind-address))
+
+(defonce default-client-url
+  ;; like the `default-client` but with hostname-verification turned on
+  ;; (assumes that requests will carry either an ssl-engine or an ssl-context)
+  (delay (make-client {:ssl-configurer url-ssl-configurer
+                       :hostname-verification true})))
 
 (def ^:dynamic ^:private *in-callback* false)
 
@@ -234,7 +268,12 @@ an SNI-capable one, e.g.:
          proxy-port -1
          proxy-url nil}}
    & [callback]]
-  (let [client (or client (force *default-client*))
+  (let [client (if (nil? client)
+                 (force *default-client*)                  ;; through the dynamic-binding
+                 (case client
+                   :default     (force default-client)     ;; straight to `default-client`
+                   :default-url (force default-client-url) ;; straight to `default-client-url`
+                   client))
         {:keys [url method headers body sslengine]} (coerce-req opts)
         deliver-resp #(deliver response ;; deliver the result
                                (try
