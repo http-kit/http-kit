@@ -4,12 +4,13 @@
             [org.httpkit.encode :refer [base64-encode]])
   (:use [clojure.walk :only [prewalk]])
   (:import [org.httpkit.client HttpClient HttpClient$AddressFinder HttpClient$SSLEngineURIConfigurer
-            IResponseHandler RespListener IFilter RequestConfig]
+                               IResponseHandler RespListener IFilter RequestConfig]
            [org.httpkit.logger ContextLogger EventLogger EventNames]
            [org.httpkit HttpMethod PrefixThreadFactory HttpUtils]
            [java.util.concurrent ThreadPoolExecutor LinkedBlockingQueue TimeUnit]
            [java.net URI URLEncoder]
-           [org.httpkit.client ClientSslEngineFactory MultipartEntity]))
+           [org.httpkit.client ClientSslEngineFactory MultipartEntity]
+           [javax.net.ssl SSLContext SSLEngine]))
 
 ;;;; Utils
 
@@ -57,15 +58,17 @@
 (comment (query-string {:k1 "v1" :k2 "v2" :k3 nil :k4 ["v4a" "v4b"] :k5 []}))
 
 (defn- coerce-req
-  [{:keys [url method body insecure? query-params form-params multipart] :as req}]
+  [{:keys [url method body sslengine query-params form-params multipart]
+    :as req}]
   (let [r (assoc req
                  :url (if query-params
                         (if (neg? (.indexOf ^String url (int \?)))
                           (str url "?" (query-string query-params))
                           (str url "&" (query-string query-params)))
                         url)
-                 :sslengine (or (:sslengine req)
-                                (when (:insecure? req) (ClientSslEngineFactory/trustAnybody)))
+                 :sslengine (or sslengine
+                                (when (:insecure? req)
+                                  (ClientSslEngineFactory/trustAnybody)))
                  :method    (HttpMethod/fromKeyword (or method :get))
                  :headers   (prepare-request-headers req)
             ;; :body ring body: null, String, seq, InputStream, File, ByteBuffer
@@ -95,6 +98,14 @@
 
 ;;; "Get the default client. Normally, you only need one client per application. You can config parameter per request basic"
 (defonce default-client (delay (HttpClient.)))
+
+(defn make-ssl-engine
+  "Helper for creating instances of SSLEngine
+   from the default, or some custom SSLContext."
+  (^SSLEngine []
+   (make-ssl-engine (SSLContext/getDefault)))
+  (^SSLEngine [^SSLContext ctx]
+   (.createSSLEngine ctx)))
 
 (defonce
   ^{:dynamic true
@@ -140,7 +151,8 @@ an SNI-capable one, e.g.:
       HttpClient$AddressFinder/DEFAULT)
     (if ssl-configurer
       (reify HttpClient$SSLEngineURIConfigurer
-        (configure [this ssl-engine uri] (ssl-configurer ssl-engine uri)))
+        (configure [this ssl-engine uri]
+          (ssl-configurer ssl-engine uri)))
       HttpClient$SSLEngineURIConfigurer/NOP)
     (if error-logger
       (reify ContextLogger
@@ -162,7 +174,7 @@ an SNI-capable one, e.g.:
 
 (def ^:dynamic ^:private *in-callback* false)
 
-(defn ^:private deadlock-guard [response]
+(defn- deadlock-guard [response]
   (let [e #(Exception. "http-kit client deadlock-guard: refusing to deref a request callback from inside a callback. This feature can be disabled with the request's `:deadlock-guard?` option.")]
     (reify
       clojure.lang.IPending
