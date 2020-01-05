@@ -57,7 +57,7 @@
 
 (comment (query-string {:k1 "v1" :k2 "v2" :k3 nil :k4 ["v4a" "v4b"] :k5 []}))
 
-(defn- url-engine
+(defn- https-engine
   ^SSLEngine [^SSLContext ssl-ctx url]
   (let [addr (-> HttpClient$AddressFinder/DEFAULT
                  (.findAddress (URI. url)))]
@@ -66,11 +66,12 @@
 (def ^:private sni? (partial = :sni))
 (def ^:private hv?  (partial = :hostname-verification))
 
-(defn url-ssl-configurer
+(defn https-configurer
   ([engine uri]
-   (url-ssl-configurer engine uri :hostname-verification))
+   (https-configurer engine uri :hostname-verification))
   ([^SSLEngine ssl-engine ^URI uri & opts]
    (let [^SSLParameters ssl-params (.getSSLParameters ssl-engine)]
+     (println (vec opts))
      (when (some hv? opts)
        (.setEndpointIdentificationAlgorithm ssl-params "HTTPS"))
      (when (some sni? opts)
@@ -88,7 +89,7 @@
                           (str url "&" (query-string query-params)))
                         url)
                  :sslengine (or sslengine
-                                (some-> ssl-context (url-engine url))
+                                (some-> ssl-context (https-engine url))
                                 (when insecure?
                                   (ClientSslEngineFactory/trustAnybody)))
                  :method    (HttpMethod/fromKeyword (or method :get))
@@ -168,7 +169,7 @@ an SNI-capable one, e.g.:
     (if ssl-configurer
       (reify HttpClient$SSLEngineURIConfigurer
         (configure [this ssl-engine uri]
-          (ssl-configurer ssl-engine uri sni hostname-verification)))
+          (ssl-configurer ssl-engine uri)))
       HttpClient$SSLEngineURIConfigurer/NOP)
     (if error-logger
       (reify ContextLogger
@@ -188,11 +189,10 @@ an SNI-capable one, e.g.:
                                     (class event-names) (pr-str event-names)))))
     bind-address))
 
-(defonce default-client-url
+(defonce default-client-https
   ;; like the `default-client` but with hostname-verification turned on
   ;; (assumes that requests will carry either an ssl-engine or an ssl-context)
-  (delay (make-client {:ssl-configurer url-ssl-configurer
-                       :hostname-verification true})))
+  (delay (make-client {:ssl-configurer https-configurer})))
 
 (def ^:dynamic ^:private *in-callback* false)
 
@@ -269,11 +269,11 @@ an SNI-capable one, e.g.:
          proxy-url nil}}
    & [callback]]
   (let [client (if (nil? client)
-                 (force *default-client*)                  ;; through the dynamic-binding
+                 (force *default-client*)                      ;; through the dynamic-binding
                  (case client
-                   :default     (force default-client)     ;; straight to `default-client`
-                   :default-url (force default-client-url) ;; straight to `default-client-url`
-                   client))
+                   :default       (force default-client)       ;; straight to `default-client`
+                   :default-https (force default-client-https) ;; straight to `default-client-https`
+                   client))                                    ;; caller provided object
         {:keys [url method headers body sslengine]} (coerce-req opts)
         deliver-resp #(deliver response ;; deliver the result
                                (try
