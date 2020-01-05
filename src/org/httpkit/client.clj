@@ -73,7 +73,7 @@
      (.setSSLParameters ssl-engine ssl-params))))
 
 (defn- coerce-req
-  [{:keys [url method body insecure? sslengine ssl-context query-params form-params multipart]
+  [{:keys [url method body insecure? sslengine query-params form-params multipart]
     :as req}]
   (let [r (assoc req
                  :url (if query-params
@@ -82,8 +82,6 @@
                           (str url "&" (query-string query-params)))
                         url)
                  :sslengine (or sslengine
-                                ;; allow for SSLContext param
-                                (some-> ssl-context .createSSLEngine)
                                 (when insecure?
                                   (ClientSslEngineFactory/trustAnybody)))
                  :method    (HttpMethod/fromKeyword (or method :get))
@@ -115,6 +113,14 @@
 
 ;;; "Get the default client. Normally, you only need one client per application. You can config parameter per request basic"
 (defonce default-client (delay (HttpClient.)))
+
+(defn make-ssl-engine
+  "Helper for creating instances of SSLEngine
+   from the default, or some custom SSLContext."
+  (^SSLEngine []
+   (make-ssl-engine (SSLContext/getDefault)))
+  (^SSLEngine [^SSLContext ctx]
+   (.createSSLEngine ctx)))
 
 (defonce
   ^{:dynamic true
@@ -182,13 +188,13 @@ an SNI-capable one, e.g.:
     bind-address))
 
 (defonce default-client-https
-  ;; like the `default-client` but with hostname-verification turned on
-  ;; (assumes that requests will carry either an ssl-engine or an ssl-context)
+  ;; similar to the `default-client`, but
+  ;; behaving more like `URL.openStream()`
   (delay (make-client {:ssl-configurer https-configurer})))
 
 (def ^:dynamic ^:private *in-callback* false)
 
-(defn ^:private deadlock-guard [response]
+(defn- deadlock-guard [response]
   (let [e #(Exception. "http-kit client deadlock-guard: refusing to deref a request callback from inside a callback. This feature can be disabled with the request's `:deadlock-guard?` option.")]
     (reify
       clojure.lang.IPending
