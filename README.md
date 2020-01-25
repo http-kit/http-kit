@@ -10,7 +10,7 @@
 [http-kit "2.1.19"]        ; Legacy, published by @shenfeng
 ```
 
-See [http-kit.org](http://http-kit.org) for documentation, examples, benchmarks, etc. (no longer maintained, some examples may contain minor bugs).
+See the [project website][] for documentation, examples, benchmarks, etc.
 
 ## Project status
 
@@ -59,7 +59,7 @@ See `org.httpkit.client/*default-client*` docstring for more details.
 
 ### Contact & Contribution
 
-Please use the [GitHub issues page](https://github.com/http-kit/http-kit/issues) for feature suggestions, bug reports, or general discussions. Current contributors are listed [here](https://github.com/http-kit/http-kit/graphs/contributors). The http-kit.org website is also on GitHub [here](https://github.com/http-kit/http-kit.github.com).
+Please use the [GitHub issues page](https://github.com/http-kit/http-kit/issues) for feature suggestions, bug reports, or general discussions. Current contributors are listed [here](https://github.com/http-kit/http-kit/graphs/contributors). The [project website][] is also on GitHub.
 
 ### License
 
@@ -68,3 +68,4 @@ Copyright &copy; 2012-2018 [@shenfeng][]. Distributed under the [Apache License 
 [CHANGELOG]: https://github.com/http-kit/http-kit/releases
 [@shenfeng]: https://github.com/shenfeng
 [@ptaoussanis]: https://github.com/ptaoussanis
+[project website]: https://http-kit.github.com
