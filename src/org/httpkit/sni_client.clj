@@ -23,17 +23,24 @@
 (defn ssl-configurer
   "SNI-capable SSL configurer.
    May be used as an argument to `org.httpkit.client/make-client`:
-    (make-client :ssl-configurer (ssl-configurer))"
+    (make-client :ssl-configurer ssl-configurer)"
   ([engine uri]
    (ssl-configurer engine uri :hostname-verification :sni))
   ([^SSLEngine ssl-engine ^URI uri & opts]
-   (let [^SSLParameters ssl-params (.getSSLParameters ssl-engine)]
+   (let [^SSLParameters ssl-params (.getSSLParameters ssl-engine)
+         client-mode? (.getUseClientMode ssl-engine)]
      (when (some hv? opts)
        (.setEndpointIdentificationAlgorithm ssl-params "HTTPS"))
      (when (some sni? opts)
        (.setServerNames ssl-params [(SNIHostName. (.getHost uri))]))
      (doto ssl-engine
-       (.setUseClientMode true) ; required for JVM 12/13 but not for JVM 8
+       (cond->
+         ;; need to be careful with Java8 here:
+         ;; java.lang.IllegalArgumentException:
+         ;; Cannot change mode after SSL traffic has started
+         ;; at sun.security.ssl.SSLEngineImpl.setUseClientMode
+         (not client-mode?)
+         (.setUseClientMode true))
        (.setSSLParameters ssl-params)))))
 
 

@@ -1,7 +1,7 @@
 (ns org.httpkit.client-https-test
   (:require [clojure.test :refer :all]
-            [org.httpkit.sni-client :as sni]
-            [org.httpkit.client :as http])
+            [org.httpkit.client :as http]
+            [org.httpkit.sni-client :as sni])
   (:import (javax.net.ssl SSLHandshakeException SSLException SSLContext)))
 
 
@@ -13,13 +13,16 @@
           url2 "https://self-signed.badssl.com"
           url3 "https://untrusted-root.badssl.com"]
 
-      (is (instance? SSLHandshakeException
-                     (:error
-                       @(http/request
-                          {:client https-client
-                           :sslengine sslengine
-                           :keepalive -1
-                           :url url1}))))
+      (let [exception (:error
+                        @(http/request
+                           {:client https-client
+                            :sslengine sslengine
+                            :keepalive -1
+                            :url url1}))]
+                ;; Java 9 and above throws proper SSLHandshakeException
+        (is (or (instance? SSLHandshakeException exception)
+                ;; Java 8 throws RuntimeException at sun.security.ssl.Handshaker
+                (instance? RuntimeException exception))))
 
       (is (instance? SSLException
                      (:error
