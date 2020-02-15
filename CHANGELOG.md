@@ -1,3 +1,33 @@
+## 2.4.0-alpha6 (2020 Feb 15)
+
+```clojure
+[http-kit "2.4.0-alpha6"]
+```
+
+> As usual, please evaluate before using in production (and **please report any problems!**).
+
+#### Changes since 2.3.0
+
+* [Server][Experimental] Deprecate `with-channel`, add `as-channel`
+* [#399][Server] Graceful Shutdown (@glenjamin)
+
+#### New since 2.3.0
+
+* [#412 #383 #388] Java 11 support (@ryfow, @RokLenarcic)
+* [#426 #422 #393 #334 #187] [Client] Add a drop-in SNI-capable client (@fpischedda, @jimpil)
+* [#422] [Client] Provide a dynamic var to override default client (@fpischedda)
+* [#395] [Server] Add keywords to cover missing WebSocket status codes (@daviesian)
+* [#374] [Client] Allow specification of local address when making requests (@snoe)
+* [#379] [Server] Support byte[] responses (@ikitommi)
+* [#389] [Client] Make `query-string` public (@kirked)
+* [#400 #402] [Client] Add :none coercion option to return byte-array (@ethpran)
+* [#403 #415] [Client] Add error message when no location header is present (@BadAlgorithm)
+
+#### Fixes since 2.3.0
+
+* [#410 #419] [Server] Special-case the parsing for ipv6, if the host header starts with `[` (@blak3mill3r)
+* [#384] [Server] Fix typo in `run-server` doc-string (@dsdolzhenko)
+
 ## 2.4.0-alpha3 (2019 Jan 19)
 
 ```clojure

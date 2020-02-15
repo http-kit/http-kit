@@ -6,7 +6,7 @@
 
 ```clojure
 [http-kit "2.3.0"]         ; Stable, published by contributors, see CHANGELOG for details
-[http-kit "2.4.0-alpha3"]  ; Dev,    published by contributors, see CHANGELOG for details
+[http-kit "2.4.0-alpha6"]  ; Dev,    published by contributors, see CHANGELOG for details
 [http-kit "2.1.19"]        ; Legacy, published by @shenfeng
 ```
 
@@ -37,7 +37,7 @@ lein test :benchmark
 
 ### Enabling http-kit client SNI support
 
-> Requires JVM >= 8, http-kit >= 2.4.0-alpha5.
+> Requires JVM >= 8, http-kit >= 2.4.0-alpha6.
 > Common cause of: `javax.net.ssl.SSLHandshakeException: Received fatal alert: handshake_failure`
 
 To retain backwards-compatibility with JVMs < 8, the http-kit client currently **does not have SNI support enabled by default**.
