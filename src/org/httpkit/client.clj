@@ -10,7 +10,7 @@
            [java.util.concurrent ThreadPoolExecutor LinkedBlockingQueue TimeUnit]
            [java.net URI URLEncoder]
            [org.httpkit.client ClientSslEngineFactory MultipartEntity]
-           (javax.net.ssl SSLContext SSLEngine SSLParameters SNIHostName)))
+           (javax.net.ssl SSLContext SSLEngine)))
 
 ;;;; Utils
 
@@ -56,21 +56,6 @@
                            (param k v))))))
 
 (comment (query-string {:k1 "v1" :k2 "v2" :k3 nil :k4 ["v4a" "v4b"] :k5 []}))
-
-(def ^:private sni? (partial = :sni))
-(def ^:private hv?  (partial = :hostname-verification))
-
-(defn https-configurer
-  ([engine uri]
-   (https-configurer engine uri :hostname-verification))
-  ([^SSLEngine ssl-engine ^URI uri & opts]
-   (let [^SSLParameters ssl-params (.getSSLParameters ssl-engine)]
-     (when (some hv? opts)
-       (.setEndpointIdentificationAlgorithm ssl-params "HTTPS"))
-     (when (some sni? opts)
-       (.setServerNames ssl-params [(SNIHostName. (.getHost uri))]))
-     (.setUseClientMode ssl-engine true)
-     (.setSSLParameters ssl-engine ssl-params))))
 
 (defn- coerce-req
   [{:keys [url method body sslengine query-params form-params multipart]
@@ -187,11 +172,6 @@ an SNI-capable one, e.g.:
                                     (class event-names) (pr-str event-names)))))
     bind-address))
 
-(defonce default-client-https
-  ;; similar to the `default-client`, but
-  ;; behaving more like `URL.openStream()`
-  (delay (make-client {:ssl-configurer https-configurer})))
-
 (def ^:dynamic ^:private *in-callback* false)
 
 (defn- deadlock-guard [response]
@@ -266,12 +246,7 @@ an SNI-capable one, e.g.:
          proxy-port -1
          proxy-url nil}}
    & [callback]]
-  (let [client (if (nil? client)
-                 (force *default-client*)                      ;; through the dynamic-binding
-                 (case client
-                   :default       (force default-client)       ;; straight to `default-client`
-                   :default-https (force default-client-https) ;; straight to `default-client-https`
-                   client))                                    ;; caller provided object
+  (let [client (or client (force *default-client*))
         {:keys [url method headers body sslengine]} (coerce-req opts)
         deliver-resp #(deliver response ;; deliver the result
                                (try
