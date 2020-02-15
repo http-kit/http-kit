@@ -5,41 +5,50 @@
   (:import [java.net URI]
            [javax.net.ssl SNIHostName SSLEngine SSLParameters]))
 
-(defn ssl-configurer
-  "SNI-capable SSL configurer.
-  May be used as an argument to `org.httpkit.client/make-client`:
-    (make-client :ssl-configurer (ssl-configurer))"
-  [^SSLEngine ssl-engine ^URI uri]
-  (let [host-name  (SNIHostName. (.getHost uri))
-        ssl-params (doto (.getSSLParameters ssl-engine)
-                     (.setServerNames [host-name]))]
-    (doto ssl-engine
-      (.setUseClientMode true) ; required for JVM 12/13 but not for JVM 8
-      (.setSSLParameters ssl-params))))
+(defn- parse-java-version
+  "Ref. https://stackoverflow.com/a/2591122"
+  [^String s]
+  (if (.startsWith s "1.") ; e.g. "1.6.0_23"
+    (Integer/parseInt (.substring s 2 3))
+    (let [dot-idx (.indexOf s ".")] ; e.g. "9.0.1"
+      (when (not= dot-idx -1)
+        (Integer/parseInt (.substring s 0 dot-idx))))))
 
-(def ^:private sni? (partial = :sni))
-(def ^:private hv?  (partial = :hostname-verification))
+(comment
+  (parse-java-version "1.6.0_23") ; 6
+  (parse-java-version "9.0.1")    ; 9
+  )
+
+(def ^:private java-version_
+  (delay (parse-java-version (str (System/getProperty "java.version")))))
+
+(comment @java-version_)
 
 (defn ssl-configurer
   "SNI-capable SSL configurer.
    May be used as an argument to `org.httpkit.client/make-client`:
     (make-client :ssl-configurer (ssl-configurer))"
-  ([engine uri]
-   (ssl-configurer engine uri :hostname-verification :sni))
-  ([^SSLEngine ssl-engine ^URI uri & opts]
+  ([ssl-engine uri] (ssl-configurer {} ssl-engine uri))
+  ([{:keys [hostname-verification? sni?] :as opts
+     :or   {;; TODO Better option/s than hacky version check?
+            hostname-verification? (>= @java-version_ 11)
+            sni?                   true}}
+    ^SSLEngine ssl-engine ^URI uri]
+
    (let [^SSLParameters ssl-params (.getSSLParameters ssl-engine)]
-     (when (some hv? opts)
-       (.setEndpointIdentificationAlgorithm ssl-params "HTTPS"))
-     (when (some sni? opts)
-       (.setServerNames ssl-params [(SNIHostName. (.getHost uri))]))
+     (when hostname-verification? (.setEndpointIdentificationAlgorithm ssl-params "HTTPS"))
+     (when sni?                   (.setServerNames                     ssl-params
+                                    [(SNIHostName. (.getHost uri))]))
+
+     ;; TODO Better option/s than hacky version check?
+     (when (and (>= @java-version_ 11) (not (.getUseClientMode ssl-engine)))
+       (.setUseClientMode ssl-engine true))
+
      (doto ssl-engine
-       (.setUseClientMode true) ; required for JVM 12/13 but not for JVM 8
        (.setSSLParameters ssl-params)))))
 
-
-
 (defonce
-  ^{:doc "Like `org.httpkit.client/default-client`, but provides SNI support using `ssl-configurer`"}
+  ^{:doc "Like `org.httpkit.client/default-client`, but provides SNI support using `ssl-configurer`. NB Hostname verification currently requires Java version >= 11."}
   default-client
   (delay
     (require '[org.httpkit.client]) ; Lazy require to help users avoid circular deps

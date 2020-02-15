@@ -21,7 +21,7 @@
   ["-Dclojure.compiler.disable-locals-clearing=true"
    "-Xms1g" "-Xmx1g"] ; Testing https require more memory
 
-  :javac-options ["-source" "1.7" "-target" "1.7" "-g"]
+  :javac-options ["-source" "1.6" "-target" "1.6" "-g"]
   :java-source-paths ["src/java"]
   :test-paths ["test"]
   :jar-exclusions [#"^java.*"] ; exclude the java directory in source path

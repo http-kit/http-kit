@@ -10,11 +10,13 @@
                    [route :only [not-found]])
         (clojure.tools [logging :only [info warn]]))
   (:require [org.httpkit.client :as http]
+            [org.httpkit.sni-client :as sni]
             [clojure.java.io :as io]
             [clj-http.client :as clj-http])
   (:import java.nio.ByteBuffer
            [org.httpkit HttpMethod HttpStatus HttpVersion DynamicBytes]
-           [org.httpkit.client Decoder IRespListener ClientSslEngineFactory]))
+           [org.httpkit.client Decoder IRespListener ClientSslEngineFactory]
+           [javax.net.ssl SSLHandshakeException SSLException SSLContext]))
 
 (defroutes test-routes
   (GET "/get" [] "hello world")
@@ -309,6 +311,50 @@
     (is (contains? @(http/get "https://localhost:9898" opts) :status))
     (is (contains? @(http/get "https://localhost:9898" opts) :status))
     (is (contains? @(http/get "https://localhost:9898" opts) :status))))
+
+(deftest test-default-sni-client
+  (testing "`sni/default-client` behaves similarly to `URL.openStream()`"
+    (let [sslengine (http/make-ssl-engine)
+          https-client @sni/default-client
+          url0 "https://www.bbc.co.uk"
+          url1 "https://wrong.host.badssl.com"
+          url2 "https://self-signed.badssl.com"
+          url3 "https://untrusted-root.badssl.com"]
+
+      (is (nil?
+            (:error
+             @(http/request
+                {:client  https-client
+                 :sslengine sslengine
+                 :keepalive -1
+                 :url url0}))))
+
+      (when (>= @@#'sni/java-version_ 11)
+        ;; Specific type depends on JVM version- could be e/o
+        ;; #{SSLHandshakeException RuntimeException ...}
+        (is (instance? Exception
+              (:error
+               @(http/request
+                  {:client https-client
+                   :sslengine sslengine
+                   :keepalive -1
+                   :url url1})))))
+
+      (is (instance? #_SSLException Exception
+                     (:error
+                       @(http/request
+                          {:client  https-client
+                           :sslengine sslengine
+                           :keepalive -1
+                           :url url2}))))
+
+      (is (instance? #_SSLException Exception
+                     (:error
+                       @(http/request
+                          {:client  https-client
+                           :sslengine sslengine
+                           :keepalive -1
+                           :url url3})))))))
 
 ;; https://github.com/http-kit/http-kit/issues/54
 (deftest test-nested-param
