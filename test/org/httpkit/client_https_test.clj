@@ -6,7 +6,7 @@
 
 
 (deftest client-https-tests
-  (testing "`default-client-https` behaves similarly to `URL.openStream()`"
+  (testing "`sni/default-client` behaves similarly to `URL.openStream()`"
     (let [sslengine (.createSSLEngine (SSLContext/getDefault))
           https-client (force sni/default-client)
           url1 "https://wrong.host.badssl.com"
