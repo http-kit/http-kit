@@ -457,11 +457,11 @@ public class HttpServer implements Runnable {
         }
     }
 
-    // public Boolean isRunning() {
-    //     return this.serverThread.isAlive();
-    // }
+    public Boolean isRunning() {
+        return this.serverThread.isAlive();
+    }
 
-    // public Boolean isShuttingDown() {
-    //     return this.isShuttingDown.get();
-    // }
+    public Boolean isShuttingDown() {
+        return this.isShuttingDown.get();
+    }
 }
