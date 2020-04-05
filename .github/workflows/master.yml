@@ -16,4 +16,6 @@ jobs:
     - name: Install dependencies
       run: lein deps
     - name: Run tests
-      run: lein test
+      run: | 
+        gem install rake
+        rake
