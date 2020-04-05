@@ -81,15 +81,21 @@
 
     (.start s)
     (with-meta
-      (fn stop-server [& {:keys [timeout running? shutting-down?] :or {timeout 100 running? false shutting-down? false}}]
+      (fn stop-server [& {:keys [timeout running? shutting-down? synchronous?] 
+                          :or {timeout 100 running? false shutting-down? false synchronous? false}}]
         ;; graceful shutdown:
         ;; 1. server stop accept new request
         ;; 2. wait for existing requests to finish
         ;; 3. close the server
         (cond 
-          (nil? running?) (.isRunning s)
-          (nil? shutting-down?) (.isShuttingDown s)
-          :else (.stop s timeout)))
+          (not (false? running?)) ;(server :running?)
+            (.isRunning s)
+          (not (false? shutting-down?)) ;(server :shutting-down?)
+            (.isShuttingDown s)
+          (true? synchronous?) ;(server :synchronous? true) || (server :timeout3000 :synchronous? true)
+            (do (.stop s timeout) (while (.isRunning s)))
+          :else 
+            (.stop s timeout)))
 
       {:local-port (.getPort s)
        :server s})))
