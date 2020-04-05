@@ -17,5 +17,5 @@ jobs:
       run: lein deps
     - name: Run tests
       run: | 
-        gem install rake
+        sudo gem install rake
         rake
