@@ -456,4 +456,12 @@ public class HttpServer implements Runnable {
             warnLogger.log(String.format("failed to close %s", closable.getClass().getName()), ex);
         }
     }
+
+    // public Boolean isRunning() {
+    //     return this.serverThread.isAlive();
+    // }
+
+    // public Boolean isShuttingDown() {
+    //     return this.isShuttingDown.get();
+    // }
 }
