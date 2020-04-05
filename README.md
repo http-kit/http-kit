@@ -1,7 +1,7 @@
 # HTTP Kit
 
 ### A high-performance event-driven HTTP client+server for Clojure
-
+![master](https://github.com/alekcz/http-kit/workflows/master/badge.svg)  
 [CHANGELOG][] | Current [semantic](http://semver.org/) version/s:
 
 ```clojure
