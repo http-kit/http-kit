@@ -435,15 +435,22 @@
     (is (= "hello world" (:body @resp)))
     (is (= 200 (:status @resp)))))
 
+;tests for synchronous shutdown
+(deftest test-synchronous-shutdown
+  (let [server (run-server (site test-routes) {:port 3474})]
+    (Thread/sleep 100)
+    (is (thrown? java.net.BindException (run-server (site test-routes) {:port 3474})))
+    (server :synchronous? true)
+    (is (nil? ((run-server (site test-routes) {:port 3474}))))))
+
 ;tests for server state queries
 (deftest test-running?
   (let [server (run-server (site test-routes) {:port 3474})]
     (Thread/sleep 100)
     (is (= true (server :state :running?)))
     (is (thrown? java.net.BindException (run-server (site test-routes) {:port 3474})))
-    (server)
-    (is (= false (server :state :running?)))
-    (is (nil? ((run-server (site test-routes) {:port 3474}))))))
+    (server :synchronous? true)
+    (is (= false (server :state :running?)))))
 
     
 (deftest test-shutting-down?
@@ -452,14 +459,6 @@
     (is (= false (server :state :shutting-down?)))
     (server)
     (is (= true (server :state :shutting-down?)))))
-
-;tests for synchronous shutdown
-(deftest test-synchronous-shutdown
-  (let [server (run-server (site test-routes) {:port 3474})]
-    (Thread/sleep 100)
-    (server :synchronous? true)
-    (is (nil? ((run-server (site test-routes) {:port 3474}))))))
-
 
 ;tests for callback on shutdown
 (deftest test-shutdown-callback
