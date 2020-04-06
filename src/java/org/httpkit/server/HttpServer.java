@@ -453,8 +453,12 @@ public class HttpServer implements Runnable {
         }
     }
 
-    public void synchronousStop(int timeout, Runnable callback) {
-        stop(timeout,callback);
+    public void stop(int timeout) {
+        stop(timeout,new Runnable() { public void run() {}});
+    }        
+    
+    public void synchronousStop(int timeout) {
+        stop(timeout);
         try {
             serverThread.join();
         } catch (InterruptedException e) {

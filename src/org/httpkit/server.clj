@@ -93,9 +93,11 @@
           (= state :shutting-down?) ;(server :query :shutting-down?)
             (.isShuttingDown s)
           (true? synchronous?) ;(server :synchronous? true) || (server :timeout 3000 :synchronous? true)
-            (.synchronousStop s timeout callback)
-          :else ;(server :callback callback-fn) || (server :timeout 3000 :callback callback-fn)
-            (.stop s timeout callback)))
+            (.synchronousStop s timeout)
+          (some? callback) ;(server :callback callback-fn) || (server :timeout 3000 :callback callback-fn)
+            (.stop s timeout callback)
+          :else 
+            (.stop s timeout)))
 
       {:local-port (.getPort s)
        :server s})))
