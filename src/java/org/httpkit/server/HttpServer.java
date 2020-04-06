@@ -442,6 +442,7 @@ public class HttpServer implements Runnable {
                         cmex = true;
                 }
             } while(cmex);
+            
             try {
                 callback.run();
             } catch (Exception e) {
@@ -449,6 +450,15 @@ public class HttpServer implements Runnable {
             }
 
             closeAndWarn(selector);
+        }
+    }
+
+    public void synchronousStop(int timeout, Runnable callback) {
+        stop(timeout,callback);
+        try {
+            serverThread.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
     }
 
@@ -471,4 +481,5 @@ public class HttpServer implements Runnable {
     public Boolean isShuttingDown() {
         return this.isShuttingDown.get();
     }
+
 }

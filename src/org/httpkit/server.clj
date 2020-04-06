@@ -93,9 +93,7 @@
           (= state :shutting-down?) ;(server :query :shutting-down?)
             (.isShuttingDown s)
           (true? synchronous?) ;(server :synchronous? true) || (server :timeout 3000 :synchronous? true)
-            (do 
-              (.stop s timeout callback) 
-              (while (.isRunning s)))
+            (.synchronousStop s timeout callback)
           :else ;(server :callback callback-fn) || (server :timeout 3000 :callback callback-fn)
             (.stop s timeout callback)))
 
