@@ -26,6 +26,8 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Callable;
+
 
 import org.httpkit.HeaderMap;
 import org.httpkit.LineTooLargeException;
@@ -392,7 +394,7 @@ public class HttpServer implements Runnable {
         serverThread.start();
     }
 
-    public void stop(int timeout) {
+    public void stop(int timeout, Runnable callback) {
 
         this.isShuttingDown.set(true);
 
@@ -412,37 +414,42 @@ public class HttpServer implements Runnable {
 
         // close socket, notify on-close handlers
         if (selector.isOpen()) {
-	    //            Set<SelectionKey> keys = selector.keys();
-	    //            SelectionKey[] keys = t.toArray(new SelectionKey[t.size()]);
-	    boolean cmex = false;
-	    do {
-		cmex = false;
-		try{
-		    for (SelectionKey k : selector.keys()) {
-			/**
-			 * 1. t.toArray will fill null if given array is larger.
-			 * 2. compute t.size(), then try to fill the array, if in the mean time, another
-			 *    thread close one SelectionKey, will result a NPE
-			 *
-			 * https://github.com/http-kit/http-kit/issues/125
-			 */
-			if (k != null)
-			    closeKey(k, 0); // 0 => close by server
-		    }
-		} catch(java.util.ConcurrentModificationException ex) {
-		    /**
-		     * The iterator will throw a CMEx as soon as we close an open connection. Since there
-		     * seems to be no other way to safely iterate over all keys we just catch the exception
-		     * and try again until we manage to notify all open connections.
-		     *
-		     * https://github.com/http-kit/http-kit/issues/355
-		     */
-		        cmex = true;
-		}
-    } while(cmex);
+            //            Set<SelectionKey> keys = selector.keys();
+            //            SelectionKey[] keys = t.toArray(new SelectionKey[t.size()]);
+            boolean cmex = false;
+            do {
+                cmex = false;
+                try{
+                    for (SelectionKey k : selector.keys()) {
+                    /**
+                    * 1. t.toArray will fill null if given array is larger.
+                    * 2. compute t.size(), then try to fill the array, if in the mean time, another
+                    *    thread close one SelectionKey, will result a NPE
+                    *
+                    * https://github.com/http-kit/http-kit/issues/125
+                    */
+                    if (k != null)
+                        closeKey(k, 0); // 0 => close by server
+                    }
+                } catch(java.util.ConcurrentModificationException ex) {
+                    /**
+                    * The iterator will throw a CMEx as soon as we close an open connection. Since there
+                    * seems to be no other way to safely iterate over all keys we just catch the exception
+                    * and try again until we manage to notify all open connections.
+                    *
+                    * https://github.com/http-kit/http-kit/issues/355
+                    */
+                        cmex = true;
+                }
+            } while(cmex);
+            try {
+                callback.run();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
 
-    closeAndWarn(selector);
-    }
+            closeAndWarn(selector);
+        }
     }
 
     public int getPort() {
@@ -458,7 +465,7 @@ public class HttpServer implements Runnable {
     }
 
     public Boolean isRunning() {
-        return this.serverThread.isAlive();
+        return (this.serverThread.isAlive() && (this.serverThread.getState() != Thread.State.NEW));
     }
 
     public Boolean isShuttingDown() {

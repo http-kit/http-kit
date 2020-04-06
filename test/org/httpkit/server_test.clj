@@ -434,3 +434,55 @@
     (server)
     (is (= "hello world" (:body @resp)))
     (is (= 200 (:status @resp)))))
+
+;tests for server state queries
+(deftest test-running?
+  (let [server (run-server (site test-routes) {:port 3474})]
+    (Thread/sleep 100)
+    (is (= true (server :state :running?)))
+    (is (thrown? java.net.BindException (run-server (site test-routes) {:port 3474})))
+    (server)
+    (is (= false (server :state :running?)))
+    (is (nil? ((run-server (site test-routes) {:port 3474}))))))
+
+    
+(deftest test-shutting-down?
+  (let [server (run-server (site test-routes) {:port 3474})]
+    (Thread/sleep 100)
+    (is (= false (server :state :shutting-down?)))
+    (server)
+    (is (= true (server :state :shutting-down?)))))
+
+;tests for synchronous shutdown
+(deftest test-synchronous-shutdown
+  (let [server (run-server (site test-routes) {:port 3474})]
+    (Thread/sleep 100)
+    (server :synchronous? true)
+    (is (nil? ((run-server (site test-routes) {:port 3474}))))))
+
+
+;tests for callback on shutdown
+(deftest test-shutdown-callback
+  (let [server (run-server (site test-routes) {:port 3474})
+        hang (atom true)
+        callback #(do 
+                    (Thread/sleep 1000)
+                    (reset! hang false))]
+    (Thread/sleep 100)
+    (server :callback callback)
+    (while @hang)
+    (is (= false @hang))))
+        
+(deftest test-shutdown-callback-2
+  (let [server (run-server (site test-routes) {:port 3474})
+        server2 (atom nil)
+        callback #(reset! server2 (run-server (site test-routes) {:port 3475}))]
+    (Thread/sleep 100)
+    (server :callback callback)
+    (is (= "fail" (:status @(future (try (http/get "http://localhost:3474")
+                              (catch Exception e {:status "fail"}))))))
+    (is (= 200 (:status @(future 
+                          (try (http/get "http://localhost:3475")
+                          (catch Exception e {:status "fail"}))))))
+    (@server2))) 
+    
