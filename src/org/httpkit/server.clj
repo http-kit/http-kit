@@ -212,6 +212,7 @@
   asynchronous HTTP or WebSocket `AsyncChannel`.
 
   Main options:
+    :init       - (fn [ch])         for misc pre-handshake setup.
     :on-receive - (fn [ch message]) called for client WebSocket messages.
     :on-ping    - (fn [ch data])    called for client WebSocket pings.
     :on-close   - (fn [ch status])  called when AsyncChannel is closed.
@@ -247,7 +248,7 @@
            :on-close   (fn [ch status]  (println \"on-close:\"   status))
            :on-open    (fn [ch]         (println \"on-open:\"    ch))})))"
 
-  [ring-req {:keys [on-receive on-ping on-close on-open on-handshake-error]
+  [ring-req {:keys [on-receive on-ping on-close on-open init on-handshake-error]
              :or   {on-handshake-error
                     (fn [ch]
                       (send! ch
@@ -258,6 +259,7 @@
 
   (when-let [ch (:async-channel ring-req)]
 
+    (when-let [f init]     (f ch))
     (when-let [f on-close] (org.httpkit.server/on-close ch (partial f ch)))
 
     (if (:websocket? ring-req)
