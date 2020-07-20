@@ -13,9 +13,9 @@
 
   :plugins
   [[lein-swank   "1.4.5"]
-   [lein-pprint  "1.2.0"]
+   [lein-pprint  "1.3.2"]
    [lein-ancient "0.6.15"]
-   [lein-codox   "0.10.3"]]
+   [lein-codox   "0.10.7"]]
 
   :jvm-opts
   ["-Dclojure.compiler.disable-locals-clearing=true"
@@ -44,12 +44,12 @@
    {:resource-paths ["test/resources"]
     :dependencies
     [[org.clojure/clojure            "1.8.0"] ; TODO Update (breaks clj-http)
-     [junit/junit                     "4.12"]
-     [org.clojure/tools.logging      "0.4.0"]
+     [junit/junit                     "4.13"]
+     [org.clojure/tools.logging      "1.1.0"]
      [ch.qos.logback/logback-classic "1.2.3"]
-     [clj-http                       "3.9.1"]
+     [clj-http                      "3.10.1"]
      [io.netty/netty           "3.6.5.Final"] ; TODO Update (breaking)
-     [org.clojure/data.json          "0.2.6"]
+     [org.clojure/data.json          "1.0.0"]
      [http.async.client              "0.5.2"] ; TODO Update (breaking)
      [compojure                      "1.5.2"] ; TODO Update (breaking)
      [org.clojure/tools.cli          "0.3.3"] ; TODO Update (breaking)
