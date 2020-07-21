@@ -379,7 +379,7 @@
                                                      :queue-size 102400}))
   (println "server started at 0.0.0.0:9090"))
 
-;;; Test graceful shutdown
+;;; Test graceful stopping
 (defn- slow-request-handler [sleep-time]
   (fn [request]
     (try
@@ -400,7 +400,7 @@
                (get "Date"))))
     (server)))
 
-(deftest test-immediate-close-kills-inflight-requests
+(deftest test-immediate-stop-kills-inflight-requests
   (let [server (run-server (slow-request-handler 2000) {:port 3474})
         resp (future (try (http/get "http://localhost:3474")
                           (catch Exception e {:status "fail"})))]
@@ -408,7 +408,7 @@
     (server)
     (is (= "fail" (:status @resp)))))
 
-(deftest test-graceful-close-kills-long-inflight-requests
+(deftest test-graceful-stop-kills-long-inflight-requests
   (let [server (run-server (slow-request-handler 2000) {:port 3474})
         resp (future (try (http/get "http://localhost:3474")
                           (catch Exception e {:status "fail"})))]
@@ -416,7 +416,7 @@
     (server :timeout 100)
     (is (= "fail" (:status @resp)))))
 
-(deftest test-graceful-close-responds-to-inflight-requests
+(deftest test-graceful-stop-responds-to-inflight-requests
   (let [server (run-server (slow-request-handler 500) {:port 3474})
         resp (future (try (http/get "http://localhost:3474")
                           (catch Exception e {:status "fail"})))]
@@ -434,3 +434,16 @@
     (server)
     (is (= "hello world" (:body @resp)))
     (is (= 200 (:status @resp)))))
+
+(deftest test-server-status
+  (let [server (run-server (slow-request-handler 500) {:port 3474 :legacy-return-value? false})
+        resp_  (future (try (http/get "http://localhost:3474") (catch Exception e {:status "fail"})))]
+
+    (is (= (server-status server) :running))
+    (let [f_ (future (server-stop! server {:timeout 1000}))]
+      (Thread/sleep 100)
+      (is (= (server-status server) :stopping)))
+
+    (Thread/sleep 1000)
+    (is (= (server-status server) :stopped))
+    (is (= (:status @resp_) 200))))

@@ -1,20 +1,35 @@
 (ns org.httpkit.server
-  (:require [org.httpkit.encode :refer [base64-encode]])
+  (:require [org.httpkit.encode :refer [base64-encode]]
+            [clojure.string :as str])
   (:import [org.httpkit.server AsyncChannel HttpServer RingHandler ProxyProtocolOption]
            [org.httpkit.logger ContextLogger EventLogger EventNames]
            java.security.MessageDigest))
 
 ;;;; Ring server
 
+(defprotocol IHttpServer
+  (server-port   [http-server] "Given an HttpServer, returns server's local port.")
+  (server-status [http-server] "Given an HttpServer, returns server's status e/o #{:stopped :running :stopping}.")
+  (server-stop!  [http-server opts]
+    "Signals given HttpServer to stop.
+
+If     already stopping: returns nil.
+If not already stopping: returns true.
+
+Options:
+  :timeout ; Max msecs to allow existing requests to complete before attempting
+           ; interrupt (default 100)."))
+
+(extend-type HttpServer
+  IHttpServer
+  (server-port   [s] (.getPort s))
+  (server-status [s] (keyword (str/lower-case (.name (.getStatus s)))))
+  (server-stop!  [s {:keys [timeout] :or {timeout 100}}]
+    (.stop s timeout)))
+
 (defn run-server
-  "Starts HTTP server and returns
-    (fn [& {:keys [timeout] ; Timeout (msecs) to wait on existing reqs to complete
-           :or   {timeout 100}}])
+  "Starts a mostly[1] Ring-compatible HttpServer with options:
 
-  Server is mostly Ring compatible, see http://http-kit.org/migration.html
-  for differences.
-
-  Options:
     :ip                 ; Which ip (if has many ips) to bind
     :port               ; Which port listen incomming request
     :thread             ; Http worker thread count
@@ -29,12 +44,20 @@
     :error-logger       ; Arity-2 fn (args: string text, exception) to log errors
     :warn-logger        ; Arity-2 fn (args: string text, exception) to log warnings
     :event-logger       ; Arity-1 fn (arg: string event name)
-    :event-names        ; map of HTTP-Kit event names to respective loggable event names"
+    :event-names        ; map of HTTP-Kit event names to respective loggable event names
+
+  If :legacy-return-value? is
+    true  (default)     ; Returns a (fn stop-server [& {:keys [timeout] :or {timeout 100}}])
+    false (recommended) ; Returns the HttpServer which can be used with `server-port`,
+                        ; `server-status`, `server-stop!`, etc.
+
+  [1] Ref. http://http-kit.org/migration.html for differences."
 
   [handler
    & [{:keys [ip port thread queue-size max-body max-ws max-line
               proxy-protocol worker-name-prefix worker-pool
-              error-logger warn-logger event-logger event-names]
+              error-logger warn-logger event-logger event-names
+              legacy-return-value?]
 
        :or   {ip         "0.0.0.0"
               port       8090
@@ -44,7 +67,8 @@
               max-ws     4194304
               max-line   8192
               proxy-protocol :disable
-              worker-name-prefix "worker-"}}]]
+              worker-name-prefix "worker-"
+              legacy-return-value? true}}]]
 
   (let [err-logger (if error-logger
                      (reify ContextLogger
@@ -80,16 +104,16 @@
             evt-names)]
 
     (.start s)
-    (with-meta
-      (fn stop-server [& {:keys [timeout] :or {timeout 100}}]
-        ;; graceful shutdown:
-        ;; 1. server stop accept new request
-        ;; 2. wait for existing requests to finish
-        ;; 3. close the server
-        (.stop s timeout))
 
-      {:local-port (.getPort s)
-       :server s})))
+    (if-not legacy-return-value?
+      s
+      (with-meta
+        (fn stop-server [& {:keys [timeout] :or {timeout 100}}]
+          (.stop s timeout)
+          nil)
+
+        {:local-port (.getPort s)
+         :server               s}))))
 
 ;;;; WebSockets
 
