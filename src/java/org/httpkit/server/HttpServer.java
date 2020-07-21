@@ -23,7 +23,7 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -75,10 +75,10 @@ public class HttpServer implements Runnable {
 
     private final ConcurrentHashMap<SelectionKey, Boolean> keptAlive = new ConcurrentHashMap<SelectionKey, Boolean>();
 
-    // Keep track of when the server has been told to shut down.
-    // When this flag is true, the server will no longer set keep alive headers
-    // on responses. This allows the server to drain requests.
-    private final AtomicBoolean isShuttingDown = new AtomicBoolean(false);
+    enum Status { STOPPED, RUNNING, STOPPING }
+
+    // Will not set keep-alive headers when STOPPING, allowing reqs to drain
+    private final AtomicReference<Status> status = new AtomicReference<Status> (Status.STOPPED);
 
     // shared, single thread
     private final ByteBuffer buffer = ByteBuffer.allocateDirect(1024 * 64 - 1);
@@ -169,7 +169,7 @@ public class HttpServer implements Runnable {
 
                 if (request != null) {
 
-                    if (isShuttingDown.get()) {
+                    if (status.get() != Status.RUNNING) {
                         request.isKeepAlive = false;
                     }
 
@@ -381,20 +381,23 @@ public class HttpServer implements Runnable {
                 // do not exits the while IO event loop. if exits, then will not process any IO event
                 // jvm can catch any exception, including OOM
             } catch (Throwable e) { // catch any exception(including OOM), print it
+                status.set(Status.STOPPED);
                 errorLogger.log("http server loop error, should not happen", e);
                 eventLogger.log(eventNames.serverLoopError);
             }
         }
     }
 
-    public void start() throws IOException {
+    public boolean start() throws IOException {
+        if (!status.compareAndSet(Status.STOPPED, Status.RUNNING)) { return false; }
         serverThread = new Thread(this, THREAD_NAME);
         serverThread.start();
+        return true;
     }
 
-    public void stop(int timeout) {
+    public boolean stop(int timeout) {
 
-        this.isShuttingDown.set(true);
+        if (!status.compareAndSet(Status.RUNNING, Status.STOPPING)) { return false; }
 
         // stop accepting new requests
         closeAndWarn(serverChannel);
@@ -443,11 +446,17 @@ public class HttpServer implements Runnable {
 
             closeAndWarn(selector);
         }
+
+        status.set(Status.STOPPED);
+        return true;
     }
 
     public int getPort() {
         return this.serverChannel.socket().getLocalPort();
     }
+
+    public Status  getStatus() { return status.get();           }
+    public boolean isAlive()   { return serverThread.isAlive(); }
 
     void closeAndWarn(Closeable closable) {
         try {
