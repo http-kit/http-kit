@@ -26,6 +26,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Callable;
 
 import org.httpkit.HeaderMap;
 import org.httpkit.LineTooLargeException;
@@ -395,7 +396,8 @@ public class HttpServer implements Runnable {
         return true;
     }
 
-    public boolean stop(int timeout) {
+    public boolean stop(int timeout                         ) { return stop(timeout, null); }
+    public boolean stop(int timeout, final Runnable callback) {
 
         if (!status.compareAndSet(Status.RUNNING, Status.STOPPING)) { return false; }
 
@@ -410,7 +412,8 @@ public class HttpServer implements Runnable {
         // From this point, no new connections should be entering the system.
         // this.warnLogger.log("Idle connections closed", new Exception("dummy"));
 
-        // wait all requests to finish, at most timeout milliseconds
+        // Block at most `timeout` msecs waiting for reqs to finish,
+        // otherwise attempt interrupt (non-blocking)
         handler.close(timeout);
 
         // close socket, notify on-close handlers
@@ -447,7 +450,22 @@ public class HttpServer implements Runnable {
             closeAndWarn(selector);
         }
 
-        status.set(Status.STOPPED);
+        // Start daemon thread to run once serverThread actually completes.
+        // This could take some time if handler.close() was struggling to
+        // actually kill some tasks.
+        Thread cbThread = new Thread(new Runnable() {
+                public void run() {
+                    try { serverThread.join(); } catch (InterruptedException e) { }
+                    if (callback != null) {
+                        try { callback.run(); } catch (Throwable t) { }
+                    }
+                    status.set(Status.STOPPED);
+                }
+            });
+
+        cbThread.setDaemon(true);
+        cbThread.start();
+
         return true;
     }
 

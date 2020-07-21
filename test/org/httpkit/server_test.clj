@@ -442,8 +442,8 @@
     (is (= (server-status server) :running))
     (let [f_ (future (server-stop! server {:timeout 1000}))]
       (Thread/sleep 100)
-      (is (= (server-status server) :stopping)))
+      (is (= (server-status server) :stopping))
+      (is (= (deref @f_ 1000 false) true)))
 
-    (Thread/sleep 1000)
     (is (= (server-status server) :stopped))
     (is (= (:status @resp_) 200))))
