@@ -5,9 +5,9 @@
 [CHANGELOG][] | Current [semantic](http://semver.org/) version/s:
 
 ```clojure
-[http-kit "2.3.0"]         ; Stable, published by contributors, see CHANGELOG for details
-[http-kit "2.4.0-alpha6"]  ; Dev,    published by contributors, see CHANGELOG for details
-[http-kit "2.1.19"]        ; Legacy, published by @shenfeng
+[http-kit "2.3.0"]       ; Stable, published by contributors, see CHANGELOG for details
+[http-kit "2.4.0-beta1"] ; Dev,    published by contributors, see CHANGELOG for details
+[http-kit "2.1.19"]      ; Legacy, published by @shenfeng
 ```
 
 See the [project website][] for documentation, examples, benchmarks, etc.
@@ -63,7 +63,7 @@ Please use the [GitHub issues page](https://github.com/http-kit/http-kit/issues)
 
 ### License
 
-Copyright &copy; 2012-2018 [@shenfeng][]. Distributed under the [Apache License Version 2.0](http://www.apache.org/licenses/LICENSE-2.0.html).
+Copyright &copy; 2012-2020 [@shenfeng][]. Distributed under the [Apache License Version 2.0](http://www.apache.org/licenses/LICENSE-2.0.html).
 
 [CHANGELOG]: https://github.com/http-kit/http-kit/releases
 [@shenfeng]: https://github.com/shenfeng
