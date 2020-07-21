@@ -23,9 +23,10 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Callable;
 
 import org.httpkit.HeaderMap;
 import org.httpkit.LineTooLargeException;
@@ -75,10 +76,10 @@ public class HttpServer implements Runnable {
 
     private final ConcurrentHashMap<SelectionKey, Boolean> keptAlive = new ConcurrentHashMap<SelectionKey, Boolean>();
 
-    // Keep track of when the server has been told to shut down.
-    // When this flag is true, the server will no longer set keep alive headers
-    // on responses. This allows the server to drain requests.
-    private final AtomicBoolean isShuttingDown = new AtomicBoolean(false);
+    enum Status { STOPPED, RUNNING, STOPPING }
+
+    // Will not set keep-alive headers when STOPPING, allowing reqs to drain
+    private final AtomicReference<Status> status = new AtomicReference<Status> (Status.STOPPED);
 
     // shared, single thread
     private final ByteBuffer buffer = ByteBuffer.allocateDirect(1024 * 64 - 1);
@@ -169,7 +170,7 @@ public class HttpServer implements Runnable {
 
                 if (request != null) {
 
-                    if (isShuttingDown.get()) {
+                    if (status.get() != Status.RUNNING) {
                         request.isKeepAlive = false;
                     }
 
@@ -381,20 +382,24 @@ public class HttpServer implements Runnable {
                 // do not exits the while IO event loop. if exits, then will not process any IO event
                 // jvm can catch any exception, including OOM
             } catch (Throwable e) { // catch any exception(including OOM), print it
+                status.set(Status.STOPPED);
                 errorLogger.log("http server loop error, should not happen", e);
                 eventLogger.log(eventNames.serverLoopError);
             }
         }
     }
 
-    public void start() throws IOException {
+    public boolean start() throws IOException {
+        if (!status.compareAndSet(Status.STOPPED, Status.RUNNING)) { return false; }
         serverThread = new Thread(this, THREAD_NAME);
         serverThread.start();
+        return true;
     }
 
-    public void stop(int timeout) {
+    public boolean stop(int timeout                         ) { return stop(timeout, null); }
+    public boolean stop(int timeout, final Runnable callback) {
 
-        this.isShuttingDown.set(true);
+        if (!status.compareAndSet(Status.RUNNING, Status.STOPPING)) { return false; }
 
         // stop accepting new requests
         closeAndWarn(serverChannel);
@@ -407,47 +412,69 @@ public class HttpServer implements Runnable {
         // From this point, no new connections should be entering the system.
         // this.warnLogger.log("Idle connections closed", new Exception("dummy"));
 
-        // wait all requests to finish, at most timeout milliseconds
+        // Block at most `timeout` msecs waiting for reqs to finish,
+        // otherwise attempt interrupt (non-blocking)
         handler.close(timeout);
 
         // close socket, notify on-close handlers
         if (selector.isOpen()) {
-	    //            Set<SelectionKey> keys = selector.keys();
-	    //            SelectionKey[] keys = t.toArray(new SelectionKey[t.size()]);
-	    boolean cmex = false;
-	    do {
-		cmex = false;
-		try{
-		    for (SelectionKey k : selector.keys()) {
-			/**
-			 * 1. t.toArray will fill null if given array is larger.
-			 * 2. compute t.size(), then try to fill the array, if in the mean time, another
-			 *    thread close one SelectionKey, will result a NPE
-			 *
-			 * https://github.com/http-kit/http-kit/issues/125
-			 */
-			if (k != null)
-			    closeKey(k, 0); // 0 => close by server
-		    }
-		} catch(java.util.ConcurrentModificationException ex) {
-		    /**
-		     * The iterator will throw a CMEx as soon as we close an open connection. Since there
-		     * seems to be no other way to safely iterate over all keys we just catch the exception
-		     * and try again until we manage to notify all open connections.
-		     *
-		     * https://github.com/http-kit/http-kit/issues/355
-		     */
-		        cmex = true;
-		}
-    } while(cmex);
+            //            Set<SelectionKey> keys = selector.keys();
+            //            SelectionKey[] keys = t.toArray(new SelectionKey[t.size()]);
+            boolean cmex = false;
+            do {
+                cmex = false;
+                try{
+                    for (SelectionKey k : selector.keys()) {
+                        /**
+                         * 1. t.toArray will fill null if given array is larger.
+                         * 2. compute t.size(), then try to fill the array, if in the mean time, another
+                         *    thread close one SelectionKey, will result a NPE
+                         *
+                         * https://github.com/http-kit/http-kit/issues/125
+                         */
+                        if (k != null)
+                            closeKey(k, 0); // 0 => close by server
+                    }
+                } catch(java.util.ConcurrentModificationException ex) {
+                    /**
+                     * The iterator will throw a CMEx as soon as we close an open connection. Since there
+                     * seems to be no other way to safely iterate over all keys we just catch the exception
+                     * and try again until we manage to notify all open connections.
+                     *
+                     * https://github.com/http-kit/http-kit/issues/355
+                     */
+                    cmex = true;
+                }
+            } while(cmex);
 
-    closeAndWarn(selector);
-    }
+            closeAndWarn(selector);
+        }
+
+        // Start daemon thread to run once serverThread actually completes.
+        // This could take some time if handler.close() was struggling to
+        // actually kill some tasks.
+        Thread cbThread = new Thread(new Runnable() {
+                public void run() {
+                    try { serverThread.join(); } catch (InterruptedException e) { }
+                    if (callback != null) {
+                        try { callback.run(); } catch (Throwable t) { }
+                    }
+                    status.set(Status.STOPPED);
+                }
+            });
+
+        cbThread.setDaemon(true);
+        cbThread.start();
+
+        return true;
     }
 
     public int getPort() {
         return this.serverChannel.socket().getLocalPort();
     }
+
+    public Status  getStatus() { return status.get();           }
+    public boolean isAlive()   { return serverThread.isAlive(); }
 
     void closeAndWarn(Closeable closable) {
         try {
