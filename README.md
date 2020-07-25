@@ -5,9 +5,9 @@
 [CHANGELOG][] | Current [semantic](http://semver.org/) version/s:
 
 ```clojure
-[http-kit "2.3.0"]       ; Stable, published by contributors, see CHANGELOG for details
-[http-kit "2.4.0-beta1"] ; Dev,    published by contributors, see CHANGELOG for details
-[http-kit "2.1.19"]      ; Legacy, published by @shenfeng
+[http-kit "2.4.0-RC1"] ; Dev,    published by contributors, see CHANGELOG for details
+[http-kit "2.3.0"]     ; Stable, published by contributors, see CHANGELOG for details
+[http-kit "2.1.19"]    ; Legacy, published by @shenfeng
 ```
 
 See the [project website][] for documentation, examples, benchmarks, etc.

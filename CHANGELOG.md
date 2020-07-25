@@ -1,3 +1,11 @@
+## 2.4.0-RC1 (2020 Jul 25)
+
+```clojure
+[http-kit "2.4.0-beta1"]
+```
+
+Identical to `2.4.0-beta1`.
+
 ## 2.4.0-beta1 (2020 Jul 21)
 
 ```clojure
