@@ -1,3 +1,42 @@
+## 2.4.0 (2020 Jul 30)
+
+```clojure
+[http-kit "2.4.0"]
+```
+
+Identical to `2.4.0-RC1`, `2.4.0-beta1`.
+
+Upgrade from `2.3.x` **should be non-breaking**, but please evaluate before using in production (and please report any problems!).
+
+[Server] **DEPRECATION NOTICE**: `with-channel` macro has been deprecated due to possible race conditions [#318]. Please prefer new `as-channel` fn instead. Migration is straightforward; please see `as-channel` docstring for usage info.
+
+#### Changes since `2.3.0`
+
+* [#318][#391] [Server] **DEPRECATE** `with-channel`, add `as-channel`
+* [#399][Server] Graceful Shutdown (@glenjamin)
+* [#427] [Client] Improve performance of `prepare-request-headers` (@bsless)
+
+#### New since `2.3.0`
+
+* [#412 #383 #388] Java 11 support (@ryfow, @RokLenarcic)
+* [#426 #422 #393 #334 #187] [Client] Add a drop-in SNI-capable client (@fpischedda, @jimpil)
+* [#422] [Client] Provide a dynamic var to override default client (@fpischedda)
+* [#318][#391] [Server] `as-channel`: add :init hook
+* [Server] Optional new return value for `run-server`, new fns: `server-port`, `server-status`, `server-shutdown!`
+* [#429 #186] [Server] `server-stop!` now returns a promise (@alekcz, @ptaoussanis)
+* [#395] [Server] Add keywords to cover missing WebSocket status codes (@daviesian)
+* [#374] [Client] Allow specification of local address when making requests (@snoe)
+* [#379] [Server] Support byte[] responses (@ikitommi)
+* [#389] [Client] Make `query-string` public (@kirked)
+* [#400 #402] [Client] Add :none coercion option to return byte-array (@ethpran)
+* [#403 #415] [Client] Add error message when no location header is present (@BadAlgorithm)
+
+#### Fixes since `2.3.0`
+
+* [#410 #419] [Server] Special-case the parsing for ipv6, if the host header starts with `[` (@blak3mill3r)
+* [#384] [Server] Fix typo in `run-server` doc-string (@dsdolzhenko)
+
+
 ## 2.4.0-RC1 (2020 Jul 25)
 
 ```clojure
@@ -18,7 +57,7 @@ Items new since `2.4.0-alpha6` prefixed with ++.
 
 #### Changes since `2.3.0`
 
-* [Server][Experimental] Deprecate `with-channel`, add `as-channel`
+* [#318][#391] [Server][Experimental] Deprecate `with-channel`, add `as-channel`
 * [#399][Server] Graceful Shutdown (@glenjamin)
 * ++ [#427] [Client] Improve performance of `prepare-request-headers` (@bsless)
 
@@ -53,7 +92,7 @@ Items new since `2.4.0-alpha6` prefixed with ++.
 
 #### Changes since 2.3.0
 
-* [Server][Experimental] Deprecate `with-channel`, add `as-channel`
+* [#318][#391] [Server][Experimental] Deprecate `with-channel`, add `as-channel`
 * [#399][Server] Graceful Shutdown (@glenjamin)
 
 #### New since 2.3.0
