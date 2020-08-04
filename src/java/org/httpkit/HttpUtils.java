@@ -439,6 +439,10 @@ public class HttpUtils {
     public static final String CL = "Content-Length";
 
     public static ByteBuffer[] HttpEncode(int status, HeaderMap headers, Object body) {
+        return HttpEncode(status, headers, body, null);
+    }
+
+    public static ByteBuffer[] HttpEncode(int status, HeaderMap headers, Object body, String serverHeader) {
         ByteBuffer bodyBuffer;
         try {
             bodyBuffer = bodyBuffer(body);
@@ -458,8 +462,8 @@ public class HttpUtils {
             headers.put(CL, Integer.toString(b.length));
             bodyBuffer = ByteBuffer.wrap(b);
         }
-        if (!headers.containsKey("Server")) {
-          headers.put("Server", "http-kit");
+        if (serverHeader != null && !headers.containsKey("Server")) {
+          headers.put("Server", serverHeader);
         }
         if (!headers.containsKey("Date")) {
           headers.put("Date", DateFormatter.getDate()); // rfc says the Date is needed

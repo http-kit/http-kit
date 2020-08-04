@@ -74,7 +74,7 @@
                          {:body p})
                false))        ;; do not close
       (send! channel "" true) ;; same as (close channel)
-)))
+      )))
 
 (defn slow-server-handler [req]
   (with-channel req channel
@@ -449,3 +449,29 @@
 
     (is (= (server-status server) :stopped))
     (is (= (:status @resp_) 200))))
+
+(deftest test-server-header
+  (let [url #(format "http://localhost:%s/headers?count=1" %)
+        get-server-header #(get-in (into {} %) [:headers "Server"])]
+
+    ;; Default header
+    (let [server (run-server (site test-routes) {:port 3476})
+          resp   (http/get (url 3476))]
+      (is (= (:status resp) 200))
+      (is (= "http-kit" (get-server-header resp)))
+      (server))
+
+    ;; Custom header
+    (let [server (run-server (site test-routes) {:port 3477 :server-header "my-server"})
+          resp   (http/get (url 3477))]
+      (is (= (:status resp) 200))
+      (is (= "my-server" (get-server-header resp)))
+      (server))
+
+    ;; No header
+    (let [server (run-server (site test-routes) {:port 3475 :server-header nil})
+          resp   (http/get (url 3475))]
+      (is (= (:status resp) 200))
+      (is (nil? (get-server-header resp)))
+      (server))))
+

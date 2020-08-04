@@ -42,7 +42,7 @@ public class RingHandlerTest {
     public void shouldUseInternalThreadPoolForExecution() throws InterruptedException, ProtocolException, LineTooLargeException, RequestTooLargeException {
         Vector<String> assertionItems = new Vector<String>();
 
-        RingHandler ringHandler = new RingHandler(1, new MockClojureHandler(aDummyResponse()), "some-prefix", 2);
+        RingHandler ringHandler = new RingHandler(1, new MockClojureHandler(aDummyResponse()), "some-prefix", 2, "http-kit");
         ringHandler.handle(aDummyRequest(), new MockRespCallback(assertionItems));
 
         Thread.sleep(50);

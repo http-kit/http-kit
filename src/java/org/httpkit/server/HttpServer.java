@@ -69,6 +69,8 @@ public class HttpServer implements Runnable {
 
     private final ProxyProtocolOption proxyProtocolOption;
 
+    public final String serverHeader;
+
     private Thread serverThread;
 
     // queue operations from worker threads to the IO thread
@@ -99,12 +101,13 @@ public class HttpServer implements Runnable {
     public HttpServer(String ip, int port, IHandler handler, int maxBody, int maxLine, int maxWs,
                       ProxyProtocolOption proxyProtocolOption)
             throws IOException {
-        this(ip, port, handler, maxBody, maxLine, maxWs, proxyProtocolOption,
+        this(ip, port, handler, maxBody, maxLine, maxWs, proxyProtocolOption, "http-kit",
                 ContextLogger.ERROR_PRINTER, DEFAULT_WARN_LOGGER, EventLogger.NOP, EventNames.DEFAULT);
     }
 
     public HttpServer(String ip, int port, IHandler handler, int maxBody, int maxLine, int maxWs,
                       ProxyProtocolOption proxyProtocolOption,
+                      String serverHeader,
                       ContextLogger<String, Throwable> errorLogger,
                       ContextLogger<String, Throwable> warnLogger,
                       EventLogger<String> eventLogger, EventNames eventNames)
@@ -118,6 +121,7 @@ public class HttpServer implements Runnable {
         this.maxBody = maxBody;
         this.maxWs = maxWs;
         this.proxyProtocolOption = proxyProtocolOption;
+        this.serverHeader = serverHeader;
 
         this.selector = Selector.open();
         this.serverChannel = ServerSocketChannel.open();
@@ -186,7 +190,7 @@ public class HttpServer implements Runnable {
                     // pipelining not supported : need queue to ensure order
                     atta.decoder.reset();
                 } else if (!sentContinue && atta.decoder.requiresContinue()) {
-                    tryWrite(key, HttpEncode(100, new HeaderMap(), null));
+                    tryWrite(key, HttpEncode(100, new HeaderMap(), null, serverHeader));
                     sentContinue = true;
                 }
             } while (buffer.hasRemaining()); // consume all
@@ -195,11 +199,11 @@ public class HttpServer implements Runnable {
         } catch (RequestTooLargeException e) {
             atta.keepalive = false;
             eventLogger.log(eventNames.serverStatus413);
-            tryWrite(key, HttpEncode(413, new HeaderMap(), e.getMessage()));
+            tryWrite(key, HttpEncode(413, new HeaderMap(), e.getMessage(), serverHeader));
         } catch (LineTooLargeException e) {
             atta.keepalive = false; // close after write
             eventLogger.log(eventNames.serverStatus414);
-            tryWrite(key, HttpEncode(414, new HeaderMap(), e.getMessage()));
+            tryWrite(key, HttpEncode(414, new HeaderMap(), e.getMessage(), serverHeader));
         }
     }
 

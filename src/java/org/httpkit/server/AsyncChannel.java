@@ -117,12 +117,12 @@ public class AsyncChannel {
         }
 
         if (close) { // normal response, Content-Length. Every http client understand it
-            buffers = HttpEncode(status, headers, body);
+            buffers = HttpEncode(status, headers, body, server.serverHeader);
         } else {
             if (request.version == HttpVersion.HTTP_1_1) {
                 headers.put("Transfer-Encoding", "chunked"); // first chunk
             }
-            ByteBuffer[] bb = HttpEncode(status, headers, body);
+            ByteBuffer[] bb = HttpEncode(status, headers, body, server.serverHeader);
             if (body == null) {
                 buffers = bb;
             } else {

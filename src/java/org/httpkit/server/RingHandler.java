@@ -99,22 +99,24 @@ class HttpHandler implements Runnable {
     final ContextLogger<String, Throwable> errorLogger;
     final EventLogger<String> eventLogger;
     final EventNames eventNames;
+    final String serverHeader;
 
     public HttpHandler(HttpRequest req, RespCallback cb, IFn handler,
-            ContextLogger<String, Throwable> errorLogger, EventLogger<String> eventLogger, EventNames eventNames) {
+            ContextLogger<String, Throwable> errorLogger, EventLogger<String> eventLogger, EventNames eventNames, String serverHeader) {
         this.req = req;
         this.cb = cb;
         this.handler = handler;
         this.errorLogger = errorLogger;
         this.eventLogger = eventLogger;
         this.eventNames = eventNames;
+        this.serverHeader = serverHeader;
     }
 
     public void run() {
         try {
             Map resp = (Map) handler.invoke(buildRequestMap(req));
             if (resp == null) { // handler return null
-                cb.run(HttpEncode(404, new HeaderMap(), null));
+                cb.run(HttpEncode(404, new HeaderMap(), null, this.serverHeader));
                 eventLogger.log(eventNames.serverStatus404);
             } else {
                 Object body = resp.get(BODY);
@@ -124,12 +126,12 @@ class HttpHandler implements Runnable {
                         headers.put("Connection", "Keep-Alive");
                     }
                     final int status = getStatus(resp);
-                    cb.run(HttpEncode(status, headers, body));
+                    cb.run(HttpEncode(status, headers, body, this.serverHeader));
                     eventLogger.log(eventNames.serverStatusPrefix + status);
                 }
             }
         } catch (Throwable e) {
-            cb.run(HttpEncode(500, new HeaderMap(), e.getMessage()));
+            cb.run(HttpEncode(500, new HeaderMap(), e.getMessage(), this.serverHeader));
             errorLogger.log(req.method + " " + req.uri, e);
             eventLogger.log(eventNames.serverStatus500);
         }
@@ -200,16 +202,17 @@ public class RingHandler implements IHandler {
     final ContextLogger<String, Throwable> errorLogger;
     final EventLogger<String> eventLogger;
     final EventNames eventNames;
+    final String serverHeader;
 
     public RingHandler(IFn handler, ExecutorService execs) {
-        this(handler, execs, ContextLogger.ERROR_PRINTER, EventLogger.NOP, EventNames.DEFAULT);
+        this(handler, execs, ContextLogger.ERROR_PRINTER, EventLogger.NOP, EventNames.DEFAULT, "http-kit");
     }
 
-    public RingHandler(int thread, IFn handler, String prefix, int queueSize) {
-        this(thread, handler, prefix, queueSize, ContextLogger.ERROR_PRINTER, EventLogger.NOP, EventNames.DEFAULT);
+    public RingHandler(int thread, IFn handler, String prefix, int queueSize, String serverHeader) {
+        this(thread, handler, prefix, queueSize, serverHeader, ContextLogger.ERROR_PRINTER, EventLogger.NOP, EventNames.DEFAULT);
     }
 
-    public RingHandler(int thread, IFn handler, String prefix, int queueSize,
+    public RingHandler(int thread, IFn handler, String prefix, int queueSize, String serverHeader,
             ContextLogger<String, Throwable> errorLogger, EventLogger<String> eventLogger, EventNames eventNames) {
         this.errorLogger = errorLogger;
         this.eventLogger = eventLogger;
@@ -218,24 +221,27 @@ public class RingHandler implements IHandler {
         BlockingQueue<Runnable> queue = new ArrayBlockingQueue<Runnable>(queueSize);
         execs = new ThreadPoolExecutor(thread, thread, 0, TimeUnit.MILLISECONDS, queue, factory);
         this.handler = handler;
+        this.serverHeader = serverHeader;
     }
 
     public RingHandler(IFn handler, ExecutorService execs,
-            ContextLogger<String, Throwable> errorLogger, EventLogger<String> eventLogger, EventNames eventNames) {
+            ContextLogger<String, Throwable> errorLogger, EventLogger<String> eventLogger, EventNames eventNames,
+            String serverHeader) {
         this.handler = handler;
         this.execs = execs;
         this.errorLogger = errorLogger;
         this.eventLogger = eventLogger;
         this.eventNames = eventNames;
+        this.serverHeader = serverHeader;
     }
 
     public void handle(HttpRequest req, RespCallback cb) {
         try {
-            execs.submit(new HttpHandler(req, cb, handler, errorLogger, eventLogger, eventNames));
+            execs.submit(new HttpHandler(req, cb, handler, errorLogger, eventLogger, eventNames, this.serverHeader));
         } catch (RejectedExecutionException e) {
             errorLogger.log("failed to submit task to executor service", e);
             eventLogger.log(eventNames.serverStatus503);
-            cb.run(HttpEncode(503, new HeaderMap(), "Server unavailable, please try again"));
+            cb.run(HttpEncode(503, new HeaderMap(), "Server unavailable, please try again", this.serverHeader));
         }
     }
 
