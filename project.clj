@@ -1,4 +1,4 @@
-(defproject http-kit "2.4.0"
+(defproject http-kit "2.4.1-SNAPSHOT"
   :author "Feng Shen (@shenfeng)"
   :description "High-performance event-driven HTTP client/server for Clojure"
   :url "http://http-kit.org/"
@@ -54,5 +54,5 @@
      [compojure                      "1.5.2"] ; TODO Update (breaking)
      [org.clojure/tools.cli          "0.3.3"] ; TODO Update (breaking)
      [ring/ring-jetty-adapter        "1.5.1"] ; TODO Update (breaking)
-     [ring/ring-core                 "1.5.1"] ; TODO Update (breaking)
-     ]}})
+     [ring/ring-core                 "1.5.1"]]}}) ; TODO Update (breaking)
+     
