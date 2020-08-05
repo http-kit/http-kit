@@ -33,16 +33,7 @@ import static org.httpkit.client.State.READ_INITIAL;
 public class HttpClient implements Runnable {
     private static final AtomicInteger ID = new AtomicInteger(0);
 
-    public static final SSLContext DEFAULT_CONTEXT;
-
-    static {
-        try {
-            DEFAULT_CONTEXT = SSLContext.getInstance("TLS");
-            DEFAULT_CONTEXT.init(null, TrustManagerFactory.getTrustManagers() ,null);
-        } catch (Exception e) {
-            throw new Error("Failed to initialize SSLContext", e);
-        }
-    }
+    private static SSLContext defaultContext = null;
 
     // queue request, for only issue connection in the IO thread
     private final Queue<Request> pending = new ConcurrentLinkedQueue<Request>();
@@ -82,6 +73,19 @@ public class HttpClient implements Runnable {
     private final SSLEngineURIConfigurer sslEngineUriConfigurer;
     private final SocketAddress bindAddress;
 
+    public static SSLContext getDefaultContext() {
+        if(defaultContext==null) {
+            try {
+                SSLContext sslContext = SSLContext.getInstance("TLS");
+                sslContext.init(null, TrustManagerFactory.getTrustManagers() ,null);
+                defaultContext = sslContext;
+            } catch (Exception e) {
+                throw new Error("Failed to initialize SSLContext", e);
+            }
+        }
+        return defaultContext;
+    }
+
     public HttpClient() throws IOException {
         this(-1);
     }
@@ -90,12 +94,13 @@ public class HttpClient implements Runnable {
     public HttpClient(long maxConnections, AddressFinder addressFinder, SSLEngineURIConfigurer sslEngineUriConfigurer,
             ContextLogger<String, Throwable> errorLogger,
             EventLogger<String> eventLogger, EventNames eventNames) throws IOException {
-      this(maxConnections, addressFinder, sslEngineUriConfigurer, errorLogger, eventLogger, eventNames, null);
+      this(maxConnections, addressFinder, sslEngineUriConfigurer, errorLogger, eventLogger, eventNames, null);          
     }
 
     public HttpClient(long maxConnections, AddressFinder addressFinder, SSLEngineURIConfigurer sslEngineUriConfigurer,
             ContextLogger<String, Throwable> errorLogger,
             EventLogger<String> eventLogger, EventNames eventNames, SocketAddress bindAddress) throws IOException {
+        getDefaultContext();
         this.addressFinder = addressFinder;
         this.sslEngineUriConfigurer = sslEngineUriConfigurer;
         this.errorLogger = errorLogger;
@@ -355,7 +360,7 @@ public class HttpClient implements Runnable {
         if ((proxyUri == null && "https".equals(scheme))
             || (proxyUri != null && "https".equals(proxyUri.getScheme()))) {
             if (engine == null) {
-                engine = DEFAULT_CONTEXT.createSSLEngine();
+                engine = getDefaultContext().createSSLEngine();
                 engine.setUseClientMode(true);
             }
             if(!engine.getUseClientMode())
