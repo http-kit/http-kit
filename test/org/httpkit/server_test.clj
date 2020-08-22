@@ -439,9 +439,11 @@
   (let [server (run-server (slow-request-handler 500) {:port 3474 :legacy-return-value? false})
         resp_  (future (try (http/get "http://localhost:3474") (catch Exception e {:status "fail"})))]
 
+    (deref resp_ 100 nil) ; Ensure http/get has started
+
     (is (= (server-status server) :running))
     (let [f_ (future (server-stop! server {:timeout 1000}))]
-      (Thread/sleep 100)
+      (deref f_ 100 nil) ; Ensure stop call has started
       (is (= (server-status server) :stopping))
       (is (= (deref @f_ 1000 false) true)))
 
