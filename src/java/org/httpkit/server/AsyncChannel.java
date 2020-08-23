@@ -5,7 +5,6 @@ import clojure.lang.Keyword;
 import org.httpkit.DynamicBytes;
 import org.httpkit.HeaderMap;
 import org.httpkit.HttpVersion;
-import sun.misc.Unsafe;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -15,6 +14,8 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.Map;
+
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.httpkit.HttpUtils.*;
 import static org.httpkit.server.ClojureRing.*;
