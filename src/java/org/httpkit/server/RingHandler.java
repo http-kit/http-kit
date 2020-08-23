@@ -285,9 +285,9 @@ public class RingHandler implements IHandler {
     }
 
     public void clientClose(final AsyncChannel channel, final int status) {
-        if (channel.closedRan == 0) { // server did not close it first
+        if (!channel.isClosed()) { // server did not close it first
             // has close handler, execute it in another thread
-            if (channel.closeHandler != null) {
+            if (channel.hasCloseHandler()) {
                 try {
                     // no need to maintain order
                     execs.submit(new Runnable() {
@@ -325,9 +325,7 @@ public class RingHandler implements IHandler {
                 }
             } else {
                 // no close handler, mark the connection as closed
-                // channel.closedRan = 1;
-                // lazySet
-                AsyncChannel.unsafe.putOrderedInt(channel, AsyncChannel.closedRanOffset, 1);
+                channel.closedRan.set(false);
             }
         }
     }
