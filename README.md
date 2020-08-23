@@ -5,7 +5,7 @@
 [CHANGELOG][] | Current [semantic](http://semver.org/) version/s:
 
 ```clojure
-[http-kit "2.5.0-alpha1"] ; Dev,    published by contributors, see commits   for details
+[http-kit "2.5.0-alpha2"] ; Dev,    published by contributors, see commits   for details
 [http-kit "2.4.0"]        ; Stable, published by contributors, see CHANGELOG for details
 [http-kit "2.1.19"]       ; Legacy, published by @shenfeng
 ```
