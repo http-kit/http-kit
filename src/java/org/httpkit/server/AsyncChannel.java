@@ -22,12 +22,19 @@ import static org.httpkit.server.WSDecoder.*;
 
 @SuppressWarnings({"unchecked"})
 public class AsyncChannel {
-    static final Unsafe unsafe;
+
     static final long closedRanOffset;
     static final long closeHandlerOffset;
     static final long receiveHandlerOffset;
     static final long pingHandlerOffset;
     static final long headerSentOffset;
+
+    static final AtomicReference<Callable> closeHandler = new AtomicReference<Callable> (null);
+    // receiveHandler
+    // pingHandler
+
+    // closedRan bool
+    // headerSent bool
 
     private final SelectionKey key;
     private final HttpServer server;

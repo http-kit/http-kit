@@ -9,7 +9,7 @@
   :global-vars {*warn-on-reflection* true}
 
   :dependencies
-  [[org.clojure/clojure "1.5.1"]]
+  []
 
   :plugins
   [[lein-swank   "1.4.5"]
@@ -34,7 +34,8 @@
    :all (fn [_] true)}
 
   :profiles
-  {:test
+  {:provided {:dependencies [[org.clojure/clojure "1.5.1"]]}
+   :test
    {:java-source-paths ["test/java" "src/java"]
     :dependencies
     [[ring/ring-defaults        "0.2.3"] ; TODO Update (causes tests to hang)
