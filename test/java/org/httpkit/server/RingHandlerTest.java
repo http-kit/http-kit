@@ -29,7 +29,7 @@ public class RingHandlerTest {
     public void shouldUseExternalThreadPoolForExecution() throws InterruptedException, ProtocolException, LineTooLargeException, RequestTooLargeException {
         Vector<String> assertionItems = new Vector<String>();
 
-        ExecutorService testWorkerPool = new ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS, new ArrayBlockingQueue(2));
+        ExecutorService testWorkerPool = new ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(2));
         RingHandler ringHandler = new RingHandler(new MockClojureHandler(aDummyResponse()), testWorkerPool);
         ringHandler.handle(aDummyRequest(), new MockRespCallback(assertionItems));
 
