@@ -10,25 +10,30 @@
 (defprotocol IHttpServer
   (server-port   [http-server] "Given an HttpServer, returns server's local port.")
   (server-status [http-server] "Given an HttpServer, returns server's status e/o #{:stopped :running :stopping}.")
-  (server-stop!  [http-server opts]
-    "Signals given HttpServer to stop.
-
-If     already stopping: returns nil.
-If not already stopping: returns a Promise that will be delivered once
-server thread actually completes.
-
-Options:
-  :timeout ; Max msecs to allow existing requests to complete before attempting
-           ; interrupt (default 100)."))
+  (-server-stop! [http-server opts]))
 
 (extend-type HttpServer
   IHttpServer
   (server-port   [s] (.getPort s))
   (server-status [s] (keyword (str/lower-case (.name (.getStatus s)))))
-  (server-stop!  [s {:keys [timeout] :or {timeout 100}}]
+  (-server-stop! [s {:keys [timeout] :or {timeout 100}}]
     (let [p_ (promise)]
       (when (.stop s timeout #(deliver p_ true))
         p_))))
+
+(defn server-stop!
+  "Signals given HttpServer to stop.
+
+  If     already stopping: returns nil.
+  If not already stopping: returns a Promise that will be delivered once
+  server thread actually completes.
+
+  Options:
+    :timeout ; Max msecs to allow existing requests to complete before attempting
+             ; interrupt (default 100)."
+
+  ([http-server     ] (-server-stop! http-server nil))
+  ([http-server opts] (-server-stop! http-server opts)))
 
 (defn run-server
   "Starts a mostly[1] Ring-compatible HttpServer with options:
