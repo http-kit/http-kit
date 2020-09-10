@@ -71,7 +71,26 @@ public class RingHandlerTest {
 
     private HttpRequest asHttpRequest(String... requestLines) throws ProtocolException, LineTooLargeException, RequestTooLargeException {
         httpDecoder.reset();
-        String joinedRequest = String.join("\n", requestLines);
+        
+        // String joinedRequest = String.join("\n", requestLines); 
+        // String.join is was only released in 1.8
+        
+        String joinedRequest = "";
+        int requestLength = requestLines.length;
+
+        if (requestLines != null && requestLength > 0) {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < requestLength; i++) {
+
+                sb.append(requestLines[i]);
+
+                if (i != requestLength - 1) {
+                    sb.append("\n");
+                }
+
+            }
+            joinedRequest = sb.toString();
+        }
         return httpDecoder.decode(ByteBuffer.wrap((joinedRequest + "\n\n").getBytes()));
     }
 
