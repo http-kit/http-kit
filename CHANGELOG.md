@@ -1,3 +1,29 @@
+## 2.5.0 (2020 Sep 10)
+
+```clojure
+[http-kit "2.5.0-RC1"]
+```
+
+> **Bumps minimum JVM version from 1.6 to 1.7**. _Should_ otherwise be non-breaking.
+> See [here](https://github.com/ptaoussanis/encore#recommended-steps-after-any-significant-dependency-update) recommended steps when updating any Clojure/Script dependencies.
+
+#### Changes since `2.4.0`
+
+* **BREAKING**: bump minimum JVM version from 1.6 to 1.7
+* [#438 #439][Server] Stop using `sun.misc.Unsafe` (@kirked)
+
+#### New since `2.4.0`
+
+* [#434][Client] GraalVM Native Image Compatibility: move SSL initialisation to constructor (@alekcz)
+* [#433 #432 #129] [Server] Configurable server header (@barkanido)
+* [#441][Server] Add 1-arity `server-stop!`
+
+#### Fixes since `2.4.0`
+
+* [#429] Fix flaky server-status tests
+* [Server][Tests] Fix lint issue with newer JDKs
+
+
 ## 2.4.0 (2020 Jul 30)
 
 ```clojure
