@@ -1,0 +1,25 @@
+name: build
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-java@v1
+      with: 
+        java-version: 11
+
+    - name: Cache deps
+      uses: actions/cache@v1
+      id: cache-deps
+      with:
+        path: ~/.m2/repository
+        key: ${{ runner.os }}-java11-${{ hashFiles('project.clj') }}
+        restore-keys: |
+              ${{ runner.os }}-java11-
+
+    - name: Run tests for Java 11
+      run: |
+        lein test

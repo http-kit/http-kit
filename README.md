@@ -2,7 +2,7 @@
 
 ### A high-performance event-driven HTTP client+server for Clojure
 
-[CHANGELOG][] | Current [semantic](http://semver.org/) version/s:
+![build status](https://github.com/http-kit/http-kit/workflows/build/badge.svg?branch=master) | [CHANGELOG][] | Current [semantic](http://semver.org/) version/s:
 
 ```clojure
 [http-kit "2.5.0-RC1"] ; Dev,    published by contributors, see CHANGELOG for details
