@@ -1,4 +1,4 @@
-# HTTP Kit
+# HTTP Kit ![build status](https://github.com/http-kit/http-kit/workflows/build/badge.svg?branch=master)
 
 ### A high-performance event-driven HTTP client+server for Clojure
 
