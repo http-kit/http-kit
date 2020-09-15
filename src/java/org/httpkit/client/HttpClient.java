@@ -220,7 +220,7 @@ public class HttpClient implements Runnable {
                         // Ensure that the key is added to keepalives exactly once on a state transition. There could be cases where decoder reaches
                         // ALL_READ state multiple times.
                         if (oldState != ALL_READ) {
-                            keepalives.offer(new PersistentConn(now + req.cfg.keepAlive, req.addr, key));
+                            keepalives.offer(new PersistentConn(now + req.cfg.keepAlive, req.host, key));
                         }
                     } else {
                         closeQuietly(key);
@@ -283,6 +283,7 @@ public class HttpClient implements Runnable {
 
     public void exec(String url, RequestConfig cfg, SSLEngine engine, IRespListener cb) {
         URI uri,proxyUri = null;
+        String host = null;
         try {
             uri = new URI(url);
             if (cfg.proxy_url != null) {
@@ -309,8 +310,10 @@ public class HttpClient implements Runnable {
         try {
             if (proxyUri == null) {
                 addr = addressFinder.findAddress(uri);
+                host = uri.getHost();
             } else {
                 addr = addressFinder.findAddress(proxyUri);
+                host = proxyUri.getHost();
             }
         } catch (UnknownHostException e) {
             cb.onThrowable(e);
@@ -369,9 +372,9 @@ public class HttpClient implements Runnable {
             // configure SSLEngine with URI
             sslEngineUriConfigurer.configure(engine, uri);
 
-            pending.offer(new HttpsRequest(addr, request, cb, requests, cfg, engine));
+            pending.offer(new HttpsRequest(addr, host, request, cb, requests, cfg, engine));
         } else {
-            pending.offer(new Request(addr, request, cb, requests, cfg));
+            pending.offer(new Request(addr, host, request, cb, requests, cfg));
         }
 
 //        pending.offer(new Request(addr, request, cb, requests, cfg));
@@ -422,7 +425,7 @@ public class HttpClient implements Runnable {
         Request job = pending.peek();
         if (job != null) {
             if (job.cfg.keepAlive > 0) {
-                PersistentConn con = keepalives.remove(job.addr);
+                PersistentConn con = keepalives.remove(job.host);
                 if (con != null) { // keep alive
                     SelectionKey key = con.key;
                     if (key.isValid()) {

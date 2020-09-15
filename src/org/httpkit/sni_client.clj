@@ -44,6 +44,9 @@
      (when (and (>= @java-version_ 11) (not (.getUseClientMode ssl-engine)))
        (.setUseClientMode ssl-engine true))
 
+     (println "HESPANHA")
+     (println (.getServerNames ssl-params))
+
      (doto ssl-engine
        (.setSSLParameters ssl-params)))))
 
