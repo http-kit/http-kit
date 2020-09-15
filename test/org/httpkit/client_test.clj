@@ -325,6 +325,8 @@
             (:error
              @(http/request
                 {:client  https-client
+                 :sslengine sslengine
+                 :keepalive -1
                  :url url0}))))
 
       (when (>= @@#'sni/java-version_ 11)
@@ -334,6 +336,8 @@
               (:error
                @(http/request
                   {:client https-client
+                   :sslengine sslengine
+                   :keepalive -1
                    :url url1})))))
 
       (is (instance? #_SSLException Exception
@@ -341,6 +345,7 @@
                        @(http/request
                           {:client  https-client
                            :sslengine sslengine
+                           :keepalive -1
                            :url url2}))))
 
       (is (instance? #_SSLException Exception
@@ -348,6 +353,7 @@
                        @(http/request
                           {:client  https-client
                            :sslengine sslengine
+                           :keepalive -1
                            :url url3})))))))
 
 ;; https://github.com/http-kit/http-kit/issues/54

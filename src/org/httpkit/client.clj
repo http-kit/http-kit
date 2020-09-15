@@ -237,7 +237,7 @@ an SNI-capable one, e.g.:
          deadlock-guard? true
          proxy-host nil
          proxy-port -1
-         proxy-ll nil}}
+         proxy-url nil}}
    & [callback]]
   (let [client (or client (force *default-client*))
         {:keys [url method headers body sslengine]} (coerce-req opts)
