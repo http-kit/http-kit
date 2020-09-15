@@ -220,7 +220,7 @@ public class HttpClient implements Runnable {
                         // Ensure that the key is added to keepalives exactly once on a state transition. There could be cases where decoder reaches
                         // ALL_READ state multiple times.
                         if (oldState != ALL_READ) {
-                            keepalives.offer(new PersistentConn(now + req.cfg.keepAlive, req.host, key));
+                            keepalives.offer(new PersistentConn(now + req.cfg.keepAlive, req.addr, req.host, key));
                         }
                     } else {
                         closeQuietly(key);
@@ -282,8 +282,8 @@ public class HttpClient implements Runnable {
 
 
     public void exec(String url, RequestConfig cfg, SSLEngine engine, IRespListener cb) {
-        URI uri,proxyUri = null;
         String host = null;
+        URI uri,proxyUri = null;
         try {
             uri = new URI(url);
             if (cfg.proxy_url != null) {
@@ -425,7 +425,7 @@ public class HttpClient implements Runnable {
         Request job = pending.peek();
         if (job != null) {
             if (job.cfg.keepAlive > 0) {
-                PersistentConn con = keepalives.remove(job.host);
+                PersistentConn con = keepalives.remove(job.addr.toString() + job.host);
                 if (con != null) { // keep alive
                     SelectionKey key = con.key;
                     if (key.isValid()) {

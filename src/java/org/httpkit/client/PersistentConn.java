@@ -5,18 +5,20 @@ import java.nio.channels.SelectionKey;
 
 public class PersistentConn implements Comparable<PersistentConn> {
     private final long timeoutTs;
-    public final String host;
+    private final String host;
+    public final InetSocketAddress addr;
     public final SelectionKey key;
 
-    public PersistentConn(long timeoutTs, String host, SelectionKey key) {
+    public PersistentConn(long timeoutTs, InetSocketAddress addr, String host, SelectionKey key) {
         this.timeoutTs = timeoutTs;
+        this.addr = addr;
         this.host = host;
         this.key = key;
     }
 
     public boolean equals(Object obj) {
-        // for PriorityQueue to remove by key and by host
-        return host.equals(obj) || key.equals(obj);
+        // for PriorityQueue to remove by key and by addr
+        return (addr.toString() + host).equals(obj) || key.equals(obj);
     }
 
     public int compareTo(PersistentConn o) {
@@ -28,6 +30,6 @@ public class PersistentConn implements Comparable<PersistentConn> {
     }
 
     public String toString() {
-        return host + "; timeout=" + (timeoutTs - System.currentTimeMillis()) + "ms";
+        return addr + "; timeout=" + (timeoutTs - System.currentTimeMillis()) + "ms";
     }
 }
