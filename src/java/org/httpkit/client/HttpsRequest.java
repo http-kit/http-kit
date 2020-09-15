@@ -15,9 +15,9 @@ import java.nio.channels.SocketChannel;
 public class HttpsRequest extends Request {
     private static final ByteBuffer EMPTY_BUFFER = ByteBuffer.allocate(0);
 
-    public HttpsRequest(InetSocketAddress addr, ByteBuffer[] request, IRespListener handler,
+    public HttpsRequest(InetSocketAddress addr, String host, ByteBuffer[] request, IRespListener handler,
                         PriorityQueue<Request> clients, RequestConfig config, SSLEngine engine) {
-        super(addr, request, handler, clients, config);
+        super(addr, host, request, handler, clients, config);
         this.engine = engine;
         this.engineOriginal = engine;
     }

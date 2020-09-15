@@ -10,6 +10,7 @@ import java.nio.channels.SelectionKey;
 public class Request implements Comparable<Request> {
 
     final InetSocketAddress addr;
+    final String host;
     final Decoder decoder;
     final ByteBuffer[] request; // HTTP request
     final RequestConfig cfg;
@@ -24,13 +25,14 @@ public class Request implements Comparable<Request> {
 
     private long timeoutTs; // future time this request timeout, ms
 
-    public Request(InetSocketAddress addr, ByteBuffer[] request, IRespListener handler,
+    public Request(InetSocketAddress addr, String host, ByteBuffer[] request, IRespListener handler,
                    PriorityQueue<Request> clients, RequestConfig config) {
         this.cfg = config;
         this.decoder = new Decoder(handler, config.method);
         this.request = request;
         this.clients = clients;
         this.addr = addr;
+        this.host = host;
         this.timeoutTs = config.connTimeout + System.currentTimeMillis();
     }
 
