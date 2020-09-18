@@ -1,14 +1,15 @@
-# HTTP Kit ![build status](https://github.com/http-kit/http-kit/workflows/build/badge.svg?branch=master)
+# HTTP Kit
 
-### A high-performance event-driven HTTP client+server for Clojure
+### A simple, high-performance event-driven HTTP client+server for Clojure
 
-[CHANGELOG][] | Current [semantic](http://semver.org/) version/s:
+**[CHANGELOG][]** | [API][] | current [Break Version][]:
 
 ```clojure
-[http-kit "2.5.0-RC1"] ; Dev,    published by contributors, see CHANGELOG for details
-[http-kit "2.4.0"]     ; Stable, published by contributors
-[http-kit "2.1.19"]    ; Legacy, published by @shenfeng
+[http-kit "2.5.0"]  ; Published by contributors, see CHANGELOG for details
+[http-kit "2.1.19"] ; Legacy, published by @shenfeng
 ```
+
+![build status](https://github.com/http-kit/http-kit/workflows/build/badge.svg?branch=master)
 
 ## Project status
 
@@ -76,9 +77,11 @@ Please use the [GitHub issues page](https://github.com/http-kit/http-kit/issues)
 
 ## License
 
-Copyright &copy; 2012-2020 [@shenfeng][]. Distributed under the [Apache License Version 2.0](http://www.apache.org/licenses/LICENSE-2.0.html).
+Copyright &copy; 2012-2020 [@shenfeng][] and contributors. Distributed under the [Apache License Version 2.0](http://www.apache.org/licenses/LICENSE-2.0.html).
 
 [CHANGELOG]: https://github.com/http-kit/http-kit/releases
+[API]: http://http-kit.github.io/http-kit/
 [@shenfeng]: https://github.com/shenfeng
 [@ptaoussanis]: https://github.com/ptaoussanis
 [project website]: https://http-kit.github.com
+[Break Version]: https://github.com/ptaoussanis/encore/blob/master/BREAK-VERSIONING.md
