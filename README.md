@@ -9,8 +9,6 @@
 [http-kit "2.1.19"] ; Legacy, published by @shenfeng
 ```
 
-![build status](https://github.com/http-kit/http-kit/workflows/build/badge.svg?branch=master)
-
 ## Project status
 
 http-kit's author ([@shenfeng][]) unfortunately hasn't had much time to maintain http-kit recently. To help out I'll be doing basic issue triage, accepting minor/obvious PRs, etc.
