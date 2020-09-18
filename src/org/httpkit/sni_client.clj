@@ -2,8 +2,10 @@
   "Provides an SNI-capable SSL configurer and client, Ref. #335.
   In a separate namespace from `org.httpkit.client` so that
   http-kit can retain backwards-compatibility with JVM < 8."
-  (:import [java.net URI]
-           [javax.net.ssl SNIHostName SSLEngine SSLParameters]))
+  (:require [org.httpkit.client])
+  (:import
+   [java.net URI]
+   [javax.net.ssl SNIHostName SSLEngine SSLParameters]))
 
 (defn- parse-java-version
   "Ref. https://stackoverflow.com/a/2591122"
@@ -51,6 +53,5 @@
   ^{:doc "Like `org.httpkit.client/default-client`, but provides SNI support using `ssl-configurer`. NB Hostname verification currently requires Java version >= 11."}
   default-client
   (delay
-    (require '[org.httpkit.client]) ; Lazy require to help users avoid circular deps
     (org.httpkit.client/make-client
       {:ssl-configurer ssl-configurer})))
