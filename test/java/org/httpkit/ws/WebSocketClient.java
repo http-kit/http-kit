@@ -56,10 +56,10 @@ public class WebSocketClient {
         });
         ChannelFuture future = bootstrap.connect(new InetSocketAddress(uri.getHost(), uri
                 .getPort()));
-        future.syncUninterruptibly();
+        future.awaitUninterruptibly();
 
         ch = future.getChannel();
-        handshaker.handshake(ch).syncUninterruptibly();
+        handshaker.handshake(ch).awaitUninterruptibly();
         latch.await(); // wait for handleshake complete
     }
 
