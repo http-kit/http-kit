@@ -51,7 +51,7 @@
      [org.clojure/tools.logging      "1.1.0"]
      [ch.qos.logback/logback-classic "1.2.3"]
      [clj-http                      "3.10.1"]
-     [io.netty/netty           "3.6.5.Final"] ; TODO Update (breaking)
+     [io.netty/netty-all      "4.1.52.Final"]
      [org.clojure/data.json          "1.0.0"]
      [http.async.client              "0.5.2"] ; TODO Update (breaking)
      [compojure                      "1.5.2"] ; TODO Update (breaking)
