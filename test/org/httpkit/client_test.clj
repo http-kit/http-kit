@@ -14,6 +14,7 @@
             [clojure.java.io :as io]
             [clj-http.client :as clj-http])
   (:import java.nio.ByteBuffer
+           java.nio.charset.StandardCharsets
            [org.httpkit HttpMethod HttpStatus HttpVersion DynamicBytes]
            [org.httpkit.client Decoder IRespListener ClientSslEngineFactory]
            [javax.net.ssl SSLHandshakeException SSLException SSLContext]))
@@ -24,15 +25,15 @@
   (ANY "/204" [] {:status 204})
   (ANY "/redirect" [] (fn [req]
                         (let [total (-> req :params :total to-int)
-                              n (-> req :params :n to-int)
-                              code (to-int (or (-> req :params :code) "302"))]
+                              n     (-> req :params :n to-int)
+                              code  (to-int (or (-> req :params :code) "302"))]
                           (if (>= n total)
                             {:status 200 :body (-> req :request-method name)}
-                            {:status code
+                            {:status  code
                              :headers {"location" (str "redirect?total=" total "&n=" (inc n)
-                                                    "&code=" code)}}))))
+                                                       "&code=" code)}}))))
   (ANY "/redirect-nil" [] (fn [req]
-                            {:status 302
+                            {:status  302
                              :headers nil}))
   (POST "/multipart" [] (fn [req]
                           (->> req
@@ -43,11 +44,12 @@
                                      (assoc acc k updated)))
                                  {})
                                pr-str)))
+
   (PATCH "/patch" [] "hello world")
   (POST "/nested-param" [] (fn [req] (pr-str (:params req))))
   (ANY "/method" [] (fn [req]
                       (let [m (:request-method req)]
-                        {:status 200
+                        {:status  200
                          :headers {"x-method" (pr-str m)}})))
   (ANY "/unicode" [] (fn [req] (-> req :params :str)))
   (DELETE "/delete" [] "deleted")
@@ -57,13 +59,13 @@
                       (let [l (-> req :params :length to-int)]
                         (subs const-string 0 l))))
   (GET "/multi-header" [] (fn [req]
-                            {:status 200
-                             :headers {"x-method" ["value1", "value2"]
+                            {:status  200
+                             :headers {"x-method"  ["value1", "value2"]
                                        "x-method2" ["value1", "value2", "value3"]}}))
   (GET "/p" [] (fn [req] (pr-str (:params req))))
   (ANY "/params" [] (fn [req] (-> req :params :param1)))
-  (PUT "/body" [] (fn [req] {:body (:body req)
-                             :status 200
+  (PUT "/body" [] (fn [req] {:body    (:body req)
+                             :status  200
                              :headers {"content-type" "text/plain"}}))
   (GET "/test-header" [] (fn [{:keys [headers]}] (str (get headers "test-header"))))
   (GET "/zip" [] (fn [req] {:body "hello world"})))
@@ -418,7 +420,18 @@
           request {:basic-auth ["user" "pass"]}]
       (is (= (keys (:headers (coerce-req request)))
              (remove #(= % "Content-Type")
-                     (keys (:headers (coerce-req (assoc request :multipart [{:name "foo" :content "bar"}]))))))))))
+                     (keys (:headers (coerce-req (assoc request :multipart [{:name "foo" :content "bar"}])))))))))
+  (testing "Multipart mixed requests shouldnt have Content-Disposition"
+    (let [coerce-req #'org.httpkit.client/coerce-req
+          request {:multipart [{:name "foo" :content "bar"}]
+                   :multipart-mixed? true}
+          coerced (coerce-req request)]
+      (is (clojure.string/starts-with?
+           (get-in coerced [:headers "Content-Type"] )
+           "multipart/mixed; boundary="))
+      (is ((complement clojure.string/includes?)
+           (-> StandardCharsets/UTF_8 (.decode (:body coerced)) (.toString))
+           "Content-Disposition")))))
 
 (deftest test-header-multiple-values
   (let [resp @(http/get "http://localhost:4347/multi-header" {:headers {"foo" ["bar" "baz"], "eggplant" "quux"}})
