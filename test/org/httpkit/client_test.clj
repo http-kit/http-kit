@@ -14,6 +14,7 @@
             [clojure.java.io :as io]
             [clj-http.client :as clj-http])
   (:import java.nio.ByteBuffer
+           java.nio.charset.StandardCharsets
            [org.httpkit HttpMethod HttpStatus HttpVersion DynamicBytes]
            [org.httpkit.client Decoder IRespListener ClientSslEngineFactory]
            [javax.net.ssl SSLHandshakeException SSLException SSLContext]))
@@ -56,6 +57,7 @@
                                      (assoc acc k updated)))
                                  {})
                                pr-str)))
+
   (PATCH "/patch" [] "hello world")
   (POST "/nested-param" [] (fn [req] (pr-str (:params req))))
   (ANY "/method" [] (fn [req]
@@ -435,7 +437,18 @@
           request {:basic-auth ["user" "pass"]}]
       (is (= (keys (:headers (coerce-req request)))
              (remove #(= % "Content-Type")
-                     (keys (:headers (coerce-req (assoc request :multipart [{:name "foo" :content "bar"}]))))))))))
+                     (keys (:headers (coerce-req (assoc request :multipart [{:name "foo" :content "bar"}])))))))))
+  (testing "Multipart mixed requests shouldnt have Content-Disposition"
+    (let [coerce-req #'org.httpkit.client/coerce-req
+          request {:multipart [{:name "foo" :content "bar"}]
+                   :multipart-mixed? true}
+          coerced (coerce-req request)]
+      (is (clojure.string/starts-with?
+           (get-in coerced [:headers "Content-Type"] )
+           "multipart/mixed; boundary="))
+      (is ((complement clojure.string/includes?)
+           (-> StandardCharsets/UTF_8 (.decode (:body coerced)) (.toString))
+           "Content-Disposition")))))
 
 (deftest test-header-multiple-values
   (let [resp @(http/get "http://localhost:4347/multi-header" {:headers {"foo" ["bar" "baz"], "eggplant" "quux"}})

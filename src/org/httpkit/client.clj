@@ -58,7 +58,7 @@
 (comment (query-string {:k1 "v1" :k2 "v2" :k3 nil :k4 ["v4a" "v4b"] :k5 []}))
 
 (defn- coerce-req
-  [{:keys [url method body sslengine insecure? query-params form-params multipart] :as req}]
+  [{:keys [url method body sslengine insecure? query-params form-params multipart multipart-mixed?] :as req}]
   (let [r (assoc req
                  :url (if query-params
                         (if (neg? (.indexOf ^String url (int \?)))
@@ -77,8 +77,8 @@
             boundary (MultipartEntity/genBoundary entities)]
         (-> r
             (assoc-in [:headers "Content-Type"]
-                      (str "multipart/form-data; boundary=" boundary))
-            (assoc :body (MultipartEntity/encode boundary entities))))
+                      (str "multipart/" (if multipart-mixed? "mixed" "form-data")"; boundary=" boundary))
+            (assoc :body (MultipartEntity/encode boundary entities multipart-mixed?))))
       r)))
 
 ;; thread pool for executing callbacks, since they may take a long time to execute.
