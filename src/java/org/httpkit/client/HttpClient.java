@@ -36,8 +36,9 @@ public class HttpClient implements Runnable {
 
     static {
         try {
-            DEFAULT_CONTEXT = SSLContext.getDefault();
-        } catch (NoSuchAlgorithmException e) {
+            DEFAULT_CONTEXT = SSLContext.getInstance("TLS");
+            DEFAULT_CONTEXT.init(null, TrustManagerFactory.getTrustManagers() ,null);
+        } catch (Exception e) {
             throw new Error("Failed to initialize SSLContext", e);
         }
     }
@@ -70,8 +71,8 @@ public class HttpClient implements Runnable {
     }
 
     public static interface SSLEngineURIConfigurer {
-        public static final SSLEngineURIConfigurer NOP = new SSLEngineURIConfigurer() {
-            public void configure(SSLEngine sslEngine, URI uri) { /* do nothing */ }
+        public static final SSLEngineURIConfigurer CLIENT_MODE = new SSLEngineURIConfigurer() {
+            public void configure(SSLEngine sslEngine, URI uri) { sslEngine.setUseClientMode(true); }
         };
         void configure(SSLEngine sslEngine, URI uri);
     }
@@ -105,7 +106,7 @@ public class HttpClient implements Runnable {
     }
 
     public HttpClient(long maxConnections) throws IOException {
-        this(maxConnections, AddressFinder.DEFAULT, SSLEngineURIConfigurer.NOP,
+        this(maxConnections, AddressFinder.DEFAULT, SSLEngineURIConfigurer.CLIENT_MODE,
                 ContextLogger.ERROR_PRINTER, EventLogger.NOP, EventNames.DEFAULT);
     }
 

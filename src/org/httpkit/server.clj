@@ -23,7 +23,7 @@
     :max-ws             ; Max websocket message size
     :max-line           ; Max http inital line length
     :proxy-protocol     ; Proxy protocol e/o #{:disable :enable :optional}
-    :worker-name-prefix ; Woker thread name prefix
+    :worker-name-prefix ; Worker thread name prefix
     :worker-pool        ; ExecutorService to use for request-handling (:thread,
                           :worker-name-prefix, :queue-size are ignored if set)
     :error-logger       ; Arity-2 fn (args: string text, exception) to log errors
