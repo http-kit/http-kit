@@ -10,15 +10,23 @@
 (defn- parse-java-version
   "Ref. https://stackoverflow.com/a/2591122"
   [^String s]
-  (if (.startsWith s "1.") ; e.g. "1.6.0_23"
-    (Integer/parseInt (.substring s 2 3))
-    (let [dot-idx (.indexOf s ".")] ; e.g. "9.0.1"
-      (when (not= dot-idx -1)
-        (Integer/parseInt (.substring s 0 dot-idx))))))
+
+  (let [dot-idx (.indexOf s ".")    ; e.g. "1.6.0_23"
+        dash-idx (.indexOf s "-")]  ; e.g. "16-ea"
+    (cond
+      (.startsWith s "1.") ; e.g. "1.6.0_23"
+      (Integer/parseInt (.substring s 2 3))
+
+      (pos? dot-idx)
+      (Integer/parseInt (.substring s 0 dot-idx))
+
+      (pos? dash-idx)
+      (Integer/parseInt (.substring s 0 dash-idx)))))
 
 (comment
   (parse-java-version "1.6.0_23") ; 6
   (parse-java-version "9.0.1")    ; 9
+  (parse-java-version "16-ea")    ; 16
   )
 
 (def ^:private java-version_
