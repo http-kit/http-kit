@@ -1,5 +1,19 @@
 > This project uses [Break Versioning](https://github.com/ptaoussanis/encore/blob/master/BREAK-VERSIONING.md) as of **Sep 18, 2020**.
 
+## v2.5.1 (2021 Jan 14)
+
+```clojure
+[http-kit "2.5.1"]
+```
+
+> Non-breaking hotfix release.
+> See [here](https://github.com/ptaoussanis/encore#recommended-steps-after-any-significant-dependency-update) recommended steps when updating any Clojure/Script dependencies.
+
+#### Fixes since `2.4.0`
+
+* [#455] [Client] Fix Java version parsing used to set default client `hostname-verification?` option (@aiba)
+
+
 ## v2.5.0 (2020 Sep 18)
 
 ```clojure
