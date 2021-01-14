@@ -9,7 +9,7 @@
 > Non-breaking hotfix release.
 > See [here](https://github.com/ptaoussanis/encore#recommended-steps-after-any-significant-dependency-update) recommended steps when updating any Clojure/Script dependencies.
 
-#### Fixes since `2.4.0`
+#### Fixes since `2.5.0`
 
 * [#455] [Client] Fix Java version parsing used to set default client `hostname-verification?` option (@aiba)
 
