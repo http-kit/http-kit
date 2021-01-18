@@ -18,6 +18,19 @@
            [org.httpkit.client Decoder IRespListener ClientSslEngineFactory]
            [javax.net.ssl SSLHandshakeException SSLException SSLContext]))
 
+(deftest ssl-engine-factory-race-condition
+  (testing ""
+    (let [errors (atom 0)]
+      (dotimes [_ 8]
+        (future
+          (dotimes [_ 8]
+            (try
+              (ClientSslEngineFactory/trustAnybody)
+              (catch Throwable _
+                (swap! errors inc))))))
+      (Thread/sleep 10)
+      (is (zero? @errors)))))
+
 (defroutes test-routes
   (GET "/get" [] "hello world")
   (POST "/post" [] "hello world")
@@ -576,3 +589,4 @@
     (info "total" (count urls) "urls")
     (doall (map-indexed fetch-group-urls (partition 1000 urls)))
     (info "all downloaded")))
+
