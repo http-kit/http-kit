@@ -11,19 +11,26 @@ import java.security.cert.X509Certificate;
 public class ClientSslEngineFactory {
 
     private static final String PROTOCOL = "TLS";
-    private static SSLContext clientContext = null;
+
+    private static class SSLHolder {
+        private static SSLContext getInitializedContext() {
+            try {
+                SSLContext context = SSLContext.getInstance(PROTOCOL);
+                context.init(null, TrustManagerFactory.getTrustManagers(), null);
+                return context;
+            } catch (Exception e) {
+                throw new Error("Failed to initialize the client-side SSLContext", e);
+            }
+        }
+        public static final SSLContext context = getInitializedContext();
+    }
+
+    private static SSLContext getContextInstance() {
+        return SSLHolder.context;
+    }
 
     public static SSLEngine trustAnybody() {
-        try {
-            clientContext = SSLContext.getInstance(PROTOCOL);
-            clientContext.init(null, TrustManagerFactory.getTrustManagers(),
-                    null);
-        } catch (Exception e) {
-            throw new Error(
-                    "Failed to initialize the client-side SSLContext", e);
-        }
-        
-        SSLEngine engine = clientContext.createSSLEngine();
+        SSLEngine engine = getContextInstance().createSSLEngine();
         engine.setUseClientMode(true);
         return engine;
     }
