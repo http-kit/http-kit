@@ -13,16 +13,26 @@ public class ClientSslEngineFactory {
     private static final String PROTOCOL = "TLS";
     private static SSLContext clientContext = null;
 
-    public static SSLEngine trustAnybody() {
+    private static synchronized void initContext() {
+        // There's a chance another thread was waiting to enter this
+        // method before clientContext was initialized but enters after
+        // initialization has finished successfully. If that happens,
+        // return without doing anything.
+        if (clientContext != null) {return;}
         try {
-            clientContext = SSLContext.getInstance(PROTOCOL);
-            clientContext.init(null, TrustManagerFactory.getTrustManagers(),
-                    null);
+            SSLContext context = SSLContext.getInstance(PROTOCOL);
+            context.init(null, TrustManagerFactory.getTrustManagers(), null);
+            clientContext = context;
         } catch (Exception e) {
-            throw new Error(
-                    "Failed to initialize the client-side SSLContext", e);
+            throw new Error("Failed to initialize the client-side SSLContext", e);
         }
-        
+    }
+
+    public static SSLEngine trustAnybody() {
+        // Enter synchronized block only when uninitialized
+        if (clientContext == null) {
+            initContext();
+        }
         SSLEngine engine = clientContext.createSSLEngine();
         engine.setUseClientMode(true);
         return engine;
