@@ -73,6 +73,29 @@ lein test :benchmark
 
 Please use the [GitHub issues page](https://github.com/http-kit/http-kit/issues) for feature suggestions, bug reports, or general discussions. Current contributors are listed [here](https://github.com/http-kit/http-kit/graphs/contributors). The [project website][] is also on GitHub.
 
+## Native Image
+
+http-kit server and client are compatible with GraalVM's native-image compiler.
+
+To ensure the image can build, provide the following options to the native-image compiler:
+
+### Reflection
+
+In your reflection-config.json
+
+```json
+{"name": "java.lang.reflect.AccessibleObject",
+ "methods" : [{"name":"canAccess"}]}
+```
+
+### Class initialization
+
+As of version `2.5.2` add the following flags:
+
+```sh
+--initialize-at-run-time=org.httpkit.client.ClientSslEngineFactory\$SSLHolder
+```
+
 ## License
 
 Copyright &copy; 2012-2020 [@shenfeng][] and contributors. Distributed under the [Apache License Version 2.0](http://www.apache.org/licenses/LICENSE-2.0.html).
