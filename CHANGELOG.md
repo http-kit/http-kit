@@ -1,5 +1,18 @@
 > This project uses [Break Versioning](https://github.com/ptaoussanis/encore/blob/master/BREAK-VERSIONING.md) as of **Sep 18, 2020**.
 
+## v2.5.2 (2021 Feb 19)
+
+```clojure
+[http-kit "2.5.2"]
+```
+
+> Non-breaking hotfix release.
+> See [here](https://github.com/ptaoussanis/encore#recommended-steps-after-any-significant-dependency-update) recommended steps when updating any Clojure/Script dependencies.
+
+#### Fixes since `2.5.1`
+
+* [#457 #456] [Client] Fix race condition in clientContext initialization (@bsless)
+
 ## v2.5.1 (2021 Jan 14)
 
 ```clojure
