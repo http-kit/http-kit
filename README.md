@@ -5,7 +5,7 @@
 **[CHANGELOG][]** | [API][] | current [Break Version][]:
 
 ```clojure
-[http-kit "2.5.2"]  ; Published by contributors, see CHANGELOG for details
+[http-kit "2.5.3"]  ; Published by contributors, see CHANGELOG for details
 [http-kit "2.1.19"] ; Legacy, published by @shenfeng
 ```
 

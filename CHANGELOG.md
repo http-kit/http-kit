@@ -1,5 +1,19 @@
 > This project uses [Break Versioning](https://github.com/ptaoussanis/encore/blob/master/BREAK-VERSIONING.md) as of **Sep 18, 2020**.
 
+## v2.5.3 (2021 Feb 21)
+
+```clojure
+[http-kit "2.5.3"]
+```
+
+> Non-breaking hotfix release.
+> See [here](https://github.com/ptaoussanis/encore#recommended-steps-after-any-significant-dependency-update) recommended steps when updating any Clojure/Script dependencies.
+
+#### Fixes since `2.5.2`
+
+* [#462 #437] Fix project.clj compiler option to support older JVMs (e.g. Java 8)
+
+
 ## v2.5.2 (2021 Feb 19)
 
 ```clojure
