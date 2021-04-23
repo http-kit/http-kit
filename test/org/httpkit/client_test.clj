@@ -384,7 +384,38 @@
           @(http/get url-1))
         (is (= [{:client-id :var-root :url url-1}
                 {:client-id :var-root :url url-2}]
-               @call-log))))
+               @call-log)))
+      (testing "closed over and used for subsequent requests"
+        (let [wrap-blocking (fn [^org.httpkit.client.HttpClient client p]
+                              (proxy [org.httpkit.client.HttpClient] []
+                                (exec [url cfg sslengine ^org.httpkit.client.IRespListener listener]
+                                  (let [blocking-listener (reify org.httpkit.client.IRespListener
+                                                            (onInitialLineReceived [this version status]
+                                                              (.onInitialLineReceived listener version status))
+                                                            (onHeadersReceived [this headers]
+                                                              (.onHeadersReceived listener headers))
+                                                            (onBodyReceived [this buf len]
+                                                              (.onBodyReceived listener buf len))
+                                                            (onCompleted [this]
+                                                              @p
+                                                              (.onCompleted listener))
+                                                            (onThrowable [this t]
+                                                              @p
+                                                              (.onThrowable listener t)))]
+                                    (.exec client url cfg sslengine blocking-listener)))))
+              call-log (atom [])
+              p (promise)
+              request (with-redefs [http/*default-client* (-> (force http/default-client) (wrap-recording call-log :var-root-1) (wrap-blocking p))]
+                        (http/get url-1))]
+          (with-redefs [http/*default-client* (-> (force http/default-client) (wrap-recording call-log :var-root-2))]
+            (is (not (realized? request)))
+            (is (= [{:client-id :var-root-1 :url url-1}]
+                   @call-log))
+            (deliver p :UNUSED)
+            (is (= {:status 200} (select-keys @request [:error :status])))
+            (is (= [{:client-id :var-root-1 :url url-1}
+                    {:client-id :var-root-1 :url url-1}]
+                   @call-log))))))
     (testing "client from dynamic binding"
       (testing "overrides var root binding"
         (let [call-log (atom [])]
