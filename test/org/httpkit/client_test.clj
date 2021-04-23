@@ -373,14 +373,14 @@
 (deftest test-redirect-with-client
   (let [url-1 "http://localhost:4347/redirect?total=1&n=0"
         url-2 "http://localhost:4347/redirect?total=1&n=1&code=302"
-        recording-client (fn [call-log-atom id]
-                           (proxy [HttpClient] []
-                             (exec [url cfg sslengine listener]
-                               (swap! call-log-atom conj {:client-id id :url url})
-                               (proxy-super exec url cfg sslengine listener))))]
+        wrap-recording (fn [^HttpClient client call-log-atom id]
+                         (proxy [HttpClient] []
+                           (exec [url cfg sslengine listener]
+                             (swap! call-log-atom conj {:client-id id :url url})
+                             (.exec client url cfg sslengine listener))))]
     (testing "client from var root binding"
       (let [call-log (atom [])]
-        (with-redefs [http/*default-client* (recording-client call-log :var-root)]
+        (with-redefs [http/*default-client* (-> (force http/default-client) (wrap-recording call-log :var-root))]
           @(http/get url-1))
         (is (= [{:client-id :var-root :url url-1}
                 {:client-id :var-root :url url-2}]
@@ -388,8 +388,8 @@
     (testing "client from dynamic binding"
       (testing "overrides var root binding"
         (let [call-log (atom [])]
-          (with-redefs [http/*default-client* (recording-client call-log :var-root)]
-            (binding [http/*default-client* (recording-client call-log :binding)]
+          (with-redefs [http/*default-client* (-> (force http/default-client) (wrap-recording call-log :var-root))]
+            (binding [http/*default-client* (-> (force http/default-client) (wrap-recording call-log :binding))]
               @(http/get url-1)))
           (is (= [{:client-id :binding :url url-1}
                   {:client-id :binding :url url-2}]
@@ -397,15 +397,15 @@
     (testing "client from request options"
       (testing "overrides var root binding"
         (let [call-log (atom [])]
-          (with-redefs [http/*default-client* (recording-client call-log :var-root)]
-            @(http/get url-1 {:client (recording-client call-log :request-opts)}))
+          (with-redefs [http/*default-client* (-> (force http/default-client) (wrap-recording call-log :var-root))]
+            @(http/get url-1 {:client (-> (force http/default-client) (wrap-recording call-log :request-opts))}))
           (is (= [{:client-id :request-opts :url url-1}
                   {:client-id :request-opts :url url-2}]
                  @call-log))))
       (testing "overrides dynamic binding"
         (let [call-log (atom [])]
-          (binding [http/*default-client* (recording-client call-log :binding)]
-            @(http/get url-1 {:client (recording-client call-log :request-opts)}))
+          (binding [http/*default-client* (-> (force http/default-client) (wrap-recording call-log :binding))]
+            @(http/get url-1 {:client (-> (force http/default-client) (wrap-recording call-log :request-opts))}))
           (is (= [{:client-id :request-opts :url url-1}
                   {:client-id :request-opts :url url-2}]
                  @call-log)))))))
