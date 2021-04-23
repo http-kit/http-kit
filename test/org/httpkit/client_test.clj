@@ -369,6 +369,7 @@
                            :keepalive -1
                            :url url3})))))))
 
+;; https://github.com/http-kit/http-kit/pull/464
 (deftest test-redirect-with-client
   (let [url-1 "http://localhost:4347/redirect?total=1&n=0"
         url-2 "http://localhost:4347/redirect?total=1&n=1&code=302"
