@@ -388,8 +388,8 @@
       (testing "closed over and used for subsequent requests"
         (let [wrap-blocking (fn [^HttpClient client p]
                               (proxy [HttpClient] []
-                                (exec [url cfg sslengine ^org.httpkit.client.IRespListener listener]
-                                  (let [blocking-listener (reify org.httpkit.client.IRespListener
+                                (exec [url cfg sslengine ^IRespListener listener]
+                                  (let [blocking-listener (reify IRespListener
                                                             (onInitialLineReceived [this version status]
                                                               (.onInitialLineReceived listener version status))
                                                             (onHeadersReceived [this headers]
