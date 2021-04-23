@@ -386,8 +386,8 @@
                 {:client-id :var-root :url url-2}]
                @call-log)))
       (testing "closed over and used for subsequent requests"
-        (let [wrap-blocking (fn [^org.httpkit.client.HttpClient client p]
-                              (proxy [org.httpkit.client.HttpClient] []
+        (let [wrap-blocking (fn [^HttpClient client p]
+                              (proxy [HttpClient] []
                                 (exec [url cfg sslengine ^org.httpkit.client.IRespListener listener]
                                   (let [blocking-listener (reify org.httpkit.client.IRespListener
                                                             (onInitialLineReceived [this version status]
