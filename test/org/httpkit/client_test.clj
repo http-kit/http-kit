@@ -390,18 +390,11 @@
                               (proxy [HttpClient] []
                                 (exec [url cfg sslengine ^IRespListener listener]
                                   (let [blocking-listener (reify IRespListener
-                                                            (onInitialLineReceived [this version status]
-                                                              (.onInitialLineReceived listener version status))
-                                                            (onHeadersReceived [this headers]
-                                                              (.onHeadersReceived listener headers))
-                                                            (onBodyReceived [this buf len]
-                                                              (.onBodyReceived listener buf len))
-                                                            (onCompleted [this]
-                                                              @p
-                                                              (.onCompleted listener))
-                                                            (onThrowable [this t]
-                                                              @p
-                                                              (.onThrowable listener t)))]
+                                                            (onInitialLineReceived [this version status]    (.onInitialLineReceived listener version status))
+                                                            (onHeadersReceived     [this headers]           (.onHeadersReceived     listener headers))
+                                                            (onBodyReceived        [this buf len]           (.onBodyReceived        listener buf len))
+                                                            (onCompleted           [this]                @p (.onCompleted           listener))
+                                                            (onThrowable           [this t]              @p (.onThrowable           listener t)))]
                                     (.exec client url cfg sslengine blocking-listener)))))
               call-log (atom [])
               p (promise)
