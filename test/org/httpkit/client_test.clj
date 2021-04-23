@@ -15,7 +15,7 @@
             [clj-http.client :as clj-http])
   (:import java.nio.ByteBuffer
            [org.httpkit HttpMethod HttpStatus HttpVersion DynamicBytes]
-           [org.httpkit.client Decoder IRespListener ClientSslEngineFactory]
+           [org.httpkit.client Decoder IRespListener ClientSslEngineFactory HttpClient]
            [javax.net.ssl SSLHandshakeException SSLException SSLContext]))
 
 (deftest ssl-engine-factory-race-condition
@@ -374,7 +374,7 @@
   (let [url-1 "http://localhost:4347/redirect?total=1&n=0"
         url-2 "http://localhost:4347/redirect?total=1&n=1&code=302"
         recording-client (fn [call-log-atom id]
-                           (proxy [org.httpkit.client.HttpClient] []
+                           (proxy [HttpClient] []
                              (exec [url cfg sslengine listener]
                                (swap! call-log-atom conj {:client-id id :url url})
                                (proxy-super exec url cfg sslengine listener))))]
