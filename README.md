@@ -104,5 +104,5 @@ Copyright &copy; 2012-2020 [@shenfeng][] and contributors. Distributed under the
 [API]: http://http-kit.github.io/http-kit/
 [@shenfeng]: https://github.com/shenfeng
 [@ptaoussanis]: https://github.com/ptaoussanis
-[project website]: https://http-kit.github.com
+[project website]: https://http-kit.github.io
 [Break Version]: https://github.com/ptaoussanis/encore/blob/master/BREAK-VERSIONING.md
