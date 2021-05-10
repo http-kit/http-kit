@@ -34,16 +34,18 @@ public class MultipartEntity {
         return "----HttpKitFormBoundary" + System.currentTimeMillis();
     }
 
-    public static ByteBuffer encode(String boundary, List<MultipartEntity> entities) throws IOException {
+    public static ByteBuffer encode(String boundary, List<MultipartEntity> entities, Boolean multipartMixed) throws IOException {
         DynamicBytes bytes = new DynamicBytes(entities.size() * 1024);
         for (MultipartEntity e : entities) {
             bytes.append("--").append(boundary).append(HttpUtils.CR, HttpUtils.LF);
-            bytes.append("Content-Disposition: form-data; name=\"");
-            bytes.append(e.name, HttpUtils.UTF_8);
-            if (e.filename != null) {
-                bytes.append("\"; filename=\"").append(e.filename).append("\"\r\n");
-            } else {
-                bytes.append("\"\r\n");
+            if (multipartMixed == null || !multipartMixed) {
+                bytes.append("Content-Disposition: form-data; name=\"");
+                bytes.append(e.name, HttpUtils.UTF_8);
+                if (e.filename != null) {
+                    bytes.append("\"; filename=\"").append(e.filename).append("\"\r\n");
+                } else {
+                    bytes.append("\"\r\n");
+                }
             }
 
             if (e.contentType != null) {
