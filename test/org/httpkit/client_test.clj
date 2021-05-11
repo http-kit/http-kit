@@ -15,7 +15,7 @@
             [clj-http.client :as clj-http])
   (:import java.nio.ByteBuffer
            [org.httpkit HttpMethod HttpStatus HttpVersion DynamicBytes]
-           [org.httpkit.client Decoder IRespListener ClientSslEngineFactory]
+           [org.httpkit.client Decoder IRespListener ClientSslEngineFactory HttpClient]
            [javax.net.ssl SSLHandshakeException SSLException SSLContext]))
 
 (deftest ssl-engine-factory-race-condition
@@ -368,6 +368,71 @@
                            :sslengine sslengine
                            :keepalive -1
                            :url url3})))))))
+
+;; https://github.com/http-kit/http-kit/pull/464
+(deftest test-redirect-with-client
+  (let [url-1 "http://localhost:4347/redirect?total=1&n=0"
+        url-2 "http://localhost:4347/redirect?total=1&n=1&code=302"
+        wrap-recording (fn [^HttpClient client call-log-atom id]
+                         (proxy [HttpClient] []
+                           (exec [url cfg sslengine listener]
+                             (swap! call-log-atom conj {:client-id id :url url})
+                             (.exec client url cfg sslengine listener))))]
+    (testing "client from var root binding"
+      (let [call-log (atom [])]
+        (with-redefs [http/*default-client* (-> (force http/default-client) (wrap-recording call-log :var-root))]
+          @(http/get url-1))
+        (is (= [{:client-id :var-root :url url-1}
+                {:client-id :var-root :url url-2}]
+               @call-log)))
+      (testing "closed over and used for subsequent requests"
+        (let [wrap-blocking (fn [^HttpClient client p]
+                              (proxy [HttpClient] []
+                                (exec [url cfg sslengine ^IRespListener listener]
+                                  (let [blocking-listener (reify IRespListener
+                                                            (onInitialLineReceived [this version status]    (.onInitialLineReceived listener version status))
+                                                            (onHeadersReceived     [this headers]           (.onHeadersReceived     listener headers))
+                                                            (onBodyReceived        [this buf len]           (.onBodyReceived        listener buf len))
+                                                            (onCompleted           [this]                @p (.onCompleted           listener))
+                                                            (onThrowable           [this t]              @p (.onThrowable           listener t)))]
+                                    (.exec client url cfg sslengine blocking-listener)))))
+              call-log (atom [])
+              p (promise)
+              request (with-redefs [http/*default-client* (-> (force http/default-client) (wrap-recording call-log :var-root-1) (wrap-blocking p))]
+                        (http/get url-1))]
+          (with-redefs [http/*default-client* (-> (force http/default-client) (wrap-recording call-log :var-root-2))]
+            (is (not (realized? request)))
+            (is (= [{:client-id :var-root-1 :url url-1}]
+                   @call-log))
+            (deliver p :UNUSED)
+            (is (= {:status 200} (select-keys @request [:error :status])))
+            (is (= [{:client-id :var-root-1 :url url-1}
+                    {:client-id :var-root-1 :url url-1}]
+                   @call-log))))))
+    (testing "client from dynamic binding"
+      (testing "overrides var root binding"
+        (let [call-log (atom [])]
+          (with-redefs [http/*default-client* (-> (force http/default-client) (wrap-recording call-log :var-root))]
+            (binding [http/*default-client* (-> (force http/default-client) (wrap-recording call-log :binding))]
+              @(http/get url-1)))
+          (is (= [{:client-id :binding :url url-1}
+                  {:client-id :binding :url url-2}]
+                 @call-log)))))
+    (testing "client from request options"
+      (testing "overrides var root binding"
+        (let [call-log (atom [])]
+          (with-redefs [http/*default-client* (-> (force http/default-client) (wrap-recording call-log :var-root))]
+            @(http/get url-1 {:client (-> (force http/default-client) (wrap-recording call-log :request-opts))}))
+          (is (= [{:client-id :request-opts :url url-1}
+                  {:client-id :request-opts :url url-2}]
+                 @call-log))))
+      (testing "overrides dynamic binding"
+        (let [call-log (atom [])]
+          (binding [http/*default-client* (-> (force http/default-client) (wrap-recording call-log :binding))]
+            @(http/get url-1 {:client (-> (force http/default-client) (wrap-recording call-log :request-opts))}))
+          (is (= [{:client-id :request-opts :url url-1}
+                  {:client-id :request-opts :url url-2}]
+                 @call-log)))))))
 
 ;; https://github.com/http-kit/http-kit/issues/54
 (deftest test-nested-param
