@@ -21,7 +21,10 @@
       (Integer/parseInt (.substring s 0 dot-idx))
 
       (pos? dash-idx)
-      (Integer/parseInt (.substring s 0 dash-idx)))))
+      (Integer/parseInt (.substring s 0 dash-idx))
+      
+      :else
+      (try (Integer/parseInt s) (catch Exception e)))))
 
 (comment
   (parse-java-version "1.6.0_23") ; 6
