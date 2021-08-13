@@ -39,7 +39,7 @@ public class HttpsClientTest {
         for (String url : urls) {
             final CountDownLatch cd = new CountDownLatch(1);
             SSLEngine engine = ClientSslEngineFactory.trustAnybody();
-            RequestConfig cfg = new RequestConfig(HttpMethod.POST, null, null, 40000, 40000, -1, null, false);
+            RequestConfig cfg = new RequestConfig(HttpMethod.POST, null, null, 40000, 40000, -1, null, false, false);
             TreeMap<String, Object> headers = new TreeMap<String, Object>();
             for (int i = 0; i < 33; i++) {
                 headers.put("X-long-header" + i, AGENT + AGENT + AGENT + AGENT);

@@ -15,10 +15,11 @@ public class RequestConfig {
     final HttpMethod method;
     final String proxy_url;
     final boolean tunnel;
+    final boolean disableAutoCompression;
 
     public RequestConfig(HttpMethod method, Map<String, Object> headers, Object body,
                          int connTimeoutMs, int idleTimeoutMs, int keepAliveMs,
-                         String proxy_url, boolean tunnel) {
+                         String proxy_url, boolean tunnel, boolean disableAutoCompression) {
         this.connTimeout = connTimeoutMs;
         this.idleTimeout = idleTimeoutMs;
         this.keepAlive = keepAliveMs;
@@ -27,9 +28,10 @@ public class RequestConfig {
         this.method = method;
         this.proxy_url = proxy_url;
         this.tunnel = tunnel;
+        this.disableAutoCompression = disableAutoCompression;
     }
 
     public RequestConfig() { // for easy test only
-        this(HttpMethod.GET, null, null, 40000, 40000, -1, null, false);
+        this(HttpMethod.GET, null, null, 40000, 40000, -1, null, false, false);
     }
 }

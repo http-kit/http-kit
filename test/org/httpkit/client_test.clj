@@ -79,7 +79,11 @@
                              :status 200
                              :headers {"content-type" "text/plain"}}))
   (GET "/test-header" [] (fn [{:keys [headers]}] (str (get headers "test-header"))))
-  (GET "/zip" [] (fn [req] {:body "hello world"})))
+  (GET "/zip" [] (fn [req] {:body "hello world"}))
+
+  (GET "/accept-encoding" [] (fn [req]
+                               {:headers {"x-sent-accept-encoding" (get-in req [:headers "accept-encoding"])}
+                                :status  200})))
 
 (use-fixtures :once
   (fn [f]
@@ -551,6 +555,27 @@
 
 (deftest zip
   (is (instance? DynamicBytes (:body @(http/get "http://localhost:4347/zip" {:as :none})))))
+
+(deftest adding-accept-encoding-header
+  (testing "if no Accept-Encoding header present, and not explicitly disabling auto compressing response, Accept-encoding header is automatically appended"
+    (let [response @(http/get "http://localhost:4347/accept-encoding" {:as :none})
+          sent-accept-encoding (:x-sent-accept-encoding (:headers response))]
+      (is (= sent-accept-encoding "gzip, deflate"))))
+
+  (testing "if Accept-Encoding present, the header is sent as-is"
+    (let [response @(http/get "http://localhost:4347/accept-encoding" {:as :none :headers {"accept-encoding" "identity"}})
+          sent-accept-encoding (:x-sent-accept-encoding (:headers response))]
+      (is (= sent-accept-encoding "identity"))))
+
+  (testing "if no Accept-Encoding present, and explicitly disabling auto compressing response, Accept-encoding header is not automatically appended"
+    (let [response @(http/get "http://localhost:4347/accept-encoding" {:as :none :disable-auto-compression? true})
+          sent-accept-encoding (:x-sent-accept-encoding (:headers response))]
+      (is (nil? sent-accept-encoding))))
+
+  (testing "if Accept-Encoding present, and explicitly disabling auto compressing response, Accept-encoding header is automatically appended"
+    (let [response @(http/get "http://localhost:4347/accept-encoding" {:as :none :disable-auto-compression? true :headers {"accept-encoding" "gzip"}})
+          sent-accept-encoding (:x-sent-accept-encoding (:headers response))]
+      (is (= sent-accept-encoding "gzip")))))
 
 ;; @(http/get "http://127.0.0.1:4348" {:headers {"Connection" "Close"}})
 
