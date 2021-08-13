@@ -15,8 +15,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
-import java.security.NoSuchAlgorithmException;
-import java.security.KeyManagementException;
 import java.util.Iterator;
 import java.util.Queue;
 import java.util.Set;
@@ -330,7 +328,7 @@ public class HttpClient implements Runnable {
 //            headers.put("Accept", "*/*");
         if (!headers.containsKey("User-Agent")) // allow override
             headers.put("User-Agent", RequestConfig.DEFAULT_USER_AGENT); // default
-        if (!headers.containsKey("Accept-Encoding"))
+        if (!headers.containsKey("Accept-Encoding") && cfg.autoCompression)
             headers.put("Accept-Encoding", "gzip, deflate"); // compression is good
 
         ByteBuffer request[];
