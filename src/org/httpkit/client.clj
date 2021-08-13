@@ -222,7 +222,7 @@ an SNI-capable one, e.g.:
     :as :form-params :client :body :basic-auth :user-agent :filter :worker-pool"
   [{:keys [client timeout connect-timeout idle-timeout filter worker-pool keepalive as follow-redirects
            max-redirects response trace-redirects allow-unsafe-redirect-methods proxy-host proxy-port
-           proxy-url tunnel? deadlock-guard?]
+           proxy-url tunnel? deadlock-guard? disable-auto-compression?]
     :as opts
     :or {connect-timeout 60000
          idle-timeout 60000
@@ -237,7 +237,8 @@ an SNI-capable one, e.g.:
          deadlock-guard? true
          proxy-host nil
          proxy-port -1
-         proxy-url nil}}
+         proxy-url nil
+         disable-auto-compression? false}}
    & [callback]]
   (let [client (or client (force *default-client*))
         {:keys [url method headers body sslengine]} (coerce-req opts)
@@ -288,7 +289,7 @@ an SNI-capable one, e.g.:
         connect-timeout (or timeout connect-timeout)
         idle-timeout    (or timeout idle-timeout)
         cfg (RequestConfig. method headers body connect-timeout idle-timeout
-              keepalive effective-proxy-url tunnel?)]
+              keepalive effective-proxy-url tunnel? disable-auto-compression?)]
     (.exec ^HttpClient client url cfg sslengine listener)
     (if deadlock-guard?
       (deadlock-guard response)
