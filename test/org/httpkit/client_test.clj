@@ -558,22 +558,22 @@
 
 (deftest adding-accept-encoding-header
   (testing "if no Accept-Encoding header present, and not explicitly disabling auto compressing response, Accept-encoding header is automatically appended"
-    (let [response @(http/get "http://localhost:4347/accept-encoding" {:as :none})
+    (let [response @(http/get "http://localhost:4347/accept-encoding")
           sent-accept-encoding (:x-sent-accept-encoding (:headers response))]
       (is (= sent-accept-encoding "gzip, deflate"))))
 
   (testing "if Accept-Encoding present, the header is sent as-is"
-    (let [response @(http/get "http://localhost:4347/accept-encoding" {:as :none :headers {"accept-encoding" "identity"}})
+    (let [response @(http/get "http://localhost:4347/accept-encoding" {:headers {"accept-encoding" "identity"}})
           sent-accept-encoding (:x-sent-accept-encoding (:headers response))]
       (is (= sent-accept-encoding "identity"))))
 
   (testing "if no Accept-Encoding present, and explicitly disabling auto compressing response, Accept-encoding header is not automatically appended"
-    (let [response @(http/get "http://localhost:4347/accept-encoding" {:as :none :disable-auto-compression? true})
+    (let [response @(http/get "http://localhost:4347/accept-encoding" {:disable-auto-compression? true})
           sent-accept-encoding (:x-sent-accept-encoding (:headers response))]
       (is (nil? sent-accept-encoding))))
 
   (testing "if Accept-Encoding present, and explicitly disabling auto compressing response, Accept-encoding header is automatically appended"
-    (let [response @(http/get "http://localhost:4347/accept-encoding" {:as :none :disable-auto-compression? true :headers {"accept-encoding" "gzip"}})
+    (let [response @(http/get "http://localhost:4347/accept-encoding" {:disable-auto-compression? true :headers {"accept-encoding" "gzip"}})
           sent-accept-encoding (:x-sent-accept-encoding (:headers response))]
       (is (= sent-accept-encoding "gzip")))))
 
