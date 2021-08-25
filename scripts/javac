@@ -3,10 +3,10 @@
 rm -rf target && mkdir -p target/classes
 
 CP=`lein classpath`
-find src/java -name "*.java" | xargs javac -Xlint:unchecked -g -target 1.8 -source 1.8 -encoding utf8 -cp $CP -d target/classes -sourcepath src/java/
+find src/java -name "*.java" | xargs javac -Xlint:unchecked -g -target 1.6 -source 1.6 -encoding utf8 -cp $CP -d target/classes -sourcepath src/java/
 
 if [ $# -gt 0 ]; then
     # lein test need it
     echo "compile java test code"
-    find test/java -name "*.java" | xargs javac -g -Xlint:unchecked -target 1.8 -source 1.8 -encoding utf8 -cp $CP -d target/classes -sourcepath test/java
+    find test/java -name "*.java" | xargs javac -g -Xlint:unchecked -target 1.6 -source 1.6 -encoding utf8 -cp $CP -d target/classes -sourcepath test/java
 fi
