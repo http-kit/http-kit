@@ -31,6 +31,8 @@ import clojure.lang.IFn;
 import clojure.lang.IPersistentMap;
 import clojure.lang.Keyword;
 import clojure.lang.PersistentArrayMap;
+import clojure.lang.PersistentHashMap;
+import clojure.lang.ITransientMap;
 
 @SuppressWarnings({"rawtypes", "unchecked"})
 class ClojureRing {
@@ -67,24 +69,26 @@ class ClojureRing {
 
     public static IPersistentMap buildRequestMap(HttpRequest req) {
         // ring spec
-        Map<Object, Object> m = new TreeMap<Object, Object>();
-        m.put(SERVER_PORT, req.serverPort);
-        m.put(SERVER_NAME, req.serverName);
-        m.put(REMOTE_ADDR, req.getRemoteAddr());
-        m.put(URI, req.uri);
-        m.put(QUERY_STRING, req.queryString);
-        m.put(SCHEME, HTTP); // only http is supported
-        m.put(ASYC_CHANNEL, req.channel);
-        m.put(WEBSOCKET, req.isWebSocket);
-        m.put(REQUEST_METHOD, req.method.KEY);
+        ITransientMap m = PersistentHashMap.EMPTY.asTransient();
+        return
+            m
+            .assoc(SERVER_PORT, req.serverPort)
+            .assoc(SERVER_NAME, req.serverName)
+            .assoc(REMOTE_ADDR, req.getRemoteAddr())
+            .assoc(URI, req.uri)
+            .assoc(QUERY_STRING, req.queryString)
+            .assoc(SCHEME, HTTP) // only http is supported
+            .assoc(ASYC_CHANNEL, req.channel)
+            .assoc(WEBSOCKET, req.isWebSocket)
+            .assoc(REQUEST_METHOD, req.method.KEY)
 
-        // key is already lower cased, required by ring spec
-        m.put(HEADERS, PersistentArrayMap.create(req.headers));
-        m.put(CONTENT_TYPE, req.contentType);
-        m.put(CONTENT_LENGTH, req.contentLength);
-        m.put(CHARACTER_ENCODING, req.charset);
-        m.put(BODY, req.getBody());
-        return PersistentArrayMap.create(m);
+            // key is already lower cased, required by ring spec
+            .assoc(HEADERS, PersistentArrayMap.create(req.headers))
+            .assoc(CONTENT_TYPE, req.contentType)
+            .assoc(CONTENT_LENGTH, req.contentLength)
+            .assoc(CHARACTER_ENCODING, req.charset)
+            .assoc(BODY, req.getBody())
+            .persistent();
     }
 }
 
