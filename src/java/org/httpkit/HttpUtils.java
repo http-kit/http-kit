@@ -37,6 +37,14 @@ class DateFormatter extends ThreadLocal<SimpleDateFormat> {
 
 public class HttpUtils {
 
+    // Files with size above this threshold should be memory mapped.
+    private static final int MAPPED_BUFFER_THRESH_SIZE_BYTES = initMappedThreshold();
+    private static int initMappedThreshold()
+    {
+        return 1024 * 1024
+            * Integer.getInteger("org.http-kit.memmap-file-threshold", 20);
+    }
+
     public static final Charset ASCII = Charset.forName("US-ASCII");
     public static final Charset UTF_8 = Charset.forName("utf8");
 
@@ -295,7 +303,7 @@ public class HttpUtils {
 
     public static ByteBuffer readAll(File f) throws IOException {
         int length = (int) f.length();
-        if (length >= 1024 * 1024 * 20) { // 20M
+        if (length >= MAPPED_BUFFER_THRESH_SIZE_BYTES) {
             FileInputStream fs = new FileInputStream(f);
             MappedByteBuffer buffer = fs.getChannel().map(MapMode.READ_ONLY, 0, length);
             fs.close();
