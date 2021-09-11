@@ -60,6 +60,10 @@
     false (recommended) ; Returns the HttpServer which can be used with `server-port`,
                         ; `server-status`, `server-stop!`, etc.
 
+  The server also supports the following JVM property:
+
+  org.http-kit.memmap-file-threshold   Files above this size (in MB) are mapped into memory for efficiency when served. Memory mapping could result to file locking. Defaults to 20 (MB).
+
   [1] Ref. http://http-kit.org/migration.html for differences."
 
   [handler
