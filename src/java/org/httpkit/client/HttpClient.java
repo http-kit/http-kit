@@ -170,6 +170,7 @@ public class HttpClient implements Runnable {
                 b.position(0); // reset for retry
             }
             req.isReuseConn = false;
+            req.setConnected(false); // "un"-connect this request if the keepalive conn wasn't able to be reused
             requests.remove(req); // remove from timeout queue
             pending.offer(req); // queue for retry
             selector.wakeup();
@@ -433,6 +434,7 @@ public class HttpClient implements Runnable {
                             key.attach(job);
                             key.interestOps(OP_WRITE);
                             requests.offer(job);
+                            job.setConnected(true); // since we're re-using a keepalive conn, set the timeout as if we're already connected
                             pending.poll();
                             return;
                         } catch (SSLException e) {
