@@ -21,12 +21,18 @@
       (Integer/parseInt (.substring s 0 dot-idx))
 
       (pos? dash-idx)
-      (Integer/parseInt (.substring s 0 dash-idx)))))
+      (Integer/parseInt (.substring s 0 dash-idx))
+
+      :else
+      (Integer/parseInt s))))
 
 (comment
-  (parse-java-version "1.6.0_23") ; 6
-  (parse-java-version "9.0.1")    ; 9
-  (parse-java-version "16-ea")    ; 16
+  (parse-java-version "1.6.0_23")  ; 6
+  (parse-java-version "1.8.0_302") ; 8
+  (parse-java-version "9.0.1")     ; 9
+  (parse-java-version "11.0.12")   ; 11
+  (parse-java-version "16-ea")     ; 16
+  (parse-java-version "17")        ; 17
   )
 
 (def ^:private java-version_
