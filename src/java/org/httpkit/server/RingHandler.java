@@ -51,6 +51,7 @@ class ClojureRing {
     static final Keyword BODY = intern("body");
     static final Keyword WEBSOCKET = intern("websocket?");
     static final Keyword ASYC_CHANNEL = intern("async-channel");
+    static final Keyword START_TIME = intern("start-time");
 
     static final Keyword HTTP = intern("http");
 
@@ -81,6 +82,7 @@ class ClojureRing {
             .assoc(ASYC_CHANNEL, req.channel)
             .assoc(WEBSOCKET, req.isWebSocket)
             .assoc(REQUEST_METHOD, req.method.KEY)
+            .assoc(START_TIME, req.startTime)
 
             // key is already lower cased, required by ring spec
             .assoc(HEADERS, PersistentArrayMap.create(req.headers))
