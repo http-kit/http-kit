@@ -27,6 +27,7 @@ public class AsyncChannel {
 
     private final SelectionKey key;
     private final HttpServer server;
+    public long createdAt;
 
     final public AtomicBoolean closedRan = new AtomicBoolean();
     final private AtomicReference<IFn> closeHandler = new AtomicReference<>(null);
@@ -49,6 +50,7 @@ public class AsyncChannel {
     }
 
     public void reset(HttpRequest request) {
+        this.createdAt = System.currentTimeMillis();
         this.request = request;
         serialTask = null;
 
