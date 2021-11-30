@@ -26,6 +26,7 @@ public class HttpRequest {
     String charset = "utf8";
     boolean isKeepAlive = false;
     boolean isWebSocket = false;
+    long startTime;
 
     InetSocketAddress remoteAddr;
     AsyncChannel channel;
@@ -41,6 +42,10 @@ public class HttpRequest {
             uri = url;
             queryString = null;
         }
+    }
+
+    public void setStartTime(long time) {
+        this.startTime = time;
     }
 
     public InputStream getBody() {

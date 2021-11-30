@@ -177,8 +177,9 @@ public class HttpServer implements Runnable {
                     if (status.get() != Status.RUNNING) {
                         request.isKeepAlive = false;
                     }
-
+                    request.setStartTime(System.currentTimeMillis());
                     channel.reset(request);
+
                     if (request.isWebSocket) {
                         key.attach(new WsAtta(channel, maxWs));
                     } else {
