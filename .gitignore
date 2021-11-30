@@ -12,3 +12,4 @@ pom.xml*
 /target
 /.idea
 /_site
+.cpcache
