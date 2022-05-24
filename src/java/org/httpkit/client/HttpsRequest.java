@@ -19,9 +19,11 @@ public class HttpsRequest extends Request {
                         PriorityQueue<Request> clients, RequestConfig config, SSLEngine engine) {
         super(addr, request, handler, clients, config);
         this.engine = engine;
+        this.engineOriginal = engine;
     }
 
     SSLEngine engine; // package private
+    SSLEngine engineOriginal;
     private ByteBuffer myNetData = ByteBuffer.allocate(40 * 1024);
     private ByteBuffer peerNetData = ByteBuffer.allocate(40 * 1024);
     boolean handshaken = false;
@@ -137,5 +139,15 @@ public class HttpsRequest extends Request {
         this.engine = ((HttpsRequest) old).engine;
         this.handshaken = true;
         wrapRequest(); // prepare for write
+    }
+
+    // if we weren't able to reuse the kept-alive conn, switch back to original ssl engine
+    @Override
+    public void unrecycle() {
+        super.unrecycle();
+        this.engine = this.engineOriginal;
+        this.handshaken = false;
+        myNetData.clear();
+        peerNetData.clear();
     }
 }

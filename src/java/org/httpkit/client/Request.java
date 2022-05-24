@@ -90,6 +90,18 @@ public class Request implements Comparable<Request> {
 
     public void recycle(Request old) throws SSLException {
         this.key = old.key;
+        isReuseConn = true;
+        clients.offer(this);
+        setConnected(true); // since we're re-using a keepalive conn, set the timeout as if we're already connected
+    }
+
+    public void unrecycle() {
+        for (ByteBuffer b : request) {
+            b.position(0); // reset for retry
+        }
+        isReuseConn = false;
+        setConnected(false);
+        clients.remove(this); // setConnected adds to timeouts queue, but we shouldn't time this out anymore
     }
 }
 
