@@ -1,5 +1,35 @@
 > This project uses [Break Versioning](https://github.com/ptaoussanis/encore/blob/master/BREAK-VERSIONING.md) as of **Sep 18, 2020**.
 
+## v2.6.0-RC1 (2022 May 28)
+
+```clojure
+[http-kit "2.6.0-RC1"]
+```
+
+> Non-breaking maintenance release with some fixes and minor features
+> See [here](https://github.com/ptaoussanis/encore#recommended-steps-after-any-significant-dependency-update) recommended steps when updating any Clojure/Script dependencies.
+
+#### Changes since `2.5.3`
+
+* [#476] [Server] Optimization: change buildRequestMap to create a PersistentHashMap directly (@bsless)
+
+#### New since `2.5.3`
+
+* [#471 #472] [Client] Add option to not automatically add Accept-Content header (@MarcoNicolodi)
+
+#### Fixes since `2.5.3`
+
+* [#469 #489] [Client] Properly unrecycle req when kept-alive conn wasn't able to be reused (@xwang1498)
+* [#475 #477] [Graal] Add --initialize-at-run-time to config to stop GRAAL builds failing (@askonomm)
+* [#482 #483] [Client] Fix java version parsing for JDK 17 (@pmonks)
+* [#401 #481] [Client] mark Request as connected when reusing keepalive (@xwang1498)
+
+#### Everything since `2.6.0-alpha1`
+
+* [#469 #489] [Fix] [Client] Properly unrecycle req when kept-alive conn wasn't able to be reused (@xwang1498)
+
+
+
 ## v2.6.0-alpha1 (2021 Oct 16)
 
 ```clojure
