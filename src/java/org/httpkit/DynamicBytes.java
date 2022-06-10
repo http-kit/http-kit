@@ -73,4 +73,13 @@ public class DynamicBytes {
         byte[] bs = str.getBytes(c);
         return append(bs, bs.length);
     }
+
+    /**
+     * get the underlying bytes, copied
+     *
+     * @return
+     */
+    public byte[] bytes() {
+        return Arrays.copyOf(data, idx);
+    }
 }
