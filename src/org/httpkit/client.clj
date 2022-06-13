@@ -205,20 +205,18 @@ an SNI-capable one, e.g.:
     (println \"resp1's status: \" (:status @resp1))
     (println \"resp2's status: \" (:status @resp2)))
 
-  Output coercion:
-  ;; Return the body as a byte stream
-  (request {:url \"http://site.com/favicon.ico\" :as :stream})
-  ;; Coerce as a byte-array
-  (request {:url \"http://site.com/favicon.ico\" :as :byte-array})
-  ;; return the body as a string body
-  (request {:url \"http://site.com/string.txt\" :as :text})
-  ;; Try to automatically coerce the output based on the content-type header, currently supports :text :stream, (with automatic charset detection)
-  (request {:url \"http://site.com/string.txt\" :as :auto})
-  ;; return the body as is with no unzipping or coercion whatsoever. return as byte[]
-  (request {:url \"http://site.com/favicon.ico\" :as :raw-byte-array})
-  ;; return the body as is with no unzipping or coercion whatsoever. returns as org.httpkit.DynamicBytes
-  (request {:url \"http://site.com/favicon.ico\" :as :none})
+  Returned body type is controlled by `:as` option:
 
+   Without automatic unzipping:
+      `:none`           - org.httpkit.DynamicBytes
+      `:raw-byte-array` - bytes[]
+
+    With automatic unzipping:
+      `:byte-array`     - bytes[]
+      `:stream`         - ByteInputStream
+      `:text`           - String (charset based on Content-Type header)
+      `:auto`           - As `:text` or `:stream` (based on Content-Type header)
+                          
   Request options:
     :url :method :headers :timeout :connect-timeout :idle-timeout :query-params
     :as :form-params :client :body :basic-auth :user-agent :filter :worker-pool"
