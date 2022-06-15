@@ -69,8 +69,8 @@ public class HttpUtils {
     public static final String TRANSFER_ENCODING = "transfer-encoding";
 
     public static final String CONTENT_ENCODING = "content-encoding";
-
     public static final String CONTENT_TYPE = "content-type";
+    public static final String CONTENT_LENGTH = "content-length";
 
     public static final String CHUNKED = "chunked";
 
@@ -85,8 +85,6 @@ public class HttpUtils {
     // public static final String LAST_MODIFIED = "Last-Modified";
 
     public static final String X_FORWARDED_FOR = "x-forwarded-for";
-
-    public static final String CONTENT_LENGTH = "content-length";
 
     // public static final String CACHE_CONTROL = "Cache-Control";
 
@@ -444,8 +442,6 @@ public class HttpUtils {
         return result == null ? UTF_8 : result;
     }
 
-    public static final String CL = "Content-Length";
-
     public static ByteBuffer[] HttpEncode(int status, HeaderMap headers, Object body) {
         return HttpEncode(status, headers, body, null);
     }
@@ -458,16 +454,16 @@ public class HttpUtils {
             if (!CHUNKED.equals(headers.get("Transfer-Encoding"))) {
                 if (bodyBuffer != null) {
                     // trust the computed length
-                    headers.putOrReplace(CL, Integer.toString(bodyBuffer.remaining()));
+                    headers.putOrReplace(CONTENT_LENGTH, Integer.toString(bodyBuffer.remaining()));
                 } else {
-                    headers.putOrReplace(CL, "0");
+                    headers.putOrReplace(CONTENT_LENGTH, "0");
                 }
             }
         } catch (IOException e) {
             byte[] b = e.getMessage().getBytes(ASCII);
             status = 500;
             headers.clear();
-            headers.put(CL, Integer.toString(b.length));
+            headers.put(CONTENT_LENGTH, Integer.toString(b.length));
             bodyBuffer = ByteBuffer.wrap(b);
         }
         if (serverHeader != null && !headers.containsKey("Server")) {
