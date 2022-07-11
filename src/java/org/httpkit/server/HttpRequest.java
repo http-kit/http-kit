@@ -27,6 +27,7 @@ public class HttpRequest {
     boolean isKeepAlive = false;
     boolean isWebSocket = false;
     long startTime;
+    boolean sentContinue = false;
 
     InetSocketAddress remoteAddr;
     AsyncChannel channel;
