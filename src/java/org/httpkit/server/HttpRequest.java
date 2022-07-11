@@ -26,6 +26,7 @@ public class HttpRequest {
     String charset = "utf8";
     boolean isKeepAlive = false;
     boolean isWebSocket = false;
+    boolean sentContinue = false;
 
     InetSocketAddress remoteAddr;
     AsyncChannel channel;

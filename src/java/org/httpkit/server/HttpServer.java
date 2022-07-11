@@ -167,7 +167,6 @@ public class HttpServer implements Runnable {
 
     private void decodeHttp(HttpAtta atta, SelectionKey key, SocketChannel ch) {
         try {
-            boolean sentContinue = false;
             do {
                 AsyncChannel channel = atta.channel;
                 HttpRequest request = atta.decoder.decode(buffer);
@@ -189,9 +188,9 @@ public class HttpServer implements Runnable {
                     handler.handle(request, new RespCallback(key, this));
                     // pipelining not supported : need queue to ensure order
                     atta.decoder.reset();
-                } else if (!sentContinue && atta.decoder.requiresContinue()) {
+                } else if (atta.decoder.requiresContinue()) {
                     tryWrite(key, HttpEncode(100, new HeaderMap(), null, serverHeader));
-                    sentContinue = true;
+                    atta.decoder.setSentContinue();
                 }
             } while (buffer.hasRemaining()); // consume all
         } catch (ProtocolException e) {
