@@ -387,7 +387,7 @@ public class HttpServer implements Runnable {
                 // jvm can catch any exception, including OOM
             } catch (Throwable e) { // catch any exception(including OOM), print it
                 status.set(Status.STOPPED);
-                errorLogger.log("http server loop error, should not happen", e);
+                errorLogger.log("http server loop error, see stack trace for details", e);
                 eventLogger.log(eventNames.serverLoopError);
             }
         }
