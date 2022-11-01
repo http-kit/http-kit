@@ -455,7 +455,7 @@ public class HttpUtils {
                 if (bodyBuffer != null) {
                     // trust the computed length
                     headers.putOrReplace(CONTENT_LENGTH, Integer.toString(bodyBuffer.remaining()));
-                } else {
+                } else if ((status / 100) != 1 && status != 204) {
                     headers.putOrReplace(CONTENT_LENGTH, "0");
                 }
             }
