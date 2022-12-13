@@ -454,15 +454,15 @@
   (let [resp @(http/get "http://localhost:4347/multi-header" {:headers {"foo" ["bar" "baz"], "eggplant" "quux"}})
         resp2 (clj-http/get "http://localhost:4347/multi-header" {:headers {"foo" ["bar" "baz"], "eggplant" "quux"}})]
     (is (= 200 (:status resp)))
-    (is (= 3 (count (split (-> resp :headers :x-method2) #","))))
-    (is (= 2 (count (split (-> resp :headers :x-method) #","))))
+    (is (= 3 (count (split (-> resp :headers :x-method2) #"\n"))))
+    (is (= 2 (count (split (-> resp :headers :x-method) #"\n"))))
     (is (= 200 (:status resp2)))))
 
 (deftest test-headers-stringified
   (doseq [[sent expected] [["test" "test"]
                            [0 "0"]
                            ['(0) "0"]
-                           ['("a" "b") "a,b"]]]
+                           ['("a" "b") "a\nb"]]]
     (let [received (:body @(http/get "http://localhost:4347/test-header"
                                      {:headers {"test-header" sent}}))]
       (is (= received expected)))))

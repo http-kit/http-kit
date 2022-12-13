@@ -375,7 +375,7 @@ public class HttpUtils {
             Object v = headers.get(key);
             if (v != null) {
                 // https://github.com/http-kit/http-kit/issues/108
-                value = v.toString() + "," + value;
+                value = v.toString() + "\n" + value;
             }
             headers.put(key, value);
         }
