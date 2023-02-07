@@ -503,6 +503,9 @@ public class HttpClient implements Runnable {
     public void stop() throws IOException {
         running = false;
         if (selector != null) {
+            for (SelectionKey selectionKey : selector.keys()) {
+                selectionKey.channel().close();
+            }
             selector.close();
         }
     }
