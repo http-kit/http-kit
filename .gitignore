@@ -1,4 +1,7 @@
 *.iml
+.clj-kondo/
+.lsp/
+.calva/
 *jar
 .classpath
 .lein-deps-sum
