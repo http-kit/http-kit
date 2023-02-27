@@ -38,7 +38,7 @@ public class HeaderMap {
     public void putOrReplace(String key, Object obj) {
         final int total = size * 2; // * 2
         for (int i = 0; i < total; i += 2) {
-            if (key.equals(arrays[i])) {
+            if (key.equalsIgnoreCase((String)arrays[i])) {
                 arrays[i + 1] = obj;// replace
                 return;
             }

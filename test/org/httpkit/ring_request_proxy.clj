@@ -49,7 +49,6 @@
         server-mapping (get opts :host-fn {})
         insecure (get opts :allow-insecure-ssl false)]
     (fn [request]
-      (println request)
       (let [request-key (identifier-fn request)
             host (server-mapping request-key)
             stripped-headers (dissoc (:headers request) "content-length")]
