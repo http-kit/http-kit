@@ -1,5 +1,7 @@
 # HTTP Kit
 
+![github actions](https://github.com/http-kit/http-kit/actions/workflows/build.yml/badge.svg)
+
 ### A simple, high-performance event-driven HTTP client+server for Clojure
 
 **[CHANGELOG][]** | [API][] | current [Break Version][]:

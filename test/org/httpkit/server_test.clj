@@ -346,9 +346,9 @@
     (is (re-find #"200" resp))
     (is (re-find #"Keep-Alive" resp))))
 
-(deftest ^:skip-travis test-ipv6
-  ;; Skipping this on Travis because of difficulties with [::1] IPv6
-  ;; on AWS CIs, Ref. https://github.com/travis-ci/travis-ci/issues/4964
+(deftest ^:skip-gha test-ipv6
+  ;; Skipping this on GitHub actions because of difficulties with [::1] IPv6
+  ;; on AWS CIs, Ref. https://github.com/actions/runner-images/issues/668
 
   ;; TODO add more
   (is (= "hello world" (:body (http/get "http://[::1]:4347/")))))
@@ -474,4 +474,3 @@
       (is (= (:status resp) 200))
       (is (nil? (get-server-header resp)))
       (server))))
-
