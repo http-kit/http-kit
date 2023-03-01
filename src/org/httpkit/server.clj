@@ -137,7 +137,8 @@
     (base64-encode
      (.digest md (.getBytes (str sec-websocket-key websocket-13-guid))))))
 
-(def accept "DEPRECATED: prefer `sec-websocket-accept`" sec-websocket-accept)
+(def ^{:deprecated "v2.4.0 (2020-07-30)"} accept
+  "DEPRECATED: prefer `sec-websocket-accept`" sec-websocket-accept)
 
 (defn websocket-handshake-check
   "Returns `sec-ws-accept` string iff given Ring request is a valid
@@ -232,6 +233,7 @@
 (defmacro with-channel
   "DEPRECATED: this macro has potential race conditions, Ref. #318.
   Prefer `as-channel` instead."
+  {:deprecated "v2.4.0 (2020-07-30)"}
   [ring-req ch-name & body]
   `(let [ring-req# ~ring-req
          ~ch-name (:async-channel ring-req#)]
