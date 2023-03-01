@@ -452,11 +452,11 @@ public class HttpUtils {
             bodyBuffer = bodyBuffer(body);
             // only write length if not chunked
             if (!CHUNKED.equals(headers.get("Transfer-Encoding"))) {
-                if ((status / 100) != 1 && status != 204) {
+                if (bodyBuffer != null) {
                     // trust the computed length
-                    headers.putOrReplace(
-                        CONTENT_LENGTH,
-                        (bodyBuffer != null)) Integer.toString(bodyBuffer.remaining()) : "0");
+                    headers.putOrReplace(CONTENT_LENGTH, Integer.toString(bodyBuffer.remaining()));
+                } else if ((status / 100) != 1 && status != 204) {
+                    headers.putOrReplace(CONTENT_LENGTH, "0");
                 }
             }
         } catch (IOException e) {
