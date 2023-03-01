@@ -12,6 +12,7 @@ import static org.httpkit.server.Frame.CloseFrame.CLOSE_NORMAL;
 import java.io.IOException;
 import java.io.Closeable;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedSelectorException;
 import java.nio.channels.SelectionKey;
@@ -26,7 +27,6 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.Callable;
 
 import org.httpkit.HeaderMap;
 import org.httpkit.LineTooLargeException;
@@ -70,6 +70,7 @@ public class HttpServer implements Runnable {
     private final ProxyProtocolOption proxyProtocolOption;
 
     public final String serverHeader;
+    private final SocketAddress socketAddress;
 
     private Thread serverThread;
 
@@ -98,6 +99,12 @@ public class HttpServer implements Runnable {
         }
     };
 
+    public static interface ServerChannelFactory {
+        ServerSocketChannel createChannel(SocketAddress address) throws IOException;
+    }
+    public static interface AddressFinder {
+        SocketAddress findAddress() throws IOException;
+    }
     public HttpServer(String ip, int port, IHandler handler, int maxBody, int maxLine, int maxWs,
                       ProxyProtocolOption proxyProtocolOption)
             throws IOException {
@@ -126,8 +133,35 @@ public class HttpServer implements Runnable {
         this.selector = Selector.open();
         this.serverChannel = ServerSocketChannel.open();
         serverChannel.configureBlocking(false);
-        serverChannel.socket().bind(new InetSocketAddress(ip, port));
+        this.socketAddress = new InetSocketAddress(ip, port);
+        serverChannel.socket().bind(socketAddress);
         serverChannel.register(selector, OP_ACCEPT);
+    }
+
+
+    public HttpServer (AddressFinder addressFinder, ServerChannelFactory channelFactory, IHandler handler, int maxBody, int maxLine, int maxWs,
+        ProxyProtocolOption proxyProtocolOption,
+        String serverHeader,
+        ContextLogger<String, Throwable> errorLogger,
+        ContextLogger<String, Throwable> warnLogger,
+        EventLogger<String> eventLogger, EventNames eventNames)
+        throws IOException {
+            this.errorLogger = errorLogger;
+            this.warnLogger = warnLogger;
+            this.eventLogger = eventLogger;
+            this.eventNames = eventNames;
+            this.handler = handler;
+            this.maxLine = maxLine;
+            this.maxBody = maxBody;
+            this.maxWs = maxWs;
+            this.proxyProtocolOption = proxyProtocolOption;
+            this.serverHeader = serverHeader;
+            this.socketAddress = addressFinder.findAddress();
+            this.serverChannel = channelFactory.createChannel(socketAddress);
+            serverChannel.configureBlocking(false);
+            this.selector = Selector.open();
+            serverChannel.bind(socketAddress);
+            serverChannel.register(selector, OP_ACCEPT);
     }
 
     void accept(SelectionKey key) {
@@ -195,7 +229,10 @@ public class HttpServer implements Runnable {
                         atta.keepalive = request.isKeepAlive;
                     }
                     request.channel = channel;
-                    request.remoteAddr = (InetSocketAddress) ch.socket().getRemoteSocketAddress();
+                    // can't call socket() on anything else
+                    if (socketAddress instanceof InetSocketAddress){
+                        request.remoteAddr = (InetSocketAddress) ch.socket().getRemoteSocketAddress();
+                    }
                     handler.handle(request, new RespCallback(key, this));
                     // pipelining not supported : need queue to ensure order
                     atta.decoder.reset();
@@ -484,7 +521,11 @@ public class HttpServer implements Runnable {
     }
 
     public int getPort() {
-        return this.serverChannel.socket().getLocalPort();
+         if (socketAddress instanceof InetSocketAddress){
+           return this.serverChannel.socket().getLocalPort();
+         }
+         return -1;
+
     }
 
     public Status  getStatus() { return status.get();           }

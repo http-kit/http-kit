@@ -53,13 +53,25 @@ public class HttpClient implements Runnable {
 
     public static interface AddressFinder {
         public static final AddressFinder DEFAULT = new AddressFinder() {
-            public InetSocketAddress findAddress(URI uri) throws UnknownHostException {
+            public SocketAddress findAddress(URI uri) throws UnknownHostException {
                 return getServerAddr(uri);
             }
         };
-        InetSocketAddress findAddress(URI uri) throws UnknownHostException;
+        SocketAddress findAddress(URI uri) throws UnknownHostException;
     }
 
+    public static interface ChannelFactory {
+        public static final ChannelFactory DEFAULT = new ChannelFactory() {
+            public SocketChannel createChannel(SocketAddress address) throws IOException {
+                SocketChannel ch = SocketChannel.open();
+                ch.setOption(StandardSocketOptions.SO_KEEPALIVE, Boolean.TRUE);
+                ch.setOption(StandardSocketOptions.TCP_NODELAY, Boolean.TRUE);
+                return ch;
+            }
+        };
+
+        SocketChannel createChannel(SocketAddress address) throws IOException;
+    }
     public static interface SSLEngineURIConfigurer {
         public static final SSLEngineURIConfigurer NOP = new SSLEngineURIConfigurer() {
             public void configure(SSLEngine sslEngine, URI uri) { /* do nothing */ }
@@ -68,6 +80,9 @@ public class HttpClient implements Runnable {
     }
 
     private final AddressFinder addressFinder;
+
+    private final ChannelFactory channelFactory;
+
     private final SSLEngineURIConfigurer sslEngineUriConfigurer;
     private final SocketAddress bindAddress;
 
@@ -88,34 +103,52 @@ public class HttpClient implements Runnable {
         this(-1);
     }
 
-
-    public HttpClient(long maxConnections, AddressFinder addressFinder, SSLEngineURIConfigurer sslEngineUriConfigurer,
+    public HttpClient (long maxConnections, AddressFinder addressFinder, ChannelFactory channelFactory, SSLEngineURIConfigurer sslEngineUriConfigurer,
             ContextLogger<String, Throwable> errorLogger,
-            EventLogger<String> eventLogger, EventNames eventNames) throws IOException {
-      this(maxConnections, addressFinder, sslEngineUriConfigurer, errorLogger, eventLogger, eventNames, null);          
+            EventLogger<String> eventLogger, EventNames eventNames, SocketAddress bindAddress) throws IOException {
+        this.maxConnections = maxConnections;
+        this.addressFinder = addressFinder;
+        this.channelFactory = channelFactory;
+        this.sslEngineUriConfigurer = sslEngineUriConfigurer;
+        this.errorLogger = errorLogger;
+        this.eventLogger = eventLogger;
+        this.eventNames = eventNames;
+        this.bindAddress = bindAddress;
+        selector = Selector.open();
+        init();
     }
 
     public HttpClient(long maxConnections, AddressFinder addressFinder, SSLEngineURIConfigurer sslEngineUriConfigurer,
             ContextLogger<String, Throwable> errorLogger,
-            EventLogger<String> eventLogger, EventNames eventNames, SocketAddress bindAddress) throws IOException {
+            EventLogger<String> eventLogger, EventNames eventNames) throws IOException {
+      this(maxConnections, addressFinder, sslEngineUriConfigurer, errorLogger, eventLogger, eventNames, null);
+    }
+
+    private final void init(){
         getDefaultContext();
+        int id = ID.incrementAndGet();
+        String name = "client-loop";
+        if (id > 1) {
+            name = name + "#" + id;
+        }
+
+        Thread t = new Thread(this, name);
+        t.setDaemon(true);
+        t.start();
+    }
+    public HttpClient(long maxConnections, AddressFinder addressFinder, SSLEngineURIConfigurer sslEngineUriConfigurer,
+            ContextLogger<String, Throwable> errorLogger,
+            EventLogger<String> eventLogger, EventNames eventNames, SocketAddress bindAddress) throws IOException {
+        this.maxConnections = maxConnections;
         this.addressFinder = addressFinder;
         this.sslEngineUriConfigurer = sslEngineUriConfigurer;
         this.errorLogger = errorLogger;
         this.eventLogger = eventLogger;
         this.eventNames = eventNames;
         this.bindAddress = bindAddress;
-
-        int id = ID.incrementAndGet();
-        String name = "client-loop";
-        if (id > 1) {
-            name = name + "#" + id;
-        }
-        this.maxConnections = maxConnections;
+        this.channelFactory = ChannelFactory.DEFAULT;
         selector = Selector.open();
-        Thread t = new Thread(this, name);
-        t.setDaemon(true);
-        t.start();
+        init();
     }
 
     public HttpClient(long maxConnections) throws IOException {
@@ -300,7 +333,7 @@ public class HttpClient implements Runnable {
             return;
         }
 
-        InetSocketAddress addr;
+        SocketAddress addr;
         try {
             if (proxyUri == null) {
                 addr = addressFinder.findAddress(uri);
@@ -443,9 +476,7 @@ public class HttpClient implements Runnable {
             if (maxConnections == -1 || numConnections < maxConnections) {
                 try {
                     pending.poll();
-                    SocketChannel ch = SocketChannel.open();
-                    ch.setOption(StandardSocketOptions.SO_KEEPALIVE, Boolean.TRUE);
-                    ch.setOption(StandardSocketOptions.TCP_NODELAY, Boolean.TRUE);
+                    SocketChannel ch = channelFactory.createChannel(job.addr);
                     if (bindAddress != null) {
                       ch.bind(bindAddress);
                     }

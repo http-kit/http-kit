@@ -1,8 +1,10 @@
 (ns org.httpkit.server
   (:require [org.httpkit.encode :refer [base64-encode]]
             [clojure.string :as str])
-  (:import [org.httpkit.server AsyncChannel HttpServer RingHandler ProxyProtocolOption]
+  (:import [org.httpkit.server AsyncChannel HttpServer RingHandler ProxyProtocolOption HttpServer$AddressFinder HttpServer$ServerChannelFactory]
            [org.httpkit.logger ContextLogger EventLogger EventNames]
+           [java.net InetSocketAddress]
+           [java.nio.channels ServerSocketChannel]
            java.security.MessageDigest))
 
 ;;;; Ring server
@@ -40,6 +42,8 @@
 
     :ip                 ; Which ip (if has many ips) to bind
     :port               ; Which port listen incomming request
+    :address-finder     ; (fn []) -> java.net.SocketAddress (ip/port ignored)
+    :channel-factory    ; (fn [java.net.SocketAddress]) -> java.nio.channels.SocketChannel
     :thread             ; Http worker thread count
     :queue-size         ; Max job queued before reject to project self
     :max-body           ; Max http body: 8m
@@ -70,7 +74,8 @@
    & [{:keys [ip port thread queue-size max-body max-ws max-line
               proxy-protocol worker-name-prefix worker-pool
               error-logger warn-logger event-logger event-names
-              legacy-return-value? server-header]
+              legacy-return-value? server-header address-finder
+              channel-factory]
 
        :or   {ip         "0.0.0.0"
               port       8090
@@ -96,10 +101,10 @@
                      (nil? event-names) EventNames/DEFAULT
                      (map? event-names) (EventNames. event-names)
                      (instance? EventNames
-                       event-names)     event-names
+                                event-names)     event-names
                      :otherwise         (throw (IllegalArgumentException.
-                                                 (format "Invalid event-names: (%s) %s"
-                                                   (class event-names) (pr-str event-names)))))
+                                                (format "Invalid event-names: (%s) %s"
+                                                        (class event-names) (pr-str event-names)))))
         h (if worker-pool
             (RingHandler. handler worker-pool err-logger evt-logger evt-names server-header)
             (RingHandler. thread handler worker-name-prefix queue-size server-header err-logger evt-logger evt-names))
@@ -108,14 +113,28 @@
                      :disable  ProxyProtocolOption/DISABLED
                      :optional ProxyProtocolOption/OPTIONAL)
 
-        s (HttpServer. ip port h max-body max-line max-ws proxy-enum
-            server-header err-logger
-            (if warn-logger
-              (reify ContextLogger
-                (log [this message error] (warn-logger message error)))
-              HttpServer/DEFAULT_WARN_LOGGER)
-            evt-logger
-            evt-names)]
+
+        s (HttpServer.
+           ^HttpServer$AddressFinder
+           (if address-finder
+             (reify HttpServer$AddressFinder
+               (findAddress [this] (address-finder)))
+             (reify HttpServer$AddressFinder
+               (findAddress [this] (InetSocketAddress. ip port))))
+           ^HttpServer$ServerChannelFactory
+           (if channel-factory
+             (reify HttpServer$ServerChannelFactory
+               (createChannel [this addr] (channel-factory addr)))
+             (reify HttpServer$ServerChannelFactory
+               (createChannel [this addr] (ServerSocketChannel/open))))
+           h max-body max-line max-ws proxy-enum
+           server-header err-logger
+           (if warn-logger
+             (reify ContextLogger
+               (log [this message error] (warn-logger message error)))
+             HttpServer/DEFAULT_WARN_LOGGER)
+           evt-logger
+           evt-names)]
 
     (.start s)
 
