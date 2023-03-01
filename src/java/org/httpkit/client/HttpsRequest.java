@@ -7,7 +7,7 @@ import javax.net.ssl.SSLEngineResult;
 import javax.net.ssl.SSLEngineResult.Status;
 import javax.net.ssl.SSLException;
 import java.io.IOException;
-import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
@@ -15,7 +15,7 @@ import java.nio.channels.SocketChannel;
 public class HttpsRequest extends Request {
     private static final ByteBuffer EMPTY_BUFFER = ByteBuffer.allocate(0);
 
-    public HttpsRequest(InetSocketAddress addr, String host, ByteBuffer[] request, IRespListener handler,
+    public HttpsRequest(SocketAddress addr, String host, ByteBuffer[] request, IRespListener handler,
                         PriorityQueue<Request> clients, RequestConfig config, SSLEngine engine) {
         super(addr, host, request, handler, clients, config);
         this.engine = engine;

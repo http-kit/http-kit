@@ -1,15 +1,15 @@
 package org.httpkit.client;
 
-import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.nio.channels.SelectionKey;
 
 public class PersistentConn implements Comparable<PersistentConn> {
     private final long timeoutTs;
     private final String host;
-    public final InetSocketAddress addr;
+    public final SocketAddress addr;
     public final SelectionKey key;
 
-    public PersistentConn(long timeoutTs, InetSocketAddress addr, String host, SelectionKey key) {
+    public PersistentConn(long timeoutTs, SocketAddress addr, String host, SelectionKey key) {
         this.timeoutTs = timeoutTs;
         this.addr = addr;
         this.host = host;

@@ -3,8 +3,7 @@
   (:require [clojure.string :as str]
             [org.httpkit.encode :refer [base64-encode]])
   (:use [clojure.walk :only [prewalk]])
-  (:import [org.httpkit.client HttpClient HttpClient$AddressFinder HttpClient$SSLEngineURIConfigurer
-                               IResponseHandler RespListener IFilter RequestConfig]
+  (:import [org.httpkit.client HttpClient HttpClient$AddressFinder HttpClient$ChannelFactory HttpClient$SSLEngineURIConfigurer IResponseHandler RespListener IFilter RequestConfig]
            [org.httpkit.logger ContextLogger EventLogger EventNames]
            [org.httpkit HttpMethod PrefixThreadFactory HttpUtils]
            [java.util.concurrent ThreadPoolExecutor LinkedBlockingQueue TimeUnit]
@@ -124,7 +123,8 @@ an SNI-capable one, e.g.:
 (defn make-client
   "Returns an HttpClient with specified options:
     :max-connections    ; Max connection count, default is unlimited (-1)
-    :address-finder     ; (fn [java.net.URI]) -> java.net.InetSocketAddress
+    :address-finder     ; (fn [java.net.URI]) -> java.net.SocketAddress
+    :channel-factory    ; (fn [java.net.SocketAddress]) -> java.nio.channels.SocketChannel
     :ssl-configurer     ; (fn [javax.net.ssl.SSLEngine java.net.URI])
     :error-logger       ; (fn [text ex])
     :event-logger       ; (fn [event-name])
@@ -136,34 +136,45 @@ an SNI-capable one, e.g.:
            error-logger
            event-logger
            event-names
-           bind-address]}]
+           bind-address
+           channel-factory]}]
   (HttpClient.
-    (or max-connections -1)
-    (if address-finder
-      (reify HttpClient$AddressFinder
-        (findAddress [this uri] (address-finder uri)))
-      HttpClient$AddressFinder/DEFAULT)
-    (if ssl-configurer
-      (reify HttpClient$SSLEngineURIConfigurer
-        (configure [this ssl-engine uri] (ssl-configurer ssl-engine uri)))
-      HttpClient$SSLEngineURIConfigurer/NOP)
-    (if error-logger
-      (reify ContextLogger
-        (log [this message error] (error-logger message error)))
-      ContextLogger/ERROR_PRINTER)
-    (if event-logger
-      (reify EventLogger
-        (log [this event] (event-logger event)))
-      EventLogger/NOP)
-    (cond
-      (nil? event-names) EventNames/DEFAULT
-      (map? event-names) (EventNames. event-names)
-      (instance? EventNames
-        event-names)     event-names
-      :otherwise         (throw (IllegalArgumentException.
-                                  (format "Invalid event-names: (%s) %s"
-                                    (class event-names) (pr-str event-names)))))
-    bind-address))
+   (or max-connections -1)
+   ^HttpClient$AddressFinder
+   (if address-finder
+     (reify HttpClient$AddressFinder
+       (findAddress [this uri] (address-finder uri)))
+     HttpClient$AddressFinder/DEFAULT)
+   ^HttpClient$ChannelFactory
+   (if channel-factory
+     (reify HttpClient$ChannelFactory
+       (createChannel [this address] (channel-factory address)))
+     HttpClient$ChannelFactory/DEFAULT)
+   ^HttpClient$SSLEngineURIConfigurer
+   (if ssl-configurer
+     (reify HttpClient$SSLEngineURIConfigurer
+       (configure [this ssl-engine uri] (ssl-configurer ssl-engine uri)))
+     HttpClient$SSLEngineURIConfigurer/NOP)
+   ^ContextLogger
+   (if error-logger
+     (reify ContextLogger
+       (log [this message error] (error-logger message error)))
+     ContextLogger/ERROR_PRINTER)
+   ^EventLogger
+   (if event-logger
+     (reify EventLogger
+       (log [this event] (event-logger event)))
+     EventLogger/NOP)
+   ^EventNames
+   (cond
+     (nil? event-names) EventNames/DEFAULT
+     (map? event-names) (EventNames. event-names)
+     (instance? EventNames
+                event-names)     event-names
+     :otherwise         (throw (IllegalArgumentException.
+                                (format "Invalid event-names: (%s) %s"
+                                        (class event-names) (pr-str event-names)))))
+   bind-address))
 
 (def ^:dynamic ^:private *in-callback* false)
 
@@ -216,7 +227,7 @@ an SNI-capable one, e.g.:
       `:stream`         - ByteInputStream
       `:text`           - String (charset based on Content-Type header)
       `:auto`           - As `:text` or `:stream` (based on Content-Type header)
-                          
+
   Request options:
     :url :method :headers :timeout :connect-timeout :idle-timeout :query-params
     :as :form-params :client :body :basic-auth :user-agent :filter :worker-pool"

@@ -14,6 +14,8 @@
             [clj-http.util :as u])
   (:import [java.io File FileOutputStream FileInputStream]
            org.httpkit.SpecialHttpClient
+           [java.net InetSocketAddress]
+           [java.nio.channels ServerSocketChannel]
            (java.nio.file Files)
            (java.util.concurrent ThreadPoolExecutor TimeUnit ArrayBlockingQueue)))
 
@@ -532,3 +534,23 @@
       (is (= (:body (get @responses_ 0)) "0"))
       (is (= (:body (get @responses_ 1)) "1"))
       (is (= (:body (get @responses_ 2)) "2")))))
+
+(defroutes custom-routes
+  (GET "/" [] "hello world"))
+
+(deftest custom-providers
+  (testing "can use a server based on custom address and channel providers"
+
+    (let [calls (atom [])
+          server (run-server
+                  custom-routes
+                  {:address-finder (fn []
+                                     (swap! calls conj :address)
+                                     (InetSocketAddress. "0.0.0.0" 34749))
+                   :channel-factory (fn [_]
+                                      (swap! calls conj :channel)
+                                      (ServerSocketChannel/open))} )]
+      (try
+        (is (= "hello world" (:body (http/get "http://localhost:34749"))))
+        (is (= [:address :channel] @calls))
+        (finally (server))))))
