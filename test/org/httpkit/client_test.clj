@@ -9,15 +9,20 @@
                    [handler :only [site]]
                    [route :only [not-found]])
         (clojure.tools [logging :only [info warn]]))
-  (:require [org.httpkit.client :as http]
-            [org.httpkit.sni-client :as sni]
+  (:require [clj-http.client :as clj-http]
             [clojure.java.io :as io]
-            [clj-http.client :as clj-http])
-  (:import java.nio.ByteBuffer
+            [org.httpkit.client :as http]
+            [org.httpkit.sni-client :as sni])
+  (:import [java.nio.channels SocketChannel]
+           java.nio.ByteBuffer
            java.nio.charset.StandardCharsets
-           [org.httpkit HttpMethod HttpStatus HttpVersion DynamicBytes]
-           [org.httpkit.client Decoder IRespListener ClientSslEngineFactory]
-           [javax.net.ssl SSLHandshakeException SSLException SSLContext]))
+           [org.httpkit
+            DynamicBytes
+            HttpMethod
+            HttpStatus
+            HttpUtils
+            HttpVersion]
+           [org.httpkit.client ClientSslEngineFactory Decoder IRespListener]))
 
 (deftest ssl-engine-factory-race-condition
   (testing ""
@@ -622,9 +627,26 @@
     (doseq [r requests] @r) ; wait
     (info group-idx "takes time" (- (System/currentTimeMillis) s))))
 
-(defn -main [& args]
+#_(defn -main [& args]
   (let [urls (shuffle (set (line-seq (io/reader "/tmp/urls"))))]
     (info "total" (count urls) "urls")
     (doall (map-indexed fetch-group-urls (partition 1000 urls)))
     (info "all downloaded")))
 
+(deftest pluggable-channel-providers
+  (let [calls (atom [])
+        c (http/make-client {:address-finder (fn [uri]
+                                               (swap! calls conj :uri)
+                                               (HttpUtils/getServerAddr uri))
+                             :channel-factory (fn [address]
+                                                (swap! calls conj :address)
+                                                (SocketChannel/open))})]
+    (testing "Can use pluggable address and channel providers"
+      (doseq [host ["http://127.0.0.1:4347" "http://127.0.0.1:14347"]]
+        (is (= 200 (:status @(http/get (str host "/get")
+                                       {:client c}
+                                       (fn [resp]
+                                         (is (= 200 (:status resp)))
+                                         resp))))))
+      (is (= [:uri :address :uri :address]
+             @calls)))))

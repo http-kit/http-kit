@@ -3,6 +3,7 @@ package org.httpkit.server;
 import org.httpkit.*;
 
 import java.io.InputStream;
+import java.net.SocketAddress;
 import java.net.InetSocketAddress;
 import java.util.Map;
 
@@ -29,7 +30,7 @@ public class HttpRequest {
     long startTime;
     boolean sentContinue = false;
 
-    InetSocketAddress remoteAddr;
+    SocketAddress remoteAddr;
     AsyncChannel channel;
 
     public HttpRequest(HttpMethod method, String url, HttpVersion version) {
@@ -67,7 +68,12 @@ public class HttpRequest {
                 return h.substring(0, idx);
             }
         } else {
-            return remoteAddr.getAddress().getHostAddress();
+            if (remoteAddr instanceof InetSocketAddress){
+                return ((InetSocketAddress)remoteAddr).getAddress().getHostAddress();
+            }else {
+                return null;
+            }
+
         }
     }
 

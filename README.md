@@ -53,8 +53,37 @@ This default may be changed in a future breaking release. In the meantime, manua
   (binding [org.httpkit.client/*default-client* sni-client/default-client]
     <...>)
 ```
-
 See `org.httpkit.client/*default-client*` docstring for more details.
+
+## Using Unix Domain Sockets in client and server
+
+Java native Unix Domain Sockets are available since Java 17, so to maintain backwards compatibility with JVMs prior to this,
+resolving SocketAddresses and SocketChannels is pluggable in both client and server.
+
+### Client of a Unix Domain Socket
+
+To talk HTTP via a Unix Domain Socket at `/tmp/test.sock`, create your own implementations of `:address-finder` and `:channel-factory` in a customised client:
+
+```clojure
+(let [client (client/make-client {:address-finder (fn [uri]
+                                                    (UnixDomainSocketAddress/of "/tmp/test.sock"))
+                                  :channel-factory (fn [address]
+                                                      (SocketChannel/open StandardProtocolFamily/UNIX))})]
+   (client/get "http://foobar"))
+```
+
+### Listen on a Unix Domain Socket
+
+To listen on a Unix Domain Socket at `/tmp/test.sock`, create your own implementations of `:address-finder` and `:channel-factory` in a customized server:
+
+```clojure
+(let [server (server/run-server
+              routes
+              {:address-finder #(UnixDomainSocketAddress/of "/tmp/test.sock")
+               :channel-factory (fn [_]
+                       (ServerSocketChannel/open StandardProtocolFamily/UNIX))}))]
+   ...)
+```
 
 ## Hack locally
 

@@ -3,13 +3,13 @@ package org.httpkit.client;
 import org.httpkit.PriorityQueue;
 
 import javax.net.ssl.SSLException;
-import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 
 public class Request implements Comparable<Request> {
 
-    final InetSocketAddress addr;
+    final SocketAddress addr;
     final String host;
     final Decoder decoder;
     final ByteBuffer[] request; // HTTP request
@@ -25,7 +25,7 @@ public class Request implements Comparable<Request> {
 
     private long timeoutTs; // future time this request timeout, ms
 
-    public Request(InetSocketAddress addr, String host, ByteBuffer[] request, IRespListener handler,
+    public Request(SocketAddress addr, String host, ByteBuffer[] request, IRespListener handler,
                    PriorityQueue<Request> clients, RequestConfig config) {
         this.cfg = config;
         this.decoder = new Decoder(handler, config.method);
@@ -106,4 +106,3 @@ public class Request implements Comparable<Request> {
         clients.remove(this); // setConnected adds to timeouts queue, but we shouldn't time this out anymore
     }
 }
-

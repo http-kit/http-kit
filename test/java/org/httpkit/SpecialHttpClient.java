@@ -20,7 +20,7 @@ public class SpecialHttpClient {
     // request + request sent to server, wait for 2 server responses
     public static String get2(String url) throws URISyntaxException, IOException {
         URI uri = new URI(url);
-        InetSocketAddress addr = HttpUtils.getServerAddr(uri);
+        SocketAddress addr = HttpUtils.getServerAddr(uri);
 
         Socket s = new Socket();
         s.connect(addr);
@@ -42,7 +42,7 @@ public class SpecialHttpClient {
 
     public static String http10(String url) throws Exception {
         URI uri = new URI(url);
-        InetSocketAddress addr = HttpUtils.getServerAddr(uri);
+        SocketAddress addr = HttpUtils.getServerAddr(uri);
 
         Socket s = new Socket();
         s.connect(addr);
@@ -66,7 +66,7 @@ public class SpecialHttpClient {
             IOException, InterruptedException {
 
         URI uri = new URI(url);
-        InetSocketAddress addr = HttpUtils.getServerAddr(uri);
+        SocketAddress addr = HttpUtils.getServerAddr(uri);
         Socket s = new Socket();
         s.setTcpNoDelay(false);
         s.connect(addr);
@@ -138,7 +138,7 @@ public class SpecialHttpClient {
     public static boolean slowWebSocketClient(String url) {
         try {
             URI uri = new URI(url);
-            InetSocketAddress addr = HttpUtils.getServerAddr(uri);
+            SocketAddress addr = HttpUtils.getServerAddr(uri);
 
             Socket s = new Socket();
             s.connect(addr);
@@ -204,7 +204,7 @@ public class SpecialHttpClient {
     public static String getPartial(String url) {
         try {
             URI uri = new URI(url);
-            InetSocketAddress addr = HttpUtils.getServerAddr(uri);
+            SocketAddress addr = HttpUtils.getServerAddr(uri);
 
             Socket s = new Socket();
             s.connect(addr);
