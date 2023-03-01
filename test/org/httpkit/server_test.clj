@@ -474,3 +474,61 @@
       (is (= (:status resp) 200))
       (is (nil? (get-server-header resp)))
       (server))))
+
+(deftest test-channel-reuse-async ; Ref. #375
+  ;; lein test :only org.httpkit.server-test/test-channel-reuse-async
+  ;; For this test, we want all client reqs to use the same socket
+  (http/with-async-connection-pool {:threads 1}
+    (let [ch_        (atom nil)
+          responses_ (atom {}) ; {<n> <resp>}
+
+          captured_ (atom []) ; [<send-success?> ...]
+          capture!  (fn [result] (swap! captured_ conj result) result)
+
+          resp-200  (fn [body] {:status 200, :headers {"Content-Type" "text/plain"}, :body body})
+          server
+          (run-server
+            (fn [req]
+              (case (:uri req)
+                "/0"
+                (with-channel req ch
+                  (let [resp (resp-200 "0")]
+                    (reset! ch_ ch) ; Hold channel!
+                    (capture! (send! ch resp)) ; Will close @ch_
+                    (capture! (send! ch resp))))
+
+                "/1"
+                (with-channel req ch
+                  (let [resp (resp-200 "1")]
+                    (capture! (send! @ch_ resp)) ; Try re-use @ch_
+                    (do       (send!  ch  resp))))
+
+                "/2" ; Fully sync response, without `with-channel`
+                (let [resp (resp-200 "2")]
+                  (capture! (send! @ch_ resp)) ; Try re-use @ch_
+                  (do                   resp))))
+
+            ;; Thread count irrelevant
+            {:port 3474, :thread 1})]
+
+      (reset! tmp-server server) ; For convenience during REPL/testing
+
+      (dotimes [n 3]
+        ;; Requests to: /0, /1, /2
+        (http/get (str "http://localhost:3474/" n)
+          {:async? true}
+          (fn cb [resp] (swap! responses_ #(assoc % n resp)))
+          (fn cb [ex]   (swap! responses_ #(assoc % n   ex))))
+        (Thread/sleep 50))
+
+      (Thread/sleep 100)
+      (server)
+
+      ;; After the first `send!`, @ch_ should *stay* closed,
+      ;; and further attempts to `send!` to @ch_ should fail.
+      (is (= @captured_ [true false false false]))
+
+      ;; Each req to uri /N should return body "N"
+      (is (= (:body (get @responses_ 0)) "0"))
+      (is (= (:body (get @responses_ 1)) "1"))
+      (is (= (:body (get @responses_ 2)) "2")))))

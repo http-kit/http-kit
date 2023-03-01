@@ -168,10 +168,20 @@ public class HttpServer implements Runnable {
     private void decodeHttp(HttpAtta atta, SelectionKey key, SocketChannel ch) {
         try {
             do {
-                AsyncChannel channel = atta.channel;
                 HttpRequest request = atta.decoder.decode(buffer);
 
                 if (request != null) {
+
+                    // It can be dangerous to re-use channels here. A user might hold
+                    // on to a channel, and reasonably expect it to *stay closed* after
+                    // use. By re-using channels here, we risk a user unintentionally
+                    // using a channel held from req1 that's since been RE-OPENED for
+                    // req2 (e.g. a completely unrelated request).
+                    // AsyncChannel channel = atta.channel;
+                    //
+                    // Ref. #375, thanks to @osbert for identifying this risk!
+
+                    AsyncChannel channel = new AsyncChannel(key, this); // This okay?
 
                     if (status.get() != Status.RUNNING) {
                         request.isKeepAlive = false;
