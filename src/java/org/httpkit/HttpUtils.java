@@ -456,7 +456,7 @@ public class HttpUtils {
                     // trust the computed length
                     headers.putOrReplace(
                         CONTENT_LENGTH,
-                        (bodyBuffer != null) ? Integer.toString(bodyBuffer.remaining()) : "0");
+                        (bodyBuffer != null)) Integer.toString(bodyBuffer.remaining()) : "0");
                 }
             }
         } catch (IOException e) {
