@@ -1,0 +1,10 @@
+;; This deps.edn allows you to use httpkit as a deps.edn dependency
+;; When target/classes doesn't exist, you will be asked to run:
+;; clj -X:deps prep
+;; which calls `lein javac` to compile the java sources.
+{:paths ["src" "resources" "target/classes"]
+ :aliases {:build {:paths ["."]
+                   :deps {babashka/process {:mvn/version "0.4.16"}}}}
+ :deps/prep-lib {:alias :build
+                 :fn build/lein-javac
+                 :ensure "target/classes"}}

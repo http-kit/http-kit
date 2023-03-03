@@ -1,6 +1,5 @@
 *.iml
-.clj-kondo/
-.lsp/
+.cache
 .calva/
 *jar
 .classpath
@@ -15,3 +14,7 @@ pom.xml*
 /target
 /.idea
 /_site
+native-test-0.0.1-standalone
+native-test-0.0.1-standalone.build_artifacts.txt
+target
+.lein-repl-history
