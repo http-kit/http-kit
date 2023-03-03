@@ -634,19 +634,24 @@
     (info "all downloaded")))
 
 (deftest pluggable-channel-providers
-  (let [calls (atom [])
-        c (http/make-client {:address-finder (fn [uri]
-                                               (swap! calls conj :uri)
-                                               (HttpUtils/getServerAddr uri))
-                             :channel-factory (fn [address]
-                                                (swap! calls conj :address)
-                                                (SocketChannel/open))})]
+  (let [calls_ (atom [])
+        c
+        (http/make-client
+          {:address-finder
+           (fn [uri]
+             (swap! calls_ conj :uri)
+             (HttpUtils/getServerAddr uri))
+
+           :channel-factory
+           (fn [address]
+             (swap! calls_ conj :address)
+             (SocketChannel/open))})]
+
     (testing "Can use pluggable address and channel providers"
       (doseq [host ["http://127.0.0.1:4347" "http://127.0.0.1:14347"]]
-        (is (= 200 (:status @(http/get (str host "/get")
-                                       {:client c}
-                                       (fn [resp]
-                                         (is (= 200 (:status resp)))
-                                         resp))))))
-      (is (= [:uri :address :uri :address]
-             @calls)))))
+        (is (= 200 (:status @(http/get (str host "/get") {:client c}
+                               (fn [resp]
+                                 (is (= 200 (:status resp)))
+                                 resp))))))
+
+      (is (= [:uri :address :uri :address] @calls_)))))

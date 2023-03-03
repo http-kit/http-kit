@@ -42,8 +42,8 @@
 
     :ip                 ; Which ip (if has many ips) to bind
     :port               ; Which port listen incomming request
-    :address-finder     ; (fn []) -> java.net.SocketAddress (ip/port ignored)
-    :channel-factory    ; (fn [java.net.SocketAddress]) -> java.nio.channels.SocketChannel
+    :address-finder     ; (fn []) -> `java.net.SocketAddress` (ip/port ignored)
+    :channel-factory    ; (fn [java.net.SocketAddress]) -> `java.nio.channels.SocketChannel`
     :thread             ; Http worker thread count
     :queue-size         ; Max job queued before reject to project self
     :max-body           ; Max http body: 8m
@@ -115,24 +115,24 @@
 
 
         s (HttpServer.
-           ^HttpServer$AddressFinder
+
+            ^HttpServer$AddressFinder
            (if address-finder
-             (reify HttpServer$AddressFinder
-               (findAddress [this] (address-finder)))
-             (reify HttpServer$AddressFinder
-               (findAddress [this] (InetSocketAddress. ip port))))
+             (reify HttpServer$AddressFinder (findAddress [this] (address-finder)))
+             (reify HttpServer$AddressFinder (findAddress [this] (InetSocketAddress. ip port))))
+
            ^HttpServer$ServerChannelFactory
            (if channel-factory
-             (reify HttpServer$ServerChannelFactory
-               (createChannel [this addr] (channel-factory addr)))
-             (reify HttpServer$ServerChannelFactory
-               (createChannel [this addr] (ServerSocketChannel/open))))
-           h max-body max-line max-ws proxy-enum
-           server-header err-logger
+             (reify HttpServer$ServerChannelFactory (createChannel [this addr] (channel-factory addr)))
+             (reify HttpServer$ServerChannelFactory (createChannel [this addr] (ServerSocketChannel/open))))
+
+           h max-body max-line max-ws proxy-enum server-header
+
+           err-logger
            (if warn-logger
-             (reify ContextLogger
-               (log [this message error] (warn-logger message error)))
+             (reify ContextLogger (log [this message error] (warn-logger message error)))
              HttpServer/DEFAULT_WARN_LOGGER)
+
            evt-logger
            evt-names)]
 

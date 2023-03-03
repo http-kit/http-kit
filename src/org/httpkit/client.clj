@@ -123,8 +123,8 @@ an SNI-capable one, e.g.:
 (defn make-client
   "Returns an HttpClient with specified options:
     :max-connections    ; Max connection count, default is unlimited (-1)
-    :address-finder     ; (fn [java.net.URI]) -> java.net.SocketAddress
-    :channel-factory    ; (fn [java.net.SocketAddress]) -> java.nio.channels.SocketChannel
+    :address-finder     ; (fn [java.net.URI]) -> `java.net.SocketAddress`
+    :channel-factory    ; (fn [java.net.SocketAddress]) -> `java.nio.channels.SocketChannel`
     :ssl-configurer     ; (fn [javax.net.ssl.SSLEngine java.net.URI])
     :error-logger       ; (fn [text ex])
     :event-logger       ; (fn [event-name])
@@ -140,40 +140,43 @@ an SNI-capable one, e.g.:
            channel-factory]}]
   (HttpClient.
    (or max-connections -1)
+
    ^HttpClient$AddressFinder
    (if address-finder
-     (reify HttpClient$AddressFinder
-       (findAddress [this uri] (address-finder uri)))
-     HttpClient$AddressFinder/DEFAULT)
+     (reify HttpClient$AddressFinder (findAddress [this uri] (address-finder uri)))
+     (do    HttpClient$AddressFinder/DEFAULT))
+
    ^HttpClient$ChannelFactory
    (if channel-factory
-     (reify HttpClient$ChannelFactory
-       (createChannel [this address] (channel-factory address)))
-     HttpClient$ChannelFactory/DEFAULT)
+     (reify HttpClient$ChannelFactory (createChannel [this address] (channel-factory address)))
+     (do    HttpClient$ChannelFactory/DEFAULT))
+
    ^HttpClient$SSLEngineURIConfigurer
    (if ssl-configurer
-     (reify HttpClient$SSLEngineURIConfigurer
-       (configure [this ssl-engine uri] (ssl-configurer ssl-engine uri)))
-     HttpClient$SSLEngineURIConfigurer/NOP)
+     (reify HttpClient$SSLEngineURIConfigurer (configure [this ssl-engine uri] (ssl-configurer ssl-engine uri)))
+     (do    HttpClient$SSLEngineURIConfigurer/NOP))
+
    ^ContextLogger
    (if error-logger
-     (reify ContextLogger
-       (log [this message error] (error-logger message error)))
-     ContextLogger/ERROR_PRINTER)
+     (reify ContextLogger (log [this message error] (error-logger message error)))
+     (do    ContextLogger/ERROR_PRINTER))
+
    ^EventLogger
    (if event-logger
-     (reify EventLogger
-       (log [this event] (event-logger event)))
-     EventLogger/NOP)
+     (reify EventLogger (log [this event] (event-logger event)))
+     (do    EventLogger/NOP))
+
    ^EventNames
    (cond
-     (nil? event-names) EventNames/DEFAULT
-     (map? event-names) (EventNames. event-names)
-     (instance? EventNames
-                event-names)     event-names
-     :otherwise         (throw (IllegalArgumentException.
-                                (format "Invalid event-names: (%s) %s"
-                                        (class event-names) (pr-str event-names)))))
+     (nil?                 event-names)  EventNames/DEFAULT
+     (map?                 event-names) (EventNames. event-names)
+     (instance? EventNames event-names)              event-names
+     :else
+     (throw
+       (IllegalArgumentException.
+         (format "Invalid event-names: (%s) %s"
+           (class event-names) (pr-str event-names)))))
+
    bind-address))
 
 (def ^:dynamic ^:private *in-callback* false)

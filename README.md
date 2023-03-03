@@ -55,35 +55,41 @@ This default may be changed in a future breaking release. In the meantime, manua
 ```
 See `org.httpkit.client/*default-client*` docstring for more details.
 
-## Using Unix Domain Sockets in client and server
+## Unix Domain Sockets (UDSs)
 
-Java native Unix Domain Sockets are available since Java 17, so to maintain backwards compatibility with JVMs prior to this,
-resolving SocketAddresses and SocketChannels is pluggable in both client and server.
+http-kit >= 2.7 supports Unix Domain Sockets for both clients and servers  when running on [Java >= 16](https://openjdk.org/jeps/380).
 
-### Client of a Unix Domain Socket
+To use UDSs, plug in appropriate `java.net.SocketAddress` and `java.nio.channels.SocketChannel` constructor fns:
 
-To talk HTTP via a Unix Domain Socket at `/tmp/test.sock`, create your own implementations of `:address-finder` and `:channel-factory` in a customised client:
-
-```clojure
-(let [client (client/make-client {:address-finder (fn [uri]
-                                                    (UnixDomainSocketAddress/of "/tmp/test.sock"))
-                                  :channel-factory (fn [address]
-                                                      (SocketChannel/open StandardProtocolFamily/UNIX))})]
-   (client/get "http://foobar"))
-```
-
-### Listen on a Unix Domain Socket
-
-To listen on a Unix Domain Socket at `/tmp/test.sock`, create your own implementations of `:address-finder` and `:channel-factory` in a customized server:
+### UDS example: client
 
 ```clojure
-(let [server (server/run-server
-              routes
-              {:address-finder #(UnixDomainSocketAddress/of "/tmp/test.sock")
-               :channel-factory (fn [_]
-                       (ServerSocketChannel/open StandardProtocolFamily/UNIX))}))]
-   ...)
+(require '[org.httpkit.client :as hk-client])
+
+(let [my-uds-path "/tmp/test.sock"
+      my-client
+      (hk-client/make-client
+        {:address-finder  (fn [_uri]     (UnixDomainSocketAddress/of my-uds-path))
+         :channel-factory (fn [_address] (SocketChannel/open StandardProtocolFamily/UNIX))})]
+
+  (hk-client/get "http://foobar" {:client my-client}))
 ```
+
+### UDS example: server
+
+```clojure
+(require '[org.http-kit.server :as hk-server])
+
+(let [my-uds-path "/tmp/test.sock"
+      my-server
+      (hk-server/run-server my-routes
+        {:address-finder  (fn []         (UnixDomainSocketAddress/of my-uds-path))
+         :channel-factory (fn [_address] (ServerSocketChannel/open StandardProtocolFamily/UNIX))})]
+  <...>
+  )
+```
+
+See the [`make-client`](http://http-kit.github.io/http-kit/org.httpkit.client.html#var-make-client) and [`run-server`](http://http-kit.github.io/http-kit/org.httpkit.server.html#var-run-server) docstrings for more info.
 
 ## Hack locally
 
