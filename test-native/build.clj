@@ -1,15 +1,9 @@
 (ns build
-  (:require [clojure.tools.build.api :as b]
-            [clojure.edn :as edn]))
+  (:require [clojure.tools.build.api :as b]))
 
-(def project (-> (edn/read-string (slurp "deps.edn"))
-                 :aliases :neil :project))
-(def lib (or (:name project) 'my/native-test))
+(def lib 'my/native-test)
 
-;; use neil project set version 1.2.0 to update the version in deps.edn
-
-(def version (or (:version project)
-                 "0.0.1"))
+(def version "0.0.1")
 (def class-dir "target/classes")
 (def basis (b/create-basis {:project "deps.edn"}))
 (def uber-file (format "target/%s-%s-standalone.jar" (name lib) version))
@@ -29,5 +23,3 @@
            :basis basis
            :main 'native.test})
   (println "Created uberjar:" uber-file))
-
-
