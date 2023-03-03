@@ -91,26 +91,7 @@ To use UDSs, plug in appropriate `java.net.SocketAddress` and `java.nio.channels
 
 See the [`make-client`](http://http-kit.github.io/http-kit/org.httpkit.client.html#var-make-client) and [`run-server`](http://http-kit.github.io/http-kit/org.httpkit.server.html#var-run-server) docstrings for more info.
 
-## Hack locally
-
-Hacker friendly: zero dependencies, written from the ground-up with only ~3.5k lines of code (including java), clean and tidy.
-
-```sh
-# Modify as you want, unit tests back you up:
-lein test
-
-# May be useful (more info), see `server_test.clj`:
-./scripts/start_test_server
-
-# Some numbers on how fast can http-kit's client can run:
-lein test :benchmark
-```
-
-### Contact & Contribution
-
-Please use the [GitHub issues page](https://github.com/http-kit/http-kit/issues) for feature suggestions, bug reports, or general discussions. Current contributors are listed [here](https://github.com/http-kit/http-kit/graphs/contributors). The [project website][] is also on GitHub.
-
-## Native Image
+## GraalVM Native Image
 
 http-kit server and client are compatible with GraalVM's native-image compiler.
 
@@ -133,9 +114,28 @@ As of version `2.5.2` add the following flags:
 --initialize-at-run-time=org.httpkit.client.ClientSslEngineFactory\$SSLHolder
 ```
 
+## Hack locally
+
+http-kit is hacker friendly: zero dependencies, written from the ground-up with only ~3.5k lines of code (including Java).
+
+```sh
+# Modify as you want, unit tests back you up:
+lein test
+
+# May be useful (more info), see `server_test.clj`:
+./scripts/start_test_server
+
+# Some numbers on how fast can http-kit's client can run:
+lein test :benchmark
+```
+
+### Contact & contribution
+
+Please use the [GitHub issues page](https://github.com/http-kit/http-kit/issues) for feature suggestions, bug reports, or general discussions. Current contributors are listed [here](https://github.com/http-kit/http-kit/graphs/contributors). The [project website][] is also on GitHub.
+
 ## License
 
-Copyright &copy; 2012-2022 [@shenfeng][] and contributors. Distributed under the [Apache License Version 2.0](http://www.apache.org/licenses/LICENSE-2.0.html).
+Copyright &copy; 2012-2023 [@shenfeng][] and contributors. Distributed under the [Apache License Version 2.0](http://www.apache.org/licenses/LICENSE-2.0.html).
 
 [CHANGELOG]: https://github.com/http-kit/http-kit/releases
 [API]: http://http-kit.github.io/http-kit/
