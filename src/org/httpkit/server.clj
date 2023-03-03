@@ -7,6 +7,8 @@
            [java.nio.channels ServerSocketChannel]
            java.security.MessageDigest))
 
+(set! *warn-on-reflection* true)
+
 ;;;; Ring server
 
 (defprotocol IHttpServer
@@ -99,17 +101,22 @@
               legacy-return-value? true
               server-header "http-kit"}}]]
 
-  (let [err-logger
+  (let [^ContextLogger err-logger
         (if error-logger
           (reify ContextLogger (log [this message error] (error-logger message error)))
           (do    ContextLogger/ERROR_PRINTER))
 
-        evt-logger
+        ^ContextLogger warn-logger
+        (if warn-logger
+          (reify ContextLogger (log [this message error] (warn-logger message error)))
+          HttpServer/DEFAULT_WARN_LOGGER)
+
+        ^EventLogger evt-logger
         (if event-logger
           (reify EventLogger (log [this event] (event-logger event)))
           (do    EventLogger/NOP))
 
-        evt-names
+        ^EventNames evt-names
         (cond
           (nil?                 event-names)  EventNames/DEFAULT
           (map?                 event-names) (EventNames. event-names)
@@ -120,39 +127,38 @@
               (format "Invalid event-names: (%s) %s"
                 (class event-names) (pr-str event-names)))))
 
-        h
+        ^org.httpkit.server.IHandler h
         (if worker-pool
           (RingHandler. handler worker-pool err-logger evt-logger evt-names server-header)
           (RingHandler. thread handler worker-name-prefix queue-size server-header err-logger evt-logger evt-names))
 
-        proxy-enum
+        ^ProxyProtocolOption proxy-enum
         (case proxy-protocol
           :enable   ProxyProtocolOption/ENABLED
           :disable  ProxyProtocolOption/DISABLED
           :optional ProxyProtocolOption/OPTIONAL)
 
-        s (HttpServer.
+        ^HttpServer$AddressFinder address-finder
+        (if address-finder
+          (reify HttpServer$AddressFinder (findAddress [this] ^java.net.SocketAddress (address-finder)))
+          (reify HttpServer$AddressFinder (findAddress [this] (InetSocketAddress. ^String ip ^Long port))))
 
-            ^HttpServer$AddressFinder
-           (if address-finder
-             (reify HttpServer$AddressFinder (findAddress [this] (address-finder)))
-             (reify HttpServer$AddressFinder (findAddress [this] (InetSocketAddress. ip port))))
+        ^HttpServer$ServerChannelFactory channel-factory
+        (if channel-factory
+          (reify HttpServer$ServerChannelFactory (createChannel [this addr] (channel-factory addr)))
+          (reify HttpServer$ServerChannelFactory (createChannel [this addr] (ServerSocketChannel/open))))
 
-           ^HttpServer$ServerChannelFactory
-           (if channel-factory
-             (reify HttpServer$ServerChannelFactory (createChannel [this addr] (channel-factory addr)))
-             (reify HttpServer$ServerChannelFactory (createChannel [this addr] (ServerSocketChannel/open))))
+        ^ContextLogger warn-logger
+        (if warn-logger
+          (reify ContextLogger (log [this message error] (warn-logger message error)))
+          HttpServer/DEFAULT_WARN_LOGGER)
 
-           h max-body max-line max-ws proxy-enum server-header
-
-           err-logger
-           (if warn-logger
-             (reify ContextLogger (log [this message error] (warn-logger message error)))
-             HttpServer/DEFAULT_WARN_LOGGER)
-
-           evt-logger
-           evt-names)]
-
+        s (HttpServer. address-finder channel-factory h
+                       ^long max-body ^long max-line ^long max-ws proxy-enum ^String server-header
+                       warn-logger
+                       err-logger
+                       evt-logger
+                       evt-names)]
     (.start s)
 
     (if-not legacy-return-value?
