@@ -240,7 +240,7 @@ an SNI-capable one, e.g.:
          proxy-url nil
          auto-compression? true}}
    & [callback]]
-  (let [client (or client (force *default-client*))
+  (let [client (force (or client *default-client*))
         {:keys [url method headers body sslengine]} (coerce-req opts)
         deliver-resp #(deliver response ;; deliver the result
                                (try
