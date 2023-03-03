@@ -40,33 +40,43 @@
 (defn run-server
   "Starts a mostly[1] Ring-compatible HttpServer with options:
 
-    :ip                 ; Which ip (if has many ips) to bind
-    :port               ; Which port listen incomming request
+    :ip                 ; Which IP to bind (default: 0.0.0.0)
+    :port               ; Which port to listen to for incoming requests
+
+    :thread             ; HTTP worker thread count (default: 4)
+    :queue-size         ; Max jobs to queue before rejecting requests to protect self
+
+    :max-body           ; Max HTTP body size in bytes (default: 8MB)
+    :max-ws             ; Max WebSocket message size in bytes (default: 4MB)
+    :max-line           ; Max HTTP header line size in bytes (default: 8KB)
+
+    :proxy-protocol     ; Proxy protocol e/o #{:disable :enable :optional}
+    :worker-pool        ; `ExecutorService` to use for request-handling.
+                        ; If set, the following opts will be ignored:
+                        ; :thread, :worker-name-prefix, :queue-size
+    :worker-name-prefix ; Worker thread name prefix
+
+    :server-header      ; The \"Server\" header, disabled if nil. Default: \"http-kit\".
+
+    :error-logger       ; (fn [msg ex])  -> log errors
+    :warn-logger        ; (fn [msg ex])  -> log warnings
+    :event-logger       ; (fn [ev-name]) -> log events
+    :event-names        ; Map of http-kit event names to loggable event names
+
+    ;; These opts may be used for Unix Domain Socket (UDS) support, see README:
     :address-finder     ; (fn []) -> `java.net.SocketAddress` (ip/port ignored)
     :channel-factory    ; (fn [java.net.SocketAddress]) -> `java.nio.channels.SocketChannel`
-    :thread             ; Http worker thread count
-    :queue-size         ; Max job queued before reject to project self
-    :max-body           ; Max http body: 8m
-    :max-ws             ; Max websocket message size
-    :max-line           ; Max http inital line length
-    :proxy-protocol     ; Proxy protocol e/o #{:disable :enable :optional}
-    :worker-name-prefix ; Worker thread name prefix
-    :worker-pool        ; ExecutorService to use for request-handling (:thread,
-                          :worker-name-prefix, :queue-size are ignored if set)
-    :error-logger       ; Arity-2 fn (args: string text, exception) to log errors
-    :warn-logger        ; Arity-2 fn (args: string text, exception) to log warnings
-    :event-logger       ; Arity-1 fn (arg: string event name)
-    :event-names        ; map of HTTP-Kit event names to respective loggable event names
-    :server-header      ; The \"Server\" header. If missing, defaults to \"http-kit\", disabled if nil.
 
   If :legacy-return-value? is
     true  (default)     ; Returns a (fn stop-server [& {:keys [timeout] :or {timeout 100}}])
-    false (recommended) ; Returns the HttpServer which can be used with `server-port`,
+    false (recommended) ; Returns the `HttpServer` which can be used with `server-port`,
                         ; `server-status`, `server-stop!`, etc.
 
-  The server also supports the following JVM property:
+  The server also supports the following JVM properties:
 
-  org.http-kit.memmap-file-threshold   Files above this size (in MB) are mapped into memory for efficiency when served. Memory mapping could result to file locking. Defaults to 20 (MB).
+     `org.http-kit.memmap-file-threshold`
+       Files above this size (in MB) are mapped into memory for efficiency when served.
+       Memory mapping could result to file locking. Defaults to 20 (MB).
 
   [1] Ref. http://http-kit.org/migration.html for differences."
 
@@ -89,30 +99,37 @@
               legacy-return-value? true
               server-header "http-kit"}}]]
 
-  (let [err-logger (if error-logger
-                     (reify ContextLogger
-                       (log [this message error] (error-logger message error)))
-                     ContextLogger/ERROR_PRINTER)
-        evt-logger (if event-logger
-                     (reify EventLogger
-                       (log [this event] (event-logger event)))
-                     EventLogger/NOP)
-        evt-names  (cond
-                     (nil? event-names) EventNames/DEFAULT
-                     (map? event-names) (EventNames. event-names)
-                     (instance? EventNames
-                                event-names)     event-names
-                     :otherwise         (throw (IllegalArgumentException.
-                                                (format "Invalid event-names: (%s) %s"
-                                                        (class event-names) (pr-str event-names)))))
-        h (if worker-pool
-            (RingHandler. handler worker-pool err-logger evt-logger evt-names server-header)
-            (RingHandler. thread handler worker-name-prefix queue-size server-header err-logger evt-logger evt-names))
-        proxy-enum (case proxy-protocol
-                     :enable   ProxyProtocolOption/ENABLED
-                     :disable  ProxyProtocolOption/DISABLED
-                     :optional ProxyProtocolOption/OPTIONAL)
+  (let [err-logger
+        (if error-logger
+          (reify ContextLogger (log [this message error] (error-logger message error)))
+          (do    ContextLogger/ERROR_PRINTER))
 
+        evt-logger
+        (if event-logger
+          (reify EventLogger (log [this event] (event-logger event)))
+          (do    EventLogger/NOP))
+
+        evt-names
+        (cond
+          (nil?                 event-names)  EventNames/DEFAULT
+          (map?                 event-names) (EventNames. event-names)
+          (instance? EventNames event-names)              event-names
+          :else
+          (throw
+            (IllegalArgumentException.
+              (format "Invalid event-names: (%s) %s"
+                (class event-names) (pr-str event-names)))))
+
+        h
+        (if worker-pool
+          (RingHandler. handler worker-pool err-logger evt-logger evt-names server-header)
+          (RingHandler. thread handler worker-name-prefix queue-size server-header err-logger evt-logger evt-names))
+
+        proxy-enum
+        (case proxy-protocol
+          :enable   ProxyProtocolOption/ENABLED
+          :disable  ProxyProtocolOption/DISABLED
+          :optional ProxyProtocolOption/OPTIONAL)
 
         s (HttpServer.
 
