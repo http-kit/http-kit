@@ -3,7 +3,7 @@
              [clojure.string :as str])
   :init (do
           (def jar "target/native-test-0.0.1-standalone.jar")
-          (def native (if (fs/windows?)
+          (def binary (if (fs/windows?)
                         "native-test-0.0.1-standalone.exe"
                         "./native-test-0.0.1-standalone")))
   clean {:doc "Clean"
@@ -22,11 +22,11 @@
                 (clojure "-T:build uber"))}
   native {:doc "Compile native image"
           :depends [test:reflection uber]
-          :task (when (seq (fs/modified-since native jar))
+          :task (when (seq (fs/modified-since binary jar))
                   (shell "native-image"
                          "--initialize-at-build-time=clojure,org.httpkit,native"
                          "--no-fallback"
                                "-jar" jar))}
   test:native {:doc "Run native test"
                :depends [native]
-               :task (shell native)}}}
+               :task (shell binary)}}}
