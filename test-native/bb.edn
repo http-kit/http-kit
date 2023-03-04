@@ -1,24 +1,32 @@
 {:tasks
- {:requires ([babashka.fs :as fs])
+ {:requires ([babashka.fs :as fs]
+             [clojure.string :as str])
   :init (do
           (def jar "target/native-test-0.0.1-standalone.jar")
           (def native (if (fs/windows?)
                         "native-test-0.0.1-standalone.exe"
                         "./native-test-0.0.1-standalone")))
+  clean {:doc "Clean"
+         :task (do (fs/delete-tree "target")
+                   (fs/delete-tree "../target"))}
   prep {:doc "Prepares httpkit for usage in clj"
         :task (when-not (fs/exists? "../../target/classes")
                 (clojure "-X:deps prep"))}
+  test:reflection {:doc "Test reflection issues"
+                   :depends [prep]
+                   :task (let [err (:err (clojure {:err :string} "-M:dev -m native.test"))]
+                           (assert (not (str/includes? err "Reflection warning"))))}
   uber {:doc "Makes uberjar"
         :depends [prep]
         :task (when (seq (fs/modified-since jar ["src"]))
                 (clojure "-T:build uber"))}
-  native:build {:doc "Compile native image"
-                :depends [uber]
-                :task (when (seq (fs/modified-since native jar))
-                        (shell "native-image"
-                               "--initialize-at-build-time=clojure,org.httpkit,native"
-                               "--no-fallback"
+  native {:doc "Compile native image"
+          :depends [test:reflection uber]
+          :task (when (seq (fs/modified-since native jar))
+                  (shell "native-image"
+                         "--initialize-at-build-time=clojure,org.httpkit,native"
+                         "--no-fallback"
                                "-jar" jar))}
-  native:test {:doc "Run native test"
-               :depends [native:build]
+  test:native {:doc "Run native test"
+               :depends [native]
                :task (shell native)}}}

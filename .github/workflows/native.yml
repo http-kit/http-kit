@@ -42,4 +42,4 @@ jobs:
           restore-keys: cljdeps-
 
       - name: Test native
-        run: bb native:test
+        run: bb test:native
