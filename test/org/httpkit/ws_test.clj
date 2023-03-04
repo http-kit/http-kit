@@ -1,71 +1,66 @@
 (ns org.httpkit.ws-test
   (:use clojure.test
-        (compojure [core :only [defroutes GET POST HEAD DELETE ANY context]]
-                   [handler :only [site]]
-                   [route :only [not-found]])
+        (compojure [core :only [defroutes GET]]
+                   [handler :only [site]])
         org.httpkit.test-util
         org.httpkit.server)
-  (:require [clj-http.client :as http]
-            [org.httpkit.client :as client]
-            [http.async.client :as h]
-            [clj-http.util :as u])
+  (:require
+   [http.async.client :as h])
   (:import [org.httpkit.ws WebSocketClient]
            org.httpkit.SpecialHttpClient))
 
 (defn ws-handler [req]
-  (with-channel req con
-    (on-close con close-handler)
-    (on-receive con (fn [msg]
-                      (try
-                        (let [{:keys [length times]} (read-string msg)]
-                          (doseq [_ (range 0 times)]
-                            (send! con (subs const-string 0 length))))
-                        (catch Exception e
-                          (println e)
-                          (send! con msg)))))))
+  (as-channel req
+              {:on-close (fn [channel status]
+                           (close-handler status))
+               :on-receive (fn [channel msg]
+                             (try
+                               (let [{:keys [length times]} (read-string msg)]
+                                 (doseq [_ (range 0 times)]
+                                   (send! channel (subs const-string 0 length))))
+                               (catch Exception e
+                                 (println e)
+                                 (send! channel msg))))}))
 
 (defn ws-handler-async-client [req] ;; test with http.async.client, echo back
-  (with-channel req con
-    (on-receive con (fn [mesg]
-                      (send! con mesg)))))
+  (as-channel req
+              {:on-receive (fn [channel mesg]
+                             (send! channel mesg))}))
 
 (defn binary-ws-handler [req]
-  (with-channel req con
-    (on-receive con (fn [data]
-                      (let [retdata (doto (aclone ^bytes data) (java.util.Arrays/sort))
-                            data (if (rand-nth [true false])
-                                   (java.io.ByteArrayInputStream. retdata)
-                                   retdata)]
-                        (send! con data))))))
+  (as-channel req {:on-receive (fn [con data]
+                                 (let [retdata (doto (aclone ^bytes data) (java.util.Arrays/sort))
+                                       data (if (rand-nth [true false])
+                                              (java.io.ByteArrayInputStream. retdata)
+                                              retdata)]
+                                   (send! con data)))}))
 
 (defn ping-ws-handler [req]
-  (with-channel req con
-    (on-ping con (fn [data] (send! con (str "ECHO: " (String. data "UTF-8")))))))
+  (as-channel req
+              {:on-ping (fn [con data]
+                          (send! con (str "ECHO: " (String. data "UTF-8"))))}))
 
 (defn messg-order-handler [req]
-  (with-channel req con
-    (let [mesg-idx (atom 0)
-          h (fn [mesg]
-              (let [id (swap! mesg-idx inc)
-                    i (:id (read-string mesg))]
-                (send! con (str (= id i)))))]
-      (on-receive con h))))
+  (let [mesg-idx (atom 0)]
+    (as-channel req {:on-receive (fn [con mesg]
+                                   (let [id (swap! mesg-idx inc)
+                                         i (:id (read-string mesg))]
+                                     (send! con (str (= id i)))))})))
 
 (defn not-interleave-handler [req]
-  (with-channel req con
-    (on-receive con
-                (fn [mesg]
-                  (let [total (to-int mesg)]
-                    (doall (pmap (fn [length idx]
-                                   (let [length (+ length 1025)
-                                         c (char (+ (int \0) (rem length 30)))]
+  (as-channel req
+              {:on-receive (fn [con mesg]
+                             (let [total (to-int mesg)]
+                               (doall (pmap (fn [length idx]
+                                              (let [length (+ length 1025)
+                                                    c (char (+ (int \0) (rem length 30)))]
                                      ;; (Thread/sleep (rand-int (* 10 total)))
-                                     (send! con (apply str (concat (take 4 (concat
-                                                                            (str idx)
-                                                                            (repeat \0)))
-                                                                   (repeat length c))))))
-                                 (repeatedly total (partial rand-int (* 1024 1024)))
-                                 (range 10 1000))))))))
+                                                (send! con (apply str (concat (take 4 (concat
+                                                                                       (str idx)
+                                                                                       (repeat \0)))
+                                                                              (repeat length c))))))
+                                            (repeatedly total (partial rand-int (* 1024 1024)))
+                                            (range 10 1000)))))}))
 
 (defroutes test-routes
   (GET "/ws" [] ws-handler)

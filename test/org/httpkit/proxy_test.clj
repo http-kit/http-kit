@@ -1,5 +1,5 @@
 (ns org.httpkit.proxy-test
-  (:use [org.httpkit.server :only [run-server with-channel send!]]
+  (:use [org.httpkit.server :only [run-server as-channel send!]]
         [org.httpkit.client :only [request]]))
 
 (defn- proxy-opts [req]
@@ -14,9 +14,9 @@
    :body (:body req)})
 
 (defn handler [req]
-  (with-channel req channel
+  (as-channel req
     (request (proxy-opts req)
-             (fn [{:keys [status headers body error]}]
+             (fn [channel {:keys [status headers body error]}]
                (if error
                  (send! channel {:status 503
                                  :headers {"Content-Type" "text/plain"}
