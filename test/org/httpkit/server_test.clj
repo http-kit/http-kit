@@ -4,15 +4,14 @@
         org.httpkit.test-util
         [clojure.java.io :only [input-stream]]
         [ring.adapter.jetty :only [run-jetty]]
-        (compojure [core :only [defroutes GET POST HEAD DELETE ANY context]]
+        (compojure [core :only [defroutes GET POST ANY context]]
                    [handler :only [site]])
         org.httpkit.server
         org.httpkit.timer)
   (:require [clj-http.client :as http]
             [org.httpkit.ws-test :as ws]
-            [org.httpkit.client :as client]
-            [clj-http.util :as u])
-  (:import [java.io File FileOutputStream FileInputStream]
+            [org.httpkit.client :as client])
+  (:import [java.io FileInputStream]
            org.httpkit.SpecialHttpClient
            [java.net InetSocketAddress]
            [java.nio.channels ServerSocketChannel]
@@ -51,64 +50,68 @@
      :body (str title ": " (:size file))}))
 
 (defn async-handler [req]
-  (with-channel req channel
-    (send! channel {:status 200 :body "hello async"})))
+  (as-channel req {:on-open
+                   #(send! % {:status 200 :body "hello async"})}))
 
 (defn async-just-body [req]
-  (with-channel req channel
-    (send! channel "just-body")))
-
-(defn async-response-handler [req]
-  (with-channel req channel
-    (send! channel {:status 200 :body "hello async"})))
+  (as-channel req {:on-open
+                   #(send! % "just-body")}))
 
 (defn streaming-handler [req]
   (let [s (or (-> req :params :s) (subs const-string 0 1024))
         n (+ (rand-int 128) 10)
         seqs (partition n n '() s)]     ; padding with empty
-    (with-channel req channel
-      (on-close channel close-handler)
-      (send! channel (first seqs) false)
-      (doseq [p (rest seqs)]
-        ;; should only pick the body if a map
-        (send! channel (if (rand-nth [true false])
-                         p
-                         {:body p})
-               false))        ;; do not close
-      (send! channel "" true) ;; same as (close channel)
-      )))
+    (as-channel req
+                {:on-close (fn [channel status]
+                             (close-handler status))
+                 :on-open
+                 (fn [channel]
+                   (send! channel (first seqs) false)
+                   (doseq [p (rest seqs)]
+                     ;; should only pick the body if a map
+                     (send! channel (if (rand-nth [true false])
+                                 p
+                                 {:body p})
+                            false)) ;; do not close
+                   (send! channel "" true))} ;; same as (close channel)
+                )))
 
 (defn slow-server-handler [req]
-  (with-channel req channel
-    (on-close channel close-handler)
-    (send! channel "hello world")
-    (schedule-task 10     ; 10ms
-                   (send! channel "hello world 2"))
-    (schedule-task 20
-                   (send! channel "finish")
-                   (close channel))))
+  (as-channel req
+              {:on-close
+               (fn [channel status]
+                 (close-handler status))
+               :on-open (fn [channel]
+                          (send! channel "hello world")
+                          (schedule-task 10     ; 10ms
+                                         (send! channel "hello world 2"))
+                          (schedule-task 20
+                                         (send! channel "finish")
+                                         (close channel)))}))
 
 (defn async-with-timeout [req]
   (let [time (to-int (-> req :params :time))
         cancel (-> req :params :cancel)]
-    (with-channel req channel
-      (with-timeout send! time
-        (send! channel {:status 200
-                        :body (str time "ms")})
-        (when cancel
-          (send! channel {:status 200 ; should return ok
-                          :body "canceled"}))))))
+    (as-channel req
+                {:on-open (fn [channel]
+                            (with-timeout send! time
+                              (send! channel {:status 200
+                                              :body (str time "ms")})
+                              (when cancel
+                                (send! channel {:status 200 ; should return ok
+                                                :body "canceled"}))))})))
 
 (defn streaming-demo [request]
   (let [time (Integer/valueOf (or ^String (-> request :params :i) 200))]
-    (with-channel request channel
-      (on-close channel (fn [status]
-                          (println channel "closed" status)))
-      (let [id (atom 0)]
-        ((fn sent-messge []
-           (send! channel (str "message from server #" (swap! id inc)))
-           (when (open? channel)
-             (schedule-task time (sent-messge)))))))))
+    (as-channel request
+                {:on-close (fn [channel status]
+                             (println channel "closed" status))
+                 :on-open (fn [channel]
+                            (let [id (atom 0)]
+                              ((fn sent-messge []
+                                 (send! channel (str "message from server #" (swap! id inc)))
+                                 (when (open? channel)
+                                   (schedule-task time (sent-messge)))))))})))
 
 (defroutes test-routes
   (GET "/" [] "hello world")
@@ -126,8 +129,9 @@
                                    :body '()}))
   (GET "/file" [] (wrap-file-info file-handler))
   (GET "/ws" [] (fn [req]
-                  (with-channel req con
-                    (on-receive con (fn [mesg] (send! con mesg))))))
+                  (as-channel req
+                              {:on-receive (fn [channel mesg]
+                                             (send! channel mesg))})))
   (context "/ws2" [] ws/test-routes)
   (GET "/inputstream" [] inputstream-handler)
   (GET "/bytearray" [] bytearray-handler)
@@ -146,7 +150,6 @@
   (GET "/async" [] async-handler)
   (GET "/slow" [] slow-server-handler)
   (GET "/streaming" [] streaming-handler)
-  (GET "/async-response" [] async-response-handler)
   (GET "/async-just-body" [] async-just-body)
   (GET "/i-set-date" [] (fn [req] {:status 200
                                    :headers {"Date" "Tue, 7 Mar 2017 19:52:50 GMT"}
@@ -272,11 +275,6 @@
 
 (deftest test-async
   (let [resp (http/get "http://localhost:4347/async")]
-    (is (= (:status resp) 200))
-    (is (= (:body resp) "hello async"))))
-
-(deftest test-async-response
-  (let [resp (http/get "http://localhost:4347/async-response")]
     (is (= (:status resp) 200))
     (is (= (:body resp) "hello async"))))
 
@@ -490,37 +488,40 @@
           resp-200  (fn [body] {:status 200, :headers {"Content-Type" "text/plain"}, :body body})
           server
           (run-server
-            (fn [req]
-              (case (:uri req)
-                "/0"
-                (with-channel req ch
-                  (let [resp (resp-200 "0")]
-                    (reset! ch_ ch) ; Hold channel!
-                    (capture! (send! ch resp)) ; Will close @ch_
-                    (capture! (send! ch resp))))
+           (fn [req]
+             (case (:uri req)
+               "/0"
+               (as-channel req
+                           {:on-open
+                            (fn [ch]
+                              (let [resp (resp-200 "0")]
+                                (reset! ch_ ch) ; Hold channel!
+                                (capture! (send! ch resp)) ; Will close @ch_
+                                (capture! (send! ch resp))))})
 
-                "/1"
-                (with-channel req ch
-                  (let [resp (resp-200 "1")]
-                    (capture! (send! @ch_ resp)) ; Try re-use @ch_
-                    (do       (send!  ch  resp))))
+               "/1"
+               (as-channel req {:on-open
+                                (fn [ch]
+                                  (let [resp (resp-200 "1")]
+                                    (capture! (send! @ch_ resp)) ; Try re-use @ch_
+                                    (send!  ch  resp)))})
 
-                "/2" ; Fully sync response, without `with-channel`
-                (let [resp (resp-200 "2")]
-                  (capture! (send! @ch_ resp)) ; Try re-use @ch_
-                  (do                   resp))))
+               "/2" ; Fully sync response, without `as-channel`
+               (let [resp (resp-200 "2")]
+                 (capture! (send! @ch_ resp)) ; Try re-use @ch_
+                 resp)))
 
             ;; Thread count irrelevant
-            {:port 3474, :thread 1})]
+           {:port 3474, :thread 1})]
 
       (reset! tmp-server server) ; For convenience during REPL/testing
 
       (dotimes [n 3]
         ;; Requests to: /0, /1, /2
         (http/get (str "http://localhost:3474/" n)
-          {:async? true}
-          (fn cb [resp] (swap! responses_ #(assoc % n resp)))
-          (fn cb [ex]   (swap! responses_ #(assoc % n   ex))))
+                  {:async? true}
+                  (fn cb [resp] (swap! responses_ #(assoc % n resp)))
+                  (fn cb [ex]   (swap! responses_ #(assoc % n   ex))))
         (Thread/sleep 50))
 
       (Thread/sleep 100)
@@ -528,12 +529,12 @@
 
       ;; After the first `send!`, @ch_ should *stay* closed,
       ;; and further attempts to `send!` to @ch_ should fail.
-      (is (= @captured_ [true false false false]))
+      (is (= [true false false false] @captured_))
 
       ;; Each req to uri /N should return body "N"
-      (is (= (:body (get @responses_ 0)) "0"))
-      (is (= (:body (get @responses_ 1)) "1"))
-      (is (= (:body (get @responses_ 2)) "2")))))
+      (is (= "0" (:body (get @responses_ 0))))
+      (is (= "1" (:body (get @responses_ 1))))
+      (is (= "2" (:body (get @responses_ 2)))))))
 
 (defroutes custom-routes
   (GET "/" [] "hello world"))
