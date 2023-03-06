@@ -1,11 +1,14 @@
 (ns org.httpkit.server
-  (:require [org.httpkit.encode :refer [base64-encode]]
-            [clojure.string :as str])
-  (:import [org.httpkit.server AsyncChannel HttpServer RingHandler ProxyProtocolOption HttpServer$AddressFinder HttpServer$ServerChannelFactory]
-           [org.httpkit.logger ContextLogger EventLogger EventNames]
-           [java.net InetSocketAddress]
-           [java.nio.channels ServerSocketChannel]
-           java.security.MessageDigest))
+  (:require
+   [clojure.string :as str]
+   [org.httpkit.encode :refer [base64-encode]])
+
+  (:import
+   [org.httpkit.server AsyncChannel HttpServer RingHandler ProxyProtocolOption HttpServer$AddressFinder HttpServer$ServerChannelFactory]
+   [org.httpkit.logger ContextLogger EventLogger EventNames]
+   [java.net InetSocketAddress]
+   [java.nio.channels ServerSocketChannel]
+   java.security.MessageDigest))
 
 (set! *warn-on-reflection* true)
 

@@ -1,15 +1,18 @@
 (ns org.httpkit.client
   (:refer-clojure :exclude [get proxy])
-  (:require [clojure.string :as str]
-            [org.httpkit.encode :refer [base64-encode]])
-  (:use [clojure.walk :only [prewalk]])
-  (:import [org.httpkit.client HttpClient HttpClient$AddressFinder HttpClient$ChannelFactory HttpClient$SSLEngineURIConfigurer IResponseHandler RespListener IFilter RequestConfig]
-           [org.httpkit.logger ContextLogger EventLogger EventNames]
-           [org.httpkit HttpMethod PrefixThreadFactory HttpUtils]
-           [java.util.concurrent ThreadPoolExecutor LinkedBlockingQueue TimeUnit]
-           [java.net URI URLEncoder]
-           [org.httpkit.client ClientSslEngineFactory MultipartEntity]
-           [javax.net.ssl SSLContext SSLEngine]))
+  (:require
+   [clojure.string :as str]
+   [clojure.walk   :as walk]
+   [org.httpkit.encode :refer [base64-encode]])
+
+  (:import
+   [org.httpkit.client HttpClient HttpClient$AddressFinder HttpClient$ChannelFactory HttpClient$SSLEngineURIConfigurer IResponseHandler RespListener IFilter RequestConfig]
+   [org.httpkit.logger ContextLogger EventLogger EventNames]
+   [org.httpkit HttpMethod PrefixThreadFactory HttpUtils]
+   [java.util.concurrent ThreadPoolExecutor LinkedBlockingQueue TimeUnit]
+   [java.net URI URLEncoder]
+   [org.httpkit.client ClientSslEngineFactory MultipartEntity]
+   [javax.net.ssl SSLContext SSLEngine]))
 
 ;;;; Utils
 
@@ -33,16 +36,19 @@
 (defn- prepare-response-headers [headers]
   (reduce (fn [m [k v]] (assoc m (keyword k) v)) {} headers))
 
-;;; {:a {:b 1 :c [1 2 3]}} => {"a[b]" 1, "a[c]" [1 2 3]}
-(defn- nested-param [params]            ; code copyed from clj-http
-  (prewalk (fn [d]
-             (if (and (vector? d) (map? (second d)))
-               (let [[fk m] d]
-                 (reduce (fn [m [sk v]]
-                           (assoc m (str (name fk) \[ (name sk) \]) v))
-                         {} m))
-               d))
-           params))
+(defn- nested-param
+  "{:a {:b 1 :c [1 2 3]}} => {\"a[b]\" 1, \"a[c]\" [1 2 3]}, etc."
+  [params]
+  ;; Code copied from clj-http
+  (walk/prewalk
+    (fn [d]
+      (if (and (vector? d) (map? (second d)))
+        (let [[fk m] d]
+          (reduce (fn [m [sk v]]
+                    (assoc m (str (name fk) \[ (name sk) \]) v))
+            {} m))
+        d))
+    params))
 
 (defn query-string
   "Returns URL-encoded query string for given params map."
