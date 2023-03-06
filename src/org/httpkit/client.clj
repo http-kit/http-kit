@@ -285,6 +285,7 @@ an SNI-capable one, e.g.:
 
                     (request
                       (assoc opts
+                        :client          client ; Retain current dynamic client, Ref. #464
                         :url             redirect-location
                         :response        response
                         :query-params    (if change-to-get?  nil (:query-params opts))
