@@ -198,8 +198,6 @@ an SNI-capable one, e.g.:
   The latter will be delivered on client errors only, not on http errors which will be
   contained in the :status of the first.
 
-  When unspecified, `callback` is the identity
-
   ;; Asynchronous GET request (returns a promise)
   (request {:url \"http://www.cnn.com\"})
 
@@ -221,7 +219,7 @@ an SNI-capable one, e.g.:
 
   Returned body type is controlled by `:as` option:
 
-   Without automatic unzipping:
+    Without automatic unzipping:
       `:none`           - org.httpkit.DynamicBytes
       `:raw-byte-array` - bytes[]
 
@@ -234,80 +232,99 @@ an SNI-capable one, e.g.:
   Request options:
     :url :method :headers :timeout :connect-timeout :idle-timeout :query-params
     :as :form-params :client :body :basic-auth :user-agent :filter :worker-pool"
+
   [{:keys [client timeout connect-timeout idle-timeout filter worker-pool keepalive as follow-redirects
            max-redirects response trace-redirects allow-unsafe-redirect-methods proxy-host proxy-port
            proxy-url tunnel? deadlock-guard? auto-compression?]
     :as opts
-    :or {connect-timeout 60000
-         idle-timeout 60000
-         follow-redirects true
-         max-redirects 10
-         filter IFilter/ACCEPT_ALL
-         worker-pool default-pool
-         response (promise)
-         keepalive 120000
-         as :auto
-         tunnel? false
-         deadlock-guard? true
-         proxy-host nil
-         proxy-port -1
-         proxy-url nil
-         auto-compression? true}}
+    :or
+    {connect-timeout 60000
+     idle-timeout 60000
+     follow-redirects true
+     max-redirects 10
+     filter IFilter/ACCEPT_ALL
+     worker-pool default-pool
+     response (promise)
+     keepalive 120000
+     as :auto
+     tunnel? false
+     deadlock-guard? true
+     proxy-host nil
+     proxy-port -1
+     proxy-url nil
+     auto-compression? true}}
+
    & [callback]]
+
   (let [client (force (or client *default-client*))
         {:keys [url method headers body sslengine]} (coerce-req opts)
-        deliver-resp #(deliver response ;; deliver the result
-                               (try
-                                 (binding [*in-callback* true]
-                                   ((or callback identity) %1))
-                                 (catch Throwable e
-                                   ;; dump stacktrace to stderr
-                                   (HttpUtils/printError (str method " " url "'s callback") e)
-                                   ;; return the error
-                                   {:opts opts :error e})))
-        handler (reify IResponseHandler
-                  (onSuccess [this status headers body]
-                    (if (and follow-redirects
-                             (#{301 302 303 307 308} status)) ; should follow redirect
-                      (if (>= max-redirects (count trace-redirects))
-                        (if-let [^String location-header (.get headers "location")]
-                          (let [redirect-location (str (.resolve (URI. url) location-header))
-                                change-to-get (and (not allow-unsafe-redirect-methods)
-                                                   (#{301 302 303} status))]
-                            (request (assoc opts          ; follow 301 and 302 redirect
-                                       :url redirect-location
-                                       :response response
-                                       :query-params (if change-to-get nil (:query-params opts))
-                                       :form-params (if change-to-get nil (:form-params opts))
-                                       :method (if change-to-get
-                                                 :get     ;; change to :GET
-                                                 (:method opts)) ;; do not change
-                                       :trace-redirects (conj trace-redirects url))
-                              callback))
-                          (deliver-resp {:opts  (dissoc opts :response)
-                                         :error (Exception. (str "No location header is present on redirect response"))}))
-                        (deliver-resp {:opts  (dissoc opts :response)
-                                       :error (Exception. (str "too many redirects: "
-                                                               (count trace-redirects)))}))
-                      (deliver-resp {:opts    (dissoc opts :response)
-                                     :body    body
-                                     :headers (prepare-response-headers headers)
-                                     :status  status})))
-                  (onThrowable [this t]
-                    (deliver-resp {:opts opts :error t})))
-        listener (RespListener. handler filter worker-pool
-                                ;; 0 will return as DynamicBytes and 5 returns bytes[] - i.e. you will need to handle unzip yourself
-                                ;; otherwise, there are 5 coercions supported for now
-                                (case as :none 0 :auto 1 :text 2 :stream 3 :byte-array 4 :raw-byte-array 5))
+
+        deliver-resp
+        (fn [resp]
+          (deliver response
+            (if callback
+              (try
+                (binding [*in-callback* true] (callback resp))
+                (catch Throwable t
+                  (HttpUtils/printError (str method " " url "'s callback") t)
+                  {:opts opts :error t}))
+              resp)))
+
+        handler
+        (reify IResponseHandler
+          (onThrowable [this t] (deliver-resp {:opts opts :error t}))
+          (onSuccess [this status headers body]
+            (if-let [follow-redirect? (and follow-redirects (#{301 302 303 307 308} status))]
+
+              ;; Follow redirect
+              (if (>= max-redirects (count trace-redirects))
+                (if-let [^String location-header (.get headers "location")]
+
+                  (let [redirect-location (str (.resolve (URI. url) location-header))
+                        change-to-get? (and (not allow-unsafe-redirect-methods) (#{301 302 303} status))]
+
+                    (request
+                      (assoc opts
+                        :url             redirect-location
+                        :response        response
+                        :query-params    (if change-to-get?  nil (:query-params opts))
+                        :form-params     (if change-to-get?  nil (:form-params  opts))
+                        :method          (if change-to-get? :get (:method       opts))
+                        :trace-redirects (conj trace-redirects url))
+                      callback))
+
+                  (deliver-resp
+                    {:opts  (dissoc opts :response)
+                     :error (Exception. (str "No location header is present on redirect response"))}))
+
+                (deliver-resp
+                  {:opts  (dissoc opts :response)
+                   :error (Exception. (str "too many redirects: " (count trace-redirects)))}))
+
+              ;; Don't follow redirect
+              (deliver-resp
+                {:opts    (dissoc opts :response)
+                 :body    body
+                 :headers (prepare-response-headers headers)
+                 :status  status}))))
+
+        listener
+        (RespListener. handler filter worker-pool
+          ;; 0 will return as DynamicBytes and 5 returns bytes[] - i.e. you will need to handle unzip yourself
+          ;; otherwise, there are 5 coercions supported for now
+          (case as :none 0 :auto 1 :text 2 :stream 3 :byte-array 4 :raw-byte-array 5))
+
         effective-proxy-url (if proxy-host (str proxy-host ":" proxy-port) proxy-url)
         connect-timeout (or timeout connect-timeout)
         idle-timeout    (or timeout idle-timeout)
         cfg (RequestConfig. method headers body connect-timeout idle-timeout
               keepalive effective-proxy-url tunnel? auto-compression?)]
+
     (.exec ^HttpClient client url cfg sslengine listener)
+
     (if deadlock-guard?
       (deadlock-guard response)
-      response)))
+      (do             response))))
 
 (defmacro ^:private defreq [method]
   `(defn ~method
