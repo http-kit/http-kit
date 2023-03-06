@@ -12,7 +12,8 @@
   (:require [clj-http.client :as clj-http]
             [clojure.java.io :as io]
             [org.httpkit.client :as http]
-            [org.httpkit.sni-client :as sni])
+            [org.httpkit.sni-client :as sni]
+            [org.httpkit.utils :as utils])
   (:import [java.nio.channels SocketChannel]
            java.nio.ByteBuffer
            java.nio.charset.StandardCharsets
@@ -353,7 +354,7 @@
                  :keepalive -1
                  :url url0}))))
 
-      (when (>= @@#'sni/java-version_ 11)
+      (when (utils/java-version>= 11)
         ;; Specific type depends on JVM version- could be e/o
         ;; #{SSLHandshakeException RuntimeException ...}
         (is (instance? Exception

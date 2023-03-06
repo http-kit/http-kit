@@ -1,44 +1,16 @@
 (ns org.httpkit.sni-client
   "Provides an SNI-capable SSL configurer and client, Ref. #335.
   In a separate namespace from `org.httpkit.client` so that
-  http-kit can retain backwards-compatibility with JVM < 8."
-  (:require [org.httpkit.client])
+  http-kit can retain backwards-compatibility with JVM < 8.
+
+  NB hostname verification currently requires Java version >= 11."
+  (:require
+   [org.httpkit.client]
+   [org.httpkit.utils :as utils])
+
   (:import
    [java.net URI]
    [javax.net.ssl SNIHostName SSLEngine SSLParameters]))
-
-(defn- parse-java-version
-  "Ref. https://stackoverflow.com/a/2591122"
-  [^String s]
-
-  (let [dot-idx (.indexOf s ".")    ; e.g. "1.6.0_23"
-        dash-idx (.indexOf s "-")]  ; e.g. "16-ea"
-    (cond
-      (.startsWith s "1.") ; e.g. "1.6.0_23"
-      (Integer/parseInt (.substring s 2 3))
-
-      (pos? dot-idx)
-      (Integer/parseInt (.substring s 0 dot-idx))
-
-      (pos? dash-idx)
-      (Integer/parseInt (.substring s 0 dash-idx))
-
-      :else
-      (Integer/parseInt s))))
-
-(comment
-  (parse-java-version "1.6.0_23")  ; 6
-  (parse-java-version "1.8.0_302") ; 8
-  (parse-java-version "9.0.1")     ; 9
-  (parse-java-version "11.0.12")   ; 11
-  (parse-java-version "16-ea")     ; 16
-  (parse-java-version "17")        ; 17
-  )
-
-(def ^:private java-version_
-  (delay (parse-java-version (str (System/getProperty "java.version")))))
-
-(comment @java-version_)
 
 (defn ssl-configurer
   "SNI-capable SSL configurer.
@@ -47,7 +19,7 @@
   ([ssl-engine uri] (ssl-configurer {} ssl-engine uri))
   ([{:keys [hostname-verification? sni?] :as opts
      :or   {;; TODO Better option/s than hacky version check?
-            hostname-verification? (>= @java-version_ 11)
+            hostname-verification? (utils/java-version>= 11)
             sni?                   true}}
     ^SSLEngine ssl-engine ^URI uri]
 
@@ -57,14 +29,14 @@
                                     [(SNIHostName. (.getHost uri))]))
 
      ;; TODO Better option/s than hacky version check?
-     (when (and (>= @java-version_ 11) (not (.getUseClientMode ssl-engine)))
+     (when (and (utils/java-version>= 11) (not (.getUseClientMode ssl-engine)))
        (.setUseClientMode ssl-engine true))
 
      (doto ssl-engine
        (.setSSLParameters ssl-params)))))
 
 (defonce
-  ^{:doc "Like `org.httpkit.client/default-client`, but provides SNI support using `ssl-configurer`. NB Hostname verification currently requires Java version >= 11."}
+  ^{:doc "Like `org.httpkit.client/default-client`, but provides SNI support using `ssl-configurer`."}
   default-client
   (delay
     (org.httpkit.client/make-client
