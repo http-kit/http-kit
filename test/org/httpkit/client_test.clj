@@ -93,19 +93,28 @@
                                {:headers {"x-sent-accept-encoding" (get-in req [:headers "accept-encoding"])}
                                 :status  200})))
 
+(defn- start-test-servers []
+  (let [running?_       (atom true)
+        http-kit-server (run-server (site test-routes) {:port 4347})
+        jetty-server    (run-jetty  (site test-routes)
+                          {:port         14347
+                           :join?        false
+                           :ssl-port     9898
+                           :ssl?         true
+                           :key-password "123456"
+                           :keystore     "test/ssl_keystore"})]
+    (fn stop []
+      (when (compare-and-set! running?_ true false)
+        (http-kit-server)
+        (.stop jetty-server)
+        true))))
+
 (use-fixtures :once
   (fn [f]
-    (let [server (run-server (site test-routes) {:port 4347})
-          jetty (run-jetty (site test-routes) {:port 14347
-                                               :join? false
-                                               :ssl-port 9898
-                                               :ssl? true
-                                               :key-password "123456"
-                                               :keystore "test/ssl_keystore"})]
-      (try (f) (finally (server) (.stop jetty))))))
+    (let [stop-fn (start-test-servers)]
+      (try (f) (finally (stop-fn))))))
 
-(comment
-  (defonce server1 (run-server (site test-routes) {:port 4347})))
+(comment (defonce test-servers (start-test-servers)))
 
 (defmacro bench [title & forms]
   `(let [start# (. System (nanoTime))]
