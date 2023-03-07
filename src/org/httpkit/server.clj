@@ -1,7 +1,8 @@
 (ns org.httpkit.server
   (:require
    [clojure.string :as str]
-   [org.httpkit.encode :refer [base64-encode]])
+   [org.httpkit.encode :refer [base64-encode]]
+   [org.httpkit.utils :as utils])
 
   (:import
    [org.httpkit.server AsyncChannel HttpServer RingHandler ProxyProtocolOption HttpServer$AddressFinder HttpServer$ServerChannelFactory]
@@ -41,6 +42,10 @@
 
   ([http-server     ] (-server-stop! http-server nil))
   ([http-server opts] (-server-stop! http-server opts)))
+
+(def ^:private ^:experimental get-virtual-executor
+  (utils/try-eval
+    (fn [] (java.util.concurrent.Executors/newVirtualThreadPerTaskExecutor))))
 
 (defn run-server
   "Starts a mostly[1] Ring-compatible HttpServer with options:
@@ -132,7 +137,14 @@
 
         ^org.httpkit.server.IHandler h
         (if worker-pool
-          (RingHandler. handler worker-pool err-logger evt-logger evt-names server-header)
+          (let [worker-pool
+                (if (= worker-pool :experimental/virtual)
+                  (if-let [f get-virtual-executor]
+                    (f)
+                    (throw (ex-info "No virtual threads support detected" {})))
+                  worker-pool)]
+
+            (RingHandler. handler worker-pool err-logger evt-logger evt-names server-header))
           (RingHandler. thread handler worker-name-prefix queue-size server-header err-logger evt-logger evt-names))
 
         ^ProxyProtocolOption proxy-enum
