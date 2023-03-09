@@ -24,17 +24,3 @@
   (delay (parse-java-version (str (System/getProperty "java.version")))))
 
 (defn java-version>= [n] (>= ^long @java-version_ (long n)))
-
-(defmacro compile-if
-  "Evaluates `test`. If it returns logical true (and doesn't throw), expands
-  to `then`, otherwise expands to `else`."
-  ;; Copied from `taoensso.encore`
-  [test then else]
-  (if (try (eval test) (catch Throwable _ false))
-    `(do ~then)
-    `(do ~else)))
-
-(defmacro try-eval
-  "Evaluates `form`. If eval doesn't throw, expands to `form`, otherwise to nil."
-  ;; Copied from `taoensso.encore`
-  [form] `(compile-if ~form ~form nil))
