@@ -93,7 +93,7 @@ See the [`make-client`](http://http-kit.github.io/http-kit/org.httpkit.client.ht
 
 ## GraalVM Native Image
 
-http-kit server and client are compatible with GraalVM's native-image compiler. See the [test-native](test-native) project which is ran in CI.
+http-kit server and client are compatible with GraalVM Native Image. See the [test-native](test-native) project which is ran in CI.
 
 ## Hack locally
 
