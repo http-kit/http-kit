@@ -93,26 +93,7 @@ See the [`make-client`](http://http-kit.github.io/http-kit/org.httpkit.client.ht
 
 ## GraalVM Native Image
 
-http-kit server and client are compatible with GraalVM's native-image compiler.
-
-To ensure the image can build, provide the following options to the native-image compiler:
-
-### Reflection
-
-In your reflection-config.json
-
-```json
-{"name": "java.lang.reflect.AccessibleObject",
- "methods" : [{"name":"canAccess"}]}
-```
-
-### Class initialization
-
-As of version `2.5.2` add the following flags:
-
-```sh
---initialize-at-run-time=org.httpkit.client.ClientSslEngineFactory\$SSLHolder
-```
+http-kit server and client are compatible with GraalVM Native Image. See the [test-native](test-native) project which is ran in CI.
 
 ## Hack locally
 
