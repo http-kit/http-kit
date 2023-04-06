@@ -1,29 +1,26 @@
-# HTTP Kit
+# http-kit
 
 ![github actions](https://github.com/http-kit/http-kit/actions/workflows/build.yml/badge.svg)
 
-### A simple, high-performance event-driven HTTP client+server for Clojure
+### Simple, high-performance event-driven HTTP client+server for Clojure
 
 **[CHANGELOG][]** | [API][] | current [Break Version][]:
 
 ```clojure
-[http-kit "2.6.0"]  ; Published by contributors, see CHANGELOG for details (stable)
-[http-kit "2.1.19"] ; Legacy, published by @shenfeng
+[http-kit "2.6.0"]  ; See CHANGELOG for details
 ```
 
 ## Project status
 
-http-kit's author ([@shenfeng][]) unfortunately hasn't had much time to maintain http-kit recently. To help out I'll be doing basic issue triage, accepting minor/obvious PRs, etc.
+http-kit was created by [@shenfeng][], but is currently being maintained by its community.
 
-A big thank you to the **[current contributors](https://github.com/http-kit/http-kit/graphs/contributors)** for keeping the project going! **Additional contributors welcome**: please ping me if you'd be interested in lending a hand.
+A big thank-you to the [current contributors](https://github.com/http-kit/http-kit/graphs/contributors) for keeping the project going! **Additional contributors very welcome**: please ping me if you'd be interested in lending a hand.
 
-See the (unmaintained, outdated) [project website][] for original documentation, examples, benchmarks, etc.
-
-\- [@ptaoussanis][]
+\- [Peter Taoussanis][@ptaoussanis]
 
 ## Features
 
-- **Ring compliant**: HTTP Kit is an [(almost)](http://http-kit.github.io/migration.html) drop-in replacement for the standard Ring Jetty adapter. So you can use it with all your current libraries (e.g. [Compojure](http://http-kit.github.io/server.html#routing)) and middleware.
+- **Ring compliant**: http-kit is an [(almost)](http://http-kit.github.io/migration.html) drop-in replacement for the standard Ring Jetty adapter. So you can use it with all your current libraries (e.g. [Compojure](http://http-kit.github.io/server.html#routing)) and middleware.
 
 - **High performance**: Using an event-driven architecture like Nginx, HTTP-kit is [very, very fast](https://github.com/ptaoussanis/clojure-web-server-benchmarks). It comfortably handles tens of thousands of requests/sec on even midrange hardware. [Here](http://www.techempower.com/benchmarks/#section=data-r3) is another test about how it stacks up with others.
 
@@ -31,9 +28,11 @@ See the (unmaintained, outdated) [project website][] for original documentation,
 
 - **Clean, simple, small**: Written from the ground-up to be lean, the entire client/server is available as a single ~90kB JAR with zero dependencies and [~3k lines](http://http-kit.github.io/http-kit-clean-small.html) of (mostly Java) code.
 
-- **Sync or async**: Synchronous is simple. Asynchronous is fast & flexible. With HTTP Kit you get the best of both with a [simple API](http://http-kit.github.io/client.html) that lets you mix & match to best fit your use case.
+- **Sync or async**: Synchronous is simple. Asynchronous is fast & flexible. With http-kit you get the best of both with a [simple API](http://http-kit.github.io/client.html) that lets you mix & match to best fit your use case.
 
 - **WebSockets and Comet**: With great out-the-box support for both [WebSockets](http://http-kit.github.io/server.html#websocket) and efficient handling of [long-held HTTP requests](http://http-kit.github.io/server.html#async), realtime web applications are a breeze to write.
+
+There's also some additional info at the legacy [project website][], though please note that this is currently unmaintained and quite outdated.
 
 ## Enabling client SNI support (DISABLED BY DEFAULT)
 
@@ -93,7 +92,7 @@ See the [`make-client`](http://http-kit.github.io/http-kit/org.httpkit.client.ht
 
 ## GraalVM Native Image
 
-http-kit server and client are compatible with GraalVM Native Image. See the [test-native](test-native) project which is ran in CI.
+http-kit server and client are compatible with GraalVM Native Image. See the [test-native](test-native) project which is run in CI.
 
 ## Hack locally
 
