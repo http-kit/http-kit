@@ -260,7 +260,7 @@ Value may be a delay. See also `make-client`."}
 
    & [callback]]
 
-  (let [client (force (or client *default-client*))
+  (let [client (or (force (or client *default-client*)) (force default-client))
         {:keys [url method headers body sslengine]} (coerce-req opts)
 
         deliver-resp

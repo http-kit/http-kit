@@ -7,7 +7,6 @@
   retain backwards-compatibility with Java < 8."
 
   (:require
-   [org.httpkit.client]
    [org.httpkit.utils :as utils])
 
   (:import
@@ -39,8 +38,5 @@
 
 (defonce
   ^{:deprecated "v2.7"
-    :doc "Like `org.httpkit.client/default-client`, but provides SNI support using `ssl-configurer`."}
-  default-client
-  (delay
-    (org.httpkit.client/make-client
-      {:ssl-configurer ssl-configurer})))
+    :doc "Deprecated with http-kit v2.7, var retained only for back-compatibility"}
+  default-client (delay nil))
