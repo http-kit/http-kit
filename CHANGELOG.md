@@ -1,4 +1,55 @@
-> This project uses [Break Versioning](https://github.com/ptaoussanis/encore/blob/master/BREAK-VERSIONING.md) as of **Sep 18, 2020**.
+> This project uses [Break Versioning](https://github.com/ptaoussanis/encore/blob/master/BREAK-VERSIONING.md)
+
+## `2.7.0-beta1` (2023 Apr 24)
+
+📦 `2.7.0-beta1` on [Clojars](https://clojars.org/http-kit/versions/2.7.0-beta1)
+
+This is a **major pre-release** that includes many significant fixes and new features.  
+Please test carefully and **report any issues**!
+
+A big thanks to the many contributors 🙏
+
+### Changes since `2.6.0` ⚠️
+
+* 6158351 [mod] [Client] [#501] [#502] Join multiple headers with "\n" rather than "," (@g23)
+
+
+### New since `2.6.0`
+
+* ed1cb8e [nop] [Docs] Introduced a new [community docs wiki](https://github.com/http-kit/http-kit/wiki)
+* e5c8caa [new] [Client] [#393 #513] Use SNI client by default for Java >= 8
+* 02a3739 [new] [Server] [Client] [#510] [#461] Support custom address & channel providers, enable Unix Domain Sockets (@kipz)
+* 17eacca [new] [Client] Support dereffable `:client` vals
+* 7cba2db [new] [Server] [#504] Add temporary clj-kondo support for `with-channel` (@figurantpp)
+* eafdfcd [#224 #451] [Client] [New] Add basic multipart/mixed support (@vtrbtf)
+* 4dd4ee5 [#400 #490] [Client] [New] Add `:as :raw-byte-array` coercion for babashka use case (@xfthhxk)
+* 13e38b8 [#485] [Client] [New] Add HTTP LIST method (@greglook)
+* 727b4f1 [#484] [Server] [New] Add `:start-time` initial timestamp to requests (@niquola)
+* 754fe88 [#479] [Server] [New] Add `org.http-kit.memmap-file-threshold` JVM property (@ikappaki)
+
+
+### Fixes since `2.6.0`
+
+* 304c042 [fix] [Client] [#464] Retain dynamic client on client redirects
+* 4ff7dba [fix] [Server] [#498] [#499] Don't send Content-Length header for status 1xx or 204 (@restenb)
+* d6fa328 [fix] [Server] [#375] [EXPERIMENTAL] NB prevent unintentional re-use of channels (@osbert)
+* 2feb510 [fix] [Client] [#446] [EXPERIMENTAL] Use host as key for keepalive conns (@luizhespanha)
+* 48a4688 [fix] [Server] [#504] [#508] Add missing ^:deprecated meta for `with-channel`, et al.
+* 5b742ed [fix] [Client] [#503] Properly close sockets when calling stop() on client (@benbramley)
+* 7632f46 [fix] [Client] [#505] Prevent duplicate headers in HeaderMap, fix broken tests (@kipz)
+* 550da73 [#493 #491] [Server] [fix] Send '100 Continue' response only once (@zgtm)
+
+
+### Other improvements since `2.6.0`
+
+* c393759 [nop] [Tests] [#508] [#512] Move all tests from `with-channel` to `as-channel` (@kipz)
+* e2d7103 [new] [Build] [#509] [#511] Add native-image test to CI (@borkdude)
+* dff3bab [new] [Build] [#507] Add GitHub to build and run tests (@kipz)
+* cf13651 [#495] [Server] [Docs] Improve error message of HTTP server loop error (@tweeks-reify)
+* 88e5a04 [Housekeeping] [Server] Use const for Content-Length header
+* deac8ee [Client] [Docs] Improve `client/request` docstring
+* 9b04909 Update some dependencies
+
 
 ## v2.6.0 (2022 Jun 13)
 

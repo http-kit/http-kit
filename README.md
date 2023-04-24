@@ -2,7 +2,10 @@
 
 ### Simple, high-performance event-driven HTTP client+server for Clojure
 
-**Latest release**: `2.6.0` (2022-06-13): [release notes](https://github.com/http-kit/http-kit/releases/tag/v2.6.0) | [Clojars](https://clojars.org/http-kit/versions/2.6.0)
+**Latest releases**:  
+- Development: `2.7.0-beta1` (2023-04-24): [release notes](https://github.com/http-kit/http-kit/releases/tag/v2.7.0-beta1) | [Clojars](https://clojars.org/http-kit/versions/2.7.0-beta1)  
+- Stable: `2.6.0` (2023-06-13): [release notes](https://github.com/http-kit/http-kit/releases/tag/v2.6.0) | [Clojars](https://clojars.org/http-kit/versions/2.6.0)
+
 
 ![github actions](https://github.com/http-kit/http-kit/actions/workflows/build.yml/badge.svg)
 
