@@ -1,8 +1,8 @@
 > This project uses [Break Versioning](https://github.com/ptaoussanis/encore/blob/master/BREAK-VERSIONING.md)
 
-## `2.7.0-beta1` (2023 Apr 24)
+## `v2.7.0-beta2` (2023 Apr 24)
 
-📦 `2.7.0-beta1` on [Clojars](https://clojars.org/http-kit/versions/2.7.0-beta1)
+📦 `2.7.0-beta2` on [Clojars](https://clojars.org/http-kit/versions/2.7.0-beta2)
 
 This is a **major pre-release** that includes many significant fixes and new features.  
 Please test carefully and **report any issues**!

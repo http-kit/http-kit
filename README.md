@@ -2,20 +2,21 @@
 
 ### Simple, high-performance event-driven HTTP client+server for Clojure
 
-**Latest releases**:  
-- Development: `2.7.0-beta1` (2023-04-24): [release notes](https://github.com/http-kit/http-kit/releases/tag/v2.7.0-beta1) | [Clojars](https://clojars.org/http-kit/versions/2.7.0-beta1)  
+### Latest releases
+
 - Stable: `2.6.0` (2023-06-13): [release notes](https://github.com/http-kit/http-kit/releases/tag/v2.6.0) | [Clojars](https://clojars.org/http-kit/versions/2.6.0)
+- Development: `2.7.0-beta2` (2023-04-24): [release notes](https://github.com/http-kit/http-kit/releases/tag/v2.7.0-beta2) | [Clojars](https://clojars.org/http-kit/versions/2.7.0-beta2)
 
 
 ![github actions](https://github.com/http-kit/http-kit/actions/workflows/build.yml/badge.svg)
 
-## Resources
+### Resources
 1. [Wiki][wiki] - **community docs** (new!) 👈
 1. [Release info][] - releases and changes
 1. [API docs][] - auto-generated API docs
 1. [GitHub issues][] - for support requests and [contributions][]
 
-## Status
+### Status
 
 http-kit was created by [@shenfeng][], but is currently being maintained by its community.
 
@@ -24,7 +25,7 @@ A big thank-you to the [current contributors](https://github.com/http-kit/http-k
 \- [Peter Taoussanis][@ptaoussanis]
 
 
-## Features
+### Features
 
 > Links below point to the [legacy website][], which is currently unmaintained and may be outdated. A community effort is [now underway][wiki] to slowly transition away from the legacy website.
 
@@ -40,7 +41,7 @@ A big thank-you to the [current contributors](https://github.com/http-kit/http-k
 
 - **WebSockets and Comet**: With great out-the-box support for both [WebSockets](http://http-kit.github.io/server.html#websocket) and efficient handling of [long-held HTTP requests](http://http-kit.github.io/server.html#async), realtime web applications are a breeze to write.
 
-## License
+### License
 
 Copyright &copy; 2012-2023 [@shenfeng][] and contributors. Distributed under the [Apache License Version 2.0](http://www.apache.org/licenses/LICENSE-2.0.html).
 
