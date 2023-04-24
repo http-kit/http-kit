@@ -4,19 +4,18 @@
 
 ### Simple, high-performance event-driven HTTP client+server for Clojure
 
-**[CHANGELOG][]** | [API][] | current [Break Version][]:
-
-```clojure
-[http-kit "2.6.0"]  ; See CHANGELOG for details
-```
-
-## Project status
-
 http-kit was created by [@shenfeng][], but is currently being maintained by its community.
 
 A big thank-you to the [current contributors](https://github.com/http-kit/http-kit/graphs/contributors) for keeping the project going! **Additional contributors very welcome**: please ping me if you'd be interested in lending a hand.
 
 \- [Peter Taoussanis][@ptaoussanis]
+
+## Resources
+
+1. [Wiki][] - **community documentation** 👈
+1. [Release info][] - releases and changes
+1. [API docs][] - auto-generated API docs
+1. [GitHub issues][] - for support requests and [contributions][], etc.
 
 ## Features
 
@@ -34,92 +33,15 @@ A big thank-you to the [current contributors](https://github.com/http-kit/http-k
 
 There's also some additional info at the legacy [project website][], though please note that this is currently unmaintained and quite outdated.
 
-## Enabling client SNI support (DISABLED BY DEFAULT)
-
-To retain backwards-compatibility with JVMs < 8, http-kit client's **SNI support is DISABLED by default**.
-
-> Common cause of: `javax.net.ssl.SSLHandshakeException: Received fatal alert: handshake_failure`
-
-This default may be changed in a future breaking release. In the meantime, manually enabling support is easy:
-
-```clojure
-  (:require [org.httpkit.sni-client :as sni-client]) ; Needs Java >= 8, http-kit >= 2.4.0-alpha6
-
-  ;; Change default client for your whole application:
-  (alter-var-root #'org.httpkit.client/*default-client* (fn [_] sni-client/default-client))
-
-  ;; or temporarily change default client for a particular thread context:
-  (binding [org.httpkit.client/*default-client* sni-client/default-client]
-    <...>)
-```
-See `org.httpkit.client/*default-client*` docstring for more details.
-
-## Unix Domain Sockets (UDSs)
-
-http-kit >= 2.7 supports Unix Domain Sockets for both clients and servers  when running on [Java >= 16](https://openjdk.org/jeps/380).
-
-To use UDSs, plug in appropriate `java.net.SocketAddress` and `java.nio.channels.SocketChannel` constructor fns:
-
-### UDS example: client
-
-```clojure
-(require '[org.httpkit.client :as hk-client])
-
-(let [my-uds-path "/tmp/test.sock"
-      my-client
-      (hk-client/make-client
-        {:address-finder  (fn [_uri]     (UnixDomainSocketAddress/of my-uds-path))
-         :channel-factory (fn [_address] (SocketChannel/open StandardProtocolFamily/UNIX))})]
-
-  (hk-client/get "http://foobar" {:client my-client}))
-```
-
-### UDS example: server
-
-```clojure
-(require '[org.http-kit.server :as hk-server])
-
-(let [my-uds-path "/tmp/test.sock"
-      my-server
-      (hk-server/run-server my-routes
-        {:address-finder  (fn []         (UnixDomainSocketAddress/of my-uds-path))
-         :channel-factory (fn [_address] (ServerSocketChannel/open StandardProtocolFamily/UNIX))})]
-  <...>
-  )
-```
-
-See the [`make-client`](http://http-kit.github.io/http-kit/org.httpkit.client.html#var-make-client) and [`run-server`](http://http-kit.github.io/http-kit/org.httpkit.server.html#var-run-server) docstrings for more info.
-
-## GraalVM Native Image
-
-http-kit server and client are compatible with GraalVM Native Image. See the [test-native](test-native) project which is run in CI.
-
-## Hack locally
-
-http-kit is hacker friendly: zero dependencies, written from the ground-up with only ~3.5k lines of code (including Java).
-
-```sh
-# Modify as you want, unit tests back you up:
-lein test
-
-# May be useful (more info), see `server_test.clj`:
-./scripts/start_test_server
-
-# Some numbers on how fast can http-kit's client can run:
-lein test :benchmark
-```
-
-### Contact & contribution
-
-Please use the [GitHub issues page](https://github.com/http-kit/http-kit/issues) for feature suggestions, bug reports, or general discussions. Current contributors are listed [here](https://github.com/http-kit/http-kit/graphs/contributors). The [project website][] is also on GitHub.
-
 ## License
 
 Copyright &copy; 2012-2023 [@shenfeng][] and contributors. Distributed under the [Apache License Version 2.0](http://www.apache.org/licenses/LICENSE-2.0.html).
 
-[CHANGELOG]: https://github.com/http-kit/http-kit/releases
-[API]: http://http-kit.github.io/http-kit/
+[Wiki]: ../../wiki
+[Release info]: ../../releases
+[API docs]: http://http-kit.github.io/http-kit/
+[GitHub issues]: ../../issues
+[contributions]: ../../blob/master/CONTRIBUTING.md
 [@shenfeng]: https://github.com/shenfeng
 [@ptaoussanis]: https://github.com/ptaoussanis
 [project website]: https://http-kit.github.io
-[Break Version]: https://github.com/ptaoussanis/encore/blob/master/BREAK-VERSIONING.md
