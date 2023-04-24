@@ -1,8 +1,18 @@
 # http-kit
 
+### Simple, high-performance event-driven HTTP client+server for Clojure
+
+**Latest release**: `2.6.0` (2022-06-13): [release notes](https://github.com/http-kit/http-kit/releases/tag/v2.6.0) | [Clojars](https://clojars.org/http-kit/versions/2.6.0)
+
 ![github actions](https://github.com/http-kit/http-kit/actions/workflows/build.yml/badge.svg)
 
-### Simple, high-performance event-driven HTTP client+server for Clojure
+## Resources
+1. [Wiki][wiki] - **community docs** (new!) 👈
+1. [Release info][] - releases and changes
+1. [API docs][] - auto-generated API docs
+1. [GitHub issues][] - for support requests and [contributions][]
+
+## Status
 
 http-kit was created by [@shenfeng][], but is currently being maintained by its community.
 
@@ -10,14 +20,10 @@ A big thank-you to the [current contributors](https://github.com/http-kit/http-k
 
 \- [Peter Taoussanis][@ptaoussanis]
 
-## Resources
-
-1. [Wiki][] - **community documentation** 👈
-1. [Release info][] - releases and changes
-1. [API docs][] - auto-generated API docs
-1. [GitHub issues][] - for support requests and [contributions][], etc.
 
 ## Features
+
+> Links below point to the [legacy website][], which is currently unmaintained and may be outdated. A community effort is [now underway][wiki] to slowly transition away from the legacy website.
 
 - **Ring compliant**: http-kit is an [(almost)](http://http-kit.github.io/migration.html) drop-in replacement for the standard Ring Jetty adapter. So you can use it with all your current libraries (e.g. [Compojure](http://http-kit.github.io/server.html#routing)) and middleware.
 
@@ -31,17 +37,15 @@ A big thank-you to the [current contributors](https://github.com/http-kit/http-k
 
 - **WebSockets and Comet**: With great out-the-box support for both [WebSockets](http://http-kit.github.io/server.html#websocket) and efficient handling of [long-held HTTP requests](http://http-kit.github.io/server.html#async), realtime web applications are a breeze to write.
 
-There's also some additional info at the legacy [project website][], though please note that this is currently unmaintained and quite outdated.
-
 ## License
 
 Copyright &copy; 2012-2023 [@shenfeng][] and contributors. Distributed under the [Apache License Version 2.0](http://www.apache.org/licenses/LICENSE-2.0.html).
 
-[Wiki]: ../../wiki
+[wiki]: ../../wiki
 [Release info]: ../../releases
 [API docs]: http://http-kit.github.io/http-kit/
 [GitHub issues]: ../../issues
 [contributions]: ../../blob/master/CONTRIBUTING.md
 [@shenfeng]: https://github.com/shenfeng
 [@ptaoussanis]: https://github.com/ptaoussanis
-[project website]: https://http-kit.github.io
+[legacy website]: https://http-kit.github.io
