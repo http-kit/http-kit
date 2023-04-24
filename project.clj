@@ -45,19 +45,19 @@
      [org.clojure/data.codec    "0.1.1"]]}
 
    :dev
-   {:resource-paths ["test/resources"]
-    :dependencies
-    [[org.clojure/clojure             "1.8.0"] ; TODO Update (blocked on `http.async.client` update`)
-     [nrepl                           "1.0.0"]
-     [junit/junit                    "4.13.2"]
-     [org.clojure/tools.logging       "1.2.4"]
-     [ch.qos.logback/logback-classic "1.2.11"]
-     [clj-http                       "3.12.3"]
-     [io.netty/netty-all       "4.1.52.Final"]
-     [org.clojure/data.json           "2.4.0"]
-     [http.async.client               "0.5.2"] ; TODO Update (breaking)
-     [compojure                       "1.7.0"]
-     [org.clojure/tools.cli         "1.0.206"]
-     [ring/ring-jetty-adapter         "1.5.1"] ; TODO Update (breaking)
-     [ring/ring-core                  "1.9.5"]
-     ]}})
+   [:test
+    {:resource-paths ["test/resources"]
+     :dependencies
+     [[org.clojure/clojure             "1.8.0"] ; TODO Update (blocked on `http.async.client` update`)
+      [nrepl                           "1.0.0"]
+      [junit/junit                    "4.13.2"]
+      [org.clojure/tools.logging       "1.2.4"]
+      [ch.qos.logback/logback-classic "1.2.11"]
+      [clj-http                       "3.12.3"]
+      [io.netty/netty-all       "4.1.52.Final"]
+      [org.clojure/data.json           "2.4.0"]
+      [http.async.client               "0.5.2"] ; TODO Update (breaking)
+      [compojure                       "1.7.0"]
+      [org.clojure/tools.cli         "1.0.206"]
+      [ring/ring-jetty-adapter         "1.5.1"] ; TODO Update (breaking)
+      [ring/ring-core                  "1.9.5"]]}]})
