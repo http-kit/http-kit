@@ -12,12 +12,10 @@
   []
 
   :plugins
-  [[lein-swank                "1.4.5"]
-   [lein-pprint               "1.3.2"]
-   [lein-ancient              "0.7.0"]
-   [lein-codox                "0.10.8"]
-   [cider/cider-nrepl         "0.30.0"]
-   [mx.cider/enrich-classpath "1.9.0"]]
+  [[lein-swank   "1.4.5"]
+   [lein-pprint  "1.3.2"]
+   [lein-ancient "0.7.0"]
+   [lein-codox   "0.10.8"]]
 
   :jvm-opts
   ["-Dclojure.compiler.disable-locals-clearing=true"
@@ -49,7 +47,6 @@
     {:resource-paths ["test/resources"]
      :dependencies
      [[org.clojure/clojure             "1.8.0"] ; TODO Update (blocked on `http.async.client` update`)
-      [nrepl                           "1.0.0"]
       [junit/junit                    "4.13.2"]
       [org.clojure/tools.logging       "1.2.4"]
       [ch.qos.logback/logback-classic "1.2.11"]
@@ -60,4 +57,10 @@
       [compojure                       "1.7.0"]
       [org.clojure/tools.cli         "1.0.206"]
       [ring/ring-jetty-adapter         "1.5.1"] ; TODO Update (breaking)
-      [ring/ring-core                  "1.9.5"]]}]})
+      [ring/ring-core                  "1.9.5"]]}]
+
+   :nrepl
+   {:dependencies [[nrepl "1.0.0"]]
+    :plugins
+    [[cider/cider-nrepl         "0.30.0"]
+     [mx.cider/enrich-classpath "1.9.0"]]}})
