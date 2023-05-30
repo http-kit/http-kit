@@ -4,7 +4,7 @@
 
 ### Latest releases
 
-- 2023-05-03: `2.7.0-beta3` (dev): [release notes](https://github.com/http-kit/http-kit/releases/tag/v2.7.0-beta3) | [Clojars](https://clojars.org/http-kit/versions/2.7.0-beta3)
+- 2023-05-30: `2.7.0-RC1` (dev): [release notes](https://github.com/http-kit/http-kit/releases/tag/v2.7.0-RC1) | [Clojars](https://clojars.org/http-kit/versions/2.7.0-RC1)
 - 2022-06-13: `2.6.0`  (stable): [release notes](https://github.com/http-kit/http-kit/releases/tag/v2.6.0) | [Clojars](https://clojars.org/http-kit/versions/2.6.0)
 
 ![github actions](https://github.com/http-kit/http-kit/actions/workflows/build.yml/badge.svg)
