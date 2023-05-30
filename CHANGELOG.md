@@ -1,13 +1,13 @@
 > This project uses [Break Versioning](https://github.com/ptaoussanis/encore/blob/master/BREAK-VERSIONING.md)
 
-## `v2.7.0-RC1` (2023 May 30)
+## `2.7.0-RC1` (2023 May 30)
 
 📦 `2.7.0-RC1` on [Clojars](https://clojars.org/http-kit/versions/2.7.0-RC1)
 
 Identical to `2.7.0-beta3`.
 
 
-## `v2.7.0-beta3` (2023 May 3)
+## `2.7.0-beta3` (2023 May 3)
 
 📦 `2.7.0-beta3` on [Clojars](https://clojars.org/http-kit/versions/2.7.0-beta3)
 
@@ -16,7 +16,7 @@ Identical to `2.7.0-beta2` except for:
 * 10501a5 [fix] [#520] Remove unintended dependency on `cider-nrepl` plugin (@harold)
 
 
-## `v2.7.0-beta2` (2023 Apr 24)
+## `2.7.0-beta2` (2023 Apr 24)
 
 📦 `2.7.0-beta2` on [Clojars](https://clojars.org/http-kit/versions/2.7.0-beta2)
 
