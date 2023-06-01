@@ -1,7 +1,7 @@
-name: Build and Test
+name: Main tests
 on: [push, pull_request]
 jobs:
-  build-and-test:
+  tests:
     runs-on: ubuntu-latest
     container: clojure:openjdk-17-lein-buster
     steps:
