@@ -1,19 +1,19 @@
 # http-kit
 
-### Simple, high-performance event-driven HTTP client+server for Clojure
+## Simple, high-performance event-driven HTTP client+server for Clojure
 
 ### Latest releases
 
 - 2023-05-30: `2.7.0-RC1` (dev): [release notes](https://github.com/http-kit/http-kit/releases/tag/v2.7.0-RC1) | [Clojars](https://clojars.org/http-kit/versions/2.7.0-RC1)
 - 2022-06-13: `2.6.0`  (stable): [release notes](https://github.com/http-kit/http-kit/releases/tag/v2.6.0) | [Clojars](https://clojars.org/http-kit/versions/2.6.0)
 
-![github actions](https://github.com/http-kit/http-kit/actions/workflows/build.yml/badge.svg)
+[![Main tests](https://github.com/http-kit/http-kit/actions/workflows/tests-main.yml/badge.svg)](https://github.com/http-kit/http-kit/actions/workflows/tests-main.yml) [![Native tests](https://github.com/http-kit/http-kit/actions/workflows/tests-native.yml/badge.svg)](https://github.com/http-kit/http-kit/actions/workflows/tests-native.yml)
 
 ### Resources
-1. [Wiki][wiki] - **community docs** (new!) 👈
+1. [Wiki][wiki] - **community docs** (👈 start here)
 1. [Release info][] - releases and changes
 1. [API docs][] - auto-generated API docs
-1. [GitHub issues][] - for support requests and [contributions][]
+1. [GitHub issues][] - for support requests, contributions, etc.
 
 ### Status
 
@@ -21,12 +21,11 @@ http-kit was created by [@shenfeng][], but is currently being maintained by its 
 
 A big thank-you to the [current contributors](https://github.com/http-kit/http-kit/graphs/contributors) for keeping the project going! **Additional contributors very welcome**: please ping me if you'd be interested in lending a hand.
 
-\- [Peter Taoussanis][@ptaoussanis]
-
+\- [Peter Taoussanis][]
 
 ### Features
 
-> Links below point to the [legacy website][], which is currently unmaintained and may be outdated. A community effort is [now underway][wiki] to slowly transition away from the legacy website.
+> Links below point to the [legacy website](https://http-kit.github.io), which is currently unmaintained and may be outdated. A community effort is [now underway][wiki] to slowly transition away from the legacy website.
 
 - **Ring compliant**: http-kit is an [(almost)](http://http-kit.github.io/migration.html) drop-in replacement for the standard Ring Jetty adapter. So you can use it with all your current libraries (e.g. [Compojure](http://http-kit.github.io/server.html#routing)) and middleware.
 
@@ -40,15 +39,17 @@ A big thank-you to the [current contributors](https://github.com/http-kit/http-k
 
 - **WebSockets and Comet**: With great out-the-box support for both [WebSockets](http://http-kit.github.io/server.html#websocket) and efficient handling of [long-held HTTP requests](http://http-kit.github.io/server.html#async), realtime web applications are a breeze to write.
 
----
+## License
 
-Copyright &copy; 2012-2023 [@shenfeng][] and contributors. Distributed under the [Apache License Version 2.0](http://www.apache.org/licenses/LICENSE-2.0.html).
+Copyright &copy; 2012-2023 [@shenfeng][] and contributors, licensed under [Apache License Version 2.0](http://www.apache.org/licenses/LICENSE-2.0.html).
 
+<!--- Common links -->
 [wiki]: ../../wiki
 [Release info]: ../../releases
-[API docs]: http://http-kit.github.io/http-kit/
 [GitHub issues]: ../../issues
-[contributions]: ../../blob/master/CONTRIBUTING.md
+[Peter Taoussanis]: https://www.taoensso.com
+
+<!--- Repo links -->
+[API docs]: http://http-kit.github.io/http-kit/
 [@shenfeng]: https://github.com/shenfeng
-[@ptaoussanis]: https://github.com/ptaoussanis
-[legacy website]: https://http-kit.github.io
+
