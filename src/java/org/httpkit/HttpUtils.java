@@ -312,14 +312,17 @@ public class HttpUtils {
     }
 
     public static DynamicBytes readAll(InputStream is) throws IOException {
-        DynamicBytes bytes = new DynamicBytes(32768); // init 32k
-        byte[] buffer = new byte[16384];
-        int read;
-        while ((read = is.read(buffer)) != -1) {
-            bytes.append(buffer, read);
+        try {
+            DynamicBytes bytes = new DynamicBytes(32768); // init 32k
+            byte[] buffer = new byte[16384];
+            int read;
+            while ((read = is.read(buffer)) != -1) {
+                bytes.append(buffer, read);
+            }
+            return bytes;
+        } finally {
+            is.close();
         }
-        is.close();
-        return bytes;
     }
 
     public static String getStringValue(Map<String, Object> headers, String key) {
