@@ -73,6 +73,7 @@ public class HttpUtils {
     public static final String CONTENT_LENGTH = "content-length";
 
     public static final String CHUNKED = "chunked";
+    public static final String TRAILER = "trailer";
 
     public static final String CONNECTION = "connection";
 

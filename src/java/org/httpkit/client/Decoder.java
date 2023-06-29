@@ -12,7 +12,7 @@ import static org.httpkit.HttpVersion.HTTP_1_1;
 import static org.httpkit.client.State.*;
 
 enum State {
-    ALL_READ, READ_CHUNK_DELIMITER, READ_CHUNK_FOOTER, READ_CHUNK_SIZE,
+    ALL_READ, READ_CHUNK_DELIMITER, READ_CHUNK_TRAILER, READ_CHUNK_SIZE,
     READ_CHUNKED_CONTENT, READ_FIXED_LENGTH_CONTENT, READ_HEADER, READ_INITIAL,
     READ_VARIABLE_LENGTH_CONTENT
 }
@@ -28,6 +28,7 @@ public class Decoder {
     private final HttpMethod method;
 
     private boolean emptyBodyExpected = false;
+    private boolean chunkTrailerExpected = false;
 
     public Decoder(IRespListener listener, HttpMethod method) {
         this.listener = listener;
@@ -96,7 +97,7 @@ public class Decoder {
                     if (line != null && !line.isEmpty()) {
                         readRemaining = getChunkSize(line);
                         if (readRemaining == 0) {
-                            state = READ_CHUNK_FOOTER;
+                            state = READ_CHUNK_TRAILER;
                         } else {
                             state = READ_CHUNKED_CONTENT;
                         }
@@ -108,8 +109,21 @@ public class Decoder {
                 case READ_CHUNKED_CONTENT:
                     readBody(buffer, READ_CHUNK_DELIMITER);
                     break;
-                case READ_CHUNK_FOOTER:
-                    readEmptyLine(buffer, ALL_READ);
+                case READ_CHUNK_TRAILER:
+                    // Ref. RFC9112 §7.1, §7.1.3 re: optional trailer section
+                    if (!chunkTrailerExpected) {
+                        readEmptyLine(buffer, ALL_READ);
+                    } else {
+                        String trLine = lineReader.readLine(buffer);
+                        while (trLine != null && !trLine.isEmpty()) {
+                            // We may later want to ignore invalid trailer fields (e.g. RFC7230 §4.1.2),
+                            // but this is probably sufficient for now
+                            HttpUtils.splitAndAddHeader(trLine, headers);
+                            trLine = lineReader.readLine(buffer);
+                         }
+                        listener.onHeadersReceived(headers);
+                        state = ALL_READ;
+                    }
                     break;
                 case READ_CHUNK_DELIMITER:
                     readEmptyLine(buffer, READ_CHUNK_SIZE);
@@ -163,6 +177,8 @@ public class Decoder {
         String te = HttpUtils.getStringValue(headers, TRANSFER_ENCODING);
         if (CHUNKED.equals(te)) {
             state = READ_CHUNK_SIZE;
+            if (headers.containsKey(TRAILER))
+              chunkTrailerExpected = true;
         } else {
             String cl = HttpUtils.getStringValue(headers, CONTENT_LENGTH);
             if (cl != null) {
