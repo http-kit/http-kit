@@ -1,24 +1,33 @@
-> This project uses [Break Versioning](https://github.com/ptaoussanis/encore/blob/master/BREAK-VERSIONING.md)
+> This project uses [Break Versioning](https://github.com/ptaoussanis/encore/blob/master/BREAK-VERSIONING.md).
 
-## `2.7.0-RC1` (2023 May 30)
+## `2.7.0` (2023-06-30)
 
-📦 `2.7.0-RC1` on [Clojars](https://clojars.org/http-kit/versions/2.7.0-RC1)
+> 📦 [Available on Clojars](https://clojars.org/http-kit/versions/2.7.0)
+
+Identical to `2.7.0-RC1` except for:
+
+* cdfc5fb [fix] [client] [#524] Reliably close InputStream when data too large (@rublag)
+
+
+## `2.7.0-RC1` (2023-05-30)
+
+> 📦 [Available on Clojars](https://clojars.org/http-kit/versions/2.7.0-RC1)
 
 Identical to `2.7.0-beta3`.
 
 
-## `2.7.0-beta3` (2023 May 3)
+## `2.7.0-beta3` (2023-05-03)
 
-📦 `2.7.0-beta3` on [Clojars](https://clojars.org/http-kit/versions/2.7.0-beta3)
+> 📦 [Available on Clojars](https://clojars.org/http-kit/versions/2.7.0-beta3)
 
 Identical to `2.7.0-beta2` except for:
 
 * 10501a5 [fix] [#520] Remove unintended dependency on `cider-nrepl` plugin (@harold)
 
 
-## `2.7.0-beta2` (2023 Apr 24)
+## `2.7.0-beta2` (2023-04-24)
 
-📦 `2.7.0-beta2` on [Clojars](https://clojars.org/http-kit/versions/2.7.0-beta2)
+> 📦 [Available on Clojars](https://clojars.org/http-kit/versions/2.7.0-beta2)
 
 This is a **major pre-release** that includes many significant fixes and new features.  
 Please test carefully and **report any issues**!
@@ -28,7 +37,6 @@ A big thanks to the many contributors 🙏
 ### Changes since `2.6.0` ⚠️
 
 * 6158351 [mod] [Client] [#501] [#502] Join multiple headers with "\n" rather than "," (@g23)
-
 
 ### New since `2.6.0`
 
@@ -43,7 +51,6 @@ A big thanks to the many contributors 🙏
 * 727b4f1 [#484] [Server] [New] Add `:start-time` initial timestamp to requests (@niquola)
 * 754fe88 [#479] [Server] [New] Add `org.http-kit.memmap-file-threshold` JVM property (@ikappaki)
 
-
 ### Fixes since `2.6.0`
 
 * 304c042 [fix] [Client] [#464] Retain dynamic client on client redirects
@@ -54,7 +61,6 @@ A big thanks to the many contributors 🙏
 * 5b742ed [fix] [Client] [#503] Properly close sockets when calling stop() on client (@benbramley)
 * 7632f46 [fix] [Client] [#505] Prevent duplicate headers in HeaderMap, fix broken tests (@kipz)
 * 550da73 [#493 #491] [Server] [fix] Send '100 Continue' response only once (@zgtm)
-
 
 ### Other improvements since `2.6.0`
 
@@ -67,7 +73,7 @@ A big thanks to the many contributors 🙏
 * 9b04909 Update some dependencies
 
 
-## v2.6.0 (2022 Jun 13)
+## v2.6.0 (2022-06-13)
 
 ```clojure
 [http-kit "2.6.0"]
