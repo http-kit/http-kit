@@ -6,7 +6,7 @@
 
 - 2023-06-30: `2.7.0` - [release notes](https://github.com/http-kit/http-kit/releases/tag/v2.7.0) | [Clojars](https://clojars.org/http-kit/versions/2.7.0)
 
-[![Main tests](https://github.com/http-kit/http-kit/actions/workflows/tests-main.yml/badge.svg)](https://github.com/http-kit/http-kit/actions/workflows/tests-main.yml) [![Native tests](https://github.com/http-kit/http-kit/actions/workflows/tests-native.yml/badge.svg)](https://github.com/http-kit/http-kit/actions/workflows/tests-native.yml)
+[![Main tests](https://github.com/http-kit/http-kit/actions/workflows/main-tests.yml/badge.svg)](https://github.com/http-kit/http-kit/actions/workflows/main-tests.yml) [![Graal tests](https://github.com/http-kit/http-kit/actions/workflows/graal-tests.yml/badge.svg)](https://github.com/http-kit/http-kit/actions/workflows/graal-tests.yml)
 
 ### Resources
 1. [Wiki][wiki] - **community docs** (👈 start here)
@@ -51,4 +51,3 @@ Copyright &copy; 2012-2023 [@shenfeng][] and contributors, licensed under [Apach
 <!--- Repo links -->
 [API docs]: http://http-kit.github.io/http-kit/
 [@shenfeng]: https://github.com/shenfeng
-

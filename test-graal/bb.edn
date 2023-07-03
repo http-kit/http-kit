@@ -1,0 +1,47 @@
+{:tasks
+ {:requires
+  ([babashka.fs    :as fs]
+   [clojure.string :as str])
+
+  :init
+  (do
+    (def jar "target/graal-tests.jar")
+    (def binary
+      (if (fs/windows?)
+        "graal-tests.exe"
+        "./graal-tests")))
+
+  clean
+  {:task
+   (do (fs/delete-tree    "target")
+       (fs/delete-tree "../target"))}
+
+  prep-deps
+  {:task
+   (when-not (fs/exists? "../../target/classes")
+     (clojure "-X:deps prep"))}
+
+  build-uberjar
+  {:depends [prep-deps]
+   :task
+   (when (seq (fs/modified-since jar ["src"]))
+     (clojure "-T:build uber"))}
+
+  compile-native-image
+  {:depends [check-reflection build-uberjar]
+   :task
+   (when (seq (fs/modified-since binary jar))
+     (shell "native-image"
+       "--initialize-at-build-time=clojure,org.httpkit,graal"
+       "--no-fallback"
+       "-jar" jar))}
+
+  check-reflection
+  {:depends [prep-deps]
+   :task
+   (let [err (:err (clojure {:err :string} "-M:dev -m graal.tests"))]
+     (assert (not (str/includes? err "Reflection warning"))))}
+
+  run-graal-tests
+  {:depends [compile-native-image]
+   :task (shell binary)}}}
