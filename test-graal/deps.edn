@@ -1,0 +1,8 @@
+{:deps {httpkit/httpkit {:local/root ".."}}
+ :aliases
+ {:dev {:extra-paths ["dev"]}
+  :build
+  {:ns-default build
+   :deps
+   {io.github.clojure/tools.build {:git/tag "v0.9.3" :git/sha "e537cd1"}
+    slipset/deps-deploy           {:mvn/version "0.2.0"}}}}}

@@ -1,0 +1,38 @@
+name: Graal tests
+on: [push, pull_request]
+defaults:
+  run:
+    working-directory: test-graal
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macOS-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: graalvm/setup-graalvm@v1
+        with:
+          version: 'latest'
+          java-version: '17'
+          components: 'native-image'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: DeLaGuardo/setup-clojure@10.2
+        with:
+          lein: latest
+          bb: latest
+
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.m2/repository
+            ~/.gitlibs
+            ~/.deps.clj
+
+          key: deps-${{ hashFiles('deps.edn') }}
+          restore-keys: deps-
+
+      - run: bb run-graal-tests
