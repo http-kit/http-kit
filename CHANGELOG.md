@@ -4,9 +4,16 @@
 
 > 📦 [Available on Clojars](https://clojars.org/http-kit/versions/2.7.0)
 
+Please **test carefully** and **report any issues**!
+
 Identical to `2.7.0-RC1` except for:
 
 * cdfc5fb [fix] [client] [#524] Reliably close InputStream when data too large (@rublag)
+
+### Changes since `2.6.0` ⚠️
+
+* [BREAK] [#528] [Client] Support for `:insecure?` flag is currently broken
+* 6158351 [mod] [Client] [#501] [#502] Join multiple headers with "\n" rather than "," (@g23)
 
 
 ## `2.7.0-RC1` (2023-05-30)
@@ -36,6 +43,7 @@ A big thanks to the many contributors 🙏
 
 ### Changes since `2.6.0` ⚠️
 
+* [BREAK] [#528] [Client] Support for `:insecure?` flag is currently broken
 * 6158351 [mod] [Client] [#501] [#502] Join multiple headers with "\n" rather than "," (@g23)
 
 ### New since `2.6.0`
