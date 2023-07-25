@@ -1,6 +1,6 @@
 (defproject http-kit "2.7.0"
   :author "Feng Shen (@shenfeng)"
-  :description "High-performance event-driven HTTP client/server for Clojure"
+  :description "Simple, high-performance event-driven HTTP client+server for Clojure"
   :url "http://http-kit.org/"
   :license {:name "Apache License, Version 2.0"
             :url "http://www.apache.org/licenses/LICENSE-2.0.html"
