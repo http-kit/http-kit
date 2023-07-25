@@ -1,31 +1,19 @@
 (defproject http-kit "2.7.0"
   :author "Feng Shen (@shenfeng)"
   :description "Simple, high-performance event-driven HTTP client+server for Clojure"
-  :url "http://http-kit.org/"
-  :license {:name "Apache License, Version 2.0"
-            :url "http://www.apache.org/licenses/LICENSE-2.0.html"
-            :distribution :repo}
-  :min-lein-version "2.3.3"
-  :global-vars {*warn-on-reflection* true}
+  :url "https://github.com/http-kit/http-kit"
 
-  :dependencies
-  []
+  :license
+  {:name "Apache License, Version 2.0"
+   :url  "https://www.apache.org/licenses/LICENSE-2.0.html"}
 
-  :plugins
-  [[lein-swank   "1.4.5"]
-   [lein-pprint  "1.3.2"]
-   [lein-ancient "0.7.0"]
-   [lein-codox   "0.10.8"]]
+  :dependencies []
 
-  :jvm-opts
-  ["-Dclojure.compiler.disable-locals-clearing=true"
-   "-Xms1g" "-Xmx1g"] ; Testing https require more memory
-
-  ;; Oldest version JVM to support:
-  :javac-options ["--release" "7" "-g"]
+  :javac-options     ["--release" "7" "-g"] ; Oldest version JVM to support
   :java-source-paths ["src/java"]
+  :jar-exclusions    [#"^java.*"] ; exclude the java directory in source path
+
   :test-paths ["test"]
-  :jar-exclusions [#"^java.*"] ; exclude the java directory in source path
   :test-selectors
   {:default (complement :benchmark)
    :gha  (complement #(or (:benchmark %) (:skip-gha %)))
@@ -33,18 +21,29 @@
    :all (fn [_] true)}
 
   :profiles
-  {:provided {:dependencies [[org.clojure/clojure "1.5.1"]]}
+  {;; :default [:base :system :user :provided :dev]
+   :provided {:dependencies [[org.clojure/clojure "1.11.1"]]}
+   :c1.11    {:dependencies [[org.clojure/clojure "1.11.1"]]}
+   :c1.10    {:dependencies [[org.clojure/clojure "1.10.3"]]}
+   :c1.9     {:dependencies [[org.clojure/clojure "1.9.0"]]}
+
    :test
    {:java-source-paths ["test/java" "src/java"]
+    :jvm-opts
+    ["-Xms1024m" "-Xmx2048m" ; Testing https require more memory
+     "-Dclojure.compiler.disable-locals-clearing=true"]
+
+    :global-vars {*warn-on-reflection* true}
     :dependencies
     [[ring/ring-defaults        "0.3.3"]
-     [ring-request-proxy       "0.1.11"]
+     [ring-request-proxy        "0.1.11"]
      [ring-basic-authentication "1.1.1"]
      [org.clojure/data.codec    "0.1.1"]]}
 
    :dev
-   [:test
+   [:c1.11 :test
     {:resource-paths ["test/resources"]
+     :jvm-opts ["-server"]
      :dependencies
      [[org.clojure/clojure             "1.8.0"] ; TODO Update (blocked on `http.async.client` update`)
       [junit/junit                    "4.13.2"]
@@ -57,7 +56,13 @@
       [compojure                       "1.7.0"]
       [org.clojure/tools.cli         "1.0.206"]
       [ring/ring-jetty-adapter         "1.5.1"] ; TODO Update (breaking)
-      [ring/ring-core                  "1.9.5"]]}]
+      [ring/ring-core                  "1.9.5"]]
+
+     :plugins
+     [[lein-swank   "1.4.5"]
+      [lein-pprint  "1.3.2"]
+      [lein-ancient "0.7.0"]
+      [lein-codox   "0.10.8"]]}]
 
    :nrepl
    {:dependencies [[nrepl "1.0.0"]]
