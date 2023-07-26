@@ -1,6 +1,8 @@
+<img src="http-kit-logo.png" alt="http-kit" width="140"/>
+
 # http-kit
 
-## Simple, high-performance event-driven HTTP client+server for Clojure
+#### Simple, high-performance event-driven HTTP client+server for Clojure
 
 ### Latest release
 
