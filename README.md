@@ -3,7 +3,7 @@
 
 # http-kit
 
-#### Simple, high-performance event-driven HTTP client+server for Clojure
+### Simple, high-performance event-driven HTTP client+server for Clojure
 
 http-kit is a minimalist and highly efficient Ring-compatible HTTP client+server for Clojure.
 

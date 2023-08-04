@@ -9,7 +9,7 @@ deps.edn:   http-kit/http-kit {:mvn/version "x-y-z"}
 
 # Usage
 
-See the [client](2-Client) or [server](3-Server) sections for more!
+See the [client](./2-Client) or [server](./3-Server) sections for more!
 
 # Tests and benchmarks
 
