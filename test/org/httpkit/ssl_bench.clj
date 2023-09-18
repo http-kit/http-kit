@@ -30,6 +30,5 @@
   (GET "/proxy" [] proxy-handler))
 
 (defn -main [& args]
-  (run-server (site test-routes) {:port 8080
-                                  :queue-size 102400})
+  (run-server (site test-routes) {:port 8080})
   (println "server started at 0.0.0.0:8080"))

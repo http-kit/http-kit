@@ -1,13 +1,15 @@
 (ns org.httpkit.server
   (:require
    [clojure.string :as str]
-   [org.httpkit.encode :refer [base64-encode]])
+   [org.httpkit.encode :refer [base64-encode]]
+   [org.httpkit.utils :as utils])
 
   (:import
    [org.httpkit.server AsyncChannel HttpServer RingHandler ProxyProtocolOption HttpServer$AddressFinder HttpServer$ServerChannelFactory]
    [org.httpkit.logger ContextLogger EventLogger EventNames]
    [java.net InetSocketAddress]
    [java.nio.channels ServerSocketChannel]
+   [java.util.concurrent ArrayBlockingQueue ThreadPoolExecutor TimeUnit]
    java.security.MessageDigest))
 
 (set! *warn-on-reflection* true)
@@ -42,24 +44,38 @@
   ([http-server     ] (-server-stop! http-server nil))
   ([http-server opts] (-server-stop! http-server opts)))
 
+(let [n-procs (.availableProcessors (Runtime/getRuntime))]
+  (defn- new-worker-pool
+    "Returns a new `java.util.concurrent.ExecutorService` delay for handling server
+    requests. When on JVM 21+, uses `newVirtualThreadPerTaskExecutor`. Otherwise
+    creates a standard `ThreadPoolExecutor`."
+    [n-threads queue-size prefix]
+    (delay
+      (utils/compile-if (Thread/ofVirtual)
+        (java.util.concurrent.Executors/newVirtualThreadPerTaskExecutor)
+        (let [queue   (ArrayBlockingQueue. (int (or queue-size (* 1024 20))))
+              factory (org.httpkit.PrefixThreadFactory. "http-kit-server-worker-")]
+          (ThreadPoolExecutor.
+            (int (or n-threads (max 2 (Math/round (* n-procs 0.5)))))
+            (int (or n-threads                    (* n-procs 16)))
+            0 TimeUnit/MILLISECONDS queue factory))))))
+
 (defn run-server
   "Starts a mostly[1] Ring-compatible HttpServer with options:
 
     :ip                 ; Which IP to bind (default: 0.0.0.0)
     :port               ; Which port to listen to for incoming requests
 
-    :thread             ; HTTP worker thread count (default: 4)
-    :queue-size         ; Max jobs to queue before rejecting requests to protect self
+    :worker-pool        ; `java.util.concurrent.ExecutorService` or delay to use
+                        ; for handling requests. Defaults to JVM 21+ virtual threads
+                        ; if available, otherwise to an auto-sized thread pool.
+                        ; See the GitHub wiki docs for details!
 
     :max-body           ; Max HTTP body size in bytes (default: 8MB)
     :max-ws             ; Max WebSocket message size in bytes (default: 4MB)
     :max-line           ; Max HTTP header line size in bytes (default: 8KB)
 
     :proxy-protocol     ; Proxy protocol e/o #{:disable :enable :optional}
-    :worker-pool        ; `ExecutorService` to use for request-handling.
-                        ; If set, the following opts will be ignored:
-                        ; :thread, :worker-name-prefix, :queue-size
-    :worker-name-prefix ; Worker thread name prefix
 
     :server-header      ; The \"Server\" header, disabled if nil. Default: \"http-kit\".
 
@@ -86,21 +102,18 @@
   [1] Ref. http://http-kit.org/migration.html for differences."
 
   [handler
-   & [{:keys [ip port thread queue-size max-body max-ws max-line
-              proxy-protocol worker-name-prefix worker-pool
+   & [{:keys [ip port max-body max-ws max-line
+              proxy-protocol worker-pool
               error-logger warn-logger event-logger event-names
               legacy-return-value? server-header address-finder
-              channel-factory]
+              channel-factory] :as opts
 
        :or   {ip         "0.0.0.0"
               port       8090
-              thread     4
-              queue-size 20480
               max-body   8388608
               max-ws     4194304
               max-line   8192
               proxy-protocol :disable
-              worker-name-prefix "worker-"
               legacy-return-value? true
               server-header "http-kit"}}]]
 
@@ -130,10 +143,17 @@
               (format "Invalid event-names: (%s) %s"
                 (class event-names) (pr-str event-names)))))
 
+        worker-pool
+        (force
+          (or
+            worker-pool
+            (let [;; Deprecated pool opts, prefer explicit `worker-pool`
+                  {:keys [thread queue-size worker-name-prefix]} opts]
+              (new-worker-pool thread queue-size worker-name-prefix))))
+
         ^org.httpkit.server.IHandler h
-        (if worker-pool
-          (RingHandler. handler worker-pool err-logger evt-logger evt-names server-header)
-          (RingHandler. thread handler worker-name-prefix queue-size server-header err-logger evt-logger evt-names))
+        (RingHandler. handler worker-pool
+          err-logger evt-logger evt-names server-header)
 
         ^ProxyProtocolOption proxy-enum
         (case proxy-protocol

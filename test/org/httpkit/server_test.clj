@@ -375,8 +375,7 @@
                                  :ssl? true
                                  :key-password "123456"
                                  :keystore "test/ssl_keystore"})
-  (reset! tmp-server (run-server (site test-routes) {:port 9090
-                                                     :queue-size 102400}))
+  (reset! tmp-server (run-server (site test-routes) {:port 9090}))
   (println "server started at 0.0.0.0:9090"))
 
 ;;; Test graceful stopping
@@ -511,8 +510,7 @@
                  (capture! (send! @ch_ resp)) ; Try re-use @ch_
                  resp)))
 
-            ;; Thread count irrelevant
-           {:port 3474, :thread 1})]
+           {:port 3474})]
 
       (reset! tmp-server server) ; For convenience during REPL/testing
 
