@@ -592,21 +592,23 @@
      [:headers {"content-length" "3"}]]))
 
 (deftest deadlock-guard
-  (let [loop-depth 2
+  (let [n-cores (.availableProcessors (Runtime/getRuntime))
+        worker  (hkc/new-worker {:n-threads n-cores})
+        loop-depth 2
         bad-callback
-        (fn bad-callback [n disable?]
+        (fn bad-callback [n guard?]
           (when (pos? n)
             @(hkc/get "badurl"
-                       (when disable?
-                         {:deadlock-guard? false})
-                       (fn [res] (bad-callback (dec n) disable?)))))]
+               {:deadlock-guard? guard?
+                :worker-pool (:pool worker)}
+               (fn [res] (bad-callback (dec n) guard?)))))]
 
-    (let [{:keys [error] :as resp} (bad-callback loop-depth false)]
+    (let [{:keys [error] :as resp} (bad-callback loop-depth true)]
       (is (and error (re-find #"deadlock-guard" (.getMessage ^Throwable error)))))
 
-    (if (< loop-depth @#'hkc/default-worker-pool-max-threads)
-      (let [{:keys [error]} (bad-callback loop-depth true)] (is (= nil error)))
-      (println "Skipping disabled-deadlock-guard test due to low CPU count."))))
+    (if (>= n-cores loop-depth)
+      (let [{:keys [error]} (bad-callback loop-depth false)] (is (= nil error)))
+      (println (str "Skipping disabled-deadlock-guard test due to low core count (" n-cores ").")))))
 
 (deftest zip
   (is (instance? DynamicBytes (:body @(hkc/get "http://localhost:4347/zip" {:as :none})))))

@@ -1,4 +1,7 @@
-(ns org.httpkit.utils)
+(ns org.httpkit.utils
+  (:import
+   [java.util.concurrent ThreadPoolExecutor TimeUnit
+    BlockingQueue ArrayBlockingQueue LinkedBlockingQueue]))
 
 (defn- parse-java-version
   "Ref. https://stackoverflow.com/a/2591122"
@@ -33,3 +36,60 @@
   (if (try (eval test) (catch Throwable _ false))
     `(do ~then)
     `(do ~else)))
+
+(defn new-worker
+  "Returns {:keys [n-cores type pool ...]} where `:pool` is a
+  `java.util.concurrent.ExecutorService`."
+
+  [{:as   _internal-opts
+    :keys [queue-type default-prefix default-queue-size
+           n-min-threads-factor n-max-threads-factor
+           keep-alive-msecs]
+    :or
+    {queue-type :array
+     default-prefix "http-kit-worker-"
+     n-min-threads-factor 1
+     n-max-threads-factor 1}}
+
+   {:as   _user-opts
+    :keys [n-min-threads n-max-threads n-threads
+           queue-size prefix allow-virtual?]}]
+
+  (let [;; Calculate at runtime to prevent Graal issues
+        n-cores (.availableProcessors (Runtime/getRuntime))]
+    (compile-if (and allow-virtual? (Thread/ofVirtual))
+
+      ;; Use JVM 21+ virtual threads
+      {:type    :virtual
+       :n-cores n-cores
+       :pool    (java.util.concurrent.Executors/newVirtualThreadPerTaskExecutor)}
+
+      ;; Use fixed thread pool
+      (let [factory          (org.httpkit.PrefixThreadFactory. (or prefix default-prefix))
+            n-min-threads    (long (or n-min-threads n-threads (max 2 (Math/round (* n-cores (double n-min-threads-factor))))))
+            n-max-threads    (long (or n-max-threads n-threads (max 2 (Math/round (* n-cores (double n-max-threads-factor))))))
+            keep-alive-msecs (long (or keep-alive-msecs 0))
+
+            queue-size (or queue-size default-queue-size)
+            queue
+            (case queue-type
+              :array (ArrayBlockingQueue. (int queue-size))
+              :linked
+              (if queue-size
+                (LinkedBlockingQueue. (int queue-size))
+                (LinkedBlockingQueue.)))]
+
+        {:type          :fixed
+         :n-cores       n-cores
+         :n-min-threads n-min-threads
+         :n-max-threads n-max-threads
+         :queue-size    queue-size
+         :queue         queue
+         :pool
+         (ThreadPoolExecutor.
+           (int n-min-threads)
+           (int n-max-threads)
+           (int keep-alive-msecs) TimeUnit/MILLISECONDS
+           ^BlockingQueue queue factory)}))))
+
+(comment (new-worker {} {}))

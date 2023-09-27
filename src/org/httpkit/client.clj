@@ -86,24 +86,31 @@
             (assoc :body (MultipartEntity/encode boundary entities multipart-mixed?))))
       r)))
 
-(let [n-procs (.availableProcessors (Runtime/getRuntime))]
-  (def ^:private default-worker-pool-max-threads "Used by tests." (* n-procs 2))
-  (defonce
-    ^{:doc
-  "Delayed default `java.util.concurrent.ExecutorService` used to handle client
-  callbacks. When on JVM 21+, uses `newVirtualThreadPerTaskExecutor`. Otherwise
-  uses a standard `ThreadPoolExecutor` with min and max thread count
-  auto-selected based on currently available processor count."}
-    default-worker-pool
-    (delay
-      (utils/compile-if (Thread/ofVirtual)
-        (java.util.concurrent.Executors/newVirtualThreadPerTaskExecutor)
-        (let [queue   (LinkedBlockingQueue.)
-              factory (org.httpkit.PrefixThreadFactory. "http-kit-client-worker-")]
-          (ThreadPoolExecutor.
-            (max 2 (Math/round (* n-procs 0.5)))
-            (do                (* n-procs 2))
-            60 TimeUnit/SECONDS queue factory))))))
+(defn new-worker
+  "Returns {:keys [n-cores type pool ...]} where `:pool` is a new
+  `java.util.concurrent.ExecutorService` for handling client callbacks.
+
+  When on JVM 21+, uses `newVirtualThreadPerTaskExecutor` by default.
+  Otherwise creates a standard `ThreadPoolExecutor` with default min and max
+  thread count auto-selected based on currently available processor count."
+
+  [{:keys [queue-size n-min-threads n-max-threads prefix allow-virtual?] :as opts}]
+  (utils/new-worker
+    {:queue-type :linked
+     :default-prefix "http-kit-client-worker-"
+     :default-queue-size nil
+     :n-min-threads-factor 1.0 ; => 8  threads on 8 core system, etc.
+     :n-max-threads-factor 2.0 ; => 16 threads on 8 core system, etc.
+     :keep-alive-msecs 60000}
+    opts))
+
+(comment (new-worker {}))
+
+(defonce
+  ^{:doc
+  "(delay (new-worker {})), used to handle client callbacks.
+  See `new-worker` for details."}
+  default-worker_ (delay (new-worker {})))
 
 ;;;; Public API
 
@@ -256,7 +263,6 @@ Value may be a delay. See also `make-client`."}
      follow-redirects true
      max-redirects 10
      filter IFilter/ACCEPT_ALL
-     worker-pool default-worker-pool
      response (promise)
      keepalive 120000
      as :auto
@@ -326,8 +332,10 @@ Value may be a delay. See also `make-client`."}
                  :headers (prepare-response-headers headers)
                  :status  status}))))
 
+        worker-pool (or (force worker-pool) (:pool @default-worker_))
+
         listener
-        (RespListener. handler filter (force worker-pool)
+        (RespListener. handler filter worker-pool
           ;; 0 will return as DynamicBytes and 5 returns bytes[] - i.e. you will need to handle unzip yourself
           ;; otherwise, there are 5 coercions supported for now
           (case as :none 0 :auto 1 :text 2 :stream 3 :byte-array 4 :raw-byte-array 5))

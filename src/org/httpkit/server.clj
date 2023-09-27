@@ -44,21 +44,28 @@
   ([http-server     ] (-server-stop! http-server nil))
   ([http-server opts] (-server-stop! http-server opts)))
 
-(let [n-procs (.availableProcessors (Runtime/getRuntime))]
-  (defn- new-worker-pool
-    "Returns a new `java.util.concurrent.ExecutorService` delay for handling server
-    requests. When on JVM 21+, uses `newVirtualThreadPerTaskExecutor`. Otherwise
-    creates a standard `ThreadPoolExecutor`."
-    [n-threads queue-size prefix]
-    (delay
-      (utils/compile-if (Thread/ofVirtual)
-        (java.util.concurrent.Executors/newVirtualThreadPerTaskExecutor)
-        (let [queue   (ArrayBlockingQueue. (int (or queue-size (* 1024 20))))
-              factory (org.httpkit.PrefixThreadFactory. "http-kit-server-worker-")]
-          (ThreadPoolExecutor.
-            (int (or n-threads (max 2 (Math/round (* n-procs 0.5)))))
-            (int (or n-threads                    (* n-procs 16)))
-            0 TimeUnit/MILLISECONDS queue factory))))))
+(defn new-worker
+  "Returns {:keys [n-cores type pool ...]} where `:pool` is a new
+  `java.util.concurrent.ExecutorService` for handling server requests.
+
+  When on JVM 21+, uses `newVirtualThreadPerTaskExecutor` by default.
+  Otherwise creates a standard `ThreadPoolExecutor` with default min and max
+  thread count auto-selected based on currently available processor count."
+
+  [{:keys [queue-size n-min-threads n-max-threads prefix allow-virtual?] :as opts}]
+  (utils/new-worker
+    {:queue-type :array
+     :default-prefix "http-kit-server-worker-"
+     :default-queue-size (* 1024 20)
+     :n-min-threads-factor  1.0 ; => 8   threads on 8 core system, etc.
+     :n-max-threads-factor 16.0 ; => 128 threads on 8 core system, etc.
+     :keep-alive-msecs 0}
+
+    (assoc opts ; Support old `run-server` opts
+      :n-threads (get opts :n-threads (:thread             opts))
+      :prefix    (get opts :prefix    (:worker-name-prefix opts)))))
+
+(comment (new-worker {}))
 
 (defn run-server
   "Starts a mostly[1] Ring-compatible HttpServer with options:
@@ -67,9 +74,8 @@
     :port               ; Which port to listen to for incoming requests
 
     :worker-pool        ; `java.util.concurrent.ExecutorService` or delay to use
-                        ; for handling requests. Defaults to JVM 21+ virtual threads
-                        ; if available, otherwise to an auto-sized thread pool.
-                        ; See the GitHub wiki docs for details!
+                        ; for handling requests. Defaults to (:pool (new-worker {})).
+                        ; See `new-worker` for details.
 
     :max-body           ; Max HTTP body size in bytes (default: 8MB)
     :max-ws             ; Max WebSocket message size in bytes (default: 4MB)
@@ -143,13 +149,7 @@
               (format "Invalid event-names: (%s) %s"
                 (class event-names) (pr-str event-names)))))
 
-        worker-pool
-        (force
-          (or
-            worker-pool
-            (let [;; Deprecated pool opts, prefer explicit `worker-pool`
-                  {:keys [thread queue-size worker-name-prefix]} opts]
-              (new-worker-pool thread queue-size worker-name-prefix))))
+        worker-pool (or (force worker-pool) (:pool (new-worker (get opts :pool-opts opts))))
 
         ^org.httpkit.server.IHandler h
         (RingHandler. handler worker-pool
