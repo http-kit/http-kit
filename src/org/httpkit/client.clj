@@ -64,14 +64,13 @@
 (comment (query-string {:k1 "v1" :k2 "v2" :k3 nil :k4 ["v4a" "v4b"] :k5 []}))
 
 (defn- coerce-req
-  [{:keys [url method body sslengine insecure? query-params form-params multipart multipart-mixed?] :as req}]
+  [{:keys [url method body query-params form-params multipart multipart-mixed?] :as req}]
   (let [r (assoc req
                  :url (if query-params
                         (if (neg? (.indexOf ^String url (int \?)))
                           (str url "?" (query-string query-params))
                           (str url "&" (query-string query-params)))
                         url)
-                 :sslengine (or sslengine (when insecure? (ClientSslEngineFactory/trustAnybody)))
                  :method    (HttpMethod/fromKeyword (or method :get))
                  :headers   (prepare-request-headers req)
             ;; :body ring body: null, String, seq, InputStream, File, ByteBuffer
@@ -171,11 +170,12 @@
     (some-> (ns-resolve 'org.httpkit.sni-client 'ssl-configurer) deref)))
 
 ;; Normally only need one client per application - params can be configured per req
+(defonce  legacy-client (delay (HttpClient.)))
 (defonce default-client
   (delay
     (if ssl-configurer
       (make-client {:ssl-configurer ssl-configurer})
-      (HttpClient.))))
+      @legacy-client)))
 
 (defonce
   ^{:dynamic true
@@ -236,7 +236,7 @@ Value may be a delay. See also `make-client`."}
 
   [{:keys [client timeout connect-timeout idle-timeout filter worker-pool keepalive as follow-redirects
            max-redirects response trace-redirects allow-unsafe-redirect-methods proxy-host proxy-port
-           proxy-url tunnel? deadlock-guard? auto-compression?]
+           proxy-url tunnel? deadlock-guard? auto-compression? insecure?]
     :as opts
     :or
     {connect-timeout 60000
@@ -257,8 +257,12 @@ Value may be a delay. See also `make-client`."}
 
    & [callback]]
 
-  (let [client (or (force (or client *default-client*)) (force default-client))
-        {:keys [url method headers body sslengine]} (coerce-req opts)
+  (let [{:keys [url method headers body]} (coerce-req opts)
+        {:keys [client sslengine]}
+        (if insecure?
+          {:client @legacy-client :sslengine (ClientSslEngineFactory/trustAnybody)}
+          {:client    (force (or client *default-client* default-client))
+           :sslengine (:sslengine opts)})
 
         deliver-resp
         (fn [resp]

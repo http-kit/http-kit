@@ -361,7 +361,8 @@
   (is (contains? @(hkc/get "https://letsencrypt.org") :status)))
 
 (deftest test-multiple-https-calls-with-same-engine
-  (let [opts {:sslengine (ClientSslEngineFactory/trustAnybody)}]
+  (let [opts {:client hkc/legacy-client
+              :sslengine (ClientSslEngineFactory/trustAnybody)}]
     (is (contains? @(hkc/get "https://localhost:9898" opts) :status))
     (is (contains? @(hkc/get "https://localhost:9898" opts) :status))
     (is (contains? @(hkc/get "https://localhost:9898" opts) :status))))
