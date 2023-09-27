@@ -188,12 +188,9 @@ Value may be a delay. See also `make-client`."}
 (defn ^:private deadlock-guard [response]
   (let [e #(Exception. "http-kit client deadlock-guard: refusing to deref a request callback from inside a callback. This feature can be disabled with the request's `:deadlock-guard?` option.")]
     (reify
-      clojure.lang.IPending
-      (isRealized [_] (realized? response))
-      clojure.lang.IDeref
-      (deref [_] (if *in-callback* (throw (e)) (deref response)))
-      clojure.lang.IBlockingDeref
-      (deref [_ ms value] (if *in-callback* (throw (e)) (deref response ms value))))))
+      clojure.lang.IPending       (isRealized [_] (realized? response))
+      clojure.lang.IDeref         (deref [_         ] (if *in-callback* (throw (e)) (deref response)))
+      clojure.lang.IBlockingDeref (deref [_ ms value] (if *in-callback* (throw (e)) (deref response ms value))))))
 
 (defn request
   "Issues an async HTTP request and returns a promise object to which the value
