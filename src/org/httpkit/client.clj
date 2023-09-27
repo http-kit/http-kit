@@ -15,6 +15,8 @@
    [org.httpkit.client ClientSslEngineFactory MultipartEntity]
    [javax.net.ssl SSLContext SSLEngine]))
 
+(set! *warn-on-reflection* true)
+
 ;;;; Utils
 
 (defn- utf8-bytes    [s]     (.getBytes         (str s) "utf8"))
@@ -86,8 +88,8 @@
             (assoc :body (MultipartEntity/encode boundary entities multipart-mixed?))))
       r)))
 
-(let [n-procs (.availableProcessors (Runtime/getRuntime))]
-  (def ^:private default-worker-pool-max-threads "Used by tests." (* n-procs 2))
+(let [n-procs (delay (.availableProcessors (Runtime/getRuntime)))]
+  (def ^:private default-worker-pool-max-threads "Used by tests." (delay (* @n-procs 2)))
   (defonce
     ^{:doc
   "Delayed default `java.util.concurrent.ExecutorService` used to handle client
@@ -101,8 +103,8 @@
         (let [queue   (LinkedBlockingQueue.)
               factory (org.httpkit.PrefixThreadFactory. "http-kit-client-worker-")]
           (ThreadPoolExecutor.
-            (max 2 (Math/round (* n-procs 0.5)))
-            (do                (* n-procs 2))
+            (max 2 (Math/round (* @n-procs 0.5)))
+            (int               (* @n-procs 2))
             60 TimeUnit/SECONDS queue factory))))))
 
 ;;;; Public API

@@ -44,7 +44,7 @@
   ([http-server     ] (-server-stop! http-server nil))
   ([http-server opts] (-server-stop! http-server opts)))
 
-(let [n-procs (.availableProcessors (Runtime/getRuntime))]
+(let [n-procs (delay (.availableProcessors (Runtime/getRuntime)))]
   (defn- new-worker-pool
     "Returns a new `java.util.concurrent.ExecutorService` delay for handling server
     requests. When on JVM 21+, uses `newVirtualThreadPerTaskExecutor`. Otherwise
@@ -56,8 +56,8 @@
         (let [queue   (ArrayBlockingQueue. (int (or queue-size (* 1024 20))))
               factory (org.httpkit.PrefixThreadFactory. "http-kit-server-worker-")]
           (ThreadPoolExecutor.
-            (int (or n-threads (max 2 (Math/round (* n-procs 0.5)))))
-            (int (or n-threads                    (* n-procs 16)))
+            (int (or n-threads (max 2 (Math/round (* @n-procs 0.5)))))
+            (int (or n-threads                    (* @n-procs 16)))
             0 TimeUnit/MILLISECONDS queue factory))))))
 
 (defn run-server
