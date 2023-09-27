@@ -35,9 +35,9 @@
 
     :global-vars {*warn-on-reflection* true}
     :dependencies
-    [[ring/ring-defaults        "0.3.3"]
+    [[ring/ring-defaults        "0.4.0"]
      [ring-request-proxy        "0.1.11"]
-     [ring-basic-authentication "1.1.1"]
+     [ring-basic-authentication "1.2.0"]
      [org.clojure/data.codec    "0.1.1"]]}
 
    :dev
@@ -48,15 +48,15 @@
      [[org.clojure/clojure             "1.8.0"] ; TODO Update (blocked on `http.async.client` update`)
       [junit/junit                    "4.13.2"]
       [org.clojure/tools.logging       "1.2.4"]
-      [ch.qos.logback/logback-classic "1.2.11"]
+      [ch.qos.logback/logback-classic "1.4.11"]
       [clj-http                       "3.12.3"]
       [io.netty/netty-all       "4.1.52.Final"]
       [org.clojure/data.json           "2.4.0"]
       [http.async.client               "0.5.2"] ; TODO Update (breaking)
       [compojure                       "1.7.0"]
-      [org.clojure/tools.cli         "1.0.206"]
+      [org.clojure/tools.cli         "1.0.219"]
       [ring/ring-jetty-adapter         "1.5.1"] ; TODO Update (breaking)
-      [ring/ring-core                  "1.9.5"]]
+      [ring/ring-core                 "1.10.0"]]
 
      :plugins
      [[lein-swank   "1.4.5"]
@@ -68,4 +68,4 @@
    {:dependencies [[nrepl "1.0.0"]]
     :plugins
     [[cider/cider-nrepl         "0.30.0"]
-     [mx.cider/enrich-classpath "1.9.0"]]}})
+     [mx.cider/enrich-classpath "1.17.2"]]}})
