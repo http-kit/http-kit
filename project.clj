@@ -52,7 +52,7 @@
       [clj-http                       "3.12.3"]
       [io.netty/netty-all       "4.1.52.Final"]
       [org.clojure/data.json           "2.4.0"]
-      [http.async.client               "0.5.2"] ; TODO Update (breaking)
+      [http.async.client               "1.2.0"] ; TODO Update (breaking)
       [compojure                       "1.7.0"]
       [org.clojure/tools.cli         "1.0.219"]
       [ring/ring-jetty-adapter         "1.5.1"] ; TODO Update (breaking)
