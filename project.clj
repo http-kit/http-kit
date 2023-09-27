@@ -9,7 +9,7 @@
 
   :dependencies []
 
-  :javac-options     ["--release" "7" "-g"] ; Oldest version JVM to support
+  :javac-options     ["--release" "8" "-g"] ; Oldest version JVM to support
   :java-source-paths ["src/java"]
   :jar-exclusions    [#"^java.*"] ; exclude the java directory in source path
 
