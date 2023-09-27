@@ -24,3 +24,12 @@
   (delay (parse-java-version (str (System/getProperty "java.version")))))
 
 (defn java-version>= [n] (>= ^long @java-version_ (long n)))
+
+(defmacro compile-if
+  "Evaluates `test`. If it returns logical true (and doesn't throw), expands
+  to `then`, otherwise expands to `else`."
+  {:style/indent 1}
+  [test then else]
+  (if (try (eval test) (catch Throwable _ false))
+    `(do ~then)
+    `(do ~else)))

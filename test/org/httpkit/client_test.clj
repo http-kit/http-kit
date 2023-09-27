@@ -604,9 +604,8 @@
     (let [{:keys [error] :as resp} (bad-callback loop-depth false)]
       (is (and error (re-find #"deadlock-guard" (.getMessage ^Throwable error)))))
 
-    (if (< loop-depth (.getMaximumPoolSize ^java.util.concurrent.ThreadPoolExecutor hkc/default-pool))
-      (let [{:keys [error]} (bad-callback loop-depth true)]
-        (is (= nil error)))
+    (if (< loop-depth @#'hkc/default-worker-pool-max-threads)
+      (let [{:keys [error]} (bad-callback loop-depth true)] (is (= nil error)))
       (println "Skipping disabled-deadlock-guard test due to low CPU count."))))
 
 (deftest zip

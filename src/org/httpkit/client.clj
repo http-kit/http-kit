@@ -86,12 +86,24 @@
             (assoc :body (MultipartEntity/encode boundary entities multipart-mixed?))))
       r)))
 
-;; thread pool for executing callbacks, since they may take a long time to execute.
-;; protect the IO loop thread: no starvation
-(def default-pool (let [max (.availableProcessors (Runtime/getRuntime))
-                        queue (LinkedBlockingQueue.)
-                        factory (PrefixThreadFactory. "client-worker-")]
-                    (ThreadPoolExecutor. max max 60 TimeUnit/SECONDS queue factory)))
+(let [n-procs (.availableProcessors (Runtime/getRuntime))]
+  (def ^:private default-worker-pool-max-threads "Used by tests." (* n-procs 2))
+  (defonce
+    ^{:doc
+  "Delayed default `java.util.concurrent.ExecutorService` used to handle client
+  callbacks. When on JVM 21+, uses `newVirtualThreadPerTaskExecutor`. Otherwise
+  uses a standard `ThreadPoolExecutor` with min and max thread count
+  auto-selected based on currently available processor count."}
+    default-worker-pool
+    (delay
+      (utils/compile-if (Thread/ofVirtual)
+        (java.util.concurrent.Executors/newVirtualThreadPerTaskExecutor)
+        (let [queue   (LinkedBlockingQueue.)
+              factory (org.httpkit.PrefixThreadFactory. "http-kit-client-worker-")]
+          (ThreadPoolExecutor.
+            (max 2 (Math/round (* n-procs 0.5)))
+            (do                (* n-procs 2))
+            60 TimeUnit/SECONDS queue factory))))))
 
 ;;;; Public API
 
@@ -244,7 +256,7 @@ Value may be a delay. See also `make-client`."}
      follow-redirects true
      max-redirects 10
      filter IFilter/ACCEPT_ALL
-     worker-pool default-pool
+     worker-pool default-worker-pool
      response (promise)
      keepalive 120000
      as :auto
@@ -315,7 +327,7 @@ Value may be a delay. See also `make-client`."}
                  :status  status}))))
 
         listener
-        (RespListener. handler filter worker-pool
+        (RespListener. handler filter (force worker-pool)
           ;; 0 will return as DynamicBytes and 5 returns bytes[] - i.e. you will need to handle unzip yourself
           ;; otherwise, there are 5 coercions supported for now
           (case as :none 0 :auto 1 :text 2 :stream 3 :byte-array 4 :raw-byte-array 5))
