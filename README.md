@@ -5,13 +5,13 @@
 
 ### Simple, high-performance event-driven HTTP client+server for Clojure
 
-http-kit is a minimalist and highly efficient Ring-compatible HTTP client+server for Clojure.
+http-kit is a minimalist and efficient Ring-compatible HTTP client+server for Clojure.
 
 It uses an event-driven architecture to support highly concurrent a/synchronous web applications, and features a simple unified API for WebSocket and HTTP long-polling/streaming.
 
 ## Latest release/s
 
-- `2023-06-30` `2.7.0`: [changes](../../releases/tag/v2.7.0)
+- `2023-06-30` `2.7.0` (stable): [changes](../../releases/tag/v2.7.0)
 
 [![Main tests][Main tests SVG]][Main tests URL]
 [![Graal tests][Graal tests SVG]][Graal tests URL]
@@ -20,19 +20,17 @@ See [here][GitHub releases] for earlier releases.
 
 ## Why http-kit?
 
-> Links below may point to the unmaintained and outdated [legacy website](https://http-kit.github.io). Efforts are underway to migrate and update info from there on the new [community wiki][GitHub wiki].
+- **Ring compliant**: http-kit is a drop-in replacement for the standard Ring Jetty adapter. You can use it with all your current libraries and middleware.
 
-- **Ring compliant**: http-kit is an [(almost)](https://http-kit.github.io/migration.html) drop-in replacement for the standard Ring Jetty adapter. So you can use it with all your current libraries (e.g. [Compojure](https://http-kit.github.io/server.html#routing)) and middleware.
+- **High performance**: http-kit uses an event-driven architecture like nginx, and is **fast**. It comfortably [handles](https://github.com/taoensso/clojure-web-server-benchmarks/tree/master/results/legacy#legacy-results) tens of thousands of requests/sec on even low-end hardware.
 
-- **High performance**: Using an event-driven architecture like Nginx, HTTP-kit is [very, very fast](https://github.com/taoensso/clojure-web-server-benchmarks). It comfortably handles tens of thousands of requests/sec on even midrange hardware. [Here](https://www.techempower.com/benchmarks/#section=data-r3) is another test about how it stacks up with others.
+- **High concurrency**: http-kit is **efficient**. Its RAM usage is O(n), with only few kB used per connection. Tests have [shown](https://http-kit.github.io/600k-concurrent-connection-http-kit.html) http-kit happily serving >600k concurrent connections.
 
-- **High concurrency**: It's not only fast, but [efficient](https://http-kit.github.io/600k-concurrent-connection-http-kit.html)! Each connection costs nothing but a few kB of memory. RAM usage grows O(n) with connections.
+- **Clean, simple, small**: written from the ground-up to be **lean**, the entire http-kit client+server JAR is ~90kB with zero dependencies and ~3k lines of code.
 
-- **Clean, simple, small**: Written from the ground-up to be lean, the entire client/server is available as a single ~90kB JAR with zero dependencies and [~3k lines](https://http-kit.github.io/http-kit-clean-small.html) of (mostly Java) code.
+- **Sync or async**: synchronous is simple, asynchronous fast & flexible. With http-kit you get the best of both with a simple API that lets you mix & match to best fit your use case.
 
-- **Sync or async**: Synchronous is simple. Asynchronous is fast & flexible. With http-kit you get the best of both with a [simple API](https://http-kit.github.io/client.html) that lets you mix & match to best fit your use case.
-
-- **WebSockets and Comet**: With great out-the-box support for both [WebSockets](https://http-kit.github.io/server.html#websocket) and efficient handling of [long-held HTTP requests](https://http-kit.github.io/server.html#async), realtime web applications are a breeze to write.
+- **WebSockets and Comet**: realtime web apps are a breeze with http-kit, with great out-the-box support for both WebSockets and efficient HTTP long-polling.
 
 ## Status
 
