@@ -360,6 +360,21 @@
   (is (contains? @(hkc/get "https://microsoft.com")   :status))
   (is (contains? @(hkc/get "https://letsencrypt.org") :status)))
 
+(deftest test-bad-ssl-certs
+  (doseq [url
+          ["https://expired.badssl.com/"
+           "https://wrong.host.badssl.com/"
+           "https://self-signed.badssl.com/"
+           "https://untrusted-root.badssl.com/"
+           ;; Temporarily disabled, Ref. <https://github.com/chromium/badssl.com/issues/515>
+           #_"https://revoked.badssl.com/"]]
+
+    (let [resp @(hkc/get url)]
+      (is (instance? javax.net.ssl.SSLHandshakeException (:error resp))
+          (str "HTTP GET to " url " did not throw an exception: "
+               (pr-str resp)))
+      (is (contains? @(hkc/get url {:insecure? true}) :status)))))
+
 (deftest test-multiple-https-calls-with-same-engine
   (let [opts {:client hkc/legacy-client
               :sslengine (ClientSslEngineFactory/trustAnybody)}]

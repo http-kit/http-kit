@@ -89,9 +89,7 @@ public class HttpClient implements Runnable {
     public static SSLContext getDefaultContext() {
         if(defaultContext==null) {
             try {
-                SSLContext sslContext = SSLContext.getInstance("TLS");
-                sslContext.init(null, TrustManagerFactory.getTrustManagers() ,null);
-                defaultContext = sslContext;
+                defaultContext = SSLContext.getDefault();
             } catch (Exception e) {
                 throw new Error("Failed to initialize SSLContext", e);
             }
