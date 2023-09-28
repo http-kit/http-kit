@@ -112,7 +112,7 @@
               proxy-protocol worker-pool
               error-logger warn-logger event-logger event-names
               legacy-return-value? server-header address-finder
-              channel-factory] :as opts
+              channel-factory ring-async?] :as opts
 
        :or   {ip         "0.0.0.0"
               port       8090
@@ -121,7 +121,8 @@
               max-line   8192
               proxy-protocol :disable
               legacy-return-value? true
-              server-header "http-kit"}}]]
+              server-header "http-kit"
+              ring-async? false}}]]
 
   (let [^ContextLogger err-logger
         (if error-logger
@@ -152,7 +153,7 @@
         worker-pool (or (force worker-pool) (:pool (new-worker (get opts :pool-opts opts))))
 
         ^org.httpkit.server.IHandler h
-        (RingHandler. handler worker-pool
+        (RingHandler. handler ring-async? worker-pool
           err-logger evt-logger evt-names server-header)
 
         ^ProxyProtocolOption proxy-enum
