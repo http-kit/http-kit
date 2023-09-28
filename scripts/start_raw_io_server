@@ -1,6 +1,6 @@
 #! /bin/bash -x
 
-# simplest NIO server to have a sense of how fast It can be
+# simplest NIO server to have a sense of how fast it can be
 
 cd test/java/
 
@@ -11,10 +11,9 @@ else
 
 fi
 
-
 exit
 
-# benchamark
+# benchmark
 # wrk -t2 -c200 -d4 http://192.168.1.101:8000/ && sleep 1 && wrk -t2 -c200 -d10 http://192.168.1.101:8000/
 
 # Fri Apr 12 14:56:27 CST 2013
@@ -41,6 +40,6 @@ exit
 
 # 15k
 
-# bulck => 130214.72
+# bulk => 130214.72
 # non-direct => 120193.54
 # direct => 137388.65

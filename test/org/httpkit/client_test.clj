@@ -218,36 +218,37 @@
           (is (= 200 (:status @r))))))))
 
 (deftest ^:benchmark performance-bench
+  (println "\nBenching clients...")
+
   (let [url "http://127.0.0.1:14347/get"]
-    ;; just for fun
-    (bench "http-kit, concurrency 1, 3000 requests: "
-      (doseq [_ (range 0 3000)] @(hkc/get url)))
-
-    (bench "clj-http, concurrency 1, 3000 requests: "
-      (doseq [_ (range 0 3000)] (clj-http/get url)))
-
-    (bench "http-kit, concurrency 10, 3000 requests: "
+    (println)
+    (println "Concurrency 1, 3k requests")
+    (bench "  http-kit: " (doseq [_ (range 0 3000)] @(hkc/get     url)))
+    (bench "  clj-http: " (doseq [_ (range 0 3000)] (clj-http/get url)))
+    (println)
+    (println "Concurrency 10, 3k requests")
+    (bench "  http-kit: "
       (doseq [_ (range 0 300)]
-        (let [requests (doall (map (fn [u] (hkc/get u))
-                                        (repeat 10 url)))]
-          (doseq [r requests] @r))))) ; wait all finish
+        (let [requests (doall (map (fn [u] (hkc/get u)) (repeat 10 url)))]
+          (doseq [r requests] @r)))))
 
   (let [url "https://127.0.0.1:9898/get"]
-    (bench "http-kit, https, concurrency 1, 1000 requests: "
-      (doseq [_ (range 0 1000)] @(hkc/get url {:insecure? true})))
-
-    (bench "http-kit, https, concurrency 10, 1000 requests: "
+    (println)
+    (println "Concurrency 1, 1k requests, https")
+    (bench "  http-kit: " (doseq [_ (range 0 1000)] @(hkc/get     url {:insecure? true})))
+    (bench "  clj-http: " (doseq [_ (range 0 1000)] (clj-http/get url {:insecure? true})))
+    (println)
+    (println "Concurrency 10, 1k requests, https")
+    (bench "  http-kit: "
       (doseq [_ (range 0 100)]
-        (let [requests (doall (map (fn [u] (hkc/get u {:insecure? true}))
-                                (repeat 10 url)))]
-          (doseq [r requests] @r)))) ; wait all finish
+        (let [requests (doall (map (fn [u] (hkc/get u {:insecure? true})) (repeat 10 url)))]
+          (doseq [r requests] @r))))
 
-    (bench "clj-http, https, concurrency 1, 1000 requests: "
-      (doseq [_ (range 0 1000)] (clj-http/get url {:insecure? true})))
-
-    (bench "http-kit, https, keepalive disabled, concurrency 1, 1000 requests: "
-      (doseq [_ (range 0 1000)] @(hkc/get url {:insecure? true
-                                               :keepalive -1})))))
+    (println)
+    (println "Concurrency 1, 1k requests, https, no keepalive")
+    (bench "  http-kit: " (doseq [_ (range 0 1000)] @(hkc/get url {:insecure? true :keepalive -1})))
+    (println)
+    (println "Finished benching clients")))
 
 (deftest test-http-client-user-agent
   (let [ua "test-ua"
