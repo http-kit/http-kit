@@ -3,6 +3,7 @@ package org.httpkit.server;
 import static clojure.lang.Keyword.intern;
 import static org.httpkit.HttpUtils.HttpEncode;
 import static org.httpkit.HttpVersion.HTTP_1_0;
+import static org.httpkit.HttpVersion.HTTP_1_1;
 import static org.httpkit.server.ClojureRing.BODY;
 import static org.httpkit.server.ClojureRing.HEADERS;
 import static org.httpkit.server.ClojureRing.buildRequestMap;
@@ -130,6 +131,8 @@ class HttpHandler implements Runnable {
                     HeaderMap headers = HeaderMap.camelCase((Map) resp.get(HEADERS));
                     if (req.version == HTTP_1_0 && req.isKeepAlive) {
                         headers.put("Connection", "Keep-Alive");
+                    } else if (req.version == HTTP_1_1 && !req.isKeepAlive) {
+                        headers.put("Connection", "Close");
                     }
                     final int status = getStatus(resp);
                     cb.run(HttpEncode(status, headers, body, this.serverHeader));
