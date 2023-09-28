@@ -32,12 +32,11 @@ This will build the java source and test files, it will then execute 'lein test'
 
 To run the java junit tests, at the root of the project type:
 
-```rake junit```
+```rake test_java```
 
 To run a set of benchmarks, at the root of the project type:
 
-```rake benchmark```
-
+```rake bench```
 
 ## Filing Pull Requests
 

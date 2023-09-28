@@ -5,7 +5,7 @@ mkdir target
 
 CP="classes:$(lein classpath)"
 
-# find src/java -name "*.java" | xargs javac -g -Xlint:unchecked -encoding utf8 -cp "$CP" -d classes -sourcepath src/java/
+# find src/java -name "*.java" | xargs javac -g -cp "$CP" -d classes -sourcepath src/java/
 
 # lein javac
 
