@@ -28,6 +28,7 @@ import org.httpkit.server.Frame.TextFrame;
 import org.httpkit.server.Frame.BinaryFrame;
 import org.httpkit.server.Frame.PingFrame;
 
+import clojure.lang.AFn;
 import clojure.lang.IFn;
 import clojure.lang.IPersistentMap;
 import clojure.lang.Keyword;
@@ -102,17 +103,19 @@ class HttpHandler implements Runnable {
     final HttpRequest req;
     final RespCallback cb;
     final IFn handler;
+    final boolean isRingAsync;
 
     final ContextLogger<String, Throwable> errorLogger;
     final EventLogger<String> eventLogger;
     final EventNames eventNames;
     final String serverHeader;
 
-    public HttpHandler(HttpRequest req, RespCallback cb, IFn handler,
-            ContextLogger<String, Throwable> errorLogger, EventLogger<String> eventLogger, EventNames eventNames, String serverHeader) {
+    public HttpHandler(HttpRequest req, RespCallback cb, IFn handler, boolean isRingAsync,
+                       ContextLogger<String, Throwable> errorLogger, EventLogger<String> eventLogger, EventNames eventNames, String serverHeader) {
         this.req = req;
         this.cb = cb;
         this.handler = handler;
+        this.isRingAsync = isRingAsync;
         this.errorLogger = errorLogger;
         this.eventLogger = eventLogger;
         this.eventNames = eventNames;
@@ -120,30 +123,70 @@ class HttpHandler implements Runnable {
     }
 
     public void run() {
-        try {
-            Map resp = (Map) handler.invoke(buildRequestMap(req));
-            if (resp == null) { // handler return null
-                cb.run(HttpEncode(404, new HeaderMap(), null, this.serverHeader));
-                eventLogger.log(eventNames.serverStatus404);
-            } else {
-                Object body = resp.get(BODY);
-                if (!(body instanceof AsyncChannel)) { // hijacked
-                    HeaderMap headers = HeaderMap.camelCase((Map) resp.get(HEADERS));
-                    if (req.version == HTTP_1_0 && req.isKeepAlive) {
-                        headers.put("Connection", "Keep-Alive");
-                    } else if (req.version == HTTP_1_1 && !req.isKeepAlive) {
-                        headers.put("Connection", "Close");
-                    }
-                    final int status = getStatus(resp);
-                    cb.run(HttpEncode(status, headers, body, this.serverHeader));
-                    eventLogger.log(eventNames.serverStatusPrefix + status);
-                }
-            }
-        } catch (Throwable e) {
-            cb.run(HttpEncode(500, new HeaderMap(), e.getMessage(), this.serverHeader));
-            errorLogger.log(req.method + " " + req.uri, e);
-            eventLogger.log(eventNames.serverStatus500);
+        if (isRingAsync) {
+            runAsync();
         }
+        else {
+            runSync();
+        }
+    }
+
+    private void runSync() {
+        try {
+            handleResponse((Map) handler.invoke(buildRequestMap(req)));
+        } catch (Throwable e) {
+            handleError(e);
+        }
+    }
+
+    private void runAsync() {
+        try {
+            handler.invoke(buildRequestMap(req),
+                           new AFn() {
+                               public Object invoke(Object resp) {
+                                   try {
+                                       handleResponse((Map) resp);
+                                   } catch (Throwable e) {
+                                       handleError(e);
+                                   }
+                                   return null;
+                               }
+                           },
+                           new AFn() {
+                               public Object invoke(Object e) {
+                                   handleError((Throwable) e);
+                                   return null;
+                               }
+                           });
+        } catch (Throwable e) {
+            handleError(e);
+        }
+    }
+
+    private void handleResponse(Map resp) throws Throwable {
+        if (resp == null) { // handler return null
+            cb.run(HttpEncode(404, new HeaderMap(), null, this.serverHeader));
+            eventLogger.log(eventNames.serverStatus404);
+        } else {
+            Object body = resp.get(BODY);
+            if (!(body instanceof AsyncChannel)) { // hijacked
+                HeaderMap headers = HeaderMap.camelCase((Map) resp.get(HEADERS));
+                if (req.version == HTTP_1_0 && req.isKeepAlive) {
+                    headers.put("Connection", "Keep-Alive");
+                } else if (req.version == HTTP_1_1 && !req.isKeepAlive) {
+                    headers.put("Connection", "Close");
+                }
+                final int status = getStatus(resp);
+                cb.run(HttpEncode(status, headers, body, this.serverHeader));
+                eventLogger.log(eventNames.serverStatusPrefix + status);
+            }
+        }
+    }
+
+    private void handleError(Throwable e) {
+        cb.run(HttpEncode(500, new HeaderMap(), e.getMessage(), this.serverHeader));
+        errorLogger.log(req.method + " " + req.uri, e);
+        eventLogger.log(eventNames.serverStatus500);
     }
 }
 
@@ -207,21 +250,22 @@ class WSHandler implements Runnable {
 public class RingHandler implements IHandler {
     final ExecutorService execs;
     final IFn handler;
+    final boolean isRingAsync;
 
     final ContextLogger<String, Throwable> errorLogger;
     final EventLogger<String> eventLogger;
     final EventNames eventNames;
     final String serverHeader;
 
-    public RingHandler(IFn handler, ExecutorService execs) {
-        this(handler, execs, ContextLogger.ERROR_PRINTER, EventLogger.NOP, EventNames.DEFAULT, "http-kit");
+    public RingHandler(IFn handler, boolean isRingAsync, ExecutorService execs) {
+        this(handler, isRingAsync, execs, ContextLogger.ERROR_PRINTER, EventLogger.NOP, EventNames.DEFAULT, "http-kit");
     }
 
-    public RingHandler(int thread, IFn handler, String prefix, int queueSize, String serverHeader) {
-        this(thread, handler, prefix, queueSize, serverHeader, ContextLogger.ERROR_PRINTER, EventLogger.NOP, EventNames.DEFAULT);
+    public RingHandler(int thread, IFn handler, boolean isRingAsync, String prefix, int queueSize, String serverHeader) {
+        this(thread, handler, isRingAsync, prefix, queueSize, serverHeader, ContextLogger.ERROR_PRINTER, EventLogger.NOP, EventNames.DEFAULT);
     }
 
-    public RingHandler(int thread, IFn handler, String prefix, int queueSize, String serverHeader,
+    public RingHandler(int thread, IFn handler, boolean isRingAsync, String prefix, int queueSize, String serverHeader,
             ContextLogger<String, Throwable> errorLogger, EventLogger<String> eventLogger, EventNames eventNames) {
         this.errorLogger = errorLogger;
         this.eventLogger = eventLogger;
@@ -230,13 +274,15 @@ public class RingHandler implements IHandler {
         BlockingQueue<Runnable> queue = new ArrayBlockingQueue<Runnable>(queueSize);
         execs = new ThreadPoolExecutor(thread, thread, 0, TimeUnit.MILLISECONDS, queue, factory);
         this.handler = handler;
+        this.isRingAsync = isRingAsync;
         this.serverHeader = serverHeader;
     }
 
-    public RingHandler(IFn handler, ExecutorService execs,
+    public RingHandler(IFn handler, boolean isRingAsync, ExecutorService execs,
             ContextLogger<String, Throwable> errorLogger, EventLogger<String> eventLogger, EventNames eventNames,
             String serverHeader) {
         this.handler = handler;
+        this.isRingAsync = isRingAsync;
         this.execs = execs;
         this.errorLogger = errorLogger;
         this.eventLogger = eventLogger;
@@ -246,7 +292,7 @@ public class RingHandler implements IHandler {
 
     public void handle(HttpRequest req, RespCallback cb) {
         try {
-            execs.submit(new HttpHandler(req, cb, handler, errorLogger, eventLogger, eventNames, this.serverHeader));
+            execs.submit(new HttpHandler(req, cb, handler, isRingAsync, errorLogger, eventLogger, eventNames, this.serverHeader));
         } catch (RejectedExecutionException e) {
             errorLogger.log("failed to submit task to executor service", e);
             eventLogger.log(eventNames.serverStatus503);

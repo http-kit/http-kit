@@ -553,3 +553,21 @@
         (is (= "hello world" (:body (http/get "http://localhost:34749"))))
         (is (= [:address :channel] @calls))
         (finally (server))))))
+
+(defn- ring-async-handler [{:keys [uri]} respond raise]
+  (case uri
+    "/world" (respond {:status 200, :headers {}, :body "hello world"})
+    "/head"  (respond {:status 200, :headers {"X-Foo" "bar"}, :body ""})
+    "/slow"  (future (Thread/sleep 1000)
+                     (respond {:status 200, :headers {}, :body "hello world"}))
+    "/error" (raise (ex-info "error" {}))))
+
+(deftest test-ring-async-handlers
+  (let [server (run-server ring-async-handler {:port 9091, :ring-async? true})]
+    (try
+      (is (= "hello world" (:body (http/get "http://localhost:9091/world"))))
+      (is (= "bar" (get-in (http/get "http://localhost:9091/head") [:headers "x-foo"])))
+      (is (= "hello world" (:body (http/get "http://localhost:9091/slow"))))
+      (is (= 500 (:status (http/get "http://localhost:9091/error"
+                                    {:throw-exceptions false}))))
+      (finally (server)))))
