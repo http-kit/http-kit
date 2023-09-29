@@ -2,6 +2,37 @@ This project uses [**Break Versioning**](https://www.taoensso.com/break-versioni
 
 ---
 
+# `v2.8.0-beta2` (2023-10-11)
+
+> 📦 [Available on Clojars](https://clojars.org/http-kit/versions/2.8.0-beta2), this project uses [Break Versioning](https://www.taoensso.com/break-versioning).
+
+This is an early **maintenance and feature pre-release**.  
+Please **test carefully and report any unexpected problems**, thank you! 🙏
+
+## Fixes since `v2.8.0-beta1`
+
+* de3596a [fix] [server] [#539] [#540] Prevent race condition in TimerService (@weavejester)
+* 2474302 [fix] [client] [#535] [#536] Fix handling of some bad ssl certificates (@jeffdik)
+* b45725f [fix] [server] [#543] Migrate away from SimpleDateFormat to java.time, fixes native-image issue (@borkdude)
+* 45a4b53 [fix] [server] [#537] Respond with `Connection: Close` when appropriate
+
+## New since `v2.8.0-beta1`
+
+* 741eed8 [new] [tests] Add new benchmark suite
+* 2a74dbf [new] [tests] Add first benchmark results
+* 6652df8 [new] [server] [#394] [#538] Add support for Ring async handler arities (@weavejester)
+* 41940f3 [new] [client] [server] Add public worker constructors
+* f267426 [new] `utils/new-worker` improvements
+
+## Other improvements since `v2.8.0-beta1`
+
+* 7d49819 [nop] Bump Jetty dependency, fix broken tests
+* 9877bca [nop] [client] Don't submit tasks to closed pool
+* 92fc3fe [wiki] Add client page from legacy website (@harold)
+* 9b131e2 [wiki] Clean-up, update client docs
+
+---
+
 # `v2.8.0-beta1` (2023-09-27)
 
 > 📦 [Available on Clojars](https://clojars.org/http-kit/versions/2.8.0-beta1), this project uses [Break Versioning](https://www.taoensso.com/break-versioning).
@@ -36,6 +67,7 @@ As always, feedback welcome! Cheers :-)
 
 * 4813a17 [nop] [#530] [#531] Update dep: `http.async.client` (@NoahTheDuke)
 
+---
 
 # `v2.7.0` (2023-06-30)
 
