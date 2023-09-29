@@ -54,8 +54,8 @@
 
   [{:keys [queue-size n-min-threads n-max-threads prefix allow-virtual?] :as opts}]
   (utils/new-worker
-    {:queue-type :array
-     :default-prefix "http-kit-server-worker-"
+    {:default-prefix "http-kit-server-worker-"
+     :default-queue-type :array
      :default-queue-size (* 1024 20)
      :n-min-threads-factor  1.0 ; => 8   threads on 8 core system, etc.
      :n-max-threads-factor 16.0 ; => 128 threads on 8 core system, etc.

@@ -37,32 +37,42 @@
     `(do ~then)
     `(do ~else)))
 
+(defn have-virtual-threads?
+  "Returns true iff the current JVM supports virtual threads."
+  [] (compile-if (Thread/ofVirtual) true false))
+
 (defn new-worker
   "Returns {:keys [n-cores type pool ...]} where `:pool` is a
   `java.util.concurrent.ExecutorService`."
 
   [{:as   _internal-opts
-    :keys [queue-type default-prefix default-queue-size
+    :keys [default-queue-type default-queue-size default-prefix
            n-min-threads-factor n-max-threads-factor
            keep-alive-msecs]
     :or
-    {queue-type :array
+    {default-queue-type :array
      default-prefix "http-kit-worker-"
      n-min-threads-factor 1
      n-max-threads-factor 1}}
 
    {:as   _user-opts
     :keys [n-min-threads n-max-threads n-threads
-           queue-size prefix allow-virtual?]}]
+           queue-type queue-size prefix allow-virtual?]
+    :or   {allow-virtual? true}}]
 
   (let [;; Calculate at runtime to prevent Graal issues
-        n-cores (.availableProcessors (Runtime/getRuntime))]
-    (compile-if (and allow-virtual? (Thread/ofVirtual))
+        n-cores (.availableProcessors (Runtime/getRuntime))
+        new-virtual-pool
+        (compile-if (Thread/ofVirtual)
+          (fn [] (java.util.concurrent.Executors/newVirtualThreadPerTaskExecutor))
+          nil)]
+
+    (if (and allow-virtual? new-virtual-pool)
 
       ;; Use JVM 21+ virtual threads
       {:type    :virtual
        :n-cores n-cores
-       :pool    (java.util.concurrent.Executors/newVirtualThreadPerTaskExecutor)}
+       :pool    (new-virtual-pool)}
 
       ;; Use fixed thread pool
       (let [factory          (org.httpkit.PrefixThreadFactory. (or prefix default-prefix))
@@ -72,7 +82,7 @@
 
             queue-size (or queue-size default-queue-size)
             queue
-            (case queue-type
+            (case (or queue-type default-queue-type)
               :array (ArrayBlockingQueue. (int queue-size))
               :linked
               (if queue-size
@@ -83,6 +93,7 @@
          :n-cores       n-cores
          :n-min-threads n-min-threads
          :n-max-threads n-max-threads
+         :queue-type    queue-type
          :queue-size    queue-size
          :queue         queue
          :pool
