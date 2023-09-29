@@ -12,17 +12,17 @@ public class TimerService implements Runnable {
     private final AtomicBoolean started = new AtomicBoolean(false);
 
     public CancelableFutureTask scheduleTask(int timeout, IFn task) {
-        // start the timer thread, if not started
-        if (started.compareAndSet(false, true)) {
-            // the timer thread will kill itself when no job to schedule for too
-            // much time. restart if new job come it
-            Thread t = new Thread(this, "timer-service");
-            t.start();
-        }
-
         CancelableFutureTask t = new CancelableFutureTask(timeout, task, queue);
         synchronized (queue) {
             queue.offer(t);
+
+            // start the timer thread, if not started
+            if (started.compareAndSet(false, true)) {
+                // the timer thread will kill itself when no job to schedule for too
+                // much time. restart if new job come it
+                new Thread(this, "timer-service").start();
+            }
+
             queue.notify();
         }
         return t;
@@ -45,16 +45,16 @@ public class TimerService implements Runnable {
             }
             if (task == null) {
                 synchronized (queue) {
-                    try {
-                        // wait 2 minute before kill self
-                        queue.wait(1000 * 120);
-                        if (emptyQueueWaited) {
-                            started.compareAndSet(true, false);
-                            break; // die, will restart
-                        } else {
+                    // wait 2 minute before kill self
+                    if (emptyQueueWaited) {
+                        started.compareAndSet(true, false);
+                        break; // die, will restart
+                    } else {
+                        try {
+                            queue.wait(1000 * 120);
                             emptyQueueWaited = true; // queue is empty
+                        } catch (InterruptedException ignore) {
                         }
-                    } catch (InterruptedException ignore) {
                     }
                 }
             } else {
