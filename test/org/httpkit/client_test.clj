@@ -47,19 +47,19 @@
 (defroutes test-routes
   (GET  "/get"      [] "hello")
   (POST "/post"     [] "hello")
-  (ANY  "/204"      [] {:status 204})
+  (ANY  "/204"      [] {:status 204 :body ""})
   (ANY  "/redirect" []
     (fn [req]
       (let [total (-> req :params :total to-int)
             n (-> req :params :n to-int)
             code (to-int (or (-> req :params :code) "302"))]
         (if (>= n total)
-          {:status 200 :body (-> req :request-method name)}
-          {:status code
+          {:status 200  :body (-> req :request-method name)}
+          {:status code :body ""
            :headers {"location" (str "redirect?total=" total "&n=" (inc n)
                                   "&code=" code)}}))))
 
-  (ANY "/redirect-nil" [] (fn [req] {:status 302 :headers nil}))
+  (ANY "/redirect-nil" [] (fn [req] {:status 302 :headers nil :body ""}))
   (POST "/multipart"   []
     (fn [req]
       (->> req
@@ -76,7 +76,7 @@
   (ANY   "/method"       []
     (fn [req]
       (let [m (:request-method req)]
-        {:status 200
+        {:status 200 :body ""
          :headers {"x-method" (pr-str m)}})))
 
   (ANY    "/unicode"    [] (fn [req] (-> req :params :str)))
@@ -89,7 +89,7 @@
 
   (GET "/multi-header" []
     (fn [req]
-      {:status 200
+      {:status 200 :body ""
        :headers {"x-method"  ["value1", "value2"]
                  "x-method2" ["value1", "value2", "value3"]}}))
 
@@ -104,8 +104,10 @@
 
   (GET "/accept-encoding" []
     (fn [req]
-      {:headers {"x-sent-accept-encoding" (get-in req [:headers "accept-encoding"])}
-       :status  200})))
+      {:status  200 :body ""
+       :headers {"x-sent-accept-encoding" (get-in req [:headers "accept-encoding"])}}))
+
+  (ANY "*" [] {:status 404 :body ""}))
 
 (defonce servers_ (atom nil))
 (defn    servers-stop! []
@@ -130,6 +132,8 @@
        :jetty (fn [] (.stop jetty))})
 
     (fn stop [] (servers-stop!))))
+
+(comment (servers-start!) (servers-stop!))
 
 ;;;;
 
@@ -379,9 +383,9 @@
 (deftest test-multiple-https-calls-with-same-engine
   (let [opts {:client hkc/legacy-client
               :sslengine (ClientSslEngineFactory/trustAnybody)}]
-    (is (contains? @(hkc/get "https://localhost:9898" opts) :status))
-    (is (contains? @(hkc/get "https://localhost:9898" opts) :status))
-    (is (contains? @(hkc/get "https://localhost:9898" opts) :status))))
+    (is (= (:status @(hkc/get "https://localhost:9898" opts) 404)))
+    (is (= (:status @(hkc/get "https://localhost:9898" opts) 404)))
+    (is (= (:status @(hkc/get "https://localhost:9898" opts) 404)))))
 
 (deftest test-default-sni-client
   (testing "`sni/default-client` behaves similarly to `URL.openStream()`"

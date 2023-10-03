@@ -53,7 +53,7 @@
       [http.async.client               "1.3.0"] ; Newer versions fail
       [compojure                       "1.7.0"]
       [org.clojure/tools.cli         "1.0.219"]
-      [ring/ring-jetty-adapter         "1.5.1"] ; Newer versions fail
+      [ring/ring-jetty-adapter        "1.10.0"]
       [ring/ring-core                 "1.10.0"]]
 
      :plugins
