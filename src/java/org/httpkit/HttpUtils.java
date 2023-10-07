@@ -10,28 +10,23 @@ import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel.MapMode;
 import java.nio.charset.Charset;
-import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import java.time.*;
+import java.time.format.DateTimeFormatter;
 
 import static java.lang.Character.isWhitespace;
 import static java.lang.Math.min;
 import static java.net.InetAddress.getByName;
 
-//  SimpleDateFormat is not thread safe
-class DateFormatter extends ThreadLocal<SimpleDateFormat> {
-    protected SimpleDateFormat initialValue() {
-        // Formats into HTTP date format (RFC 822/1123).
-        SimpleDateFormat f = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.US);
-        f.setTimeZone(TimeZone.getTimeZone("GMT"));
-        return f;
-    }
-
-    private static final DateFormatter FORMATTER = new DateFormatter();
+class DateFormatter {
+    private static ZoneId GMT = ZoneId.of("GMT");
+    private static DateTimeFormatter formatter = DateTimeFormatter.RFC_1123_DATE_TIME.withLocale(Locale.US);
 
     public static String getDate() {
-        return FORMATTER.get().format(new Date());
+        return ZonedDateTime.now(GMT).format(formatter);
     }
 }
 
