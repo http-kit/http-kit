@@ -3,6 +3,7 @@ package org.httpkit.server;
 import org.httpkit.HttpUtils;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 
 public abstract class Frame {
     public final byte[] data;
@@ -49,6 +50,13 @@ public abstract class Frame {
                 return ByteBuffer.wrap(data, 0, 2).getShort();
             }
             return CLOSE_NORMAL;
+        }
+
+        public String getReason() {
+            if (data.length >= 2) {
+                return new String(data, 2, data.length - 2, StandardCharsets.UTF_8);
+            }
+            return "";
         }
     }
 

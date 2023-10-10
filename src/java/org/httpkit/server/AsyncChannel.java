@@ -30,9 +30,11 @@ public class AsyncChannel {
 
     final public AtomicBoolean closedRan = new AtomicBoolean();
     final private AtomicReference<IFn> closeHandler = new AtomicReference<>(null);
+    final private AtomicReference<IFn> closeRingHandler = new AtomicReference<>(null);
 
     final private AtomicReference<IFn> receiveHandler = new AtomicReference<>(null);
     final private AtomicReference<IFn> pingHandler = new AtomicReference<>(null);
+    final private AtomicReference<IFn> pongHandler = new AtomicReference<>(null);
 
     private HttpRequest request;     // package private, for http 1.0 keep-alive
 
@@ -55,8 +57,10 @@ public class AsyncChannel {
         headerSent = false;
         closedRan.set(false);
         closeHandler.set(null);
+        closeRingHandler.set(null);
         receiveHandler.set(null);
         pingHandler.set(null);
+        pongHandler.set(null);
     }
 
     private static final byte[] finalChunkBytes = "0\r\n\r\n".getBytes();
@@ -147,6 +151,12 @@ public class AsyncChannel {
         }
     }
 
+    public void setPongHandler(IFn fn) {
+        if (!pongHandler.compareAndSet(null, fn)) {
+            throw new IllegalStateException("pong handler exist: " + pongHandler);
+        }
+    }
+
     public void messageReceived(final Object mesg) {
         IFn f = receiveHandler.get();
         if (f != null) {
@@ -158,6 +168,16 @@ public class AsyncChannel {
         IFn f = pingHandler.get();
         if (f != null) {
             f.invoke(mesg);
+        } else {
+            // if no ping handler, default to sending a return PONG frame
+            server.tryWrite(key, WsEncode(OPCODE_PONG, mesg));
+        }
+    }
+
+    public void pongReceived(final byte[] mesg) {
+        IFn f = pongHandler.get();
+        if (f != null) {
+            f.invoke(mesg);
         }
     }
 
@@ -167,7 +187,7 @@ public class AsyncChannel {
     }
 
     public boolean hasCloseHandler() {
-        return closeHandler.get() != null;
+        return closeHandler.get() != null || closeRingHandler.get() != null;
     }
 
     public void setCloseHandler(IFn fn) {
@@ -179,17 +199,35 @@ public class AsyncChannel {
         }
     }
 
+    public void setCloseRingHandler(IFn fn) {
+        if (!closeRingHandler.compareAndSet(null, fn)) { // only once
+            throw new IllegalStateException("close ring handler exist: " + closeRingHandler);
+        }
+    }
+
     public void onClose(int status) {
+        onClose(status, "");
+    }
+
+    public void onClose(int status, String reason) {
         if (closedRan.compareAndSet(false, true)) {
             IFn f = closeHandler.get();
             if (f != null) {
                 f.invoke(readable(status));
             }
+            f = closeRingHandler.get();
+            if (f != null) {
+                f.invoke(status, reason);
+            }
         }
     }
 
-    // also sent CloseFrame a final Chunk
     public boolean serverClose(int status) {
+        return serverClose(status, "");
+    }
+
+    // also sent CloseFrame a final Chunk
+    public boolean serverClose(int status, String reason) {
         if (!closedRan.compareAndSet(false, true)) {
             return false; // already closed
         }
@@ -202,6 +240,10 @@ public class AsyncChannel {
         IFn f = closeHandler.get();
         if (f != null) {
             f.invoke(readable(0)); // server close is 0
+        }
+        f = closeRingHandler.get();
+        if (f != null) {
+            f.invoke(status, reason);
         }
         return true;
     }
@@ -226,6 +268,10 @@ public class AsyncChannel {
             } else if (data instanceof InputStream) {
                 DynamicBytes bytes = readAll((InputStream) data);
                 server.tryWrite(key, WsEncode(OPCODE_BINARY, bytes.get(), bytes.length()));
+            } else if (data instanceof Frame.PingFrame) {
+                server.tryWrite(key, WsEncode(OPCODE_PING, ((Frame) data).data));
+            } else if (data instanceof Frame.PongFrame) {
+                server.tryWrite(key, WsEncode(OPCODE_PONG, ((Frame) data).data));
             } else if (data != null) { // ignore null
                 String mesg = "send! called with data: " + data.toString() +
                         "(" + data.getClass() + "), but only string, byte[], InputStream expected";

@@ -5,9 +5,10 @@
    [org.httpkit.utils :as utils])
 
   (:import
-   [org.httpkit.server AsyncChannel HttpServer RingHandler ProxyProtocolOption HttpServer$AddressFinder HttpServer$ServerChannelFactory]
+   [org.httpkit.server AsyncChannel HttpServer RingHandler ProxyProtocolOption HttpServer$AddressFinder HttpServer$ServerChannelFactory Frame$PingFrame Frame$PongFrame]
    [org.httpkit.logger ContextLogger EventLogger EventNames]
    [java.net InetSocketAddress]
+   [java.nio ByteBuffer]
    [java.nio.channels ServerSocketChannel]
    [java.util.concurrent ArrayBlockingQueue ThreadPoolExecutor TimeUnit]
    java.security.MessageDigest))
@@ -66,6 +67,8 @@
       :prefix    (get opts :prefix    (:worker-name-prefix opts)))))
 
 (comment (new-worker {}))
+
+(declare wrap-ring-websocket)
 
 (defn run-server
   "Starts a mostly[1] Ring-compatible HttpServer with options:
@@ -153,7 +156,8 @@
         worker-pool (or (force worker-pool) (:pool (new-worker (get opts :pool-opts opts))))
 
         ^org.httpkit.server.IHandler h
-        (RingHandler. handler ring-async? worker-pool
+        (RingHandler.
+          (wrap-ring-websocket handler) ring-async? worker-pool
           err-logger evt-logger evt-names server-header)
 
         ^ProxyProtocolOption proxy-enum
@@ -287,8 +291,11 @@
     ([ch data close-after-send?] (.send ch data (boolean close-after-send?))))
 
   (on-receive [ch callback] (.setReceiveHandler ch callback))
-  (on-ping    [ch callback] (.setPingHandler    ch callback))
-  (on-close   [ch callback] (.setCloseHandler   ch callback)))
+  (on-close   [ch callback] (.setCloseHandler   ch callback))
+  (on-ping    [ch callback] (.setPingHandler    ch
+                              (fn callback* [data]
+                                (.send ch (Frame$PongFrame. data) false)
+                                (callback data)))))
 
 (defmacro with-channel
   "DEPRECATED: this macro has potential race conditions, Ref. #318.
@@ -306,6 +313,11 @@
            {:body ~ch-name})
          {:status 400 :body "Bad Sec-WebSocket-Key header"})
        (do ~@body {:body ~ch-name}))))
+
+(def ^:private bad-ring-websocket-resp
+  {:status 400
+   :headers {"Content-Type" "text/plain"}
+   :body "Bad Sec-Websocket-Key header"})
 
 (defn as-channel
   "Returns `{:body ch}`, where `ch` is the request's underlying
@@ -349,13 +361,7 @@
            :on-open    (fn [ch]             (println \"on-open:\"    ch))})))"
 
   [ring-req {:keys [on-receive on-ping on-close on-open init on-handshake-error]
-             :or   {on-handshake-error
-                    (fn [ch]
-                      (send! ch
-                        {:status 400
-                         :headers {"Content-Type" "text/plain"}
-                         :body "Bad Sec-Websocket-Key header"}
-                        true))}}]
+             :or   {on-handshake-error (fn [ch] (send! ch bad-ring-websocket-resp true))}}]
 
   (when-let [ch (:async-channel ring-req)]
 
@@ -373,3 +379,56 @@
       (when-let [f on-open] (f ch)))
 
     {:body ch}))
+
+(defn- buffer->bytes [^ByteBuffer buf]
+  (let [len (.remaining buf)
+        bs  (byte-array len)]
+    (.get buf bs 0 len)
+    bs))
+
+(defn- ring-websocket-resp [rreq rresp]
+  (utils/compile-if
+    (do (require '[ring.websocket.protocols :as wsp]) true) ; Have optional dep
+    (let [^AsyncChannel ch (:async-channel rreq)
+          listener (:ring.websocket/listener rresp)]
+      (if (and (:websocket? rreq) (some? listener))
+        (if-let [sec-ws-accept (websocket-handshake-check rreq)]
+          (let [l listener
+                sock
+                (reify wsp/Socket
+                  (-open? [_]        (not (.isClosed    ch)))
+                  (-send  [_ msg]         (.send        ch (if (string? msg) msg (buffer->bytes msg))     false))
+                  (-ping  [_ bb-data]     (.send        ch (Frame$PingFrame.     (buffer->bytes bb-data)) false))
+                  (-pong  [_ bb-data]     (.send        ch (Frame$PongFrame.     (buffer->bytes bb-data)) false))
+                  (-close [_ code reason] (.serverClose ch code reason)))]
+
+            (when (satisfies? wsp/PingListener listener)
+              (.setPingHandler    ch (fn [ba-msg]      (wsp/on-ping    l sock                       (ByteBuffer/wrap ba-msg)))))
+            (.setPongHandler      ch (fn [ba-msg]      (wsp/on-pong    l sock                       (ByteBuffer/wrap ba-msg))))
+            (.setReceiveHandler   ch (fn [msg]         (wsp/on-message l sock (if (string? msg) msg (ByteBuffer/wrap msg)))))
+            (.setCloseRingHandler ch (fn [code reason] (wsp/on-close   l sock code reason)))
+
+            (let [headers
+                  {"Upgrade"              "websocket"
+                   "Connection"           "Upgrade"
+                   "Sec-WebSocket-Accept" sec-ws-accept}]
+
+              (.sendHandshake ch
+                (if-let [protocol (:ring.websocket/protocol rresp)]
+                  (assoc headers "Sec-WebSocket-Protocol" protocol)
+                  headers)))
+
+            (wsp/on-open listener sock)
+            {:body ch})
+
+          bad-ring-websocket-resp)
+        rresp))
+    rresp))
+
+(defn- wrap-ring-websocket [ring-handler]
+  (fn ring-handler*
+    ([rreq              ] (ring-websocket-resp rreq (ring-handler rreq)))
+    ([rreq respond raise]
+     (ring-handler rreq
+       (fn respond* [rresp] (respond (ring-websocket-resp rreq rresp)))
+       raise))))

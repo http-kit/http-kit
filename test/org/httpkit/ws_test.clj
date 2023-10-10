@@ -8,7 +8,9 @@
    org.httpkit.server)
 
   (:require
-   [http.async.client :as h])
+   [http.async.client :as h]
+   [ring.websocket    :as ws]
+   [hato.websocket    :as hato])
 
   (:import
    [org.httpkit.ws WebSocketClient]
@@ -200,6 +202,54 @@
       ;; (h/send ws :byte (byte-array 10)) not implemented yet
       (let [msg "testing12"] (h/send ws :text msg) @latch (is (= msg @received-msg_)))
       (h/close ws))))
+
+(defn- buf->str [buffer]
+  (let [bs (byte-array (.capacity buffer))]
+    (doto buffer .mark (.get bs) .reset)
+    (String. bs)))
+
+(deftest test-ring-websocket-handlers
+  (let [log_ (atom [])
+        log+ (fn [x] (swap! log_ conj x))
+        handler
+        (constantly
+          {::ws/protocol "test"
+           ::ws/listener
+           {:on-open    (fn [sock]           (log+ [:server/open]) (ws/send sock "hello"))
+            :on-ping    (fn [sock bb-data]   (log+ [:server/ping (buf->str bb-data)]) (Thread/sleep 50) (ws/pong sock bb-data))
+            :on-pong    (fn [_    bb-data]   (log+ [:server/pong (buf->str bb-data)]))
+            :on-message (fn [_ msg]          (log+ [:server/message msg]))
+            :on-close   (fn [_ code reason]  (log+ [:server/close code reason]))}})
+
+        server (run-server handler {:port 9092})]
+
+    (try
+      (let [ws
+            @(hato/websocket "ws://localhost:9092/"
+               {:subprotocols ["test"]
+                :on-open    (fn [_]             (log+ [:client/open]))
+                :on-ping    (fn [_ bb-data]     (log+ [:client/ping (buf->str bb-data)]))
+                :on-pong    (fn [_ bb-data]     (log+ [:client/pong (buf->str bb-data)]))
+                :on-message (fn [_ msg _close?] (log+ [:client/message (str msg)]))
+                :on-close   (fn [_ code reason] (log+ [:client/close code reason]))})]
+
+        (is (= "test" (.getSubprotocol ^java.net.http.WebSocket ws)))
+        (Thread/sleep 100) @(hato/send!  ws "world")
+        (Thread/sleep 100) @(hato/ping!  ws (java.nio.ByteBuffer/wrap (.getBytes "foo")))
+        (Thread/sleep 100) @(hato/close! ws 1000 "normal closure")
+        (Thread/sleep 100))
+
+      (finally (server)))
+
+    (is (= @log_
+          [[:server/open]
+           [:client/open]
+           [:client/message "hello"]
+           [:server/message "world"]
+           [:server/ping "foo"]
+           [:client/pong "foo"]
+           [:server/close 1000 "normal closure"]
+           [:client/close 1000 "normal closure"]]))))
 
 ;; ;; test many times, and connect result
 ;; ;; rm /tmp/test_results&& ./scripts/javac with-test && for i in {1..100}; do lein test org.httpkit.ws-test >> /tmp/test_results; done

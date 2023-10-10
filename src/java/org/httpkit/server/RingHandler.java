@@ -27,6 +27,7 @@ import org.httpkit.logger.EventLogger;
 import org.httpkit.server.Frame.TextFrame;
 import org.httpkit.server.Frame.BinaryFrame;
 import org.httpkit.server.Frame.PingFrame;
+import org.httpkit.server.Frame.PongFrame;
 
 import clojure.lang.AFn;
 import clojure.lang.IFn;
@@ -237,6 +238,8 @@ class WSHandler implements Runnable {
                 channel.messageReceived(frame.data);
             } else if (frame instanceof PingFrame) {
                 channel.pingReceived(frame.data);
+            } else if (frame instanceof PongFrame) {
+                channel.pongReceived(frame.data);
             } else {
                 errorLogger.log("Unknown frame received in websocket handler " + frame, null);
             }
@@ -340,6 +343,10 @@ public class RingHandler implements IHandler {
     }
 
     public void clientClose(final AsyncChannel channel, final int status) {
+        clientClose(channel, status, "");
+    }
+
+    public void clientClose(final AsyncChannel channel, final int status, final String reason) {
         if (!channel.isClosed()) { // server did not close it first
             // has close handler, execute it in another thread
             if (channel.hasCloseHandler()) {
@@ -348,7 +355,7 @@ public class RingHandler implements IHandler {
                     execs.submit(new Runnable() {
                         public void run() {
                             try {
-                                channel.onClose(status);
+                                channel.onClose(status, reason);
                             } catch (Exception e) {
                                 errorLogger.log("on close handler", e);
                                 eventLogger.log(eventNames.serverChannelCloseError);
@@ -368,7 +375,7 @@ public class RingHandler implements IHandler {
                      */
                     if (execs.isShutdown()) {
                         try {
-                            channel.onClose(status);  // do it in current thread
+                            channel.onClose(status, reason);  // do it in current thread
                         } catch (Exception e1) {
                             errorLogger.log("on close handler", e);
                             eventLogger.log(eventNames.serverChannelCloseError);
