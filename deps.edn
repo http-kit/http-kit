@@ -3,6 +3,7 @@
 ;; `clj -X:deps prep` which calls `lein javac` to compile the java sources.
 
 {:paths ["src" "resources" "target/classes"]
+ :deps {ring/ring-core {:mvn/version "1.11.0-alpha4"}}
  :aliases
  {:build
   {:paths ["."]

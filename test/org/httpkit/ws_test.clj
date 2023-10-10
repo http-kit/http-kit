@@ -5,8 +5,11 @@
         org.httpkit.test-util
         org.httpkit.server)
   (:require
-   [http.async.client :as h])
-  (:import [org.httpkit.ws WebSocketClient]
+   [http.async.client :as h]
+   [hato.websocket :as hato]
+   [ring.websocket :as ws])
+  (:import [java.nio ByteBuffer]
+           [org.httpkit.ws WebSocketClient]
            org.httpkit.SpecialHttpClient))
 
 (defn ws-handler [req]
@@ -202,6 +205,51 @@
         @latch
         (is (= msg @received-msg)))
       (h/close ws))))
+
+(defn- buf->str [buffer]
+  (let [bs (byte-array (.capacity buffer))]
+    (doto buffer .mark (.get bs) .reset)
+    (String. bs)))
+
+(deftest test-ring-websocket-handlers
+  (let [log (atom [])
+        handler (constantly
+                 {::ws/listener
+                  {:on-open (fn [sock]
+                              (swap! log conj [:server/open])
+                              (ws/send sock "hello"))
+                   :on-message (fn [_ m] (swap! log conj [:server/message m]))
+                   :on-ping (fn [sock d]
+                              (swap! log conj [:server/ping (buf->str d)])
+                              (Thread/sleep 50)
+                              (ws/pong sock d))
+                   :on-pong (fn [_ d] (swap! log conj [:server/pong (buf->str d)]))
+                   :on-close (fn [_ c r] (swap! log conj [:server/close c r]))}})
+        server (run-server handler {:port 9092})]
+    (try
+      (let [ws @(hato/websocket
+                 "ws://localhost:9092/"
+                 {:on-open (fn [_] (swap! log conj [:client/open]))
+                  :on-message (fn [_ m _] (swap! log conj [:client/message (str m)]))
+                  :on-ping (fn [_ d] (swap! log conj [:client/ping (buf->str d)]))
+                  :on-pong (fn [_ d] (swap! log conj [:client/pong (buf->str d)]))
+                  :on-close (fn [_ c r] (swap! log conj [:client/close c r]))})]
+        (Thread/sleep 100)
+        @(hato/send! ws "world")
+        (Thread/sleep 100)
+        @(hato/ping! ws (ByteBuffer/wrap (.getBytes "foo")))
+        (Thread/sleep 100)
+        @(hato/close! ws 1000 "normal closure")
+        (Thread/sleep 100))
+      (finally (server)))
+    (is (= @log [[:server/open]
+                 [:client/open]
+                 [:client/message "hello"]
+                 [:server/message "world"]
+                 [:server/ping "foo"]
+                 [:client/pong "foo"]
+                 [:server/close 1000 "normal closure"]
+                 [:client/close 1000 "normal closure"]]))))
 
 ;; ;; test many times, and connect result
 ;; ;; rm /tmp/test_results&& ./scripts/javac with-test && for i in {1..100}; do lein test org.httpkit.ws-test >> /tmp/test_results; done

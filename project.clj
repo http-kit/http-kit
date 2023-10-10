@@ -9,7 +9,7 @@
 
   :global-vars {*warn-on-reflection* true}
 
-  :dependencies []
+  :dependencies [[ring/ring-core "1.11.0-alpha4"]]
 
   :javac-options     ["--release" "8" "-g"] ; Oldest version JVM to support
   :java-source-paths ["src/java"]
@@ -31,7 +31,8 @@
    {:java-source-paths ["test/java" "src/java"]
     :jvm-opts ["-server" "-Xms1024m" "-Xmx2048m"]
     :dependencies
-    [[ring/ring-defaults        "0.4.0"]
+    [[ring/ring-core            "1.11.0-alpha4"]
+     [ring/ring-defaults        "0.4.0"]
      [ring-request-proxy        "0.1.11"]
      [ring-basic-authentication "1.2.0"]
      [org.clojure/data.codec    "0.1.1"]]}
@@ -49,6 +50,7 @@
       [io.netty/netty-all       "4.1.98.Final"]
       [org.clojure/data.json           "2.4.0"]
       [http.async.client               "1.3.0"] ; Newer versions fail
+      [hato                            "0.9.0"]
       [compojure                       "1.7.0"]
       [org.clojure/tools.cli         "1.0.219"]
       [ring/ring-jetty-adapter        "1.10.0"]

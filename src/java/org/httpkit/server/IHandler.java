@@ -7,6 +7,8 @@ public interface IHandler {
 
     public void clientClose(AsyncChannel channel, int status);
 
+    public void clientClose(AsyncChannel channel, int status, String reason);
+
     // close any resource with this handler
     void close(int timeoutMs);
 }
