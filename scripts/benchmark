@@ -1,0 +1,46 @@
+#!/bin/bash
+
+echo
+echo "JVM info:"
+java -XX:+PrintFlagsFinal -version | grep MaxHeapSize
+
+echo
+echo "ulimit info:"
+ulimit -a
+
+echo
+echo -n "Current Java processes: "
+echo "$(pgrep -f "java" | tr '\n' ',')" | sed 's/, $//'
+
+echo
+echo "Will compile http-kit..."
+./scripts/javac with-test
+
+if [ $# -eq 1 ]; then
+  edn_opts="$1"
+else
+  edn_opts="{:profile :quick}"
+fi
+
+echo
+echo "Will run benchmarks using bench opts edn:"
+echo "  $edn_opts"
+
+echo
+echo "Running benching process with nohup (> bench.log)"
+echo "================================================="
+
+rm bench.log
+nohup java -server -cp `lein classpath` clojure.main -m org.httpkit.benchmark "$edn_opts" > bench.log 2>&1 &
+
+echo
+echo "*** Bench process PID: $! *** (handy if you need to kill process)"
+echo
+
+while [ ! -e bench.log ]; do
+    sleep 1
+done
+
+tail -f bench.log
+
+exit 0

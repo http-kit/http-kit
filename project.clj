@@ -17,10 +17,8 @@
 
   :test-paths ["test"]
   :test-selectors
-  {:all     (constantly true)
-   :default (complement :benchmark)
-   :gha     (complement #(or (:benchmark %) (:skip-gha %)))
-   :benchmark :benchmark}
+  {:all (constantly true)
+   :gha (complement #(:skip-gha %))}
 
   :profiles
   {;; :default [:base :system :user :provided :dev]

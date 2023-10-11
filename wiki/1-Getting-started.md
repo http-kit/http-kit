@@ -16,9 +16,9 @@ See the [client](./2-Client) or [server](./3-Server) sections for more!
 http-kit is hacker friendly: it has zero dependencies, and is only ~3.5k lines of code.
 
 ```sh
-lein repl # Run a local REPL
-lein test # Run the unit tests
-lein test :benchmark # Run the benchmarks
+lein repl        # Run a local REPL
+lein test        # Run the unit tests
+lein test :bench # Run the benchmark suite with default opts
 ```
 
-See also the [scripts dir](../../tree/master/scripts) for a few other tools.
+See the [benchmarking](./4-Benchmarking) section for lots more info on http-kit's **benchmark suite**.

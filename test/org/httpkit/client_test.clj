@@ -140,13 +140,6 @@
 (test/use-fixtures :once
   (fn [f] (servers-start!) (try (f) (finally (servers-stop!)))))
 
-(defmacro bench [title & forms]
-  `(let [start# (. System (nanoTime))]
-     ~@forms
-     (println (str ~title "Elapsed time: "
-                (/ (double (- (. System (nanoTime)) start#)) 1000000.0)
-                " msecs"))))
-
 (defmulti callback-multi
   "Assertions to check multimethods can be used as callbacks"
   :status)
@@ -220,39 +213,6 @@
 
         (doseq [r requests]
           (is (= 200 (:status @r))))))))
-
-(deftest ^:benchmark performance-bench
-  (println "\nBenching clients...")
-
-  (let [url "http://127.0.0.1:14347/get"]
-    (println)
-    (println "Concurrency 1, 3k requests")
-    (bench "  http-kit: " (doseq [_ (range 0 3000)] @(hkc/get     url)))
-    (bench "  clj-http: " (doseq [_ (range 0 3000)] (clj-http/get url)))
-    (println)
-    (println "Concurrency 10, 3k requests")
-    (bench "  http-kit: "
-      (doseq [_ (range 0 300)]
-        (let [requests (doall (map (fn [u] (hkc/get u)) (repeat 10 url)))]
-          (doseq [r requests] @r)))))
-
-  (let [url "https://127.0.0.1:9898/get"]
-    (println)
-    (println "Concurrency 1, 1k requests, https")
-    (bench "  http-kit: " (doseq [_ (range 0 1000)] @(hkc/get     url {:insecure? true})))
-    (bench "  clj-http: " (doseq [_ (range 0 1000)] (clj-http/get url {:insecure? true})))
-    (println)
-    (println "Concurrency 10, 1k requests, https")
-    (bench "  http-kit: "
-      (doseq [_ (range 0 100)]
-        (let [requests (doall (map (fn [u] (hkc/get u {:insecure? true})) (repeat 10 url)))]
-          (doseq [r requests] @r))))
-
-    (println)
-    (println "Concurrency 1, 1k requests, https, no keepalive")
-    (bench "  http-kit: " (doseq [_ (range 0 1000)] @(hkc/get url {:insecure? true :keepalive -1})))
-    (println)
-    (println "Finished benching clients")))
 
 (deftest test-http-client-user-agent
   (let [ua "test-ua"
