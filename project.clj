@@ -55,11 +55,14 @@
       [ring/ring-core                 "1.10.0"]]
 
      :plugins
-     [[lein-pprint               "1.3.2"]
-      [lein-ancient              "0.7.0"]
-      [lein-codox                "0.10.8"]
-      [cider/cider-nrepl         "0.38.1"]
-      [mx.cider/enrich-classpath "1.18.0"]]}]}
+     [[lein-pprint  "1.3.2"]
+      [lein-ancient "0.7.0"]
+      [lein-codox   "0.10.8"]]}]
+
+   :nrepl
+   {:plugins
+    [[cider/cider-nrepl         "0.38.1"]
+     [mx.cider/enrich-classpath "1.18.0"]]}}
 
   :aliases
-  {"start-dev" ["with-profile" "+dev" "repl" ":headless"]})
+  {"start-dev" ["with-profile" "+dev,+nrepl" "repl" ":headless"]})
