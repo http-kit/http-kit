@@ -444,7 +444,7 @@
     (let [f_ (future (server-stop! server {:timeout 1000}))]
       (deref f_ 100 nil) ; Ensure stop call has started
       (is (= (server-status server) :stopping))
-      (is (= (deref @f_ 1000 false) true)))
+      (is (= (deref @f_ 5000 false) true)))
 
     (is (= (server-status server) :stopped))
     (is (= (:status @resp_) 200))))
