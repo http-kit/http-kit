@@ -122,6 +122,7 @@ public class RespListener implements IRespListener {
     }
 
     public void onCompleted() {
+        if (pool.isShutdown()) { return; }
         if (status == null) {
             pool.submit(new Handler(handler, new ProtocolException("No status")));
             return;
@@ -152,6 +153,7 @@ public class RespListener implements IRespListener {
     }
 
     public void onThrowable(Throwable t) {
+        if (pool.isShutdown()) { return; }
         pool.submit(new Handler(handler, t));
     }
 
