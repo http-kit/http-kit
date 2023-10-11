@@ -2,6 +2,12 @@ This project uses [**Break Versioning**](https://www.taoensso.com/break-versioni
 
 ---
 
+# `v2.8.0-beta3` (2023-10-11)
+
+> 📦 [Available on Clojars](https://clojars.org/http-kit/versions/2.8.0-beta3), this project uses [Break Versioning](https://www.taoensso.com/break-versioning).
+
+**Hotfix**: identical to `v2.8.0-beta2` but removes an unintended dependency on Cider. Thanks to @borkdude for the report!
+
 # `v2.8.0-beta2` (2023-10-11)
 
 > 📦 [Available on Clojars](https://clojars.org/http-kit/versions/2.8.0-beta2), this project uses [Break Versioning](https://www.taoensso.com/break-versioning).

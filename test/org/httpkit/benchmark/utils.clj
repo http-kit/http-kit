@@ -12,7 +12,7 @@
 ;;;; Consts
 
 (def ^:dynamic *verbose-logging?* false)
-(def ^:const dep-http-kit "http-kit v2.8.0-beta2")
+(def ^:const dep-http-kit "http-kit v2.8.0-beta3")
 (def ^:const dep-jetty    "ring-jetty-adapter v1.10.0 (Jetty 9.4.51.v20230217)")
 (def ^:const dep-clj-http "clj-http v3.12.3")
 
