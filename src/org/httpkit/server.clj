@@ -2,8 +2,7 @@
   (:require
    [clojure.string :as str]
    [org.httpkit.encode :refer [base64-encode]]
-   [org.httpkit.utils :as utils]
-   [ring.websocket.protocols :as wsp])
+   [org.httpkit.utils :as utils])
 
   (:import
    [org.httpkit.server AsyncChannel HttpServer RingHandler ProxyProtocolOption HttpServer$AddressFinder HttpServer$ServerChannelFactory Frame$PingFrame Frame$PongFrame]
@@ -395,36 +394,36 @@
     (.get buf bs 0 len)
     bs))
 
-(extend-type AsyncChannel
-  wsp/Socket
-  (-open? [ch]
-    (not (.isClosed ch)))
-  (-send [ch mesg]
-    (.send ch (if (string? mesg) mesg (buffer->bytes mesg)) false))
-  (-ping [ch data]
-    (.send ch (Frame$PingFrame. (buffer->bytes data)) false))
-  (-pong [ch data]
-    (.send ch (Frame$PongFrame. (buffer->bytes data)) false))
-  (-close [ch code reason]
-    (.serverClose ch code reason)))
-
 (defn- ->ring-message [mesg]
   (if (string? mesg) mesg (ByteBuffer/wrap mesg)))
 
-(defn- ring-websocket-response
-  [{^AsyncChannel ch :async-channel :as request}
-   {:keys [:ring.websocket/listener] :as response}]
-  (if (and (:websocket? request) (some? listener))
-    (if-let [sec-ws-accept (websocket-handshake-check request)]
-      (do (.setReceiveHandler ch #(wsp/on-message listener ch (->ring-message %)))
-          (when (satisfies? wsp/PingListener listener)
-            (.setPingHandler ch #(wsp/on-ping listener ch (ByteBuffer/wrap %))))
-          (.setPongHandler ch #(wsp/on-pong listener ch (ByteBuffer/wrap %)))
-          (.setCloseRingHandler ch #(wsp/on-close listener ch %1 %2))
-          (send-checked-websocket-handshake! ch sec-ws-accept)
-          (wsp/on-open listener ch)
-          {:body ch})
-      bad-websocket-response)
+(defn- ring-websocket-response [request response]
+  (utils/compile-if (do (require '[ring.websocket.protocols :as wsp]) true)
+    (let [^AsyncChannel ch (:async-channel request)
+          listener (:ring.websocket/listener response)]
+      (if (and (:websocket? request) (some? listener))
+        (if-let [sec-ws-accept (websocket-handshake-check request)]
+          (let [sock (reify wsp/Socket
+                       (-open? [_]
+                         (not (.isClosed ch)))
+                       (-send [_ mesg]
+                         (.send ch (if (string? mesg) mesg (buffer->bytes mesg)) false))
+                       (-ping [_ data]
+                         (.send ch (Frame$PingFrame. (buffer->bytes data)) false))
+                       (-pong [_ data]
+                         (.send ch (Frame$PongFrame. (buffer->bytes data)) false))
+                       (-close [_ code reason]
+                         (.serverClose ch code reason)))]
+            (.setReceiveHandler ch #(wsp/on-message listener sock (->ring-message %)))
+            (when (satisfies? wsp/PingListener listener)
+              (.setPingHandler ch #(wsp/on-ping listener sock (ByteBuffer/wrap %))))
+            (.setPongHandler ch #(wsp/on-pong listener sock (ByteBuffer/wrap %)))
+            (.setCloseRingHandler ch #(wsp/on-close listener sock %1 %2))
+            (send-checked-websocket-handshake! ch sec-ws-accept)
+            (wsp/on-open listener sock)
+            {:body ch})
+          bad-websocket-response)
+        response))
     response))
 
 (defn- wrap-ring-websocket [handler]

@@ -3,7 +3,6 @@
 ;; `clj -X:deps prep` which calls `lein javac` to compile the java sources.
 
 {:paths ["src" "resources" "target/classes"]
- :deps {org.ring-clojure/ring-websocket-protocols {:mvn/version "1.11.0-alpha5"}}
  :aliases
  {:build
   {:paths ["."]

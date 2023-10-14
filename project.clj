@@ -9,7 +9,7 @@
 
   :global-vars {*warn-on-reflection* true}
 
-  :dependencies [[org.ring-clojure/ring-websocket-protocols "1.11.0-alpha5"]]
+  :dependencies []
 
   :javac-options     ["--release" "8" "-g"] ; Oldest version JVM to support
   :java-source-paths ["src/java"]
@@ -53,8 +53,8 @@
       [hato                            "0.9.0"]
       [compojure                       "1.7.0"]
       [org.clojure/tools.cli         "1.0.219"]
-      [ring/ring-jetty-adapter        "1.10.0"]
-      [ring/ring-core                 "1.10.0"]]
+      [ring/ring-jetty-adapter        "1.11.0-alpha5"]
+      [ring/ring-core                 "1.11.0-alpha5"]]
 
      :plugins
      [[lein-pprint  "1.3.2"]
