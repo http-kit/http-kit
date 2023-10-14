@@ -124,6 +124,7 @@
                  :join?        false
                  :ssl-port     9898
                  :ssl?         true
+                 :sni-host-check? false
                  :key-password "123456"
                  :keystore     "test/ssl_keystore"})]
 
