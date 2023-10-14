@@ -120,12 +120,13 @@
   (servers-stop!)
   (let [hk    (hks/run-server  (site test-routes) {:port 4347})
         jetty (jetty/run-jetty (site test-routes)
-                {:port         14347
-                 :join?        false
-                 :ssl-port     9898
-                 :ssl?         true
-                 :key-password "123456"
-                 :keystore     "test/ssl_keystore"})]
+                {:port            14347
+                 :join?           false
+                 :ssl-port        9898
+                 :ssl?            true
+                 :sni-host-check? false
+                 :key-password    "123456"
+                 :keystore        "test/ssl_keystore"})]
 
     (reset! servers_
       {:hk    (fn [] (hk))

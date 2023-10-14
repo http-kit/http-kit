@@ -56,12 +56,12 @@
         (jetty/run-jetty
           (rmwr-defaults/wrap-defaults test-routes rmwr-defaults/site-defaults)
           {:port 14347 :join? false :ssl-port 9898 :ssl? true :http? false
-           :key-password "123456" :keystore "test/ssl_keystore"})
+           :sni-host-check? false :key-password "123456" :keystore "test/ssl_keystore"})
 
         jetty-ssl-proxy
         (jetty/run-jetty proxy-handler
           {:port 14348 :join? false :ssl-port 9899 :ssl? true :http? false
-           :key-password "123456" :keystore "test/ssl_keystore"})]
+           :sni-host-check? false :key-password "123456" :keystore "test/ssl_keystore"})]
 
     (reset! servers_
       {:hk-default      (fn [] (hk-default))
