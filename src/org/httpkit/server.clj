@@ -3,7 +3,7 @@
    [clojure.string :as str]
    [org.httpkit.encode :refer [base64-encode]]
    [org.httpkit.utils :as utils]
-   [ring.websocket :as ws])
+   [ring.websocket.protocols :as wsp])
 
   (:import
    [org.httpkit.server AsyncChannel HttpServer RingHandler ProxyProtocolOption HttpServer$AddressFinder HttpServer$ServerChannelFactory Frame$PingFrame Frame$PongFrame]
@@ -396,7 +396,7 @@
     bs))
 
 (extend-type AsyncChannel
-  ws/Socket
+  wsp/Socket
   (-open? [ch]
     (not (.isClosed ch)))
   (-send [ch mesg]
@@ -413,16 +413,16 @@
 
 (defn- ring-websocket-response
   [{^AsyncChannel ch :async-channel :as request}
-   {:keys [::ws/listener] :as response}]
+   {:keys [:ring.websocket/listener] :as response}]
   (if (and (:websocket? request) (some? listener))
     (if-let [sec-ws-accept (websocket-handshake-check request)]
-      (do (.setReceiveHandler ch #(ws/on-message listener ch (->ring-message %)))
-          (when (satisfies? ws/PingListener listener)
-            (.setPingHandler ch #(ws/on-ping listener ch (ByteBuffer/wrap %))))
-          (.setPongHandler ch #(ws/on-pong listener ch (ByteBuffer/wrap %)))
-          (.setCloseRingHandler ch #(ws/on-close listener ch %1 %2))
+      (do (.setReceiveHandler ch #(wsp/on-message listener ch (->ring-message %)))
+          (when (satisfies? wsp/PingListener listener)
+            (.setPingHandler ch #(wsp/on-ping listener ch (ByteBuffer/wrap %))))
+          (.setPongHandler ch #(wsp/on-pong listener ch (ByteBuffer/wrap %)))
+          (.setCloseRingHandler ch #(wsp/on-close listener ch %1 %2))
           (send-checked-websocket-handshake! ch sec-ws-accept)
-          (ws/on-open listener ch)
+          (wsp/on-open listener ch)
           {:body ch})
       bad-websocket-response)
     response))

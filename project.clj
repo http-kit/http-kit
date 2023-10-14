@@ -9,7 +9,7 @@
 
   :global-vars {*warn-on-reflection* true}
 
-  :dependencies [[ring/ring-core "1.11.0-alpha4"]]
+  :dependencies [[org.ring-clojure/ring-websocket-protocols "1.11.0-alpha5"]]
 
   :javac-options     ["--release" "8" "-g"] ; Oldest version JVM to support
   :java-source-paths ["src/java"]
@@ -31,7 +31,7 @@
    {:java-source-paths ["test/java" "src/java"]
     :jvm-opts ["-server" "-Xms1024m" "-Xmx2048m"]
     :dependencies
-    [[ring/ring-core            "1.11.0-alpha4"]
+    [[ring/ring-core            "1.11.0-alpha5"]
      [ring/ring-defaults        "0.4.0"]
      [ring-request-proxy        "0.1.11"]
      [ring-basic-authentication "1.2.0"]
