@@ -214,7 +214,8 @@
 (deftest test-ring-websocket-handlers
   (let [log (atom [])
         handler (constantly
-                 {::ws/listener
+                 {::ws/protocol "test"
+                  ::ws/listener
                   {:on-open (fn [sock]
                               (swap! log conj [:server/open])
                               (ws/send sock "hello"))
@@ -233,7 +234,9 @@
                   :on-message (fn [_ m _] (swap! log conj [:client/message (str m)]))
                   :on-ping (fn [_ d] (swap! log conj [:client/ping (buf->str d)]))
                   :on-pong (fn [_ d] (swap! log conj [:client/pong (buf->str d)]))
-                  :on-close (fn [_ c r] (swap! log conj [:client/close c r]))})]
+                  :on-close (fn [_ c r] (swap! log conj [:client/close c r]))
+                  :subprotocols ["test"]})]
+        (is (= "test" (.getSubprotocol ^java.net.http.WebSocket ws)))
         (Thread/sleep 100)
         @(hato/send! ws "world")
         (Thread/sleep 100)

@@ -419,9 +419,15 @@
               (.setPingHandler ch #(wsp/on-ping listener sock (ByteBuffer/wrap %))))
             (.setPongHandler ch #(wsp/on-pong listener sock (ByteBuffer/wrap %)))
             (.setCloseRingHandler ch #(wsp/on-close listener sock %1 %2))
-            (send-checked-websocket-handshake! ch sec-ws-accept)
-            (wsp/on-open listener sock)
-            {:body ch})
+            (let [headers {"Upgrade" "websocket"
+                           "Connection" "Upgrade"
+                           "Sec-WebSocket-Accept" sec-ws-accept}]
+              (.sendHandshake ch
+                (if-let [protocol (:ring.websocket/protocol response)]
+                  (assoc headers "Sec-WebSocket-Protocol" protocol)
+                  headers)))
+              (wsp/on-open listener sock)
+              {:body ch})
           bad-websocket-response)
         response))
     response))
