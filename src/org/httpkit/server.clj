@@ -172,11 +172,6 @@
           (reify HttpServer$ServerChannelFactory (createChannel [this addr] (channel-factory addr)))
           (reify HttpServer$ServerChannelFactory (createChannel [this addr] (ServerSocketChannel/open))))
 
-        ^ContextLogger warn-logger
-        (if warn-logger
-          (reify ContextLogger (log [this message error] (warn-logger message error)))
-          HttpServer/DEFAULT_WARN_LOGGER)
-
         s (HttpServer. address-finder channel-factory h
                        ^long max-body ^long max-line ^long max-ws proxy-enum ^String server-header
                        warn-logger
