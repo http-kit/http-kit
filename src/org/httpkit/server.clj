@@ -174,8 +174,8 @@
 
         s (HttpServer. address-finder channel-factory h
                        ^long max-body ^long max-line ^long max-ws proxy-enum ^String server-header
-                       warn-logger
                        err-logger
+                       warn-logger
                        evt-logger
                        evt-names)]
     (.start s)
