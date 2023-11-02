@@ -42,7 +42,7 @@ public class MultipartEntity {
                 bytes.append("Content-Disposition: form-data; name=\"");
                 bytes.append(e.name, HttpUtils.UTF_8);
                 if (e.filename != null) {
-                    bytes.append("\"; filename=\"").append(e.filename).append("\"\r\n");
+                    bytes.append("\"; filename=\"").append(e.filename, HttpUtils.UTF_8).append("\"\r\n");
                 } else {
                     bytes.append("\"\r\n");
                 }
