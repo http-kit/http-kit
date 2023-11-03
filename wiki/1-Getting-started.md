@@ -9,7 +9,7 @@ deps.edn:   http-kit/http-kit {:mvn/version "x-y-z"}
 
 # Usage
 
-See the [client](./2-Client.md) or [server](./3-Server.md) sections for more!
+See the [client](./2-Client) or [server](./3-Server) sections for more!
 
 # Tests and benchmarks
 
@@ -21,4 +21,4 @@ lein test        # Run the unit tests
 lein test :bench # Run the benchmark suite with default opts
 ```
 
-See the [benchmarking](./4-Benchmarking.md) section for lots more info on http-kit's **benchmark suite**.
+See the [benchmarking](./4-Benchmarking) section for lots more info on http-kit's **benchmark suite**.
