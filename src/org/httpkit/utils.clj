@@ -3,30 +3,32 @@
    [java.util.concurrent ThreadPoolExecutor TimeUnit
     BlockingQueue ArrayBlockingQueue LinkedBlockingQueue]))
 
-(defn- parse-java-version
-  "Ref. https://stackoverflow.com/a/2591122"
-  [^String s]
-  (let [dot-idx  (.indexOf s ".")  ; e.g. "1.6.0_23"
-        dash-idx (.indexOf s "-")] ; e.g. "16-ea"
-    (cond
-      ;; e.g. "1.6.0_23"
-      (.startsWith s "1.") (Integer/parseInt (.substring s 2 3))
-      (pos? dot-idx)       (Integer/parseInt (.substring s 0 dot-idx))
-      (pos? dash-idx)      (Integer/parseInt (.substring s 0 dash-idx))
-      :else                (Integer/parseInt             s))))
+(defn- java-version
+  "Returns Java's major version integer (8, 17, etc.)."
+  ;; Ref. `taoensso.encore/java-version`
+  (^long [              ] (java-version (System/getProperty "java.version")))
+  (^long [version-string]
+   (or
+     (when-let [^String s version-string]
+       (try
+         (Integer/parseInt
+           (or ; Ref. <https://stackoverflow.com/a/2591122>
+             (when     (.startsWith s "1.")                  (.substring s 2 3))    ; "1.6.0_23", etc.
+             (let [idx (.indexOf    s ".")] (when (pos? idx) (.substring s 0 idx))) ; "9.0.1",    etc.
+             (let [idx (.indexOf    s "-")] (when (pos? idx) (.substring s 0 idx))) ; "16-ea",    etc.
+             (do                                                         s)))
+         (catch Exception _ nil)))
 
-(comment ; [6 8 9 11 16 17]
-  [(parse-java-version "1.6.0_23")
-   (parse-java-version "1.8.0_302")
-   (parse-java-version "9.0.1")
-   (parse-java-version "11.0.12")
-   (parse-java-version "16-ea")
-   (parse-java-version "17")])
+     (throw
+       (ex-info "Failed to parse Java version string (unexpected form)"
+         {:version-string version-string})))))
 
-(def ^:private java-version_
-  (delay (parse-java-version (str (System/getProperty "java.version")))))
+(comment (mapv java-version ["1.6.0_23" "1.8.0_302" "9.0.1" "11.0.12" "16-ea" "17"]))
 
-(defn java-version>= [n] (>= ^long @java-version_ (long n)))
+(let [version_ (delay (java-version))]
+  (defn java-version>=
+    "Returns true iff Java's major version integer is >= given integer."
+    [n] (>= ^long @version_ (long n))))
 
 (defmacro compile-if
   "Evaluates `test`. If it returns logical true (and doesn't throw), expands
