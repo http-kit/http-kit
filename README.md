@@ -57,12 +57,12 @@ A big thank-you to the [current contributors](../../graphs/contributors) for kee
 
 ## Documentation
 
-- [Full documentation][GitHub wiki] (**getting started** and more)
-- Auto-generated API reference: [Codox][Codox docs], [clj-doc][clj-doc docs]
+- [Wiki][GitHub wiki] (getting started, usage, etc.)
+- API reference: [Codox][Codox docs], [clj-doc][clj-doc docs]
 
 ## License
 
-Copyright &copy; 2012-2023 [Feng Shen][@shenfeng] and contributors.  
+Copyright &copy; 2012-2024 [Feng Shen][@shenfeng] and contributors.  
 Licensed under [Apache 2.0](LICENSE.txt).
 
 <!-- Common -->
