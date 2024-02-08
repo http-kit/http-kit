@@ -1,13 +1,18 @@
 (ns org.httpkit.ws-test
-  (:use clojure.test
-        (compojure [core :only [defroutes GET]]
-                   [handler :only [site]])
-        org.httpkit.test-util
-        org.httpkit.server)
+  (:use
+   clojure.test
+   [compojure
+    [core    :only [defroutes GET]]
+    [handler :only [site]]]
+   org.httpkit.test-util
+   org.httpkit.server)
+
   (:require
    [http.async.client :as h])
-  (:import [org.httpkit.ws WebSocketClient]
-           org.httpkit.SpecialHttpClient))
+
+  (:import
+   [org.httpkit.ws WebSocketClient]
+   [org.httpkit  SpecialHttpClient]))
 
 (defn ws-handler [req]
   (as-channel req
@@ -184,23 +189,16 @@
 
 (deftest test-with-http.async.client
   (with-open [client (h/create-client)]
-    (let [latch (promise)
-          received-msg (atom nil)
-          ws (h/websocket client "ws://localhost:4348/http-async-client"
-                          :text (fn [con mesg]
-                                  (reset! received-msg mesg)
-                                  (deliver latch true))
-                          :close (fn [con status]
-                                   ;; (println "close:" con status)
-)
-                          :open (fn [con]
-                                  ;; (println "opened:" con)
-))]
+    (let [latch         (promise)
+          received-msg_ (atom nil)
+          ws
+          (h/websocket client "ws://localhost:4348/http-async-client"
+            :text  (fn [con msg]    (reset! received-msg_ msg) (deliver latch true))
+            :close (fn [con status] #_(println "close:"  con status))
+            :open  (fn [con]        #_(println "opened:" con)))]
+
       ;; (h/send ws :byte (byte-array 10)) not implemented yet
-      (let [msg "testing12"]
-        (h/send ws :text msg)
-        @latch
-        (is (= msg @received-msg)))
+      (let [msg "testing12"] (h/send ws :text msg) @latch (is (= msg @received-msg_)))
       (h/close ws))))
 
 ;; ;; test many times, and connect result

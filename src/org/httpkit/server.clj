@@ -265,8 +265,8 @@
     data param represents application data and will by a byte[].")
 
   (on-close [ch callback]
-    "Sets handler (fn [status]) for notification of channel being closed by the
-    server or client. Handler will be invoked at most once. Useful for clean-up.
+    "Sets handler (fn [status-code]) for notification of channel being closed by
+    the server or client. Handler will be invoked at most once. Useful for clean-up.
 
     Callback status argument:
       :server-close   : Channel closed by sever
@@ -281,7 +281,6 @@
   Channel
   (open?      [ch] (not (.isClosed ch)))
   (websocket? [ch] (.isWebSocket   ch))
-
   (close      [ch] (.serverClose   ch 1000))
   (send!
     ([ch data                  ] (.send ch data (not (websocket? ch))))
@@ -313,11 +312,11 @@
   asynchronous HTTP or WebSocket `AsyncChannel`.
 
   Main options:
-    :init       - (fn [ch])         for misc pre-handshake setup.
-    :on-receive - (fn [ch message]) called for client WebSocket messages.
-    :on-ping    - (fn [ch data])    called for client WebSocket pings.
-    :on-close   - (fn [ch status])  called when AsyncChannel is closed.
-    :on-open    - (fn [ch])         called when AsyncChannel is ready for `send!`, etc.
+    :init       - (fn [ch])             for misc pre-handshake setup.
+    :on-receive - (fn [ch message])     called for client WebSocket messages.
+    :on-ping    - (fn [ch data])        called for client WebSocket pings.
+    :on-close   - (fn [ch status-code]) called when AsyncChannel is closed.
+    :on-open    - (fn [ch])             called when AsyncChannel is ready for `send!`, etc.
 
   See `Channel` protocol for more info on handlers and `AsyncChannel`s.
   See `org.httpkit.timer` ns for optional timeout utils.
@@ -345,9 +344,9 @@
       (if-not (:websocket? ring-req)
         {:status 200 :body \"Welcome to the chatroom! JS client connecting...\"}
         (as-channel ring-req
-          {:on-receive (fn [ch message] (println \"on-receive:\" message))
-           :on-close   (fn [ch status]  (println \"on-close:\"   status))
-           :on-open    (fn [ch]         (println \"on-open:\"    ch))})))"
+          {:on-receive (fn [ch message]     (println \"on-receive:\" message))
+           :on-close   (fn [ch status-code] (println \"on-close:\"   status-code))
+           :on-open    (fn [ch]             (println \"on-open:\"    ch))})))"
 
   [ring-req {:keys [on-receive on-ping on-close on-open init on-handshake-error]
              :or   {on-handshake-error
