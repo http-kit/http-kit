@@ -209,7 +209,7 @@
     (String. bs)))
 
 (deftest test-ring-websocket-handlers
-  (when-not #'org.httpkit.server/no-ring-websockets?
+  (when-not @#'org.httpkit.server/no-ring-websockets?
     (let [log_ (atom [])
           log+ (fn [x] (swap! log_ conj x))
           handler
