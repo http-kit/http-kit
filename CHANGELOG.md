@@ -2,6 +2,68 @@ This project uses [**Break Versioning**](https://www.taoensso.com/break-versioni
 
 ---
 
+# `v2.8.0-RC1` (2024-02-26)
+
+> 📦 [Available on Clojars](https://clojars.org/http-kit/versions/2.8.0-RC1), this project uses [Break Versioning](https://www.taoensso.com/break-versioning).
+
+This is a **major feature and maintenance** pre-release.  
+Please **test carefully and report any unexpected problems**, thank you! 🙏
+
+Highlights include:
+
+- Support for the latest Ring async and WebSocket APIs
+- Performance improvements, incl. auto use of JVM 21+ virtual threads when available
+- Numerous minor features, fixes, and other improvements
+
+Please see linked commits below for details.
+
+A huge thanks to all contributors!
+
+## Changes since `v2.7.x`
+
+* 6db3f0f [mod] Bump minimum Java version: 7->8
+
+## Fixes since `v2.7.x`
+
+* 2474302 [fix] [client] [#535] [#536] Fix handling of some bad ssl certificates (@jeffdik)
+* b9f84d5 [fix] [client] [#523] Basic support for trailer section in chunked encoding responses
+* b45725f [fix] [server] [#543] Migrate away from `SimpleDateFormat` to `java.time`, fixes native-image issue (@borkdude)
+* 45a4b53 [fix] [server] [#537] Respond with `Connection: Close` when appropriate
+* 126d5df [fix] [client] [#528] Possible fix for broken `insecure?` client option
+* 9be19c0 [fix] [client] [#528] Re-enable insecure SSL client tests disabled for #513
+* de3596a [fix] [server] [#539] [#540] Prevent race condition in `TimerService` (@weavejester)
+* 99de95b [fix] [server] [#552] [#553] Bad arg order causing broken loggers config (@frwdrik)
+* 2dcfa29 [fix] [server] [#546] Fix Jetty server SNI check in client tests (@weavejester)
+* ed6833e [fix] [client] [#560] Attempted fix to allow SSL with IP host
+* 48cb7fe [fix] [server] [#559] Add missing `Content-Type` header to last-resort error responses
+* bfba515 [fix] [client] Ignore nil clients, even when they're delay-wrapped
+* 8738140 [fix] [server] [#551] Unintentional code duplication (@slipset)
+* 491e19c [fix] [tests] Flaky timing in CI
+* e2ca731 [fix] Resolve Lein composite profile warning
+
+## New since `v2.7.x`
+
+* c91a752 [new] [server] [#546] Add support for Ring WebSocket API (@weavejester)
+* 6652df8 [new] [server] [#394] [#538] Add support for Ring async handler arities (@weavejester)
+* 47129af [new] [server] Refactor worker threading, use virtual threads by default on JVM 21+
+* e38169b [new] [client] Refactor worker threading, use virtual threads by default on JVM 21+
+* 741eed8 [new] [tests] Add new benchmark suite
+* 2a74dbf [new] [tests] Add first benchmark results
+* af5550f [new] [client] [#554] Support non-ASCII characters on multipart filenames (@davartens)
+* 41940f3 [new] [client] [server] Add public worker constructors
+* f267426 [new] [client] [server] `utils/new-worker` improvements
+
+## Other improvements since `v2.7.x`
+
+* 5379f62 [new] [server] [#546] Also test without support for Ring WebSocket API
+* 4813a17 [nop] [#530] [#531] Update dep: `http.async.client` (@NoahTheDuke)
+* 9877bca [nop] [client] Don't submit tasks to closed pool
+* 92fc3fe [wiki] Add client page from legacy website (@harold)
+* 9b131e2 [wiki] Clean-up, update client docs
+* Updated dependencies
+
+---
+
 # `v2.8.0-beta3` (2023-10-11)
 
 > 📦 [Available on Clojars](https://clojars.org/http-kit/versions/2.8.0-beta3), this project uses [Break Versioning](https://www.taoensso.com/break-versioning).
