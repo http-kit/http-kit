@@ -17,8 +17,8 @@
 
   :test-paths ["test"]
   :test-selectors
-  {:gha (complement #{:skip-gha}) ; GitHub Actions
-   :all (constantly true)}
+  {:all (constantly true)
+   :ci  (complement :skip-ci)}
 
   :profiles
   {;; :default [:base :system :user :provided :dev]
@@ -65,5 +65,5 @@
 
   :aliases
   {"start-dev"       ["with-profile" "+dev,+nrepl" "repl" ":headless"]
-   "test-no-ring-ws" ["with-profile" "+no-ring-websockets" "test" ":gha"]
-   "test-gha"        ["do" ["test" ":gha"] ["test-no-ring-ws"]]})
+   "test-no-ring-ws" ["with-profile" "+no-ring-websockets" "test" ":ci"]
+   "test-ci"         ["do" ["test" ":ci"] ["test-no-ring-ws"]]})
