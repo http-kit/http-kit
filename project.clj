@@ -17,8 +17,8 @@
 
   :test-paths ["test"]
   :test-selectors
-  {:all (constantly true)
-   :gha (complement #(:skip-gha %))}
+  {:gha (complement #{:skip-gha}) ; GitHub Actions
+   :all (constantly true)}
 
   :profiles
   {;; :default [:base :system :user :provided :dev]
@@ -26,6 +26,9 @@
    :c1.11    {:dependencies [[org.clojure/clojure "1.11.1"]]}
    :c1.10    {:dependencies [[org.clojure/clojure "1.10.3"]]}
    :c1.9     {:dependencies [[org.clojure/clojure "1.9.0"]]}
+
+   :no-ring-websockets
+   {:jvm-opts ["-Dhttp-kit.no-ring-websockets=true"]}
 
    :test
    {:java-source-paths ["test/java" "src/java"]
@@ -67,4 +70,6 @@
      [mx.cider/enrich-classpath "1.18.0"]]}}
 
   :aliases
-  {"start-dev" ["with-profile" "+dev,+nrepl" "repl" ":headless"]})
+  {"start-dev"       ["with-profile" "+dev,+nrepl" "repl" ":headless"]
+   "test-no-ring-ws" ["with-profile" "+no-ring-websockets" "test" ":gha"]
+   "test-gha"        ["do" ["test" ":gha"] ["test-no-ring-ws"]]})

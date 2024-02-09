@@ -386,9 +386,16 @@
     (.get buf bs 0 len)
     bs))
 
+(def ^:private no-ring-websockets?
+  "Should support for `org.ring-clojure/ring-websocket-protocols` be disabled?
+  There shouldn't be any reason besides testing to use this."
+  (when (= (System/getProperty "http-kit.no-ring-websockets") "true")
+    (println "Note: disabled Ring WebSocket protocol support for testing.")
+    true))
+
 (defn- ring-websocket-resp [rreq rresp]
   (utils/compile-if
-    (do (require '[ring.websocket.protocols :as wsp]) true) ; Have optional dep
+    (when-not no-ring-websockets? (require '[ring.websocket.protocols :as wsp]) true)
     (let [^AsyncChannel ch (:async-channel rreq)
           listener (:ring.websocket/listener rresp)]
       (if (and (:websocket? rreq) (some? listener))
