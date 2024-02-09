@@ -30,39 +30,33 @@
    :no-ring-websockets
    {:jvm-opts ["-Dhttp-kit.no-ring-websockets=true"]}
 
-   :test
-   {:java-source-paths ["test/java" "src/java"]
-    :jvm-opts ["-server" "-Xms1024m" "-Xmx2048m"]
-    :dependencies
-    [[ring/ring-core            "1.11.0"]
-     [ring/ring-defaults        "0.4.0"]
-     [ring-request-proxy        "0.1.11"]
-     [ring-basic-authentication "1.2.0"]
-     [org.clojure/data.codec    "0.1.1"]]}
-
    :dev
-   [:c1.11 :test
-    {:resource-paths ["test/resources"]
-     :dependencies
-     [[org.clojure/clojure            "1.11.1"]
-      #_[nrepl                         "1.0.0"]
-      [junit/junit                    "4.13.2"]
-      [org.clojure/tools.logging       "1.2.4"]
-      [ch.qos.logback/logback-classic "1.4.11"]
-      [clj-http                       "3.12.3"]
-      [io.netty/netty-all       "4.1.98.Final"]
-      [org.clojure/data.json           "2.4.0"]
-      [http.async.client               "1.3.0"] ; Newer versions fail
-      [hato                            "0.9.0"]
-      [compojure                       "1.7.0"]
-      [org.clojure/tools.cli         "1.0.219"]
-      [ring/ring-jetty-adapter        "1.11.0"]
-      [ring/ring-core                 "1.11.0"]]
+   {:jvm-opts ["-server" "-Xms1024m" "-Xmx2048m"]
+    :java-source-paths ["test/java" "src/java"]
+    :resource-paths    ["test/resources"]
+    :dependencies
+    [[org.clojure/clojure            "1.11.1"]
+     [ring/ring-core                 "1.11.0"]
+     [ring/ring-jetty-adapter        "1.11.0"]
+     [ring/ring-defaults              "0.4.0"]
+     [ring-request-proxy             "0.1.11"]
+     [ring-basic-authentication       "1.2.0"]
+     [org.clojure/data.codec          "0.1.1"]
+     [junit/junit                    "4.13.2"]
+     [org.clojure/tools.logging       "1.2.4"]
+     [ch.qos.logback/logback-classic "1.4.11"]
+     [clj-http                       "3.12.3"]
+     [io.netty/netty-all       "4.1.98.Final"]
+     [org.clojure/data.json           "2.4.0"]
+     [http.async.client               "1.3.0"] ; Newer versions fail
+     [hato                            "0.9.0"]
+     [compojure                       "1.7.0"]
+     [org.clojure/tools.cli         "1.0.219"]]
 
-     :plugins
-     [[lein-pprint  "1.3.2"]
-      [lein-ancient "0.7.0"]
-      [lein-codox   "0.10.8"]]}]
+    :plugins
+    [[lein-pprint  "1.3.2"]
+     [lein-ancient "0.7.0"]
+     [lein-codox   "0.10.8"]]}
 
    :nrepl
    {:plugins
