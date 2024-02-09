@@ -9,16 +9,16 @@
 
   :global-vars {*warn-on-reflection* true}
 
-  :dependencies []
-
   :javac-options     ["--release" "8" "-g"] ; Oldest version JVM to support
   :java-source-paths ["src/java"]
-  :jar-exclusions    [#"^java.*"] ; exclude the java directory in source path
+  :jar-exclusions    [#"^java.*"] ; Exclude Java dir from source path
 
   :test-paths ["test"]
   :test-selectors
   {:all (constantly true)
    :ci  (complement :skip-ci)}
+
+  :dependencies []
 
   :profiles
   {;; :default [:base :system :user :provided :dev]
