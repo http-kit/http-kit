@@ -43,14 +43,14 @@
      [ring-basic-authentication       "1.2.0"]
      [org.clojure/data.codec          "0.1.1"]
      [junit/junit                    "4.13.2"]
-     [org.clojure/tools.logging       "1.2.4"]
-     [ch.qos.logback/logback-classic "1.4.11"]
+     [org.clojure/tools.logging       "1.3.0"]
+     [ch.qos.logback/logback-classic "1.4.14"]
      [clj-http                       "3.12.3"]
      [io.netty/netty-all       "4.1.98.Final"]
-     [org.clojure/data.json           "2.4.0"]
-     [http.async.client               "1.3.0"] ; Newer versions fail
+     [org.clojure/data.json           "2.5.0"]
+     [http.async.client               "1.3.0"] ; TODO Update (newer versions failing)
      [hato                            "0.9.0"]
-     [compojure                       "1.7.0"]
+     [compojure                       "1.7.1"]
      [org.clojure/tools.cli         "1.0.219"]]
 
     :plugins
@@ -60,8 +60,8 @@
 
    :nrepl
    {:plugins
-    [[cider/cider-nrepl         "0.38.1"]
-     [mx.cider/enrich-classpath "1.18.0"]]}}
+    [[cider/cider-nrepl         "0.45.0"]
+     [mx.cider/enrich-classpath "1.19.0"]]}}
 
   :aliases
   {"start-dev"       ["with-profile" "+dev,+nrepl" "repl" ":headless"]
