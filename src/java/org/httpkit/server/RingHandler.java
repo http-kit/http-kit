@@ -97,6 +97,13 @@ class ClojureRing {
     }
 }
 
+class ErrorResponse {
+    static final HeaderMap headers;
+    static {
+        headers = new HeaderMap();
+        headers.put("Content-Type", "text/plain; charset=utf-8");
+    }
+}
 
 @SuppressWarnings({"rawtypes", "unchecked"})
 class HttpHandler implements Runnable {
@@ -187,7 +194,7 @@ class HttpHandler implements Runnable {
     private void handleError(Throwable e) {
         errorLogger.log(req.method + " " + req.uri, e);
         eventLogger.log(eventNames.serverStatus500);
-        cb.run(HttpEncode(500, new HeaderMap(), e.getMessage(), this.serverHeader));
+        cb.run(HttpEncode(500, ErrorResponse.headers, e.getMessage(), this.serverHeader));
     }
 }
 
@@ -299,7 +306,7 @@ public class RingHandler implements IHandler {
         } catch (RejectedExecutionException e) {
             errorLogger.log("failed to submit task to executor service", e);
             eventLogger.log(eventNames.serverStatus503);
-            cb.run(HttpEncode(503, new HeaderMap(), "Server unavailable, please try again", this.serverHeader));
+            cb.run(HttpEncode(503, ErrorResponse.headers, "Server unavailable, please try again", this.serverHeader));
         }
     }
 
