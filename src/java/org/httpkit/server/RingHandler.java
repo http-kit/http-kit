@@ -185,9 +185,9 @@ class HttpHandler implements Runnable {
     }
 
     private void handleError(Throwable e) {
-        cb.run(HttpEncode(500, new HeaderMap(), e.getMessage(), this.serverHeader));
         errorLogger.log(req.method + " " + req.uri, e);
         eventLogger.log(eventNames.serverStatus500);
+        cb.run(HttpEncode(500, new HeaderMap(), e.getMessage(), this.serverHeader));
     }
 }
 
