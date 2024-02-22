@@ -324,7 +324,14 @@
   (is (contains? @(hkc/get "https://google.com")      :status))
   (is (contains? @(hkc/get "https://apple.com")       :status))
   (is (contains? @(hkc/get "https://microsoft.com")   :status))
-  (is (contains? @(hkc/get "https://letsencrypt.org") :status)))
+  (is (contains? @(hkc/get "https://letsencrypt.org") :status))
+  (is (contains? @(hkc/get "https://1.1.1.1")         :status) "CloudFlare public DNS")
+  (is (contains? @(hkc/get "https://8.8.8.8")         :status) "Google public DNS")
+
+  (is (re-find #"unable to find valid certification path"
+        (str (:error @(hkc/get "https://142.250.181.196"))))
+
+    "Random google.com IP address (may need updating!). Correct error is about cert path, NOT invalid hostname."))
 
 (deftest test-bad-ssl-certs
   (doseq [url
