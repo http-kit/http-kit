@@ -41,22 +41,22 @@
      [ring/ring-defaults              "0.4.0"]
      [ring-request-proxy             "0.1.11"]
      [ring-basic-authentication       "1.2.0"]
-     [org.clojure/data.codec          "0.1.1"]
+     [org.clojure/data.codec          "0.2.0"]
      [junit/junit                    "4.13.2"]
      [org.clojure/tools.logging       "1.3.0"]
-     [ch.qos.logback/logback-classic "1.4.14"]
+     [ch.qos.logback/logback-classic  "1.5.0"]
      [clj-http                       "3.12.3"]
      [io.netty/netty-all       "4.1.98.Final"]
      [org.clojure/data.json           "2.5.0"]
      [http.async.client               "1.3.0"] ; TODO Update (newer versions failing)
      [hato                            "0.9.0"]
      [compojure                       "1.7.1"]
-     [org.clojure/tools.cli         "1.0.219"]]
+     [org.clojure/tools.cli         "1.1.230"]]
 
     :plugins
     [[lein-pprint  "1.3.2"]
      [lein-ancient "0.7.0"]
-     [lein-codox   "0.10.8"]]}
+     [com.taoensso.forks/lein-codox "0.10.11"]]}
 
    :nrepl
    {:plugins
