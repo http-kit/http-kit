@@ -6,7 +6,7 @@ jobs:
     runs-on: ubuntu-latest
     container: clojure:openjdk-17-lein-buster
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - run: apt update
       - run: apt install -y rake
       - run: lein test-ci
