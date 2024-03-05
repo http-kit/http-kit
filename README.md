@@ -1,5 +1,5 @@
 <span><img src="http-kit-logo.png" alt="http-kit" width="140"/></span>  
-[**Documentation**](#documentation) | [Latest releases](#latest-releases) | [Get support][GitHub issues]
+[**Documentation**](#documentation) | [Latest releases](#latest-releases) | [Slack channel][]
 
 # http-kit
 
@@ -11,8 +11,8 @@ It uses an event-driven architecture to support highly concurrent a/synchronous 
 
 ## Latest release/s
 
-- `2024-02-26` `2.8.0-RC1` (dev): [changes](../../releases/tag/v2.8.0-RC1)
-- `2023-06-30` `2.7.0` (stable): [changes](../../releases/tag/v2.7.0)
+- `2024-02-26` `2.8.0-RC1` (dev): [release info](../../releases/tag/v2.8.0-RC1)
+- `2023-06-30` `2.7.0` (stable): [release info](../../releases/tag/v2.7.0)
 
 [![Main tests][Main tests SVG]][Main tests URL]
 [![Graal tests][Graal tests SVG]][Graal tests URL]
@@ -58,7 +58,7 @@ A big thank-you to the [current contributors](../../graphs/contributors) for kee
 ## Documentation
 
 - [Wiki][GitHub wiki] (getting started, usage, etc.)
-- API reference: [Codox][Codox docs], [clj-doc][clj-doc docs]
+- API reference: [cljdoc][cljdoc docs], [Codox][Codox docs]
 
 ## License
 
@@ -70,13 +70,14 @@ Licensed under [Apache 2.0](LICENSE.txt).
 [GitHub releases]: ../../releases
 [GitHub issues]:   ../../issues
 [GitHub wiki]:     ../../wiki
+[Slack channel]: https://www.taoensso.com/http-kit/slack
 
 [Peter Taoussanis]: https://www.taoensso.com
 
 <!-- Project -->
 
 [Codox docs]:   https://http-kit.github.io/http-kit/
-[clj-doc docs]: https://cljdoc.org/d/http-kit/http-kit/
+[cljdoc docs]: https://cljdoc.org/d/http-kit/http-kit/
 
 [Clojars SVG]: https://img.shields.io/clojars/v/http-kit.svg
 [Clojars URL]: https://clojars.org/http-kit
