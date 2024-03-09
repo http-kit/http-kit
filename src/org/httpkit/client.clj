@@ -37,44 +37,60 @@
 (defn- prepare-response-headers [headers]
   (reduce (fn [m [k v]] (assoc m (keyword k) v)) {} headers))
 
+(defn- name* [v] (if (instance? clojure.lang.Named v) (name v) v))
+
 (defn- nested-param
   "{:a {:b 1 :c [1 2 3]}} => {\"a[b]\" 1, \"a[c]\" [1 2 3]}, etc."
-  [params]
+  [params style]
   ;; Code copied from clj-http
   (walk/prewalk
     (fn [d]
-      (if (and (vector? d) (map? (second d)))
+      (if (and (vector? d) (or (map? (second d))
+                               (and (= style :indexed) (vector? (second d)))))
         (let [[fk m] d]
-          (reduce (fn [m [sk v]]
-                    (assoc m (str (name fk) \[ (name sk) \]) v))
-            {} m))
+          (reduce-kv (fn [m sk v]
+                       (assoc m (str (name* fk) \[ (name* sk) \]) v))
+                     {} m))
         d))
     params))
 
+(defn- param-encoder [sfx]
+  (fn [k v] (str (url-encode (str (name k) sfx)) "=" (url-encode v))))
+
 (defn query-string
   "Returns URL-encoded query string for given params map."
-  [m]
-  (let [m (nested-param m)
-        param (fn [k v]  (str (url-encode (name k)) "=" (url-encode v)))
-        join  (fn [strs] (str/join "&" strs))]
+  [m style]
+  (let [m (nested-param m style)
+        param (param-encoder "")
+        param-arr (if (= style :array) (param-encoder "[]") param)
+        join (fn [strs] (str/join "&" strs))]
     (join (for [[k v] m] (if (sequential? v)
-                           (join (map (partial param k) (or (seq v) [""])))
+                           (if (= style :comma-separated)
+                             (param k (str/join "," v))
+                             (join (map (partial param-arr k) (or (seq v) [""]))))
                            (param k v))))))
 
-(comment (query-string {:k1 "v1" :k2 "v2" :k3 nil :k4 ["v4a" "v4b"] :k5 []}))
+(comment
+  (query-string {:k1 "v1" :k2 "v2" :k3 nil :k4 ["v4a" "v4b"] :k5 []} nil)
+  (query-string {:k1 "v1" :k2 "v2" :k3 nil :k4 ["v4a" "v4b"] :k5 []} :comma-separated)
+  (query-string {:k1 "v1" :k2 "v2" :k3 nil :k4 ["v4a" "v4b"] :k5 []} :array)
+  (with-redefs [url-encode identity]
+    (query-string {:card {:numbers [4242 1313 6767] :exp_month 12}
+                   :prices [{:amt 12 :name "prod-1"}
+                            {:amt 20 :name "prod-2"}]} :index)))
 
 (defn- coerce-req
-  [{:keys [url method body query-params form-params multipart multipart-mixed?] :as req}]
+  [{:keys [url method body query-params form-params multipart multipart-mixed? nested-param-style] :as req}]
   (let [r (assoc req
                  :url (if query-params
                         (if (neg? (.indexOf ^String url (int \?)))
-                          (str url "?" (query-string query-params))
-                          (str url "&" (query-string query-params)))
+                          (str url "?" (query-string query-params nested-param-style))
+                          (str url "&" (query-string query-params nested-param-style)))
                         url)
                  :method    (HttpMethod/fromKeyword (or method :get))
                  :headers   (prepare-request-headers req)
             ;; :body ring body: null, String, seq, InputStream, File, ByteBuffer
-                 :body      (if form-params (query-string form-params) body))]
+                 :body      (if form-params (query-string form-params nested-param-style) body))]
     (if multipart
       (let [entities (into (map (fn [{:keys [name content filename content-type]}]
                                   (MultipartEntity. name content filename content-type)) multipart)

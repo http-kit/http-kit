@@ -402,7 +402,27 @@
 ;; https://github.com/http-kit/http-kit/issues/54
 (deftest test-nested-param
   (let [url "http://localhost:4347/nested-param"
-        params {:card {:number "4242424242424242" :exp_month "12"}}]
+        params {:card {:number "4242424242424242" :exp_month "12"}}
+        params-inp {:card {:numbers [4242 1313 6767] :exp_month 12}
+                    :prices [{:amt 12 :name "prod-1"}
+                             {:amt 20 :name "prod-2"}]}
+        ;; NOTE: Under the default style, an explicit vector of maps is
+        ;; indistinguishable (to the `prewalk` employed inside of
+        ;; `org.httpkit.client/nested-param`) to a map pair, and gets treated as
+        ;; such. That is, the :prices [{...} {...}] structure above is treated
+        ;; as if it were :prices {"{...}" {...}}, and produces the strange
+        ;; output in `params-outp-default` below. It's included here and tested
+        ;; under each style for completeness. If a user were actually employing
+        ;; such nested parameters, however, they would almost certainly be using
+        ;; style `:index` which handles these things properly.
+        params-outp-default {:card {:numbers ["4242" "1313" "6767"] :exp_month "12"}
+                             :prices "{\"{:amt 12, :name \\\"prod-1\\\"}[amt]\" 20, \"{:amt 12, :name \\\"prod-1\\\"}[name]\" \"prod-2\"}"}
+        params-outp-index {:card {:numbers {"0" "4242", "1" "1313", "2" "6767"}
+                                  :exp_month "12"}
+                           :prices {"0" {:amt "12", :name "prod-1"}
+                                    "1" {:amt "20", :name "prod-2"}}}
+        params-outp-comma {:card {:numbers "4242,1313,6767" :exp_month "12"}
+                           :prices "{\"{:amt 12, :name \\\"prod-1\\\"}[amt]\" 20, \"{:amt 12, :name \\\"prod-1\\\"}[name]\" \"prod-2\"}"}]
     (is (= params (read-string (:body @(hkc/post url {:form-params params})))))
 
     (is (= params (read-string (:body @(hkc/post url
@@ -414,7 +434,24 @@
     ;; to maintain backward compatibility
     (is (= params (read-string (:body @(hkc/post url
                                          {:form-params {"card[number]" 4242424242424242
-                                                        "card[exp_month]" 12}})))))))
+                                                        "card[exp_month]" 12}})))))
+    ;; Issue No. 561
+    (is (= params-outp-default
+           (read-string (:body @(hkc/post url
+                                          {:form-params params-inp
+                                           :nested-param-style nil})))))
+    (is (= params-outp-index
+           (read-string (:body @(hkc/post url
+                                          {:form-params params-inp
+                                           :nested-param-style :indexed})))))
+    (is (= params-outp-default
+           (read-string (:body @(hkc/post url
+                                          {:form-params params-inp
+                                           :nested-param-style :array})))))
+    (is (= params-outp-comma
+           (read-string (:body @(hkc/post url
+                                          {:form-params params-inp
+                                           :nested-param-style :comma-separated})))))))
 
 (deftest test-redirect
   (testing "When location header is"
