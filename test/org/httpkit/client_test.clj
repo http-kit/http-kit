@@ -399,15 +399,41 @@
                   :keepalive -1
                   :url url3}))))])))
 
-;; https://github.com/http-kit/http-kit/issues/54
 (deftest test-nested-param
-  (let [url    "http://localhost:4347/nested-param"
-        params {:card {:number "4242424242424242" :exp_month "12"}}]
-    (is (= params (read-string (:body @(hkc/post     url {:form-params params})))))
-    (is (= params (read-string (:body @(hkc/post     url {:query-params {"card[number]" 4242424242424242, "card[exp_month]" 12}})))))
-    (is (= params (read-string (:body (clj-http/post url {:query-params params})))))
-    (is (= params (read-string (:body @(hkc/post     url {:form-params  {"card[number]" 4242424242424242, "card[exp_month]" 12}}))))
-      "clj-http doesn't process these as nested params anymore but leaving to maintain backward compatibility")))
+  [(testing "Issue #54 (form-param dictionary support)"
+     (let [url    "http://localhost:4347/nested-param"
+           params {:card {:number "4242424242424242" :exp_month "12"}}]
+
+       [(is (= params (read-string (:body @(hkc/post     url {:form-params params})))))
+        (is (= params (read-string (:body @(hkc/post     url {:query-params {"card[number]" 4242424242424242, "card[exp_month]" 12}})))))
+        (is (= params (read-string (:body (clj-http/post url {:query-params params})))))
+        (is (= params (read-string (:body @(hkc/post     url {:form-params {"card[number]" 4242424242424242, "card[exp_month]" 12}}))))
+          "clj-http doesn't process these as nested params anymore but leaving to maintain backward compatibility")]))]
+
+  (testing "Issue #561 (configurable encoding of nested form and query params)"
+    (let [url       "http://localhost:4347/nested-param"
+          params-in {:card {:numbers [4242 1313 6767] :exp_month 12}
+                     :prices [{:amt 12 :name "prod-1"}
+                              {:amt 20 :name "prod-2"}]}
+
+          ;; Under the default style, a vec of maps is indistinguishable to a map pair, so gets treated as such.
+          ;; It's tested here for completeness but a real user would likely prefer the `:index` style here.
+          params-out-default
+          {:card   {:numbers ["4242" "1313" "6767"] :exp_month "12"}
+           :prices "{\"{:amt 12, :name \\\"prod-1\\\"}[amt]\" 20, \"{:amt 12, :name \\\"prod-1\\\"}[name]\" \"prod-2\"}"}
+
+          params-out-index
+          {:card   {:numbers {"0" "4242", "1" "1313", "2" "6767"}, :exp_month "12"}
+           :prices {"0" {:amt "12", :name "prod-1"}, "1" {:amt "20", :name "prod-2"}}}
+
+          params-out-comma
+          {:card    {:numbers "4242,1313,6767" :exp_month "12"}
+           :prices "{\"{:amt 12, :name \\\"prod-1\\\"}[amt]\" 20, \"{:amt 12, :name \\\"prod-1\\\"}[name]\" \"prod-2\"}"}]
+
+      [(is (= params-out-default (read-string (:body @(hkc/post url {:form-params params-in, :nested-param-style nil})))))
+       (is (= params-out-index   (read-string (:body @(hkc/post url {:form-params params-in, :nested-param-style :indexed})))))
+       (is (= params-out-default (read-string (:body @(hkc/post url {:form-params params-in, :nested-param-style :array})))))
+       (is (= params-out-comma   (read-string (:body @(hkc/post url {:form-params params-in, :nested-param-style :comma-separated})))))])))
 
 (deftest test-redirect
   (testing "When location header is"
