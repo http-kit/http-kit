@@ -1,4 +1,4 @@
-See the menu to the right for content 👉
+See the **menu to the right** for content 👉
 
 # Contributions welcome
 
