@@ -293,6 +293,8 @@ public class HttpServer implements Runnable {
 
     private void doRead(final SelectionKey key) {
         SocketChannel ch = (SocketChannel) key.channel();
+        ServerAtta atta = (ServerAtta) key.attachment();
+        atta.touch();
         try {
             buffer.clear(); // clear for read
             int read = ch.read(buffer);
@@ -301,7 +303,6 @@ public class HttpServer implements Runnable {
                 closeKey(key, CLOSE_AWAY);
             } else if (read > 0) {
                 buffer.flip(); // flip for read
-                final ServerAtta atta = (ServerAtta) key.attachment();
                 if (atta instanceof HttpAtta) {
                     decodeHttp((HttpAtta) atta, key, ch);
                 } else {
@@ -320,6 +321,7 @@ public class HttpServer implements Runnable {
             // the sync is per socket (per client). virtually, no contention
             // 1. keep byte data order, 2. ensure visibility
             synchronized (atta) {
+                atta.touch();
                 LinkedList<ByteBuffer> toWrites = atta.toWrites;
                 int size = toWrites.size();
                 if (size == 1) {
@@ -406,7 +408,16 @@ public class HttpServer implements Runnable {
                         closeKey(k.key, k.Op);
                     }
                 }
-                if (selector.select() <= 0) {
+                if (selector.select(1000) <= 0) {
+                    // check for stale/blocked channels
+                    for(SelectionKey old : selector.keys()){
+                        ServerAtta atta = (ServerAtta)old.attachment();
+                        if(atta != null){
+                            if(atta.notTouchedIn(1000)){
+                                closeKey(old, -1);
+                            }
+                        }
+                    }
                     continue;
                 }
                 Set<SelectionKey> selectedKeys = selector.selectedKeys();
