@@ -22,6 +22,7 @@ A huge thanks to all contributors!
 ## Changes since `v2.7.x`
 
 * 6db3f0f [mod] Bump minimum Java version: 7->8
+* If using **AOT/uberjar**, please ensure that you build with the **lowest Java version** that you'd like to support.
 
 ## Fixes since `v2.7.x`
 
