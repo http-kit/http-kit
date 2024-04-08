@@ -31,6 +31,15 @@ public class RequestConfig {
         this.autoCompression = autoCompression;
     }
 
+    // needed for instrumentation
+    public void setHeader(String name, Object value) {
+        headers.put(name, value);
+    }
+
+    public HttpMethod getMethod() {
+        return method;
+    }
+
     public RequestConfig() { // for easy test only
         this(HttpMethod.GET, null, null, 40000, 40000, -1, null, false, false);
     }

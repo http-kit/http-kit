@@ -168,4 +168,12 @@ public class RespListener implements IRespListener {
             throws AbortException {
         this.status = status;
     }
+
+    public HttpStatus getStatus() {
+        return status;
+    }
+
+    public Object getHeader(String name) {
+        return headers.get(name);
+    }
 }
