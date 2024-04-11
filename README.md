@@ -58,7 +58,7 @@ A big thank-you to the [current contributors](../../graphs/contributors) for kee
 ## Documentation
 
 - [Wiki][GitHub wiki] (getting started, usage, etc.)
-- API reference: [Codox][Codox docs], [clj-doc][clj-doc docs]
+- API reference: [cljdoc][cljdoc docs], [Codox][Codox docs]
 
 ## License
 
@@ -76,7 +76,7 @@ Licensed under [Apache 2.0](LICENSE.txt).
 <!-- Project -->
 
 [Codox docs]:   https://http-kit.github.io/http-kit/
-[clj-doc docs]: https://cljdoc.org/d/http-kit/http-kit/
+[cljdoc docs]: https://cljdoc.org/d/http-kit/http-kit/
 
 [Clojars SVG]: https://img.shields.io/clojars/v/http-kit.svg
 [Clojars URL]: https://clojars.org/http-kit
