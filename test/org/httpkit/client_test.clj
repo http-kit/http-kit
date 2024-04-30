@@ -401,20 +401,13 @@
 
 ;; https://github.com/http-kit/http-kit/issues/54
 (deftest test-nested-param
-  (let [url "http://localhost:4347/nested-param"
+  (let [url    "http://localhost:4347/nested-param"
         params {:card {:number "4242424242424242" :exp_month "12"}}]
-    (is (= params (read-string (:body @(hkc/post url {:form-params params})))))
-
-    (is (= params (read-string (:body @(hkc/post url
-                                         {:query-params {"card[number]" 4242424242424242
-                                                         "card[exp_month]" 12}})))))
+    (is (= params (read-string (:body @(hkc/post     url {:form-params params})))))
+    (is (= params (read-string (:body @(hkc/post     url {:query-params {"card[number]" 4242424242424242, "card[exp_month]" 12}})))))
     (is (= params (read-string (:body (clj-http/post url {:query-params params})))))
-
-    ;; clj-http doesn't actually process these as nested params anymore. Leaving
-    ;; to maintain backward compatibility
-    (is (= params (read-string (:body @(hkc/post url
-                                         {:form-params {"card[number]" 4242424242424242
-                                                        "card[exp_month]" 12}})))))))
+    (is (= params (read-string (:body @(hkc/post     url {:form-params  {"card[number]" 4242424242424242, "card[exp_month]" 12}}))))
+      "clj-http doesn't process these as nested params anymore but leaving to maintain backward compatibility")))
 
 (deftest test-redirect
   (testing "When location header is"
