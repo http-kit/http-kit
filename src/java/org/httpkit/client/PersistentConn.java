@@ -16,9 +16,29 @@ public class PersistentConn implements Comparable<PersistentConn> {
         this.key = key;
     }
 
+    private static boolean equalsToRequest(PersistentConn pc, Request req) {
+        return pc.addr.equals(req.addr) && pc.host.equals(req.host);
+    }
+
+    private static boolean equalsToSelectionKey(PersistentConn pc, SelectionKey key) {
+        return pc.key.equals(key);
+    }
+
+    private static boolean equalsToPersistentConn(PersistentConn pc1, PersistentConn pc2) {
+        return pc1.addr.equals(pc2.addr) && pc1.host.equals(pc2.host);
+    }
+
     public boolean equals(Object obj) {
         // for PriorityQueue to remove by key and by addr
-        return (addr.toString() + host).equals(obj) || key.equals(obj);
+        if (obj instanceof Request) {
+            return equalsToRequest(this, (Request) obj);
+        } else if (obj instanceof SelectionKey) {
+            return equalsToSelectionKey(this, (SelectionKey) obj);
+        } else if (obj instanceof PersistentConn) {
+            return equalsToPersistentConn(this, (PersistentConn) obj);
+        } else {
+            return (addr.toString() + host).equals(obj) || key.equals(obj);
+        }
     }
 
     public int compareTo(PersistentConn o) {
