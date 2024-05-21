@@ -450,7 +450,7 @@ public class HttpClient implements Runnable {
         Request job = pending.peek();
         if (job != null) {
             if (job.cfg.keepAlive > 0) {
-                PersistentConn con = keepalives.remove(job.addr.toString() + job.host);
+                PersistentConn con = keepalives.remove(job);
                 if (con != null) { // keep alive
                     SelectionKey key = con.key;
                     if (key.isValid()) {
