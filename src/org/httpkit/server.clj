@@ -202,7 +202,7 @@
     (base64-encode
      (.digest md (.getBytes (str sec-websocket-key websocket-13-guid))))))
 
-(def ^{:deprecated "v2.4.0 (2020-07-30)"} accept
+(def ^{:deprecated "v2.4.0 (2020-07-30)" :no-doc true} accept
   "DEPRECATED: prefer `sec-websocket-accept`" sec-websocket-accept)
 
 (defn websocket-handshake-check
