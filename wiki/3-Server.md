@@ -41,7 +41,7 @@ The `run-server` call above returns a stop function that you can call like so:
 
 There are 2 ways to handle WebSockets with `http-kit`:
 - use `http-kit`'s own unified API for WebSocket and HTTP long-polling/streaming
-- use the standard Ring WebSocket API
+- use the Ring's experimental (see https://github.com/ring-clojure/ring/wiki/WebSockets) WebSocket API
 
 ### Approach 1
 
