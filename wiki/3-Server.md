@@ -37,7 +37,40 @@ The `run-server` call above returns a stop function that you can call like so:
 (my-server :timeout 100)
 ```
 
+## Websockets
 
+There are 2 ways to handle WebSockets with `http-kit`:
+- use `http-kit`'s own unified API for WebSocket and HTTP long-polling/streaming
+- use the standard Ring WebSocket API
+
+### Approach 1
+
+```clj
+(ns demo
+  (:require [org.httpkit.server :as hk-server]))
+
+(def channels (atom #{}))
+
+(defn on-open [ch]
+  (swap! channels conj ch))
+
+(defn on-receive [ch message]
+  (doseq [ch @channels]
+    (hk-server/send! ch (str "broadcasting: " message))))
+
+(defn on-close [ch status-code]
+  (swap! channels disj ch))
+
+(defn app [req]
+  (if-not (:websocket? req)
+    {:status 200 :headers {"content-type" "text/html"} :body "<h1>Main screen turn on.</h1><h2>Start connecting websockets.</h2>"}
+    (hk-server/as-channel req
+                          {:on-open    #(on-open    %)
+                           :on-receive #(on-receive %1 %2)
+                           :on-close   #(on-close   %1 %2)})))
+
+(def server (hk-server/run-server app {:port 8080}))
+```
 
 ## Production environments
 
