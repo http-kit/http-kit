@@ -72,6 +72,36 @@ There are 2 ways to handle WebSockets with `http-kit`:
 (def server (hk-server/run-server app {:port 8080}))
 ```
 
+### Approach 2
+
+```clj
+(ns example.ring-api
+  (:require [org.httpkit.server :as hk-server]
+            [ring.websocket :as ws]))
+
+(def sockets (atom #{}))
+
+(defn on-open [ch]
+  (swap! sockets conj ch))
+
+(defn on-message [ch message]
+  (doseq [ch @sockets]
+    (ws/send ch (str "broadcasting: " message))))
+
+(defn on-close [ch status-code reason]
+  (swap! sockets disj ch))
+
+(defn app [req]
+  (if-not (:websocket? req)
+    {:status 200 :headers {"content-type" "text/html"} :body "<h1>Main screen turn on.</h1><h2>Start connecting websockets.</h2>"}
+    {::ws/listener
+     {:on-open    #(on-open    %)
+      :on-message #(on-message %1 %2)
+      :on-close   #(on-close   %1 %2 %3)}}))
+
+(def server (hk-server/run-server app {:port 8080}))
+```
+
 ## Production environments
 
 http-kit runs alone happily, which is handy for development and quick deployment. 
