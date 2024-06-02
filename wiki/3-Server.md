@@ -37,11 +37,9 @@ The `run-server` call above returns a stop function that you can call like so:
 (my-server :timeout 100)
 ```
 
-
-
 ## Production environments
 
-http-kit runs alone happily, which is handy for development and quick deployment. 
+http-kit runs alone happily, which is handy for development and quick deployment.
 
 But for production environments, it's **strongly recommended** to run http-kit behind a battle-hardened reverse proxy like [nginx](https://docs.nginx.com/nginx/admin-guide/web-server/reverse-proxy/), [Caddy](https://caddyserver.com/docs/quick-starts/reverse-proxy), [HAProxy](https://www.haproxy.org/), etc.
 
@@ -75,6 +73,73 @@ server {
     }
 }
 ```
+
+## Websockets
+
+There are 2 ways to handle WebSockets with `http-kit`:
+ 1. Use `http-kit`'s own unified API for WebSocket and HTTP long-polling
+ 2. Use [Ring's WebSocket API](https://github.com/ring-clojure/ring/wiki/WebSockets)
+
+### Using http-kit's unified API
+
+```clj
+(ns ws-example.unified-api
+  (:require
+    [org.httpkit.server :as hk-server]))
+
+(def channels (atom #{}))
+
+(defn on-open    [ch]             (swap! channels conj ch))
+(defn on-close   [ch status-code] (swap! channels disj ch))
+(defn on-receive [ch message]
+  (doseq [ch @channels]
+    (hk-server/send! ch (str "Broadcasting: " message))))
+
+(defn app [ring-req]
+  (if-not (:websocket? ring-req)
+    {:status 200 :headers {"content-type" "text/html"} :body "Connect WebSockets to this URL."}
+    (hk-server/as-channel ring-req
+      {:on-open    on-open
+       :on-receive on-receive
+       :on-close   on-close})))
+
+(def server (hk-server/run-server app {:port 8080}))
+```
+
+### Using Ring's WebSocket API
+
+```clj
+(ns ws-example.ring-api
+  (:require
+    [org.httpkit.server :as hk-server]
+    [ring.websocket :as ws]))
+
+(def sockets (atom #{}))
+
+(defn on-open    [ch]                    (swap! sockets conj ch))
+(defn on-close   [ch status-code reason] (swap! sockets disj ch))
+(defn on-message [ch message]
+  (doseq [ch @sockets]
+    (ws/send ch (str "Broadcasting: " message))))
+
+(defn app [ring-req]
+  (if-not (:websocket? ring-req)
+    {:status 200 :headers {"content-type" "text/html"} :body "Connect WebSockets to this URL."}
+    {::ws/listener
+     {:on-open    on-open
+      :on-message on-message
+      :on-close   on-close}}))
+
+(def server (hk-server/run-server app {:port 8080}))
+```
+
+These look the same on the surface, but let's dive deeper:
+
+- With the unified API you can use the exact same code for both WebSockets and HTTP long-polling (e.g. as a fallback). With the Ring WebSocket API you'd need to write separate code to handle HTTP long-polling.
+  
+- With the unified API you detect send success or failure by checking the `send!` return value. With the Ring WebSocket API you detect send success or failure by providing callback functions.
+  
+- The unified API provides no `reason` on WebSocket close. The Ring WebSocket API does, though in practice the reason is often empty (as of Jun 2024). Both APIs provide a `status-code` on close.
 
 # Advanced topics
 
