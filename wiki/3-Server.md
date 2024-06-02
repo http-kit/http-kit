@@ -46,7 +46,7 @@ There are 2 ways to handle WebSockets with `http-kit`:
 ### Approach 1
 
 ```clj
-(ns demo
+(ns example.unified-api
   (:require [org.httpkit.server :as hk-server]))
 
 (def channels (atom #{}))
