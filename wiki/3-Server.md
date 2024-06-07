@@ -37,7 +37,78 @@ The `run-server` call above returns a stop function that you can call like so:
 (my-server :timeout 100)
 ```
 
+## Websockets
 
+There are 2 ways to handle WebSockets with `http-kit`:
+1. use `http-kit`'s own unified API for WebSocket and HTTP long-polling
+1. use the Ring's experimental (see https://github.com/ring-clojure/ring/wiki/WebSockets) WebSocket API
+
+#### example code using the unified API
+
+```clj
+(ns example.unified-api
+  (:require [org.httpkit.server :as hk-server]))
+
+(def channels (atom #{}))
+
+(defn on-open [ch]
+  (swap! channels conj ch))
+
+(defn on-receive [ch message]
+  (doseq [ch @channels]
+    (hk-server/send! ch (str "broadcasting: " message))))
+
+(defn on-close [ch status-code]
+  (swap! channels disj ch))
+
+(defn app [req]
+  (if-not (:websocket? req)
+    {:status 200 :headers {"content-type" "text/html"} :body "<h1>Main screen turn on.</h1><h2>Start connecting websockets.</h2>"}
+    (hk-server/as-channel req
+                          {:on-open    #(on-open    %)
+                           :on-receive #(on-receive %1 %2)
+                           :on-close   #(on-close   %1 %2)})))
+
+(def server (hk-server/run-server app {:port 8080}))
+```
+
+#### example code using Ring's WebSocket API
+
+```clj
+(ns example.ring-api
+  (:require [org.httpkit.server :as hk-server]
+            [ring.websocket :as ws]))
+
+(def sockets (atom #{}))
+
+(defn on-open [ch]
+  (swap! sockets conj ch))
+
+(defn on-message [ch message]
+  (doseq [ch @sockets]
+    (ws/send ch (str "broadcasting: " message))))
+
+(defn on-close [ch status-code reason]
+  (swap! sockets disj ch))
+
+(defn app [req]
+  (if-not (:websocket? req)
+    {:status 200 :headers {"content-type" "text/html"} :body "<h1>Main screen turn on.</h1><h2>Start connecting websockets.</h2>"}
+    {::ws/listener
+     {:on-open    #(on-open    %)
+      :on-message #(on-message %1 %2)
+      :on-close   #(on-close   %1 %2 %3)}}))
+
+(def server (hk-server/run-server app {:port 8080}))
+```
+
+On the surface, except for syntactical differences, these really look the same. But let's dive deeper:
+
+- with the unified API, you really only need to write one set of code (even right down to using the same `data` argument for `send!`) server-side if you want to support both WebSockets, and HTTP long-polling (perhaps as a fallback). Not so if you use the Ring WebSocket API. You will need to write separate code to handle HTTP long-polling.
+
+- with the unified API, detecting success or failure for `send!` (which is asynchronous already, by the way) is easy enough: just check the return value, no callbacks necessary. With the Ring WebSocket API, if you intend to send asynchronously, you will need to construct your own callback functions with each `send` (essentially closures; no data is otherwise provided to callbacks to link the success/failure back to the specific `send`).
+
+- with the unified API, you do not get the `reason` for a WebSocket close. The Ring WebSocket API, on the other hand, does provide a `reason` parameter. In practice, though (at least for a proper close), the reason is often empty (as of Jun 3 2024), and all you need is the status code, which both APIs provide.
 
 ## Production environments
 
