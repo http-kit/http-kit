@@ -106,7 +106,7 @@ On the surface, except for syntactical differences, these really look the same. 
 
 - with the unified API, you really only need to write one set of code (even right down to using the same `data` argument for `send!`) server-side if you want to support both WebSockets, and HTTP long-polling (perhaps as a fallback). Not so if you use the Ring WebSocket API. You will need to write separate code to handle HTTP long-polling.
 
-- with the unified API, detecting success or failure for `send!` (which is asynchronous already, by the way) is easy enough: just check the return value, no callbacks necessary. With the Ring WebSocket API, if you intend to send asynchronously, you will need to construct your own callback functions with each `send` (no data is otherwise provided to callbacks to link the success/failure back to the specific `send`).
+- with the unified API, detecting success or failure for `send!` (which is asynchronous already, by the way) is easy enough: just check the return value, no callbacks necessary. With the Ring WebSocket API, if you intend to send asynchronously, you will need to construct your own callback functions with each `send` (essentially closures; no data is otherwise provided to callbacks to link the success/failure back to the specific `send`).
 
 - with the unified API, you do not get the `reason` for a WebSocket close. The Ring WebSocket API, on the other hand, does provide a `reason` parameter. In practice, though (at least for a proper close), the reason is often empty (as of Jun 3 2024), and all you need is the status code, which both APIs provide.
 
