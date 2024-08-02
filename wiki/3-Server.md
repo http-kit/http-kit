@@ -176,6 +176,7 @@ http-kit server's worker pool can be easily customised for arbitrary control and
 (.size (:queue my-http-kit-pool)) ; Get current queue size
 ```
 
+NB see also [`utils/new-worker`](https://cljdoc.org/d/http-kit/http-kit/CURRENT/api/org.httpkit.utils#new-worker) for an easy custom pool constructor.
 ### Java 19+ virtual threads
 
 As above, but using [`java.util.concurrent.Executors/newVirtualThreadPerTaskExecutor`](https://docs.oracle.com/en/java/javase/19/docs/api/java.base/java/util/concurrent/Executors.html#newVirtualThreadPerTaskExecutor()):
@@ -188,6 +189,8 @@ As above, but using [`java.util.concurrent.Executors/newVirtualThreadPerTaskExec
   {:worker-pool (java.util.concurrent.Executors/newVirtualThreadPerTaskExecutor)
    :port 11000})
 ```
+
+NB see also [`utils/new-worker`](https://cljdoc.org/d/http-kit/http-kit/CURRENT/api/org.httpkit.utils#new-worker) for an easy custom pool constructor.
 
 ## Unix Domain Sockets (UDS)
 
