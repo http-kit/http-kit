@@ -10,6 +10,7 @@ import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.Inflater;
+import java.util.zip.Deflater;
 import java.util.zip.InflaterInputStream;
 
 import static org.httpkit.HttpUtils.CONTENT_ENCODING;
@@ -81,7 +82,17 @@ public class RespListener implements IRespListener {
             is = new GZIPInputStream(bis);
         } else if ("deflate".equals(encoding) || "x-deflate".equals(encoding)) {
             // http://stackoverflow.com/questions/3932117/handling-http-contentencoding-deflate
-            is = new InflaterInputStream(bis, new Inflater(true));
+	    final int i1 = body.get()[0];
+	    final int i2 = body.get()[1];
+	    boolean nowrap = true;
+	    final int b1 = i1 & 0xFF;
+	    final int compressionMethod = b1 & 0xF;
+	    final int compressionInfo = b1 >> 4 & 0xF;
+	    final int b2 = i2 & 0xFF;
+	    if (compressionMethod == Deflater.DEFLATED && compressionInfo <= 7 && ((b1 << 8) | b2) % 31 == 0) {
+		nowrap = false;
+	    }
+            is = new InflaterInputStream(bis, new Inflater(nowrap));
         } else {
             return body; // not compressed
         }
