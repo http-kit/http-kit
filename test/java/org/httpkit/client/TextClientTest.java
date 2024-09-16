@@ -32,7 +32,8 @@ public class TextClientTest {
         String[] urls = new String[]{"http://feed.feedsky.com/amaze",
                 "http://macorz.cn/feed", "http://www.ourlinux.net/feed",
                 "http://blog.jjgod.org/feed/", "http://www.lostleon.com/blog/feed/",
-                "http://feed.feedsky.com/hellodb"};
+                "http://feed.feedsky.com/hellodb", "https://httpbin.org/deflate"
+	};
 
         runIt(urls);
 
