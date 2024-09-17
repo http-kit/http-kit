@@ -6,7 +6,10 @@
   :init
   (do
     (def jar "target/graal-tests.jar")
-    (def binary (if (fs/windows?) "graal-tests.exe" "./graal-tests")))
+    (def binary
+      (if (fs/windows?)
+        "./graal-tests.exe"
+        "./graal-tests")))
 
   clean
   {:task
