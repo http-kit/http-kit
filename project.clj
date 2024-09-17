@@ -22,9 +22,9 @@
 
   :profiles
   {;; :default [:base :system :user :provided :dev]
-   :provided {:dependencies [[org.clojure/clojure "1.11.3"]]}
-   :c1.12    {:dependencies [[org.clojure/clojure "1.12.0-alpha10"]]}
-   :c1.11    {:dependencies [[org.clojure/clojure "1.11.3"]]}
+   :provided {:dependencies [[org.clojure/clojure "1.12.0"]]}
+   :c1.12    {:dependencies [[org.clojure/clojure "1.12.0"]]}
+   :c1.11    {:dependencies [[org.clojure/clojure "1.11.4"]]}
    :c1.10    {:dependencies [[org.clojure/clojure "1.10.3"]]}
    :c1.9     {:dependencies [[org.clojure/clojure "1.9.0"]]}
 
@@ -36,20 +36,20 @@
     :java-source-paths ["test/java" "src/java"]
     :resource-paths    ["test/resources"]
     :dependencies
-    [[ring/ring-core                 "1.12.1"]
-     [ring/ring-jetty-adapter        "1.12.1"]
+    [[ring/ring-core                 "1.12.2"]
+     [ring/ring-jetty-adapter        "1.12.2"]
      [ring/ring-defaults              "0.5.0"]
      [ring-request-proxy             "0.1.11"]
      [ring-basic-authentication       "1.2.0"]
      [org.clojure/data.codec          "0.2.0"]
      [junit/junit                    "4.13.2"]
      [org.clojure/tools.logging       "1.3.0"]
-     [ch.qos.logback/logback-classic  "1.5.6"]
+     [ch.qos.logback/logback-classic  "1.5.8"]
      [clj-http                       "3.13.0"]
      [io.netty/netty-all       "4.1.98.Final"]
      [org.clojure/data.json           "2.5.0"]
      [http.async.client               "1.3.0"] ; TODO Update (newer versions failing)
-     [hato                            "0.9.0"]
+     [hato                            "1.0.0"]
      [compojure                       "1.7.1"]
      [org.clojure/tools.cli         "1.1.230"]]
 
@@ -60,7 +60,7 @@
 
    :nrepl
    {:plugins
-    [[cider/cider-nrepl         "0.47.1"]
+    [[cider/cider-nrepl         "0.50.2"]
      [mx.cider/enrich-classpath "1.19.3"]]}}
 
   :aliases
