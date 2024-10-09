@@ -366,7 +366,9 @@
   (when-let [ch (:async-channel ring-req)]
 
     (when-let [f init]     (f ch))
-    (when-let [f on-close] (org.httpkit.server/on-close ch (partial f ch)))
+    (when-let [f on-close]
+      (println ">>> set on-close!")
+      (org.httpkit.server/on-close ch (partial f ch)))
 
     (if (:websocket? ring-req)
       (if-let [sec-ws-accept (websocket-handshake-check ring-req)]

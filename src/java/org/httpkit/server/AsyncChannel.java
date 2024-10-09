@@ -14,6 +14,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.Map;
+import java.util.UUID;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -24,6 +25,8 @@ import static org.httpkit.server.WSDecoder.*;
 
 @SuppressWarnings({"unchecked"})
 public class AsyncChannel {
+
+    public final UUID uid = UUID.randomUUID();
 
     private final SelectionKey key;
     private final HttpServer server;
@@ -46,11 +49,13 @@ public class AsyncChannel {
     LinkingRunnable serialTask;
 
     public AsyncChannel(SelectionKey key, HttpServer server) {
+	System.out.println(">>> AsyncChannel.create: " + uid);
         this.key = key;
         this.server = server;
     }
 
     public void reset(HttpRequest request) {
+	System.out.println(">>> AsyncChannel.reset: " + uid);
         this.request = request;
         serialTask = null;
 
@@ -187,10 +192,12 @@ public class AsyncChannel {
     }
 
     public boolean hasCloseHandler() {
+	System.out.println(">>> AsyncChannel.hasCloseHandler: " + uid);
         return closeHandler.get() != null || closeRingHandler.get() != null;
     }
 
     public void setCloseHandler(IFn fn) {
+	System.out.println(">>> AsyncChannel.setCloseHandler: " + uid);
         if (!closeHandler.compareAndSet(null, fn)) { // only once
             throw new IllegalStateException("close handler exist: " + closeHandler);
         }
@@ -200,6 +207,7 @@ public class AsyncChannel {
     }
 
     public void setCloseRingHandler(IFn fn) {
+	System.out.println(">>> AsyncChannel.setCloseRingHandler: " + uid);
         if (!closeRingHandler.compareAndSet(null, fn)) { // only once
             throw new IllegalStateException("close ring handler exist: " + closeRingHandler);
         }
@@ -210,6 +218,7 @@ public class AsyncChannel {
     }
 
     public void onClose(int status, String reason) {
+	System.out.println(">>> AsyncChannel.onClose: " + uid);
         if (closedRan.compareAndSet(false, true)) {
             IFn f = closeHandler.get();
             if (f != null) {

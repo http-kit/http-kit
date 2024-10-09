@@ -354,14 +354,19 @@ public class RingHandler implements IHandler {
     }
 
     public void clientClose(final AsyncChannel channel, final int status, final String reason) {
+	System.out.println(">>> RingHandler.clientClose: " + channel.uid);
+	
         if (!channel.isClosed()) { // server did not close it first
+	    System.out.println(">>> RingHandler.clientClose (NOT already closed): " + channel.uid);
             // has close handler, execute it in another thread
             if (channel.hasCloseHandler()) {
+		System.out.println(">>> RingHandler.clientClose.hasCloseHandler: " + channel.uid);
                 try {
                     // no need to maintain order
                     execs.submit(new Runnable() {
                         public void run() {
                             try {
+				System.out.println(">>> RingHandler.clientClose.callHandler: " + channel.uid);
                                 channel.onClose(status, reason);
                             } catch (Exception e) {
                                 errorLogger.log("on close handler", e);
@@ -393,6 +398,7 @@ public class RingHandler implements IHandler {
                     }
                 }
             } else {
+		System.out.println(">>> RingHandler.clientClose (NO CloseHandler): " + channel.uid);
                 // no close handler, mark the connection as closed
                 channel.closedRan.set(false);
             }

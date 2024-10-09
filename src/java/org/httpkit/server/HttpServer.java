@@ -183,6 +183,8 @@ public class HttpServer implements Runnable {
 
     private void closeKey(final SelectionKey key, int status) {
 
+	System.out.println(">>> HttpServer.closeKey");
+
         keptAlive.remove(key);
 
         try {
@@ -193,8 +195,10 @@ public class HttpServer implements Runnable {
 
         ServerAtta att = (ServerAtta) key.attachment();
         if (att instanceof HttpAtta) {
+	    System.out.println(">>> HttpServer.closeKey.clientClose (with HttpAtta): " + att.channel.uid);
             handler.clientClose(att.channel, -1);
         } else if (att != null) {
+	    System.out.println(">>> HttpServer.closeKey.clientClose (without HttpAtta): " + att.channel.uid);
             handler.clientClose(att.channel, status);
         }
     }
@@ -215,7 +219,8 @@ public class HttpServer implements Runnable {
                     //
                     // Ref. #375, thanks to @osbert for identifying this risk!
 
-                    AsyncChannel channel = new AsyncChannel(key, this); // This okay?
+                    // AsyncChannel channel = atta.channel;
+		    AsyncChannel channel = new AsyncChannel(key, this); // This okay?
 
                     if (status.get() != Status.RUNNING) {
                         request.isKeepAlive = false;
