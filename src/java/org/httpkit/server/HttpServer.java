@@ -214,8 +214,20 @@ public class HttpServer implements Runnable {
                     // AsyncChannel channel = atta.channel;
                     //
                     // Ref. #375, thanks to @osbert for identifying this risk!
-
-                    AsyncChannel channel = new AsyncChannel(key, this); // This okay?
+                    //
+                    // The change from #375 was preventing the close handler from firing.
+                    // This was due to creating new AsyncChannel which did not have a
+                    // close handler set.
+                    //
+                    // To fix this we only create a new channel if the previous one was
+                    // closed. This prevents the issue of closed channels being reopened 
+                    // and reused described above. But, still ensures the close handler 
+                    // for a channel is called correctly.                    
+                    // AsyncChannel channel new AsyncChannel(key, this);
+                    //
+                    // Ref. #578
+                    //
+                    AsyncChannel channel = atta.channel.isClosed() ? new AsyncChannel(key, this) : atta.channel;
 
                     if (status.get() != Status.RUNNING) {
                         request.isKeepAlive = false;
