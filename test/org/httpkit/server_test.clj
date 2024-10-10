@@ -533,6 +533,51 @@
       (is (= "1" (:body (get @responses_ 1))))
       (is (= "2" (:body (get @responses_ 2)))))))
 
+(deftest test-channel-async-client-side-close ; Ref. #578 #579
+  ;; lein test :only org.httpkit.server-test/test-channel-async-client-side-close
+  (http/with-async-connection-pool {:threads 1}
+    (let [ch_            (atom nil)
+          on-close-run?_ (atom false)
+          captured_      (atom []) ; [<send-success?> ...]
+          capture!       (fn [result] (swap! captured_ conj result) result)
+          sse-event
+          {:status 200
+           :body   "data: hello \n\n"
+           :headers
+           {"Content-Type"  "text/event-stream"
+            "Cache-Control" "no-cache, no-store"}}
+
+          server
+          (run-server
+           (fn [req]
+             (as-channel req
+               {:on-open  (fn [ch]  (reset! ch_ ch))
+                :on-close (fn [_ _] (reset! on-close-run?_ true))}))
+
+           {:port 3474})]
+
+      ;; Open event-stream
+      (http/get "http://localhost:3474/"
+        {:timeout 100 ; Close client after 100ms
+         :async?  true
+         :as      :stream}
+        (fn cb [_] nil)
+        (fn cb [_] nil))
+
+      (Thread/sleep 50)
+
+      ;; Send some events without closing on the server side
+      (capture! (send! @ch_ sse-event false))
+      (capture! (send! @ch_ sse-event false))
+
+      ;; Wait before closing the server
+      (Thread/sleep 100)
+      (server)
+
+      (is (= [true true] @captured_) "After the first `send!`, @ch_ should not be closed.")
+      (is (= true (.isClosed @ch_))  "Check that client closing the channel is detected.")
+      (is (= true @on-close-run?_)   "Check that client closing the channel fired the `:on-close` handler."))))
+
 (defroutes custom-routes
   (GET "/" [] "hello world"))
 

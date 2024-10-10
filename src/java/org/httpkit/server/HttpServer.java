@@ -206,20 +206,24 @@ public class HttpServer implements Runnable {
 
                 if (request != null) {
 
-                    // It can be dangerous to re-use channels here. A user might hold
-                    // on to a channel, and reasonably expect it to *stay closed* after
-                    // use. By re-using channels here, we risk a user unintentionally
-                    // using a channel held from req1 that's since been RE-OPENED for
-                    // req2 (e.g. a completely unrelated request).
-                    // AsyncChannel channel = atta.channel;
+                    // Get AsyncChannel to associate with this request.
+                    // Logic has had subtle issues in the past.
                     //
-                    // Ref. #375, thanks to @osbert for identifying this risk!
+                    // 1. If HttpAtta's channel is open, use that (pre-existing) channel.
+                    //    [#578] Important to ensure that we preserve attached handlers, etc.
+                    //
+                    // 2. If HttpAtta's channel is closed, KEEP it closed and create a new channel.
+                    //    [#375] Important to ensure that AsyncChannels (which may be held by users!)
+                    //    stay closed once closed, and don't get accidentally reset+reused for
+                    //    different logical requests.
 
-                    AsyncChannel channel = new AsyncChannel(key, this); // This okay?
+                    // Is this reasonable?
+                    AsyncChannel channel = atta.channel.isClosed() ? new AsyncChannel(key, this) : atta.channel;
 
                     if (status.get() != Status.RUNNING) {
                         request.isKeepAlive = false;
                     }
+
                     request.setStartTime(System.nanoTime());
                     channel.reset(request);
 
