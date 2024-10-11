@@ -537,29 +537,29 @@
   (http/with-async-connection-pool {:threads 1}
     (let [ch_          (atom nil)
           fired-close_ (atom nil)
-          captured_ (atom []) ; [<send-success?> ...]
-          capture!  (fn [result] (swap! captured_ conj result) result)
-          sse-event {:status 200
-                     :headers
-                     {"Content-Type"  "text/event-stream"
-                      "Cache-Control" "no-cache, no-store"}
-                     :body   "data: hello \n\n"}
+          captured_    (atom []) ; [<send-success?> ...]
+          capture!     (fn [result] (swap! captured_ conj result) result)
+          sse-event    {:status 200
+                        :headers
+                        {"Content-Type"  "text/event-stream"
+                         "Cache-Control" "no-cache, no-store"}
+                        :body   "data: hello \n\n"}
           server
           (run-server
-            (fn [req]
-              (as-channel req
-                {:on-open  (fn [ch] (reset! ch_ ch))
-                 :on-close (fn [_ _]  (reset! fired-close_ true))}))
-            {:port 3474})]
+           (fn [req]
+             (as-channel req
+                         {:on-open  (fn [ch] (reset! ch_ ch))
+                          :on-close (fn [_ _]  (reset! fired-close_ true))}))
+           {:port 3474})]
 
       ;; open event-stream
       (http/get "http://localhost:3474/"
-        {:async? true
-         ;; Close client after 200ms
-         :timeout 100
-         :as :stream}
-        (fn cb [_] nil)
-        (fn cb [_] nil))
+                {:async?  true
+                 ;; Close client after 100ms
+                 :timeout 100
+                 :as      :stream}
+                (fn cb [_] nil)
+                (fn cb [_] nil))
 
       (Thread/sleep 50)
 
