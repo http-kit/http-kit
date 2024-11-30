@@ -1,7 +1,9 @@
 package org.httpkit;
 
+import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.Arrays;
+import org.httpkit.ArrayTooLargeException;
 
 public class DynamicBytes {
     private byte[] data;
@@ -13,11 +15,11 @@ public class DynamicBytes {
 
     private void expandIfNeeded(int more) {
         if (idx + more > data.length) {
-            int after = (int) ((idx + more) * 1.33);
-            // String msg = "expand memory, from " + data.length + " to " +
-            // after + "; need " + more;
-            // System.out.println(msg);
-            data = Arrays.copyOf(data, after);
+            long after =  (long)((idx + more) * 1.33);
+            if (after >= Integer.MAX_VALUE) {
+                throw new ArrayTooLargeException("Cannot expand array: Size " + after + " exceeds java limits");
+            }
+            data = Arrays.copyOf(data, (int)after);
         }
     }
 
