@@ -92,7 +92,13 @@ public class HttpRequest {
             int idx = h.lastIndexOf(':');
             if (idx != -1 && idx > ipv6end) {
                 this.serverName = h.substring(0, idx);
-                serverPort = Integer.valueOf(h.substring(idx + 1));
+                String serverPortCandidate = h.substring(idx + 1);
+                if (!serverPortCandidate.isEmpty()) {
+                    try {
+                        serverPort = Integer.parseInt(serverPortCandidate);
+                    } catch (Exception ignore) {
+                    }
+                }
             } else {
                 this.serverName = h;
             }
