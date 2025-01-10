@@ -82,7 +82,7 @@ public class HttpRequest {
         this.contentLength = count;
     }
 
-    public void setHeaders(Map<String, Object> headers) {
+    public void setHeaders(Map<String, Object> headers) throws ProtocolException {
         String h = getStringValue(headers, "host");
         if (h != null && !h.equals("")) {
             // the port is an integer following the last ':'
@@ -92,7 +92,14 @@ public class HttpRequest {
             int idx = h.lastIndexOf(':');
             if (idx != -1 && idx > ipv6end) {
                 this.serverName = h.substring(0, idx);
-                serverPort = Integer.valueOf(h.substring(idx + 1));
+                String serverPortCandidate = h.substring(idx + 1);
+                if (!serverPortCandidate.isEmpty()) {
+                    try {
+                        serverPort = Integer.parseInt(serverPortCandidate);
+                    } catch (NumberFormatException e) {
+                        throw new ProtocolException("Invalid host header (bad port): " + h);
+                    }
+                }
             } else {
                 this.serverName = h;
             }
