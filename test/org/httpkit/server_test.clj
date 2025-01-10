@@ -16,7 +16,8 @@
            [java.net InetSocketAddress]
            [java.nio.channels ServerSocketChannel]
            (java.nio.file Files)
-           (java.util.concurrent ThreadPoolExecutor TimeUnit ArrayBlockingQueue)))
+           (java.util.concurrent ThreadPoolExecutor TimeUnit ArrayBlockingQueue)
+           (org.apache.http NoHttpResponseException)))
 
 (defn file-handler [req]
   {:status 200
@@ -262,6 +263,29 @@
   (let [resp (http/get "http://localhost:4347/"
                        {:headers {"host" ""}})]
     (is (= 200 (:status resp)))))
+(deftest test-host-header-validity
+  (let [resp (http/get "http://localhost:4347/"
+                       {:headers {"host" "localhost"}})]
+    (is (= 200 (:status resp))))
+  (let [resp (http/get "http://localhost:4347/"
+                       {:headers {"host" "localhost:4347"}})]
+    (is (= 200 (:status resp))))
+  (let [resp (http/get "http://localhost:4347/"
+                       {:headers {"host" "localhost:"}})]
+    (is (= 200 (:status resp))))
+  (try
+    (http/get "http://localhost:4347/"
+              {:headers {"host" "localhost:es"}})
+    (catch Exception e
+      (is NoHttpResponseException (type e))
+      (is true "Exception thrown as expected")))
+  (try
+    (http/get "http://localhost:4347/"
+              {:headers {"host" "localhost:()"}})
+    (catch Exception e
+      (is NoHttpResponseException (type e))
+      (is true "Exception thrown as expected"))))
+
 
 ;;;;; async
 
