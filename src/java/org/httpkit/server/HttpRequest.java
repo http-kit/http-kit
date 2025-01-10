@@ -82,7 +82,7 @@ public class HttpRequest {
         this.contentLength = count;
     }
 
-    public void setHeaders(Map<String, Object> headers) {
+    public void setHeaders(Map<String, Object> headers) throws ProtocolException {
         String h = getStringValue(headers, "host");
         if (h != null && !h.equals("")) {
             // the port is an integer following the last ':'
@@ -96,7 +96,8 @@ public class HttpRequest {
                 if (!serverPortCandidate.isEmpty()) {
                     try {
                         serverPort = Integer.parseInt(serverPortCandidate);
-                    } catch (Exception ignore) {
+                    } catch (NumberFormatException e) {
+                        throw new ProtocolException(e.getMessage());
                     }
                 }
             } else {
