@@ -543,4 +543,13 @@ public class HttpServer implements Runnable {
             warnLogger.log(String.format("failed to close %s", closable.getClass().getName()), ex);
         }
     }
+
+    /**
+     * Joins the thread in which the server runs; this will block until the server is stopped.
+     *
+     * @throws InterruptedException
+     */
+    public void join() throws InterruptedException {
+        serverThread.join();
+    }
 }
