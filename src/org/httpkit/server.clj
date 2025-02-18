@@ -439,3 +439,8 @@
      (ring-handler rreq
        (fn respond* [rresp] (respond (ring-websocket-resp rreq rresp)))
        raise))))
+
+(defn join-server
+  "Joins the server, which will block the current thread until the server is stopped."
+  [^HttpServer server]
+  (.join server))
