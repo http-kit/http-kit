@@ -639,8 +639,7 @@
 
                  (reset! *state :after)
                  (.countDown after-latch))]
-    (doto (Thread. joiner)
-      .start)
+    (.start (Thread. joiner))
 
     (.await before-latch)
 
