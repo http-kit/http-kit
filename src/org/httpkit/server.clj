@@ -32,7 +32,7 @@
         p_))))
 
 (defn server-stop!
-  "Signals given HttpServer to stop.
+  "Signals given `HttpServer` to stop.
 
   If     already stopping: returns nil.
   If not already stopping: returns a Promise that will be delivered once
@@ -44,6 +44,12 @@
 
   ([http-server     ] (-server-stop! http-server nil))
   ([http-server opts] (-server-stop! http-server opts)))
+
+(defn server-join
+  "Joins given `HttpServer` server thread, blocking the current thread until
+  server is stopped."
+  [^HttpServer server]
+  (.join server))
 
 (defn new-worker
   "Returns {:keys [n-cores type pool ...]} where `:pool` is a new
@@ -100,7 +106,7 @@
   If :legacy-return-value? is
     true  (default)     ; Returns a (fn stop-server [& {:keys [timeout] :or {timeout 100}}])
     false (recommended) ; Returns the `HttpServer` which can be used with `server-port`,
-                        ; `server-status`, `server-stop!`, etc.
+                        ; `server-status`, `server-stop!`, `server-join`, etc.
 
   The server also supports the following JVM properties:
 

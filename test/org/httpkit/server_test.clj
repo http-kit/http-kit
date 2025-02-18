@@ -16,7 +16,7 @@
            [java.net InetSocketAddress]
            [java.nio.channels ServerSocketChannel]
            (java.nio.file Files)
-           (java.util.concurrent ThreadPoolExecutor TimeUnit ArrayBlockingQueue)))
+           (java.util.concurrent CountDownLatch ThreadPoolExecutor TimeUnit ArrayBlockingQueue)))
 
 (defn file-handler [req]
   {:status 200
@@ -570,3 +570,33 @@
       (is (= 500 (:status (http/get "http://localhost:9091/error"
                                     {:throw-exceptions false}))))
       (finally (server)))))
+
+(deftest can-join-server
+  (let [before-latch (CountDownLatch. 1)
+        after-latch  (CountDownLatch. 1)
+        state_       (atom nil)
+        server
+        (run-server
+          identity ; Handler irrelevant, we don't send any requests
+          {:legacy-return-value? false
+           :port 10871})
+
+        joiner
+        (fn []
+          (reset! state_ :before-join)
+          (.countDown before-latch)
+
+          (server-join server) ; Blocks
+
+          (reset! state_ :after-join)
+          (.countDown after-latch))]
+
+    (.start (Thread. joiner))
+
+    (.await before-latch)
+    (is (= @state_ :before-join))
+
+    (server-stop! server)
+
+    (.await after-latch)
+    (is (= @state_ :after-join))))
