@@ -1,20 +1,21 @@
 package org.httpkit.client;
 
-import org.httpkit.*;
+import static org.httpkit.HttpUtils.CONTENT_ENCODING;
+import static org.httpkit.HttpUtils.CONTENT_TYPE;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.ProtocolException;
 import java.nio.charset.Charset;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
+import java.util.zip.Deflater;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.Inflater;
-import java.util.zip.Deflater;
 import java.util.zip.InflaterInputStream;
 
-import static org.httpkit.HttpUtils.CONTENT_ENCODING;
-import static org.httpkit.HttpUtils.CONTENT_TYPE;
+import org.httpkit.*;
 
 class Handler implements Runnable {
 
@@ -158,7 +159,7 @@ public class RespListener implements IRespListener {
                     pool.submit(new Handler(handler, status.getCode(), headers, is));
                 }
             }
-        } catch (IOException e) {
+        } catch (IOException | ArrayTooLargeException e) {
             handler.onThrowable(e);
         }
     }
