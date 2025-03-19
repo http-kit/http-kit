@@ -35,7 +35,7 @@ public class WebSocketClient {
 
     public WebSocketClient(String url) throws Exception {
         bootstrap = new ClientBootstrap(new NioClientSocketChannelFactory(
-                Executors.newFixedThreadPool(1), Executors.newFixedThreadPool(1)));
+                Executors.newFixedThreadPool(1), Executors.newFixedThreadPool(1), 1, 1));
         this.uri = new URI(url);
         HashMap<String, String> customHeaders = new HashMap<String, String>();
         final WebSocketClientHandshaker handshaker = new WebSocketClientHandshakerFactory()
