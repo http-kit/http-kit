@@ -39,11 +39,18 @@ The `run-server` call above returns a stop function that you can call like so:
 
 ## Production environments
 
-http-kit runs alone happily, which is handy for development and quick deployment.
+http-kit server runs alone happily, which is handy for development and quick deployment.
 
-But for production environments, it's **strongly recommended** to run http-kit behind a battle-hardened reverse proxy like [nginx](https://docs.nginx.com/nginx/admin-guide/web-server/reverse-proxy/), [Caddy](https://caddyserver.com/docs/quick-starts/reverse-proxy), [HAProxy](https://www.haproxy.org/), etc.
+But for production environments, it's **strongly recommended** to run http-kit behind a well-configured and battle-hardened reverse proxy like [nginx](https://docs.nginx.com/nginx/admin-guide/web-server/reverse-proxy/), [Caddy](https://caddyserver.com/docs/quick-starts/reverse-proxy), [HAProxy](https://www.haproxy.org/), [AWS ALB](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/introduction.html), etc.
 
-http-kit's philosophy is to **focus on running Clojure code**, while leaving as much of the rest as possible to these very heavily optimised+tested solutions for things like **HTTPS**, compression, load balancing, static file serving, etc.
+Your proxy can then provide:
+
+1. **HTTPS** support (which http-kit lacks)
+2. Load balancing
+3. Static file serving performance
+4. Improved security against un/intentional bad requests, DDoS attempts, etc.
+
+http-kit's philosophy is to **focus on running Clojure code**, while leaving as much as possible to the rest of your stack.
 
 ###  Sample Nginx configuration
 

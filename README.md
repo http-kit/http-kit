@@ -32,6 +32,12 @@ See [here][GitHub releases] for earlier releases.
 
 - **WebSockets**: realtime web apps are a breeze with http-kit, with great out-the-box support for both WebSockets and efficient HTTP long-polling.
 
+## Production usage
+
+For production environments, it's **strongly recommended** to run http-kit behind a well-configured and battle-hardened reverse proxy like [nginx](https://docs.nginx.com/nginx/admin-guide/web-server/reverse-proxy/), [Caddy](https://caddyserver.com/docs/quick-starts/reverse-proxy), [HAProxy](https://www.haproxy.org/), [AWS ALB](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/introduction.html), etc.
+
+See [here](../../wiki/3-Server#production-environments) for more info.
+
 ## Performance
 
 http-kit now includes an extensive single-system **benchmark suite** that can be easily customized and run in your own environment.
