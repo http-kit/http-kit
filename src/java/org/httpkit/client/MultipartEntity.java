@@ -72,7 +72,7 @@ public class MultipartEntity {
                 byte[] contentBytes = (byte[])e.content;
                 bytes.append(contentBytes, contentBytes.length);
             } else if (e.content instanceof Number) {
-                bytes.append(e.toString(), HttpUtils.UTF_8);
+                bytes.append(e.content.toString(), HttpUtils.UTF_8);
             } else
                 throw new IllegalArgumentException("Unknown parameter type " + e.content.getClass().getName() + " of parameter " + e.name + ". Try to pass a string.");
             bytes.append(HttpUtils.CR, HttpUtils.LF);
