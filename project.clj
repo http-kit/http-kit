@@ -36,18 +36,18 @@
     :java-source-paths ["test/java" "src/java"]
     :resource-paths    ["test/resources"]
     :dependencies
-    [[ring/ring-core                 "1.12.2"]
-     [ring/ring-jetty-adapter        "1.12.2"]
-     [ring/ring-defaults              "0.5.0"]
+    [[ring/ring-core                 "1.14.1"]
+     [ring/ring-jetty-adapter        "1.14.1"]
+     [ring/ring-defaults              "0.6.0"]
      [ring-request-proxy             "0.1.11"]
      [ring-basic-authentication       "1.2.0"]
      [org.clojure/data.codec          "0.2.0"]
      [junit/junit                    "4.13.2"]
      [org.clojure/tools.logging       "1.3.0"]
-     [ch.qos.logback/logback-classic  "1.5.8"]
+     [ch.qos.logback/logback-classic "1.5.18"]
      [clj-http                       "3.13.0"]
      [io.netty/netty-all       "4.1.98.Final"]
-     [org.clojure/data.json           "2.5.0"]
+     [org.clojure/data.json           "2.5.1"]
      [http.async.client               "1.3.0"] ; TODO Update (newer versions failing)
      [hato                            "1.0.0"]
      [compojure                       "1.7.1"]
@@ -60,7 +60,7 @@
 
    :nrepl
    {:plugins
-    [[cider/cider-nrepl         "0.50.2"]
+    [[cider/cider-nrepl         "0.55.1"]
      [mx.cider/enrich-classpath "1.19.3"]]}}
 
   :aliases
