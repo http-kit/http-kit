@@ -1,5 +1,5 @@
 <span><img src="http-kit-logo.png" alt="http-kit" width="140"/></span>  
-[**Documentation**](#documentation) | [Latest releases](#latest-releases) | [Slack channel][]
+[**API**][cljdoc] | [Latest releases](#latest-releases) | [Slack channel][]
 
 # http-kit
 
@@ -11,7 +11,8 @@ It uses an event-driven architecture to support highly concurrent a/synchronous 
 
 ## Latest release/s
 
-- `2024-02-30` `v2.8.0`: [release info](../../releases/tag/v2.8.0)
+- `2025-04-15` `v2.9.0-beta1`: (dev) [release info](../../releases/tag/v2.9.0-beta1)
+- `2024-02-30` `v2.8.0`: (stable) [release info](../../releases/tag/v2.8.0)
 
 [![Main tests][Main tests SVG]][Main tests URL]
 [![Graal tests][Graal tests SVG]][Graal tests URL]
@@ -63,11 +64,12 @@ A big thank-you to the [current contributors](../../graphs/contributors) for kee
 ## Documentation
 
 - [Wiki][GitHub wiki] (getting started, usage, etc.)
-- API reference: [cljdoc][cljdoc docs], [Codox][Codox docs]
+- API reference via [cljdoc][cljdoc]
+- Support via [Slack channel][] or [GitHub issues][]
 
 ## License
 
-Copyright &copy; 2012-2024 [Feng Shen][@shenfeng] and contributors.  
+Copyright &copy; 2012-2025 [Feng Shen][@shenfeng] and contributors.  
 Licensed under [Apache 2.0](LICENSE.txt).
 
 <!-- Common -->
@@ -81,8 +83,7 @@ Licensed under [Apache 2.0](LICENSE.txt).
 
 <!-- Project -->
 
-[Codox docs]:   https://http-kit.github.io/http-kit/
-[cljdoc docs]: https://cljdoc.org/d/http-kit/http-kit/
+[cljdoc]: https://cljdoc.org/d/http-kit/http-kit/
 
 [Clojars SVG]: https://img.shields.io/clojars/v/http-kit.svg
 [Clojars URL]: https://clojars.org/http-kit

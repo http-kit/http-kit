@@ -2,6 +2,33 @@ This project uses [**Break Versioning**](https://www.taoensso.com/break-versioni
 
 ---
 
+# `v2.9.0-beta1` (2025-04-15)
+
+- **Dependency**: [on Clojars](https://clojars.org/http-kit/versions/2.9.0-beta1)
+- **Versioning**: [Break Versioning](https://www.taoensso.com/break-versioning)
+
+This is a **feature and maintenance** pre-release. It's expected to be stable but as always, please **test carefully and report any unexpected problems**, thank you! 🙏
+
+See linked commits below for details, and big thanks to all contributors!
+
+\- [Peter Taoussanis](https://www.taoensso.com)
+
+## Since `v2.8.0` (2024-04-30)
+
+* \[fix] [server] [#584] Reject invalid host header ports (@ianmuge) \[de33aed]
+* \[fix] [server] [#578] [#579] Fix regression in #375 (@andersmurphy) \[76b869f]
+* \[fix] [client] [#592] Fix number encoding in `MultipartEntity` (@GAumala) \[2baeab5]
+* \[fix] [client] [#590] [#576] Fix warning during client tests (@kolstae) \[a8a5df8]
+* \[fix] [client] [#574] [#575] Fix possible `java.util.zip.ZipException` for deflate encodings (@pieterbreed) \[42ad799]
+* \[fix] [client] [#568] [#569] Fix performance regression (@bsless) \[3831982]
+* \[new] [server] [#588] [#589] Add `join-server` function (@hlship) \[b31d588]
+* \[new] [client] [#517] [#567] Add some Java methods to better enable instrumentation (@jefimm) \[082eb7f]
+* \[doc] Mention `utils/new-worker` util \[1d173fe]
+* \[doc] Extend production info section, link directly from README \[fd6b993]
+* \[doc] [#570] [#572] Add updated WebSocket example to wiki (@jf) \[a0d39bf]
+
+---
+
 # `v2.8.0` (2024-04-30)
 
 > **Dep/s**: http-kit is [on Clojars](https://clojars.org/http-kit/versions/2.8.0).  
