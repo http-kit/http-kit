@@ -32,4 +32,16 @@ public abstract class ServerAtta {
     public void chunkedResponseInprogress(boolean b) {
         chunkedResponseInprogress = b;
     }
+
+    // when we we last read or write to this socket?
+    protected long lastTouched = System.currentTimeMillis();
+
+    public long touch(){
+        lastTouched = System.currentTimeMillis();
+        return lastTouched;
+    }
+
+    public boolean notTouchedIn(long millis){
+        return (System.currentTimeMillis() - lastTouched) > millis;
+    }
 }
