@@ -107,6 +107,9 @@
       {:status  200 :body ""
        :headers {"x-sent-accept-encoding" (get-in req [:headers "accept-encoding"])}}))
 
+  (GET "/content-length" [] (fn [{:keys [headers]}] (str (get headers "content-length"))))
+  (POST "/content-length" [] (fn [{:keys [headers]}] (str (get headers "content-length"))))
+
   (ANY "*" [] {:status 404 :body ""}))
 
 (defonce servers_ (atom nil))
@@ -516,6 +519,16 @@
       (is (= received expected)))))
 
 (defn- utf8 [^String s] (ByteBuffer/wrap (.getBytes s "UTF-8")))
+
+(deftest test-sent-content-length
+  ;; fix #583
+  (is (= ""  (:body @(hkc/get  "http://127.0.0.1:14347/content-length"))))
+  (is (= ""  (:body @(hkc/head "http://127.0.0.1:14347/content-length"))))
+  (is (= ""  (:body @(hkc/post "http://127.0.0.1:14347/content-length"))))
+  (is (= "3" (:body @(hkc/post "http://127.0.0.1:14347/content-length"
+                               {:body "123"}))))
+  (is (= "0" (:body @(hkc/post "http://127.0.0.1:14347/content-length"
+                               {:headers {"content-length" "0"}})))))
 
 (defn- decode [method buffer]
   (let [out (atom [])

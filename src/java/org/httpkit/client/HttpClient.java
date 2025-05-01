@@ -411,10 +411,10 @@ public class HttpClient implements Runnable {
         ByteBuffer bodyBuffer = HttpUtils.bodyBuffer(body);
 
         if (body != null) {
-            headers.putOrReplace("Content-Length", Integer.toString(bodyBuffer.remaining()));
-        } else {
-            headers.putOrReplace("Content-Length", "0");
+            String value = Integer.toString(bodyBuffer.remaining());
+            headers.putOrReplace("Content-Length", value);
         }
+
         DynamicBytes bytes = new DynamicBytes(196);
         bytes.append(method.toString()).append(SP).append(path);
         bytes.append(" HTTP/1.1\r\n");
