@@ -4,6 +4,9 @@ import org.httpkit.*;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.PipedInputStream;
+import java.io.PipedOutputStream;
 import java.nio.charset.Charset;
 import java.util.Map;
 import java.util.TreeMap;
@@ -117,15 +120,48 @@ public class RespListener implements IRespListener {
     private final ExecutorService pool;
     final int coercion;
 
+    // only used if coercion has type stream
+    private OutputStream responseStreamer;
+
     public RespListener(IResponseHandler handler, IFilter filter, ExecutorService pool, int coercion) {
         body = new DynamicBytes(1024 * 8);
         this.filter = filter;
         this.handler = handler;
         this.coercion = coercion;
         this.pool = pool;
+
+
+    }
+
+    private OutputStream startStreamingResponse() throws AbortException {
+        try {
+            PipedInputStream is = new PipedInputStream(1024 * 8);
+            PipedOutputStream os = new PipedOutputStream(is);
+            pool.submit(new Handler(handler, status.getCode(), headers, is));
+            return os;
+        } catch (IOException ex) {
+            throw new AbortException("Failed to start streaming response");
+        }
+    }
+
+    private void streamResponseChunk(byte[] buf, int length) throws AbortException {
+        if (responseStreamer == null) {
+            responseStreamer = startStreamingResponse();
+        }
+        try {
+            responseStreamer.write(buf, 0, length);
+        } catch (IOException ex) {
+            throw new AbortException("Failed to stream response");
+        }
     }
 
     public void onBodyReceived(byte[] buf, int length) throws AbortException {
+        if (coercion == 3) {
+            // result type is stream, pipe the chunk and exit
+            streamResponseChunk(buf, length);
+            return;
+        }
+
         body.append(buf, length);
         if (filter != null && !filter.accept(body)) {
             throw new AbortException("Rejected when reading body, length: " + body.length());
@@ -139,13 +175,21 @@ public class RespListener implements IRespListener {
             return;
         }
         try {
+            if (coercion == 3) {
+                // 3=>stream
+                // stream has already been submitted
+                if (responseStreamer != null) {
+                  responseStreamer.close();
+                }
+                return;
+            }
             if (coercion == 0 || coercion == 5) { // 0=> none, 5=> raw-byte-array
                 Object b = coercion == 0 ? body : body.bytes();
                 pool.submit(new Handler(handler, status.getCode(), headers, b));
                 return;
             }
             DynamicBytes bytes = unzipBody();
-            // 1=> auto, 2=>text, 3=>stream, 4=>byte-array
+            // 1=> auto, 2=>text, 4=>byte-array
             if (coercion == 2 || (coercion == 1 && isText())) {
                 Charset charset = HttpUtils.detectCharset(headers, bytes);
                 String html = new String(bytes.get(), 0, bytes.length(), charset);
