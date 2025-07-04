@@ -68,6 +68,7 @@ public class HttpUtils {
     public static final String CONTENT_LENGTH = "content-length";
 
     public static final Set<String> NON_TEXT_CONTENT_TYPES = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
+            "image/svg+xml",                                                             // .svg
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",   // .docx
             "application/vnd.openxmlformats-officedocument.wordprocessingml.template",   // .dotx
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",         // .xlsx
