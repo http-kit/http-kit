@@ -67,6 +67,22 @@ public class HttpUtils {
     public static final String CONTENT_TYPE = "content-type";
     public static final String CONTENT_LENGTH = "content-length";
 
+    public static final Set<String> NON_TEXT_CONTENT_TYPES = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",   // .docx
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.template",   // .dotx
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",         // .xlsx
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.template",      // .xltx
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation", // .pptx
+            "application/vnd.openxmlformats-officedocument.presentationml.slide",        // .sldx
+            "application/vnd.openxmlformats-officedocument.presentationml.slideshow",    // .ppsx
+            "application/vnd.openxmlformats-officedocument.presentationml.template",     // .potx
+            "application/vnd.oasis.opendocument.text",                                   // .odt
+            "application/vnd.oasis.opendocument.text-template",                          // .ott
+            "application/vnd.oasis.opendocument.text-web",                               // .oth
+            "application/vnd.oasis.opendocument.text-master"                             // .odm
+    )));
+
+
     public static final String CHUNKED = "chunked";
     public static final String TRAILER = "trailer";
 
