@@ -18,6 +18,7 @@ import java.util.zip.InflaterInputStream;
 
 import static org.httpkit.HttpUtils.CONTENT_ENCODING;
 import static org.httpkit.HttpUtils.CONTENT_TYPE;
+import static org.httpkit.HttpUtils.NON_TEXT_CONTENT_TYPES;
 
 class Handler implements Runnable {
 
@@ -62,7 +63,11 @@ public class RespListener implements IRespListener {
             if (type != null) {
                 type = type.toLowerCase();
                 // TODO may miss something
-                return type.contains("text") || type.contains("json") || type.contains("xml");
+                if (NON_TEXT_CONTENT_TYPES.contains(type)) {
+                    return false;
+                } else {
+                    return type.contains("text") || type.contains("json") || type.contains("xml");
+                }
             } else {
                 return false;
             }
