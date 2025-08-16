@@ -191,6 +191,23 @@
     (is (= "application/x-www-form-urlencoded" (:content-type req)))
     (is (= "utf8" (:character-encoding req)))))
 
+(deftest test-legacy-unsafe-remote-addr-option
+  (let [req {:headers {"X-Forwarded-For" "1.2.3.4"}
+             :as      :text}
+       handler (fn [req] {:status 200 :body (:remote-addr req)}) ]
+    (testing "legacy-unsafe-remote-addr? true allows spoofing"
+      (let [server  (run-server handler {:port 3474})]
+        (try
+          (let [resp @(client/get "http://localhost:3474" req)]
+            (is (= "1.2.3.4" (:body resp))))
+          (finally (server)))) )
+    (testing "legacy-unsafe-remote-addr? false does not allow spoofing"
+      (let [server  (run-server handler {:port 3474 :legacy-unsafe-remote-addr? false})]
+        (try
+          (let [resp @(client/get "http://localhost:3474" req)]
+            (is (= "127.0.0.1" (:body resp))))
+          (finally (server)))))))
+
 (deftest test-body-string
   (let [resp (http/get "http://localhost:4347/string")]
     (is (= (:status resp) 200))

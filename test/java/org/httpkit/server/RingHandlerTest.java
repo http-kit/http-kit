@@ -23,7 +23,7 @@ import static org.hamcrest.CoreMatchers.is;
 
 public class RingHandlerTest {
 
-    private HttpDecoder httpDecoder = new HttpDecoder(8388608, 4096, ProxyProtocolOption.DISABLED);
+    private HttpDecoder httpDecoder = new HttpDecoder(8388608, 4096, ProxyProtocolOption.DISABLED, true);
 
     @Test
     public void shouldUseExternalThreadPoolForExecution() throws InterruptedException, ProtocolException, LineTooLargeException, RequestTooLargeException {

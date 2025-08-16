@@ -68,6 +68,7 @@ public class HttpServer implements Runnable {
     private final ServerSocketChannel serverChannel;
 
     private final ProxyProtocolOption proxyProtocolOption;
+    private final boolean legacyUnsafeRemoteAddr;
 
     public final String serverHeader;
     private final SocketAddress socketAddress;
@@ -108,13 +109,14 @@ public class HttpServer implements Runnable {
     public HttpServer(String ip, int port, IHandler handler, int maxBody, int maxLine, int maxWs,
                       ProxyProtocolOption proxyProtocolOption)
             throws IOException {
-        this(ip, port, handler, maxBody, maxLine, maxWs, proxyProtocolOption, "http-kit",
+        this(ip, port, handler, maxBody, maxLine, maxWs, proxyProtocolOption, "http-kit", true,
                 ContextLogger.ERROR_PRINTER, DEFAULT_WARN_LOGGER, EventLogger.NOP, EventNames.DEFAULT);
     }
 
     public HttpServer(String ip, int port, IHandler handler, int maxBody, int maxLine, int maxWs,
                       ProxyProtocolOption proxyProtocolOption,
                       String serverHeader,
+                      boolean legacyUnsafeRemoteAddr,
                       ContextLogger<String, Throwable> errorLogger,
                       ContextLogger<String, Throwable> warnLogger,
                       EventLogger<String> eventLogger, EventNames eventNames)
@@ -128,6 +130,7 @@ public class HttpServer implements Runnable {
         this.maxBody = maxBody;
         this.maxWs = maxWs;
         this.proxyProtocolOption = proxyProtocolOption;
+        this.legacyUnsafeRemoteAddr = legacyUnsafeRemoteAddr;
         this.serverHeader = serverHeader;
 
         this.selector = Selector.open();
@@ -142,6 +145,7 @@ public class HttpServer implements Runnable {
     public HttpServer (AddressFinder addressFinder, ServerChannelFactory channelFactory, IHandler handler, int maxBody, int maxLine, int maxWs,
         ProxyProtocolOption proxyProtocolOption,
         String serverHeader,
+        boolean legacyUnsafeRemoteAddr,
         ContextLogger<String, Throwable> errorLogger,
         ContextLogger<String, Throwable> warnLogger,
         EventLogger<String> eventLogger, EventNames eventNames)
@@ -155,6 +159,7 @@ public class HttpServer implements Runnable {
             this.maxBody = maxBody;
             this.maxWs = maxWs;
             this.proxyProtocolOption = proxyProtocolOption;
+            this.legacyUnsafeRemoteAddr = legacyUnsafeRemoteAddr;
             this.serverHeader = serverHeader;
             this.socketAddress = addressFinder.findAddress();
             this.serverChannel = channelFactory.createChannel(socketAddress);
@@ -170,7 +175,7 @@ public class HttpServer implements Runnable {
         try {
             while ((s = ch.accept()) != null) {
                 s.configureBlocking(false);
-                HttpAtta atta = new HttpAtta(maxBody, maxLine, proxyProtocolOption);
+                HttpAtta atta = new HttpAtta(maxBody, maxLine, proxyProtocolOption, legacyUnsafeRemoteAddr);
                 SelectionKey k = s.register(selector, OP_READ, atta);
                 atta.channel = new AsyncChannel(k, this);
             }
