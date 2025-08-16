@@ -237,3 +237,43 @@ To use, plug in appropriate `java.net.SocketAddress` and `java.nio.channels.Sock
 ```
 
 See [`run-server`](http://http-kit.github.io/http-kit/org.httpkit.server.html#var-run-server) for more info.
+
+## Content-Length Header Control
+
+http-kit 2.9+ provides control over Content-Length header behavior through the `:legacy-content-length?` option:
+
+```clojure
+(hk-server/run-server app {:port 8080
+                           :legacy-content-length? false})
+```
+
+- **`:legacy-content-length? true`** (default): http-kit always calculates the Content-Length from the response body and sets the header automatically. Any Content-Length header provided by your handler will be overridden. This behavior exists for backwards compatibility.
+- **`:legacy-content-length? false`**: http-kit respects Content-Length headers provided by your handler. If no Content-Length is provided, http-kit calculates it from the body.
+
+The primary use case is [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110.html#section-8.6-6) compliant HEAD responses. The HTTP specification requires that HEAD responses include the same Content-Length that would be sent for a GET request, but without the body:
+
+```clojure
+(defn my-handler [req]
+  (case (:request-method req)
+    :get  {:status 200
+           ;; An expensive operation
+           :body (generate-large-resource)}
+    :head {:status 200
+           :headers {"Content-Length"
+                     ;; Not quite as expensive
+                     (size-of-large-resource)}
+           ;; No body for HEAD
+           :body nil}))
+
+(hk-server/run-server my-handler {:port 8080
+                                 :legacy-content-length? false})
+```
+
+This allows you to return the correct Content-Length for HEAD requests without generating the expensive response body.
+
+- http-kit does NOT validate Content-Length values (e.g., non-numeric, negative)
+- Does NOT detect or warn about duplicate Content-Length headers
+- Does NOT enforce that Content-Length matches actual body size
+- When multiple Content-Length headers exist (matched case-insensitively), returns one of them, which one is undefined
+
+This follows the principle that invalid headers indicate a middleware bug that is not http-kit's responsibility to fix. When `:legacy-content-length? false`, you have full control and responsibility for Content-Length correctness.

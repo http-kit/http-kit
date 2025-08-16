@@ -107,6 +107,9 @@
     :event-logger               ; (fn [ev-name]) -> log events
     :event-names                ; Map of http-kit event names to loggable event names
 
+    :legacy-content-length? ; When true (default), http-kit always calculates Content-Length headers.
+                            ; When false, respects handler-provided Content-Length headers if provided.
+
     ;; These opts may be used for Unix Domain Socket (UDS) support, see README:
     :address-finder             ; (fn []) -> `java.net.SocketAddress` (ip/port ignored)
     :channel-factory            ; (fn [java.net.SocketAddress]) -> `java.nio.channels.SocketChannel`
@@ -128,7 +131,7 @@
    & [{:keys [ip port max-body max-ws max-line
               proxy-protocol worker-pool
               error-logger warn-logger event-logger event-names
-              legacy-return-value? legacy-unsafe-remote-addr?
+              legacy-return-value? legacy-unsafe-remote-addr? legacy-content-length?
               server-header address-finder
               channel-factory ring-async?] :as opts
 
@@ -141,7 +144,8 @@
               legacy-return-value? true
               legacy-unsafe-remote-addr? true
               server-header "http-kit"
-              ring-async? false}}]]
+              ring-async? false
+              legacy-content-length? true}}]]
 
   (let [^ContextLogger err-logger
         (if error-logger
@@ -173,8 +177,8 @@
 
         ^org.httpkit.server.IHandler h
         (RingHandler.
-          (wrap-ring-websocket handler) ring-async? worker-pool
-          err-logger evt-logger evt-names server-header)
+         (wrap-ring-websocket handler) ring-async? worker-pool
+         err-logger evt-logger evt-names server-header legacy-content-length?)
 
         ^ProxyProtocolOption proxy-enum
         (case proxy-protocol
