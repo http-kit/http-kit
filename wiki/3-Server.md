@@ -52,6 +52,26 @@ Your proxy can then provide:
 
 http-kit's philosophy is to **focus on running Clojure code**, while leaving as much as possible to the rest of your stack.
 
+### Security consideration
+
+#### Client IP address / `:remote-addr` spoofing
+
+By default, http-kit populates the `:remote-addr` field in Ring requests from the `X-Forwarded-For` header if present. **This allows trivial IP spoofing** - any client can send `X-Forwarded-For: 1.2.3.4` and make your application think the request came from that IP address.
+
+To be secure, you should set `:legacy-unsafe-remote-addr? false` when starting your server:
+
+```clj
+(hk-server/run-server app {:port 8080 
+                           :legacy-unsafe-remote-addr? false})
+```
+
+With this option disabled, `:remote-addr` will always contain the actual socket address (the immediate connection's IP), which cannot be spoofed. This will probably be the ip address of your reverse proxy.
+
+The `:legacy-unsafe-remote-addr?` option currently defaults to `true` for backwards compatibility, but will possibly be changed to `false` by default in an unspecified future version.
+
+If you need the real client IP when behind proxies, parse the `X-Forwarded-For` header at the application level with knowledge of your trusted proxies - never trust the leftmost IP blindly. This is a surprisingly complicated topic. Further reading at [1](https://owasp.org/www-community/pages/attacks/ip_spoofing_via_http_headers) [2](https://adam-p.ca/blog/2022/03/x-forwarded-for/). In the clojure ecosystem there exists libraries like [client-ip](https://github.com/outskirtslabs/client-ip) to help you navigate this complexity easily.
+
+
 ###  Sample Nginx configuration
 
 ```

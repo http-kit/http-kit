@@ -17,6 +17,7 @@ public class HttpRequest {
     public final HttpVersion version;
 
     private byte[] body;
+    private final boolean legacyUnsafeRemoteAddr;
 
     // package visible
     int serverPort = 80;
@@ -33,9 +34,10 @@ public class HttpRequest {
     SocketAddress remoteAddr;
     AsyncChannel channel;
 
-    public HttpRequest(HttpMethod method, String url, HttpVersion version) {
+    public HttpRequest(HttpMethod method, String url, HttpVersion version, boolean legacyUnsafeRemoteAddr) {
         this.method = method;
         this.version = version;
+        this.legacyUnsafeRemoteAddr = legacyUnsafeRemoteAddr;
         int idx = url.indexOf('?');
         if (idx > 0) {
             uri = url.substring(0, idx);
@@ -58,22 +60,24 @@ public class HttpRequest {
     }
 
     public String getRemoteAddr() {
-        String h = getStringValue(headers, HttpUtils.X_FORWARDED_FOR);
-        if (null != h) {
-            int idx = h.indexOf(',');
-            if (idx == -1) {
-                return h;
-            } else {
-                // X-Forwarded-For: client, proxy1, proxy2
-                return h.substring(0, idx);
+        if (legacyUnsafeRemoteAddr) {
+            // legacy behavior: use X-Forwarded-For if present (INSECURE - allows spoofing)
+            String h = getStringValue(headers, X_FORWARDED_FOR);
+            if (null != h) {
+                int idx = h.indexOf(',');
+                if (idx == -1) {
+                    return h;
+                } else {
+                    // X-Forwarded-For: client, proxy1, proxy2
+                    return h.substring(0, idx);
+                }
             }
+        }
+        // secure behavior: always return actual socket address
+        if (remoteAddr instanceof InetSocketAddress) {
+            return ((InetSocketAddress) remoteAddr).getAddress().getHostAddress();
         } else {
-            if (remoteAddr instanceof InetSocketAddress){
-                return ((InetSocketAddress)remoteAddr).getAddress().getHostAddress();
-            }else {
-                return null;
-            }
-
+            return null;
         }
     }
 

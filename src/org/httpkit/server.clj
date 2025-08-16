@@ -79,34 +79,42 @@
 (defn run-server
   "Starts a mostly[1] Ring-compatible HttpServer with options:
 
-    :ip                 ; Which IP to bind (default: 0.0.0.0)
-    :port               ; Which port to listen to for incoming requests
+    :ip                         ; Which IP to bind (default: 0.0.0.0)
+    :port                       ; Which port to listen to for incoming requests
 
-    :worker-pool        ; `java.util.concurrent.ExecutorService` or delay to use
-                        ; for handling requests. Defaults to (:pool (new-worker {})).
-                        ; See `new-worker` for details.
+    :worker-pool                ; `java.util.concurrent.ExecutorService` or delay to use
+                                ; for handling requests. Defaults to (:pool (new-worker {})).
+                                ; See `new-worker` for details.
 
-    :max-body           ; Max HTTP body size in bytes (default: 8MB)
-    :max-ws             ; Max WebSocket message size in bytes (default: 4MB)
-    :max-line           ; Max HTTP header line size in bytes (default: 8KB)
+    :max-body                   ; Max HTTP body size in bytes (default: 8MB)
+    :max-ws                     ; Max WebSocket message size in bytes (default: 4MB)
+    :max-line                   ; Max HTTP header line size in bytes (default: 8KB)
 
-    :proxy-protocol     ; Proxy protocol e/o #{:disable :enable :optional}
+    :proxy-protocol             ; Proxy protocol e/o #{:disable :enable :optional}
 
-    :server-header      ; The \"Server\" header, disabled if nil. Default: \"http-kit\".
+    :server-header              ; The \"Server\" header, disabled if nil. Default: \"http-kit\".
 
-    :error-logger       ; (fn [msg ex])  -> log errors
-    :warn-logger        ; (fn [msg ex])  -> log warnings
-    :event-logger       ; (fn [ev-name]) -> log events
-    :event-names        ; Map of http-kit event names to loggable event names
+    :legacy-unsafe-remote-addr? ; If true (default), populates :remote-addr from
+                                ; X-Forwarded-For header if present. This is INSECURE as it
+                                ; allows IP spoofing. If false, :remote-addr always contains
+                                ; the immediate connection's IP (socket address), matching
+                                ; Ring's standard behavior. The X-Forwarded-For header remains
+                                ; available in :headers for parsing trusted proxies.
+                                ; In some future version, this option will be defaulted to false
+
+    :error-logger               ; (fn [msg ex])  -> log errors
+    :warn-logger                ; (fn [msg ex])  -> log warnings
+    :event-logger               ; (fn [ev-name]) -> log events
+    :event-names                ; Map of http-kit event names to loggable event names
 
     ;; These opts may be used for Unix Domain Socket (UDS) support, see README:
-    :address-finder     ; (fn []) -> `java.net.SocketAddress` (ip/port ignored)
-    :channel-factory    ; (fn [java.net.SocketAddress]) -> `java.nio.channels.SocketChannel`
+    :address-finder             ; (fn []) -> `java.net.SocketAddress` (ip/port ignored)
+    :channel-factory            ; (fn [java.net.SocketAddress]) -> `java.nio.channels.SocketChannel`
 
   If :legacy-return-value? is
-    true  (default)     ; Returns a (fn stop-server [& {:keys [timeout] :or {timeout 100}}])
-    false (recommended) ; Returns the `HttpServer` which can be used with `server-port`,
-                        ; `server-status`, `server-stop!`, `server-join`, etc.
+    true  (default)             ; Returns a (fn stop-server [& {:keys [timeout] :or {timeout 100}}])
+    false (recommended)         ; Returns the `HttpServer` which can be used with `server-port`,
+                                ; `server-status`, `server-stop!`, `server-join`, etc.
 
   The server also supports the following JVM properties:
 
@@ -120,7 +128,8 @@
    & [{:keys [ip port max-body max-ws max-line
               proxy-protocol worker-pool
               error-logger warn-logger event-logger event-names
-              legacy-return-value? server-header address-finder
+              legacy-return-value? legacy-unsafe-remote-addr?
+              server-header address-finder
               channel-factory ring-async?] :as opts
 
        :or   {ip         "0.0.0.0"
@@ -130,13 +139,14 @@
               max-line   8192
               proxy-protocol :disable
               legacy-return-value? true
+              legacy-unsafe-remote-addr? true
               server-header "http-kit"
               ring-async? false}}]]
 
   (let [^ContextLogger err-logger
         (if error-logger
           (reify ContextLogger (log [this message error] (error-logger message error)))
-          (do    ContextLogger/ERROR_PRINTER))
+          (do ContextLogger/ERROR_PRINTER))
 
         ^ContextLogger warn-logger
         (if warn-logger
@@ -184,6 +194,7 @@
 
         s (HttpServer. address-finder channel-factory h
                        ^long max-body ^long max-line ^long max-ws proxy-enum ^String server-header
+                       legacy-unsafe-remote-addr?
                        err-logger
                        warn-logger
                        evt-logger

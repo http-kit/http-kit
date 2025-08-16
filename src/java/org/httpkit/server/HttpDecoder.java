@@ -60,10 +60,12 @@ public class HttpDecoder {
 
     private final int maxBody;
     private final LineReader lineReader;
+    private final boolean legacyUnsafeRemoteAddr;
 
-    public HttpDecoder(int maxBody, int maxLine, ProxyProtocolOption proxyProtocolOption) {
+    public HttpDecoder(int maxBody, int maxLine, ProxyProtocolOption proxyProtocolOption, boolean legacyUnsafeRemoteAddr) {
         this.maxBody = maxBody;
         this.lineReader = new LineReader(maxLine);
+        this.legacyUnsafeRemoteAddr = legacyUnsafeRemoteAddr;
         this.proxyProtocolOption = (proxyProtocolOption == null)
             ? ProxyProtocolOption.DISABLED : proxyProtocolOption;
 
@@ -134,7 +136,7 @@ public class HttpDecoder {
                 if ("HTTP/1.0".equals(sb.substring(cStart, cEnd))) {
                     version = HTTP_1_0;
                 }
-                request = new HttpRequest(method, sb.substring(bStart, bEnd), version);
+                request = new HttpRequest(method, sb.substring(bStart, bEnd), version, legacyUnsafeRemoteAddr);
             } catch (Exception e) {
                 throw new ProtocolException("method not understand");
             }
