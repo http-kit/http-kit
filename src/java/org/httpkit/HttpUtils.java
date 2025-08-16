@@ -446,16 +446,34 @@ public class HttpUtils {
     }
 
     public static ByteBuffer[] HttpEncode(int status, HeaderMap headers, Object body, String serverHeader) {
+        return HttpEncode(status, headers, body, serverHeader, true);
+    }
+
+    public static ByteBuffer[] HttpEncode(int status, HeaderMap headers, Object body, String serverHeader, boolean legacyContentLength) {
         ByteBuffer bodyBuffer;
         try {
             bodyBuffer = bodyBuffer(body);
             // only write length if not chunked
             if (!CHUNKED.equals(headers.get("Transfer-Encoding"))) {
-                if (bodyBuffer != null) {
-                    // trust the computed length
-                    headers.putOrReplace(CONTENT_LENGTH, Integer.toString(bodyBuffer.remaining()));
-                } else if ((status / 100) != 1 && status != 204) {
-                    headers.putOrReplace(CONTENT_LENGTH, "0");
+                if (legacyContentLength) {
+                    // Legacy behavior: always calculate and override Content-Length
+                    if (bodyBuffer != null) {
+                        // trust the computed length
+                        headers.putOrReplace(CONTENT_LENGTH, Integer.toString(bodyBuffer.remaining()));
+                    } else if ((status / 100) != 1 && status != 204) {
+                        headers.putOrReplace(CONTENT_LENGTH, "0");
+                    }
+                } else {
+                    // New behavior: if present, respect Content-Length provided by the user from the handler by not touching that header
+                    String userContentLength = headers.getUserContentLength();
+                    if (userContentLength == null) {
+                        // No user-provided Content-Length, calculate it
+                        if (bodyBuffer != null) {
+                            headers.putOrReplace(CONTENT_LENGTH, Integer.toString(bodyBuffer.remaining()));
+                        } else if ((status / 100) != 1 && status != 204) {
+                            headers.putOrReplace(CONTENT_LENGTH, "0");
+                        }
+                    }
                 }
             }
         } catch (IOException e) {

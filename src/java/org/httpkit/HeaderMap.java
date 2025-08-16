@@ -66,6 +66,17 @@ public class HeaderMap {
         return false;
     }
 
+    public String getUserContentLength() {
+        final int total = size * 2; // * 2
+        for (int i = 0; i < total; i += 2) {
+            if ("content-length".equalsIgnoreCase((String)arrays[i])) {
+                Object value = arrays[i + 1];
+                return value != null ? value.toString() : null;
+            }
+        }
+        return null;
+    }
+
     public void clear() {
         this.size = 0;
     }

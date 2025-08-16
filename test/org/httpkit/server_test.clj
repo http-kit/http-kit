@@ -17,7 +17,7 @@
            [java.nio.channels ServerSocketChannel]
            (java.nio.file Files)
            (java.util.concurrent CountDownLatch ThreadPoolExecutor TimeUnit ArrayBlockingQueue)
-           (org.apache.http NoHttpResponseException)))
+           (org.apache.http NoHttpResponseException ConnectionClosedException)))
 
 (defn file-handler [req]
   {:status 200
@@ -237,6 +237,69 @@
           resp (http/get uri)]
       (is (= (:status resp) 200))
       (is (= length (count (:body resp)))))))
+
+(deftest test-respect-user-content-length
+  (testing "Legacy behavior - should override user Content-Length"
+    (let [test-port 4348
+          legacy-handler (fn [req]
+                           {:status 200
+                            :headers {"Content-Length" "1234"}
+                            :body nil})
+          server (run-server legacy-handler {:port test-port
+                                             :legacy-return-value? false
+                                             :legacy-content-length? true})]
+      (try
+        (is (= (get-in (http/head (str "http://localhost:" test-port)) [:headers "content-length"])
+               "0"))
+        (finally
+          (server-stop! server)))))
+
+  (testing "New behavior - should respect user Content-Length for HEAD requests"
+    (let [test-port 4349
+          new-handler (fn [req]
+                        {:status 200
+                         :headers {"Content-Length" "1234"}
+                         :body nil})
+          server (run-server new-handler {:port test-port
+                                          :legacy-return-value? false
+                                          :legacy-content-length? false})]
+      (try
+        (is (= (get-in (http/head (str "http://localhost:" test-port)) [:headers "content-length"])
+               "1234"))
+        (finally
+          (server-stop! server)))))
+
+  (testing "Content-Length mismatch behavior with new settings"
+    (let [test-port 4350
+          mismatch-handler (fn [req]
+                             {:status 200
+                              ;; body is 5 chars, but Content-Length says 5678
+                              :headers {"content-length" "5678"}
+                              :body "hello"})
+          server (run-server mismatch-handler {:port test-port
+                                               :legacy-return-value? false
+                                               :legacy-content-length? false})]
+      (try
+        (is (thrown-with-msg? ConnectionClosedException
+                              #"Premature end of Content-Length delimited message body.*expected: 5,678; received: 5"
+                              (http/get (str "http://localhost:" test-port))))
+        (finally
+          (server-stop! server)))))
+
+  (testing "New behavior falls back to auto-calculation when no Content-Length provided"
+    (let [test-port 4351
+          handler-no-cl (fn [req]
+                          {:status 200
+                           :headers {"Content-Type" "text/plain"}
+                           :body "hello world"})
+          server (run-server handler-no-cl {:port test-port
+                                            :legacy-return-value? false
+                                            :legacy-content-length? false})]
+      (try
+        (is (= (get-in (http/get (str "http://localhost:" test-port)) [:headers "content-length"])
+               "11"))
+        (finally
+          (server-stop! server))))))
 
 (deftest test-body-iseq
   (let [resp (http/get "http://localhost:4347/iseq")]
