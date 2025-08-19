@@ -58,21 +58,22 @@ class Handler implements Runnable {
 public class RespListener implements IRespListener {
 
     private boolean isText() {
-        if (status.getCode() == 200) {
-            String type = HttpUtils.getStringValue(headers, CONTENT_TYPE);
-            if (type != null) {
-                type = type.toLowerCase();
-                // TODO may miss something
-                if (NON_TEXT_CONTENT_TYPES.contains(type)) {
-                    return false;
-                } else {
-                    return type.contains("text") || type.contains("json") || type.contains("xml");
-                }
-            } else {
-                return false;
-            }
-        } else {  // non 200: treat as text
+        if (status.getCode() != 200) {
             return true;
+        } // non 200: treat as text
+        String type = HttpUtils.getStringValue(headers, CONTENT_TYPE);
+
+        if (type == null) {
+            return false;
+        }
+
+        type = type.toLowerCase();
+
+        // TODO may miss something
+        if (NON_TEXT_CONTENT_TYPES.contains(type)) {
+            return false;
+        } else {
+            return type.contains("text") || type.contains("json") || type.contains("xml");
         }
     }
 
