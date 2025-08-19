@@ -198,7 +198,7 @@
 
         s (HttpServer. address-finder channel-factory h
                        ^long max-body ^long max-line ^long max-ws proxy-enum ^String server-header
-                       legacy-unsafe-remote-addr?
+                       (boolean legacy-unsafe-remote-addr?)
                        err-logger
                        warn-logger
                        evt-logger

@@ -40,7 +40,8 @@
   {:depends [prep-deps]
    :task
    (let [err (:err (clojure {:err :string} "-M:dev -m graal.tests"))]
-     (assert (not (str/includes? err "Reflection warning"))))}
+     (assert (not (str/includes? err "Reflection warning"))
+       (str "Reflection warning: " err)))}
 
   run-graal-tests
   {:depends [compile-native-image]
