@@ -2,6 +2,20 @@ This project uses [**Break Versioning**](https://www.taoensso.com/break-versioni
 
 ---
 
+# `v2.8.1` (2025-08-19)
+
+- **Dependency**: [on Clojars](https://clojars.org/http-kit/versions/2.8.1)
+- **Versioning**: [Break Versioning](https://www.taoensso.com/break-versioning)
+
+This is a **stable hotfix release** to backport 2 commits from the v2.9 dev branch:
+
+- \[new] \[server] [#588] [#589] Add `join-server` function (@hlship) \[a251a4c]
+- \[fix] \[client] [#568] [#569] Fix performance regression (@bsless) \[a879b3d]
+
+This should be a safe update for users of v2.8.0.
+
+---
+
 # `v2.9.0-beta1` (2025-04-15)
 
 - **Dependency**: [on Clojars](https://clojars.org/http-kit/versions/2.9.0-beta1)
