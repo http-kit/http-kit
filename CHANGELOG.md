@@ -2,6 +2,32 @@ This project uses [**Break Versioning**](https://www.taoensso.com/break-versioni
 
 ---
 
+# `v2.9.0-beta2` (2025-08-19)
+
+- **Dependency**: [on Clojars](https://clojars.org/http-kit/versions/2.9.0-beta2)
+- **Versioning**: [Break Versioning](https://www.taoensso.com/break-versioning)
+
+This is a **feature and maintenance** pre-release. It's expected to be stable but as always, please **test carefully and report any unexpected problems**, thank you! 🙏
+
+See linked commits below for details, and big thanks to all contributors!
+
+\- [Peter Taoussanis](https://www.taoensso.com)
+
+## Security note ⚠️
+
+This release includes a new `:legacy-unsafe-remote-addr?` option for http-kit server kindly provided by @ramblurr. The default value (`true`) retains the old (unsafe) behaviour for backwards compatibility, but you may want to check the [relevant docs](https://github.com/http-kit/http-kit/wiki/3-Server#client-ip-address--remote-addr-spoofing) and consider a change for improved security.
+
+## Since `v2.9.0-beta1` (2025-04-15)
+
+- \[fix] \[client] [#583] [#594] Don't send Content-Length: 0 if body is nil (@GAumala) \[eefe7c1]
+- \[new] \[client] [#591] [#593] Make RespListener immediately stream response (@GAumala) \[cdb06f2]
+- \[new] \[client] [#366] [#596] Check for non-text doc types with "text" or "xml" in Content-Type (@TheKostins) \[3629757]
+- \[new] \[server] \[client] [#581] [#582] Throw instead of trying to allocate impossibly large arrays (@reutsharabani) \[e4937b1]
+- \[new] \[server] [#454] [#600] Add `:legacy-content-length?` option (@Ramblurr) \[e33f7c9]
+- \[new] \[server] [#226] [#599] Add `:legacy-unsafe-remote-addr?` option for secure IP handling (@ramblurr) \[72b4a03]
+
+---
+
 # `v2.8.1` (2025-08-19)
 
 - **Dependency**: [on Clojars](https://clojars.org/http-kit/versions/2.8.1)

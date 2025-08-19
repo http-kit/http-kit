@@ -11,7 +11,7 @@ It uses an event-driven architecture to support highly concurrent a/synchronous 
 
 ## Latest release/s
 
-- `2025-04-15` `v2.9.0-beta1`: (dev) [release info](../../releases/tag/v2.9.0-beta1)
+- `2025-08-19` `v2.9.0-beta2`: (dev) [release info](../../releases/tag/v2.9.0-beta2)
 - `2024-08-19` `v2.8.1`: (stable) [release info](../../releases/tag/v2.8.1)
 
 [![Main tests][Main tests SVG]][Main tests URL]
