@@ -11,9 +11,9 @@
   (:require [clj-http.client :as http]
             [org.httpkit.ws-test :as ws]
             [org.httpkit.client :as client])
-  (:import [java.io FileInputStream]
+  (:import [java.io FileInputStream PrintStream]
            org.httpkit.SpecialHttpClient
-           [java.net InetSocketAddress]
+           [java.net InetSocketAddress URL Socket]
            [java.nio.channels ServerSocketChannel]
            (java.nio.file Files)
            (java.util.concurrent CountDownLatch ThreadPoolExecutor TimeUnit ArrayBlockingQueue)
@@ -138,7 +138,9 @@
   (GET "/bytearray" [] bytearray-handler)
   (POST "/multipart" [] multipart-handler)
   (POST "/chunked-input" [] (fn [req] {:status 200
-                                       :body (str (:content-length req))}))
+                                       :body (str (or
+                                                   (:content-length req)
+                                                   "unset"))}))
   (GET "/length" [] (fn [req]
                       (let [l (-> req :params :length to-int)]
                         {:status 200
@@ -448,6 +450,39 @@
                         {:body (input-stream (gen-tempfile size ".jpg"))})]
     (is (= 200 (:status resp)))
     (is (= (str size) (:body resp)))))
+
+(defn chunked-http-request
+  "Raw sockets because proper http clients won't generate these invalid requests"
+  [include-cl?]
+  (try
+    (with-open [s (Socket. "localhost", 4347)
+                o (.getOutputStream s)
+                i (.getInputStream s)]
+      (.setSoTimeout s 5000)
+      (let [pw (PrintStream. o)]
+        (.println pw "POST /chunked-input HTTP/1.1\r")
+        (.println pw "Host: localhost:4347\r")
+        (.println pw "Connection: close\r")
+        (when include-cl?
+          (.println pw "Content-length: -1\r"))
+        (.println pw "Transfer-Encoding: chunked\r")
+        ;(.println pw "\r")
+        ;; (.println pw "6\r")
+        ;; (.println pw "foobar\r")
+        ;; (.println pw "0\r")
+        ;; (.println pw "\r")
+        (.flush pw)
+        (slurp i)))
+    (catch java.net.SocketTimeoutException e
+      :timedout)))
+
+(deftest test-chunked-encoding-negative-size
+  ;;e.g. https://github.com/http-kit/http-kit/issues/137
+  (testing "server shouldn't hang on invalid http requests"
+    (let [response (chunked-http-request true)]
+      (is (not (= :timedout response))))
+    (let [response (chunked-http-request false)]
+      (is (not (= :timedout response))))))
 
 ;;; start a test server, for test or benchmark
 (defonce tmp-server (atom nil))
