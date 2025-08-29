@@ -14,7 +14,8 @@ public class DynamicBytes {
 
     private void expandIfNeeded(int more) {
         if (idx + more > data.length) {
-            long after =  (long)((idx + more) * 1.33);
+            double after =  (((long)idx + more) * 1.33);
+            // java arrays are indexed by `int`
             if (after >= Integer.MAX_VALUE) {
                 throw new ContentTooLargeException("Cannot expand DynamicBytes array: requested size (" + after + ") exceeds java limits");
             }
