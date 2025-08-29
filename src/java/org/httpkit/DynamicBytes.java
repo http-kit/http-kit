@@ -8,17 +8,32 @@ public class DynamicBytes {
     private byte[] data;
     private int idx = 0;
 
+    // Ref. https://github.com/openjdk/jdk/blob/d5ce66698d2f15c5f8316110a6118a10baa4013d/src/java.base/share/classes/jdk/internal/util/ArraysSupport.java#L842-L854
+    private static final int SOFT_MAX_ARRAY_LENGTH = Integer.MAX_VALUE - 8;
+
     public DynamicBytes(int size) {
         data = new byte[size];
     }
 
     private void expandIfNeeded(int more) {
-        if (idx + more > data.length) {
-            long after =  (long)((idx + more) * 1.33);
-            if (after >= Integer.MAX_VALUE) {
-                throw new ContentTooLargeException("Cannot expand DynamicBytes array: requested size (" + after + ") exceeds java limits");
+        long need = (long) idx + more;
+
+        if (need > SOFT_MAX_ARRAY_LENGTH) {
+            throw new ContentTooLargeException("Cannot expand DynamicBytes array: requested size (" + need + ") exceeds Java limits");
+        }
+
+        if (data.length < need) {
+            long newLength = data.length + (data.length >> 1); // 150% of old
+
+            if (newLength < need) {
+                newLength = need + (need >> 2); // 125% of need
             }
-            data = Arrays.copyOf(data, (int)after);
+
+            if (newLength > SOFT_MAX_ARRAY_LENGTH) {
+                newLength = SOFT_MAX_ARRAY_LENGTH;
+            }
+
+            data = Arrays.copyOf(data, (int) newLength);
         }
     }
 
