@@ -332,7 +332,7 @@
   (is (contains? @(hkc/get "https://8.8.8.8")         :status) "Google public DNS")
 
   (is (re-find #"unable to find valid certification path"
-        (str (:error @(hkc/get "https://142.250.181.196"))))
+        (str (:error @(hkc/get "https://172.217.16.68"))))
 
     "Random google.com IP address (may need updating!). Correct error is about cert path, NOT invalid hostname."))
 
