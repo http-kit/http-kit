@@ -15,7 +15,7 @@ See linked commits below for details, and big thanks to all contributors!
 
 ## Security note ⚠️
 
-This release includes a new `:legacy-unsafe-remote-addr?` option for http-kit server kindly provided by @ramblurr. The default value (`true`) retains the old (unsafe) behaviour for backwards compatibility, but you may want to check the [relevant docs](https://github.com/http-kit/http-kit/wiki/3-Server#client-ip-address--remote-addr-spoofing) and consider a change for improved security.
+This release includes a new `:legacy-unsafe-remote-addr?` option for http-kit server kindly provided by @ramblurr. The default value (`true`) retains the old (unsafe) behaviour for backwards compatibility, but you may want to check the [relevant docs](https://github.com/http-kit/http-kit/wiki/3-Server#client-ip-address-remote-addr-spoofing) and consider a change for improved security.
 
 ## Since `v2.9.0-beta2` (2025-08-19)
 
