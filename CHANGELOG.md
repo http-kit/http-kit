@@ -2,6 +2,47 @@ This project uses [**Break Versioning**](https://www.taoensso.com/break-versioni
 
 ---
 
+# `v2.9.0-beta3` (2025-11-04)
+
+- **Dependency**: [on Clojars](https://clojars.org/http-kit/versions/2.9.0-beta3)
+- **Versioning**: [Break Versioning](https://www.taoensso.com/break-versioning)
+
+This is a **feature and maintenance** pre-release. It's expected to be stable but as always, please **test carefully and report any unexpected problems**, thank you! 🙏
+
+See linked commits below for details, and big thanks to all contributors!
+
+\- [Peter Taoussanis](https://www.taoensso.com)
+
+## Security note ⚠️
+
+This release includes a new `:legacy-unsafe-remote-addr?` option for http-kit server kindly provided by @ramblurr. The default value (`true`) retains the old (unsafe) behaviour for backwards compatibility, but you may want to check the [relevant docs](https://github.com/http-kit/http-kit/wiki/3-Server#client-ip-address--remote-addr-spoofing) and consider a change for improved security.
+
+## Since `v2.9.0-beta2` (2025-08-19)
+
+* [REVERTED](https://github.com/http-kit/http-kit/pull/593#issuecomment-3485787486) \[new] \[client] \[#591] \[#593] Make RespListener immediately stream response (@GAumala) \[fc1254c]
+* \[fix] \[#601] Avoid int overflow in DynamicBytes (@reutsharabani) \[e8ade61]
+
+## Since `v2.8.0` (2024-04-30)
+
+* \[fix] \[server] \[#584] Reject invalid host header ports (@ianmuge) \[de33aed]
+* \[fix] \[server] \[#578] [#579] Fix regression in #375 (@andersmurphy) \[76b869f]
+* \[fix] \[client] [#592] Fix number encoding in `MultipartEntity` (@GAumala) \[2baeab5]
+* \[fix] \[client] \[#574] [#575] Fix possible `java.util.zip.ZipException` for deflate encodings (@pieterbreed) \[42ad799]
+* \[fix] \[client] \[#568] [#569] Fix performance regression (@bsless) \[3831982]
+* \[fix] \[client] \[#583] [#594] Don't send Content-Length: 0 if body is nil (@GAumala) \[eefe7c1]
+* \[fix] \[client] \[#590] [#576] Fix warning during client tests (@kolstae) \[a8a5df8]
+* \[new] \[server] \[#454] \[#600] Add `:legacy-content-length?` option (@Ramblurr) \[e33f7c9]
+* \[new] \[server] \[#226] \[#599] Add `:legacy-unsafe-remote-addr?` option for secure IP handling (@ramblurr) \[72b4a03]
+* \[new] \[server] \[#588] \[#589] Add `join-server` function (@hlship) \[b31d588]
+* \[new] \[server] \[client] \[#581] \[#582] \[#601] Throw instead of trying to allocate impossibly large arrays (@reutsharabani) \[e4937b1]
+* \[new] \[client] \[#517] \[#567] Add some Java methods to better enable instrumentation (@jefimm) \[082eb7f]
+* \[new] \[client] \[#366] [#596] Check for non-text doc types with "text" or "xml" in Content-Type (@TheKostins) \[3629757]
+* \[doc] Mention `utils/new-worker` util \[1d173fe]
+* \[doc] Extend production info section, link directly from README \[fd6b993]
+* \[doc] \[#570] [#572] Add updated WebSocket example to wiki (@jf) \[a0d39bf]
+
+---
+
 # `v2.9.0-beta2` (2025-08-19)
 
 - **Dependency**: [on Clojars](https://clojars.org/http-kit/versions/2.9.0-beta2)
