@@ -1,5 +1,8 @@
 <span><img src="http-kit-logo.png" alt="http-kit" width="140"/></span>  
-[**API**][cljdoc] | [Latest releases](#latest-releases) | [Slack channel][]
+[**API**][cljdoc] | [**Wiki**][GitHub wiki] | [Slack][] | Latest releases: [v2.8.1](../../releases/tag/v2.8.1) or [v2.9.0-beta3](../../releases/tag/v2.9.0-beta3)
+
+[![Main tests][Main tests SVG]][Main tests URL]
+[![Graal tests][Graal tests SVG]][Graal tests URL]
 
 # http-kit
 
@@ -8,16 +11,6 @@
 http-kit is a minimalist and efficient Ring-compatible HTTP client+server for Clojure.
 
 It uses an event-driven architecture to support highly concurrent a/synchronous web applications, and features a simple unified API for WebSocket and HTTP long-polling/streaming.
-
-## Latest release/s
-
-- `2025-08-19` `v2.9.0-beta2`: (dev) [release info](../../releases/tag/v2.9.0-beta2)
-- `2024-08-19` `v2.8.1`: (stable) [release info](../../releases/tag/v2.8.1)
-
-[![Main tests][Main tests SVG]][Main tests URL]
-[![Graal tests][Graal tests SVG]][Graal tests URL]
-
-See [here][GitHub releases] for earlier releases.
 
 ## Why http-kit?
 
@@ -65,7 +58,7 @@ A big thank-you to the [current contributors](../../graphs/contributors) for kee
 
 - [Wiki][GitHub wiki] (getting started, usage, etc.)
 - API reference via [cljdoc][cljdoc]
-- Support via [Slack channel][] or [GitHub issues][]
+- Support via [Slack][] or [GitHub issues][]
 
 ## License
 
@@ -77,7 +70,7 @@ Licensed under [Apache 2.0](LICENSE.txt).
 [GitHub releases]: ../../releases
 [GitHub issues]:   ../../issues
 [GitHub wiki]:     ../../wiki
-[Slack channel]: https://www.taoensso.com/http-kit/slack
+[Slack]: https://www.taoensso.com/http-kit/slack
 
 [Peter Taoussanis]: https://www.taoensso.com
 
