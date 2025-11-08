@@ -6,10 +6,12 @@
    [sse-helpers :refer [sse-response sse-event]]))
 
 (defn my-handler
-  "Handler that returns SSE response"
+  "Handler that returns SSE response with compression and error handling"
   [request]
   (sse-response request
-    {:on-open
+    {:compress? true  ; Enable gzip compression
+
+     :on-open
      (fn [send-fn!]
        (println "Client connected")
 
@@ -29,8 +31,15 @@
                 (schedule-task 1000 (broadcast))))))))
 
      :on-close
-     (fn [status]
-       (println "Client disconnected, status:" status))}))
+     (fn [reason]
+       (case reason
+         :send-failed (println "Client disconnected: send failed")
+         :exception   (println "Connection closed due to exception")
+         (println "Client disconnected, status:" reason)))
+
+     :on-exception
+     (fn [e]
+       (println "Error while sending SSE event:" (.getMessage e)))}))
 
 (defn -main [& args]
   (let [port 8080]
