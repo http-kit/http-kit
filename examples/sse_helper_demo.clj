@@ -3,12 +3,12 @@
   (:require
    [org.httpkit.server :refer [run-server]]
    [org.httpkit.timer :refer [schedule-task]]
-   [sse-helpers :refer [create-sse-handler sse-event]]))
+   [sse-helpers :refer [sse-response sse-event]]))
 
-(defn my-sse-handler
-  "SSE handler using the high-level helper"
-  []
-  (create-sse-handler
+(defn my-handler
+  "Handler that returns SSE response"
+  [request]
+  (sse-response request
     {:on-open
      (fn [send-fn!]
        (println "Client connected")
@@ -34,7 +34,7 @@
 
 (defn -main [& args]
   (let [port 8080]
-    (run-server (my-sse-handler) {:port port})
+    (run-server my-handler {:port port})
     (println (format "SSE server running on http://localhost:%d" port))
     (println "Test with: curl -N http://localhost:8080")
     (println "Press Ctrl+C to stop")))

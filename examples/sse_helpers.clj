@@ -3,8 +3,8 @@
   (:require
    [org.httpkit.server :refer [as-channel send!]]))
 
-(defn create-sse-handler
-  "Creates an SSE handler with simplified user callbacks.
+(defn sse-response
+  "Returns an SSE async channel response from within your handler.
 
   Options:
     :on-open  - (fn [send-fn!]) called when client connects
@@ -12,42 +12,44 @@
     :on-close - (fn [status]) called when client disconnects
 
   Example:
-    (create-sse-handler
-      {:on-open (fn [send-fn!]
-                  (send-fn! \"data: hello\\n\\n\")
-                  (future
-                    (loop [i 0]
-                      (Thread/sleep 1000)
-                      (when (send-fn! (format \"data: Event #%d\\n\\n\" i))
-                        (recur (inc i))))))
-       :on-close (fn [status]
-                   (println \"Client disconnected:\" status))})"
-  [{:keys [on-open on-close]}]
-  (fn [request]
-    (as-channel request
-      {:on-open
-       (fn [ch]
-         ;; Send SSE headers first
-         (send! ch
-           {:status 200
-            :headers {"Content-Type" "text/event-stream"
-                      "Cache-Control" "no-cache, no-store"
-                      "Connection" "keep-alive"}}
-           false)
+    (defn my-handler [request]
+      (if (authenticated? request)
+        (sse-response request
+          {:on-open (fn [send-fn!]
+                      (send-fn! \"data: hello\\n\\n\")
+                      (future
+                        (loop [i 0]
+                          (Thread/sleep 1000)
+                          (when (send-fn! (format \"data: Event #%d\\n\\n\" i))
+                            (recur (inc i))))))
+           :on-close (fn [status]
+                       (println \"Client disconnected:\" status))})
+        {:status 401 :body \"Unauthorized\"}))"
+  [request {:keys [on-open on-close]}]
+  (as-channel request
+    {:on-open
+     (fn [ch]
+       ;; Send SSE headers first
+       (send! ch
+         {:status 200
+          :headers {"Content-Type" "text/event-stream"
+                    "Cache-Control" "no-cache, no-store"
+                    "Connection" "keep-alive"}}
+         false)
 
-         ;; Create send function that handles all the checks
-         (let [send-fn! (fn [data]
-                          ;; Returns true if sent, false if channel closed
-                          (send! ch {:body data} false))]
+       ;; Create send function that handles all the checks
+       (let [send-fn! (fn [data]
+                        ;; Returns true if sent, false if channel closed
+                        (send! ch {:body data} false))]
 
-           ;; Call user's on-open with the send function
-           (when on-open
-             (on-open send-fn!))))
+         ;; Call user's on-open with the send function
+         (when on-open
+           (on-open send-fn!))))
 
-       :on-close
-       (fn [ch status]
-         (when on-close
-           (on-close status)))})))
+     :on-close
+     (fn [ch status]
+       (when on-close
+         (on-close status)))}))
 
 (defn sse-event
   "Formats data as an SSE event string.
@@ -76,29 +78,34 @@
   (require '[org.httpkit.server :refer [run-server]]
            '[org.httpkit.timer :refer [schedule-task]])
 
-  (defn my-sse-handler []
-    (create-sse-handler
-      {:on-open
-       (fn [send-fn!]
-         (println "Client connected")
+  (defn my-handler [request]
+    (case (:uri request)
+      "/events"
+      (sse-response request
+        {:on-open
+         (fn [send-fn!]
+           (println "Client connected")
 
-         ;; Send initial event
-         (send-fn! (sse-event {:data "Connected!"}))
+           ;; Send initial event
+           (send-fn! (sse-event {:data "Connected!"}))
 
-         ;; Start broadcasting with recursion
-         (let [counter (atom 0)]
-           ((fn broadcast []
-              (when (send-fn! (sse-event
-                                {:id @counter
-                                 :data (str "Event #" (swap! counter inc))}))
-                (schedule-task 1000 (broadcast)))))))
+           ;; Start broadcasting with recursion
+           (let [counter (atom 0)]
+             ((fn broadcast []
+                (when (send-fn! (sse-event
+                                  {:id @counter
+                                   :data (str "Event #" (swap! counter inc))}))
+                  (schedule-task 1000 (broadcast)))))))
 
-       :on-close
-       (fn [status]
-         (println "Client disconnected:" status))}))
+         :on-close
+         (fn [status]
+           (println "Client disconnected:" status))})
+
+      ;; Regular response for other routes
+      {:status 200 :body "Use /events for SSE"}))
 
   ;; Start server
-  (def server (run-server (my-sse-handler) {:port 8080}))
+  (def server (run-server my-handler {:port 8080}))
 
   ;; Stop server
   (server)
