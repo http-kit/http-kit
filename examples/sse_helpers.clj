@@ -7,24 +7,9 @@
   "Returns an SSE async channel response from within your handler.
 
   Options:
-    :on-open  - (fn [send-fn!]) called when client connects
-                send-fn! is a function that sends SSE data, returns true if sent
-    :on-close - (fn [status]) called when client disconnects
-
-  Example:
-    (defn my-handler [request]
-      (if (authenticated? request)
-        (sse-response request
-          {:on-open (fn [send-fn!]
-                      (send-fn! \"data: hello\\n\\n\")
-                      (future
-                        (loop [i 0]
-                          (Thread/sleep 1000)
-                          (when (send-fn! (format \"data: Event #%d\\n\\n\" i))
-                            (recur (inc i))))))
-           :on-close (fn [status]
-                       (println \"Client disconnected:\" status))})
-        {:status 401 :body \"Unauthorized\"}))"
+    :on-open  - (fn [send-fn!]) called when client connects.
+                send-fn! is a function that sends SSE data, returns true if sent.
+    :on-close - (fn [status]) called when client disconnects."
   [request {:keys [on-open on-close]}]
   (as-channel request
     {:on-open
@@ -50,6 +35,22 @@
      (fn [ch status]
        (when on-close
          (on-close status)))}))
+
+;; Example: Basic usage
+;;
+;; (defn my-handler [request]
+;;   (if (authenticated? request)
+;;     (sse-response request
+;;       {:on-open (fn [send-fn!]
+;;                   (send-fn! "data: hello\n\n")
+;;                   (future
+;;                     (loop [i 0]
+;;                       (Thread/sleep 1000)
+;;                       (when (send-fn! (format "data: Event #%d\n\n" i))
+;;                         (recur (inc i))))))
+;;        :on-close (fn [status]
+;;                    (println "Client disconnected:" status))})
+;;     {:status 401 :body "Unauthorized"}))
 
 (defn sse-event
   "Formats data as an SSE event string.
