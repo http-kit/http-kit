@@ -348,8 +348,8 @@
   (is (= 200 (:status (http/get "http://localhost:4347/" {:headers {"host" "localhost"}}))))
   (is (= 200 (:status (http/get "http://localhost:4347/" {:headers {"host" "localhost:4347"}}))))
   (is (= 200 (:status (http/get "http://localhost:4347/" {:headers {"host" "localhost:"}}))))
-  (is (thrown? NoHttpResponseException (http/get "http://localhost:4347/" {:headers {"host" "localhost:es"}})))
-  (is (thrown? NoHttpResponseException (http/get "http://localhost:4347/" {:headers {"host" "localhost:()"}}))))
+  (is (= 400 (:status (http/get "http://localhost:4347/" {:headers {"host" "localhost:es"} :throw-exceptions false})) ))
+  (is (= 400 (:status (http/get "http://localhost:4347/" {:headers {"host" "localhost:()"} :throw-exceptions false})))))
 
 ;;;;; async
 

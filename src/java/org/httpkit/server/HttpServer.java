@@ -251,7 +251,8 @@ public class HttpServer implements Runnable {
                 }
             } while (buffer.hasRemaining()); // consume all
         } catch (ProtocolException e) {
-            closeKey(key, -1);
+            tryWrite(key, HttpEncode(400, new HeaderMap(), e.getMessage(), serverHeader));
+            closeKey(key, CLOSE_NORMAL);
         } catch (RequestTooLargeException e) {
             atta.keepalive = false;
             eventLogger.log(eventNames.serverStatus413);
