@@ -296,14 +296,13 @@ Value may be a delay. See also `make-client`."}
    & [callback]]
 
   (let [{:keys [url method headers body]} (coerce-req opts)
-        [sslengine client]
-        (if insecure?
-          [(ClientSslEngineFactory/trustAnybody) @legacy-client]
-          [(:sslengine opts)
-           (or
-             (force          client)
-             (force *default-client*)
-             (force  default-client))])
+        sslengine (if insecure?
+                    (ClientSslEngineFactory/trustAnybody)
+                    (:sslengine opts))
+        client (or
+                 (force          client)
+                 (force *default-client*)
+                 (force  default-client))
 
         deliver-resp
         (fn [resp]
