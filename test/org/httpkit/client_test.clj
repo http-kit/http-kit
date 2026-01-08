@@ -360,6 +360,36 @@
                (pr-str resp)))
       (is (contains? @(hkc/get url {:insecure? true}) :status)))))
 
+(deftest test-insecure-with-sni
+  (testing "Issue #607 (SNI should work with :insecure? true)"
+    (testing "ssl-configurer respects hostname-verification? option"
+      (let [ssl-context (javax.net.ssl.SSLContext/getDefault)
+            engine (.createSSLEngine ssl-context "test.local" 443)
+            uri (java.net.URI. "https://test.local/")]
+        (sni/ssl-configurer {:hostname-verification? false} engine uri)
+        (let [params (.getSSLParameters engine)]
+          (is (nil? (.getEndpointIdentificationAlgorithm params))
+              "EndpointIdentificationAlgorithm should be nil when hostname-verification? is false")
+          (is (= 1 (count (.getServerNames params)))
+              "ServerNames should still be set for SNI routing"))))
+
+    (testing "ssl-configurer enables hostname verification by default on Java 11+"
+      (when (utils/java-version>= 11)
+        (let [ssl-context (javax.net.ssl.SSLContext/getDefault)
+              engine (.createSSLEngine ssl-context "test.local" 443)
+              uri (java.net.URI. "https://test.local/")]
+          (sni/ssl-configurer {} engine uri)
+          (let [params (.getSSLParameters engine)]
+            (is (= "HTTPS" (.getEndpointIdentificationAlgorithm params))
+                "EndpointIdentificationAlgorithm should be HTTPS by default on Java 11+")))))
+
+    (testing ":insecure? true works with hostname-mismatched certificates"
+      (let [resp @(hkc/get "https://wrong.host.badssl.com/" {:insecure? true})]
+        (is (contains? resp :status)
+            "Should successfully connect to hostname-mismatched cert with :insecure? true")
+        (is (nil? (:error resp))
+            "Should not have an error")))))
+
 (deftest test-multiple-https-calls-with-same-engine
   (let [opts {:client hkc/legacy-client
               :sslengine (ClientSslEngineFactory/trustAnybody)}]

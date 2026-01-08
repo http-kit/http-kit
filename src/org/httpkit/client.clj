@@ -214,6 +214,15 @@
       (make-client {})
       @legacy-client)))
 
+(defonce ^{:doc "Client with SNI enabled but hostname verification disabled.
+   Used when :insecure? is true to allow connections to servers with
+   mismatched certificates while still supporting SNI for routing."}
+  insecure-client
+  (delay
+    (if default-ssl-configurer
+      (make-client {:ssl-configurer (fn [ssl-engine uri] (default-ssl-configurer {:hostname-verification? false} ssl-engine uri))})
+      @legacy-client)))
+
 (defonce
   ^{:dynamic true
     :doc "Specifies the default `HttpClient` used by the `request` function.
@@ -297,14 +306,14 @@ Value may be a delay. See also `make-client`."}
    & [callback]]
 
   (let [{:keys [url method headers body]} (coerce-req opts)
-        [sslengine client]
-        (if insecure?
-          [(ClientSslEngineFactory/trustAnybody) @legacy-client]
-          [(:sslengine opts)
-           (or
-             (force          client)
-             (force *default-client*)
-             (force  default-client))])
+        sslengine (if insecure?
+                    (ClientSslEngineFactory/trustAnybody)
+                    (:sslengine opts))
+        client (if insecure?
+                 (or (force client) (force insecure-client))
+                 (or (force client)
+                     (force *default-client*)
+                     (force default-client)))
 
         deliver-resp
         (fn [resp]
