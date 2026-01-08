@@ -139,6 +139,13 @@
   (^SSLEngine [               ] (make-ssl-engine (SSLContext/getDefault)))
   (^SSLEngine [^SSLContext ctx] (.createSSLEngine ctx)))
 
+(def ^:private default-ssl-configurer
+  "SNI-capable SSL configurer, or nil."
+  (when (utils/java-version>= 8)
+    ;; Note "Gilardi scenario"
+    (require            'org.httpkit.sni-client)
+    (some-> (ns-resolve 'org.httpkit.sni-client 'ssl-configurer) deref)))
+
 (defn make-client
   "Returns an HttpClient with specified options:
     :max-connections    ; Max connection count, default is unlimited (-1)
@@ -156,7 +163,8 @@
            event-logger
            event-names
            bind-address
-           channel-factory]}]
+           channel-factory]
+    :or   {ssl-configurer default-ssl-configurer}}]
   (HttpClient.
    (or max-connections -1)
 
@@ -198,19 +206,12 @@
 
    bind-address))
 
-(def ^:private ssl-configurer
-  "SNI-capable SSL configurer, or nil."
-  (when (utils/java-version>= 8)
-    ;; Note "Gilardi scenario"
-    (require            'org.httpkit.sni-client)
-    (some-> (ns-resolve 'org.httpkit.sni-client 'ssl-configurer) deref)))
-
 ;; Normally only need one client per application - params can be configured per req
 (defonce  legacy-client (delay (HttpClient.)))
 (defonce default-client
   (delay
-    (if ssl-configurer
-      (make-client {:ssl-configurer ssl-configurer})
+    (if default-ssl-configurer
+      (make-client {})
       @legacy-client)))
 
 (defonce
