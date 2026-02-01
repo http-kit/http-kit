@@ -115,40 +115,4 @@ class ResponseCompression {
                 return baseStream;
         }
     }
-    
-    /**
-     * Helper method to detect compression type from response parts.
-     * Useful for streaming scenarios where you might have headers but not the full body yet.
-     * 
-     * @param encoding The Content-Encoding header
-     * @param firstChunk The first chunk of body data (optional)
-     * @return The detected compression type
-     */
-    public static Type fromStreamingResponse(
-            String encoding, 
-            byte[] firstChunk) {
-        
-        if (encoding == null || encoding.trim().isEmpty()) {
-            return Type.NONE;
-        }
-        
-        encoding = encoding.toLowerCase().trim();
-        
-        if ("gzip".equals(encoding) || "x-gzip".equals(encoding)) {
-            return Type.GZIP;
-        }
-        
-        if ("deflate".equals(encoding) || "x-deflate".equals(encoding)) {
-            // For streaming, we need to peek at the first chunk
-            if (firstChunk == null || firstChunk.length < 2) {
-                // Can't determine yet - return a special value or default
-                // Using DEFLATE_NO_WRAP as default since it's more common
-                return Type.DEFLATE_NO_WRAP;
-            }
-            
-            return detectDeflateType(firstChunk);
-        }
-        
-        return Type.NONE;
-    }
 }

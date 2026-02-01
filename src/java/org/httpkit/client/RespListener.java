@@ -75,7 +75,6 @@ public class RespListener implements IRespListener {
             return body;
         }
 
-        encoding = encoding.toLowerCase();
         BytesInputStream bis = new BytesInputStream(body.get(), body.length());
         InputStream is =
             ResponseCompression.createDecompressingStream(bis, compressionType);
@@ -109,8 +108,6 @@ public class RespListener implements IRespListener {
         this.handler = handler;
         this.coercion = coercion;
         this.pool = pool;
-
-
     }
 
     private OutputStream startStreamingResponse(byte[] firstBytes) throws AbortException {
