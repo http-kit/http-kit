@@ -101,6 +101,15 @@
 
   (GET "/test-header" [] (fn [{:keys [headers]}] (str (get headers "test-header"))))
   (GET "/zip"         [] (fn [req] {:body "hello"}))
+  (GET "/manual-gzip" []
+    (fn [req]
+      (let [content "This is manually gzipped content"
+            compressed (gzip-compress content)]
+        {:status 200
+         :body (java.io.ByteArrayInputStream. compressed)
+         :headers {"Content-Type" "text/plain"
+                   "Content-Encoding" "gzip"
+                   "Content-Length" (str (alength compressed))}})))
 
   (GET "/accept-encoding" []
     (fn [req]
@@ -619,6 +628,14 @@
 
 (deftest zip
   (is (instance? DynamicBytes (:body @(hkc/get "http://localhost:4347/zip" {:as :none})))))
+
+(deftest gzip-decompression
+  (testing "Client correctly decompresses gzip response in text mode"
+    (let [{:keys [body]} @(hkc/get "http://localhost:4347/manual-gzip" {:as :text})]
+      (is (= "This is manually gzipped content" body))))
+  (testing "Client correctly decompresses gzip response in stream mode"
+    (let [{:keys [body]} @(hkc/get "http://localhost:4347/manual-gzip" {:as :stream})]
+      (is (= "This is manually gzipped content" (slurp body))))))
 
 (deftest adding-accept-encoding-header
   (testing "if no Accept-Encoding header present, and not explicitly disabling auto compressing response, Accept-encoding header is automatically appended"
