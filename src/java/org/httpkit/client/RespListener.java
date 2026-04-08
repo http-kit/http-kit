@@ -4,14 +4,13 @@ import org.httpkit.*;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.PipedInputStream;
+import java.io.PipedOutputStream;
 import java.nio.charset.Charset;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.Inflater;
-import java.util.zip.Deflater;
-import java.util.zip.InflaterInputStream;
 
 import static org.httpkit.HttpUtils.CONTENT_ENCODING;
 import static org.httpkit.HttpUtils.CONTENT_TYPE;
@@ -76,32 +75,15 @@ public class RespListener implements IRespListener {
 
     private DynamicBytes unzipBody() throws IOException {
         String encoding = HttpUtils.getStringValue(headers, CONTENT_ENCODING);
-        if (encoding == null || body.length() == 0) {
+        ResponseCompression.Type compressionType =
+            ResponseCompression.detect(encoding, body.get());
+        if (compressionType == ResponseCompression.Type.NONE) {
             return body;
         }
 
-        encoding = encoding.toLowerCase();
         BytesInputStream bis = new BytesInputStream(body.get(), body.length());
-        InputStream is;
-
-        if ("gzip".equals(encoding) || "x-gzip".equals(encoding)) {
-            is = new GZIPInputStream(bis);
-        } else if ("deflate".equals(encoding) || "x-deflate".equals(encoding)) {
-            // http://stackoverflow.com/questions/3932117/handling-http-contentencoding-deflate
-	    final int i1 = body.get()[0];
-	    final int i2 = body.get()[1];
-	    boolean nowrap = true;
-	    final int b1 = i1 & 0xFF;
-	    final int compressionMethod = b1 & 0xF;
-	    final int compressionInfo = b1 >> 4 & 0xF;
-	    final int b2 = i2 & 0xFF;
-	    if (compressionMethod == Deflater.DEFLATED && compressionInfo <= 7 && ((b1 << 8) | b2) % 31 == 0) {
-		nowrap = false;
-	    }
-            is = new InflaterInputStream(bis, new Inflater(nowrap));
-        } else {
-            return body; // not compressed
-        }
+        InputStream is =
+            ResponseCompression.createDecompressingStream(bis, compressionType);
 
         DynamicBytes unzipped = new DynamicBytes(body.length() * 5);
         byte[] buffer = new byte[4096];
@@ -123,6 +105,9 @@ public class RespListener implements IRespListener {
     private final ExecutorService pool;
     final int coercion;
 
+    // only used if coercion has type stream
+    private OutputStream responseStreamer;
+
     public RespListener(IResponseHandler handler, IFilter filter, ExecutorService pool, int coercion) {
         body = new DynamicBytes(1024 * 8);
         this.filter = filter;
@@ -131,7 +116,48 @@ public class RespListener implements IRespListener {
         this.pool = pool;
     }
 
+    private OutputStream startStreamingResponse(byte[] firstBytes) throws AbortException {
+        try {
+            PipedInputStream is = new PipedInputStream(1024 * 8);
+            PipedOutputStream os = new PipedOutputStream(is);
+            // Immediately write to output stream so that GZIPInputStream doesn't block
+            os.write(firstBytes, 0, firstBytes.length);
+
+            // create input stream that handles compression if necessary
+            String encoding = HttpUtils.getStringValue(headers, CONTENT_ENCODING);
+            ResponseCompression.Type compressionType =
+                ResponseCompression.detect(encoding, firstBytes);
+            InputStream handlerStream =
+                ResponseCompression.createDecompressingStream(is, compressionType);
+
+            pool.submit(
+                new Handler(handler, status.getCode(), headers, handlerStream)
+            );
+            return os;
+        } catch (IOException ex) {
+            throw new AbortException("Failed to start streaming response");
+        }
+    }
+
+    private void streamResponseChunk(byte[] buf, int length) throws AbortException {
+        if (responseStreamer == null) {
+            responseStreamer = startStreamingResponse(buf);
+            return;
+        }
+        try {
+            responseStreamer.write(buf, 0, length);
+        } catch (IOException ex) {
+            throw new AbortException("Failed to stream response");
+        }
+    }
+
     public void onBodyReceived(byte[] buf, int length) throws AbortException {
+        if (coercion == 3) {
+            // result type is stream, pipe the chunk and exit
+            streamResponseChunk(buf, length);
+            return;
+        }
+
         body.append(buf, length);
         if (filter != null && !filter.accept(body)) {
             throw new AbortException("Rejected when reading body, length: " + body.length());
@@ -145,13 +171,21 @@ public class RespListener implements IRespListener {
             return;
         }
         try {
+            if (coercion == 3) {
+                // 3=>stream
+                // stream has already been submitted
+                if (responseStreamer != null) {
+                  responseStreamer.close();
+                }
+                return;
+            }
             if (coercion == 0 || coercion == 5) { // 0=> none, 5=> raw-byte-array
                 Object b = coercion == 0 ? body : body.bytes();
                 pool.submit(new Handler(handler, status.getCode(), headers, b));
                 return;
             }
             DynamicBytes bytes = unzipBody();
-            // 1=> auto, 2=>text, 3=>stream, 4=>byte-array
+            // 1=> auto, 2=>text, 4=>byte-array
             if (coercion == 2 || (coercion == 1 && isText())) {
                 Charset charset = HttpUtils.detectCharset(headers, bytes);
                 String html = new String(bytes.get(), 0, bytes.length(), charset);

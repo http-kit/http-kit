@@ -160,6 +160,27 @@ public class Decoder {
         }
     }
 
+    private int parseContentLength() {
+        String cl = HttpUtils.getStringValue(headers, CONTENT_LENGTH);
+        if (cl == null) {
+            // response does not have content length
+            // it either has no body or is variable length
+            return -1;
+        }
+
+        try {
+          return Integer.parseInt(cl);
+        } catch (NumberFormatException ex) {
+          long parsed = Long.parseLong(cl);
+          if (parsed > Integer.MAX_VALUE) {
+            // Content is is larger that Integer.MAX_VALUE
+            // Let's pretend it has variable length.
+            return -1;
+          }
+          throw ex;
+        }
+    }
+
     private void readHeaders(ByteBuffer buffer) throws LineTooLargeException, AbortException, ProtocolException {
         String line = lineReader.readLine(buffer);
         while (line != null && !line.isEmpty()) {
@@ -180,14 +201,15 @@ public class Decoder {
             if (headers.containsKey(TRAILER))
               chunkTrailerExpected = true;
         } else {
-            String cl = HttpUtils.getStringValue(headers, CONTENT_LENGTH);
-            if (cl != null) {
-                readRemaining = Integer.parseInt(cl);
+            int cl = parseContentLength();
+            if (cl >= 0) {
+                readRemaining = cl;
                 if (readRemaining == 0) {
                     state = ALL_READ;
                 } else {
                     state = READ_FIXED_LENGTH_CONTENT;
                 }
+
             } else if (emptyBodyExpected) {
                 state = ALL_READ;
             } else {

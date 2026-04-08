@@ -1,6 +1,7 @@
 (ns org.httpkit.test-util
   (:use clojure.test)
-  (:import [java.io File FileOutputStream FileInputStream]))
+  (:import [java.io File FileOutputStream FileInputStream ByteArrayOutputStream]
+           [java.util.zip GZIPOutputStream]))
 
 (defn- string-80k []
   (apply str (map char
@@ -44,3 +45,10 @@
 
 (defn close-handler [status]
   (reset! channel-closed true))
+
+(defn gzip-compress [s]
+  (let [baos (ByteArrayOutputStream.)
+        gzos (GZIPOutputStream. baos)]
+    (.write gzos (.getBytes s "UTF-8"))
+    (.close gzos)
+    (.toByteArray baos)))
