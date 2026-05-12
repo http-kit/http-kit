@@ -22,6 +22,12 @@ public class HttpRequest {
     // package visible
     int serverPort = 80;
     String serverName;
+    public String protocol() {
+        if (version == HttpVersion.HTTP_1_0) {
+            return "HTTP/1.0";
+        }
+        return "HTTP/1.1";
+    }
     Map<String, Object> headers;
     int contentLength = 0;
     String contentType;

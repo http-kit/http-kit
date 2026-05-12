@@ -42,6 +42,7 @@ class ClojureRing {
 
     static final Keyword SERVER_PORT = intern("server-port");
     static final Keyword SERVER_NAME = intern("server-name");
+    static final Keyword PROTOCOL = intern("protocol");
     static final Keyword REMOTE_ADDR = intern("remote-addr");
     static final Keyword URI = intern("uri");
     static final Keyword QUERY_STRING = intern("query-string");
@@ -78,6 +79,7 @@ class ClojureRing {
             m
             .assoc(SERVER_PORT, req.serverPort)
             .assoc(SERVER_NAME, req.serverName)
+            .assoc(PROTOCOL, req.protocol())
             .assoc(REMOTE_ADDR, req.getRemoteAddr())
             .assoc(URI, req.uri)
             .assoc(QUERY_STRING, req.queryString)

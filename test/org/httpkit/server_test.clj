@@ -17,7 +17,7 @@
            [java.nio.channels ServerSocketChannel]
            (java.nio.file Files)
            (java.util.concurrent CountDownLatch ThreadPoolExecutor TimeUnit ArrayBlockingQueue)
-           (org.apache.http NoHttpResponseException ConnectionClosedException)))
+           (org.apache.http ConnectionClosedException)))
 
 (defn file-handler [req]
   {:status 200
@@ -169,6 +169,7 @@
     (is (= 4347 (:server-port req)))
     (is (= "127.0.0.1" (:remote-addr req)))
     (is (= "localhost" (:server-name req)))
+    (is (= "HTTP/1.1" (:protocol req)))
     (is (= "/spec" (:uri req)))
     (is (= "c=d&a=b" (:query-string req)))
     (is (= :http (:scheme req)))
