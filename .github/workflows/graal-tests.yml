@@ -18,7 +18,7 @@ jobs:
           components: 'native-image'
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: DeLaGuardo/setup-clojure@13.6
+      - uses: DeLaGuardo/setup-clojure@13.6.0
         with:
           lein: latest
           bb: latest
