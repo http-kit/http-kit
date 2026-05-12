@@ -5,22 +5,22 @@ jobs:
   tests:
     strategy:
       matrix:
-        java: ['17', '19', '21']
+        java: ['17', '21', '25']
         os: [ubuntu-latest]
 
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
         with:
           distribution: 'corretto'
           java-version: ${{ matrix.java }}
 
-      - uses: DeLaGuardo/setup-clojure@12.5
+      - uses: DeLaGuardo/setup-clojure@13.6
         with:
           lein: latest
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         id: cache-deps
         with:
           path: ~/.m2/repository

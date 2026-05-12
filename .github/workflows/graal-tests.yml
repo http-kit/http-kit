@@ -5,12 +5,12 @@ jobs:
   test:
     strategy:
       matrix:
-        java: ['17']
+        java: ['25']
         os: [ubuntu-latest, macOS-latest, windows-latest]
 
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: graalvm/setup-graalvm@v1
         with:
           version: 'latest'
@@ -18,12 +18,12 @@ jobs:
           components: 'native-image'
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: DeLaGuardo/setup-clojure@12.5
+      - uses: DeLaGuardo/setup-clojure@13.6
         with:
           lein: latest
           bb: latest
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ~/.m2/repository
           key: deps-${{ hashFiles('deps.edn') }}
