@@ -410,3 +410,4 @@ Value may be a delay. See also `make-client`."}
 (defreq acl)
 (defreq copy)
 (defreq move)
+(defreq query)

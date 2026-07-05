@@ -268,7 +268,7 @@
                   {:filter (hkc/max-body-filter 30000)}))))
 
 (deftest test-http-method
-  (doseq [m [:get :post :put :delete :head]]
+  (doseq [m [:get :post :put :delete :head :query]]
     (is (= m (-> @(hkc/request {:method m
                                 :url "http://127.0.0.1:4347/method"}
                     identity)
