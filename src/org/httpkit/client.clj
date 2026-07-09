@@ -337,7 +337,9 @@ Value may be a delay. See also `make-client`."}
                 (if-let [^String location-header (.get headers "location")]
 
                   (let [redirect-location (str (.resolve (URI. url) location-header))
-                        change-to-get? (and (not allow-unsafe-redirect-methods) (#{301 302 303} status))]
+                        change-to-get? (and (not allow-unsafe-redirect-methods)
+                                            (#{301 302 303} status)
+                                            (or (= 303 status) (not= :query (:method opts))))]
 
                     (request
                       (assoc opts
