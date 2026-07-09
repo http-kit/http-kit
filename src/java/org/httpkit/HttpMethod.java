@@ -11,7 +11,8 @@ public enum HttpMethod {
     CONNECT(intern("connect")), PATCH(intern("patch")), PROPFIND(intern("propfind")),
     PROPPATCH(intern("proppatch")), LOCK(intern("lock")), UNLOCK(intern("unlock")),
     REPORT(intern("report")), ACL(intern("acl")), MOVE(intern("move")),
-    COPY(intern("copy")), MKCOL(intern("mkcol")), LIST(intern("list"));
+    COPY(intern("copy")), MKCOL(intern("mkcol")), LIST(intern("list")),
+    QUERY(intern("query"));
 
     public final Keyword KEY;
 

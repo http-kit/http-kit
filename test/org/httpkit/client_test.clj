@@ -268,7 +268,7 @@
                   {:filter (hkc/max-body-filter 30000)}))))
 
 (deftest test-http-method
-  (doseq [m [:get :post :put :delete :head]]
+  (doseq [m [:get :post :put :delete :head :query]]
     (is (= m (-> @(hkc/request {:method m
                                 :url "http://127.0.0.1:4347/method"}
                     identity)
@@ -486,7 +486,10 @@
         (is (= 302 (:status @(hkc/get url {:follow-redirects false}))))
         (is (= "get" (:body @(hkc/post url {:as :text}))))     ; should switch to get method
         (is (= "post" (:body @(hkc/post url {:as :text :allow-unsafe-redirect-methods true})))) ; should not change method
-        (is (= "post" (:body @(hkc/post (str url "&code=307") {:as :text})))))) ; should not change method
+        (is (= "post" (:body @(hkc/post (str url "&code=307") {:as :text})))) ; should not change method
+        (is (= "query" (:body @(hkc/query (str url "&code=301") {:as :text})))) ; should not change method
+        (is (= "query" (:body @(hkc/query (str url "&code=302") {:as :text})))) ; should not change method
+        (is (= "get" (:body @(hkc/query (str url "&code=303") {:as :text})))))) ; should switch to get method
 
     (testing "nil"
       (let [url "http://localhost:4347/redirect-nil"]
