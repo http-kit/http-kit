@@ -378,6 +378,12 @@ public class HttpClient implements Runnable {
             return;
         }
 
+        if (proxyUri != null && cfg.tunnel) {
+            cb.onThrowable(new ProtocolException(
+                    "Proxy tunneling is not supported; refusing to treat the CONNECT response as the target response"));
+            return;
+        }
+
         SocketAddress addr;
         try {
             if (proxyUri == null) {

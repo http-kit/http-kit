@@ -467,4 +467,10 @@
                          :headers {"X-Test" "safe\r\nInjected: yes"}}))))
         (finally (.stop ^HttpClient http-client)))))
 
+  (testing "unsupported proxy tunnels fail explicitly"
+    (let [response @(client/get "https://target.test"
+                     {:proxy-url "http://proxy.test" :tunnel? true})]
+      (is (:error response))
+      (is (str/includes? (str (:error response))
+            "Proxy tunneling is not supported"))))
 )
