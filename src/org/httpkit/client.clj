@@ -181,7 +181,15 @@
 
 ;;;; Public API
 
-(defn max-body-filter "reject if response's body exceeds size in bytes"
+(defn max-body-filter
+  "Returns an IFilter that rejects response bodies over `size` bytes.
+
+  Checks both received and automatically decompressed body sizes, so this is
+  also the mitigation for compressed responses that expand far beyond their
+  wire size (\"zip bombs\"). Other IFilter implementations are not applied
+  after decompression.
+
+  Buffered responses have no body-size limit by default."
   [size] (org.httpkit.client.IFilter$MaxBodyFilter. (int size)))
 
 (defn make-ssl-engine

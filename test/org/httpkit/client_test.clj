@@ -22,12 +22,13 @@
    [java.io ByteArrayOutputStream IOException InputStream]
    [java.net ServerSocket]
    [java.nio.channels SocketChannel]
-   [java.util Arrays]
+   [java.util Arrays Map]
    [java.util.zip Deflater DeflaterOutputStream]
    java.nio.ByteBuffer
    java.nio.charset.StandardCharsets
    [org.httpkit DynamicBytes HttpMethod HttpStatus HttpUtils HttpVersion]
-   [org.httpkit.client ClientSslEngineFactory Decoder HttpClient IRespListener]))
+   [org.httpkit.client ClientSslEngineFactory Decoder HttpClient IFilter
+    IFilter$MaxBodyFilter IRespListener]))
 
 (comment
   (remove-ns      'org.httpkit.client-test)
@@ -128,6 +129,13 @@
      :body ""
      :headers {"Content-Type" "text/plain"
                "Content-Encoding" "gzip"}})
+
+  (GET "/large-gzip" []
+    (let [compressed (gzip-compress (apply str (repeat 10000 "x")))]
+      {:status 200
+       :body compressed
+       :headers {"Content-Type" "text/plain"
+                 "Content-Encoding" "gzip"}}))
 
   (GET "/accept-encoding" []
     (fn [req]
@@ -766,7 +774,38 @@
       (is (= "This is manually gzipped content" body))))
   (testing "Client correctly decompresses gzip response in stream mode"
     (let [{:keys [body]} @(hkc/get "http://localhost:4347/manual-gzip" {:as :stream})]
-      (is (= "This is manually gzipped content" (slurp body))))))
+      (is (= "This is manually gzipped content" (slurp body)))))
+  (testing "Client filters the decompressed response size"
+    (let [{:keys [error]} @(hkc/get "http://localhost:4347/large-gzip"
+                            {:as :text :filter (hkc/max-body-filter 1000)})]
+      (is error)))
+  (testing "Custom filters retain wire-body callbacks only"
+    (let [body-lengths_ (atom [])
+          filter
+          (reify IFilter
+            (^boolean accept [_ ^Map _headers] true)
+            (^boolean accept [_ ^DynamicBytes partial-body]
+              (swap! body-lengths_ conj (.length partial-body))
+              true))
+          {:keys [status body]} @(hkc/get "http://localhost:4347/large-gzip"
+                                  {:as :text :filter filter})]
+      (is (= 200 status))
+      (is (= 10000 (count body)))
+      (is (seq @body-lengths_))
+      (is (every? #(< % 1000) @body-lengths_))))
+  (testing "Max-body subclasses retain overridden wire callbacks"
+    (let [body-lengths_ (atom [])
+          filter
+          (proxy [IFilter$MaxBodyFilter] [1000]
+            (accept [value]
+              (when (instance? DynamicBytes value)
+                (swap! body-lengths_ conj (.length ^DynamicBytes value)))
+              true))
+          {:keys [error]} @(hkc/get "http://localhost:4347/large-gzip"
+                            {:as :text :filter filter})]
+      (is error)
+      (is (seq @body-lengths_))
+      (is (every? #(< % 1000) @body-lengths_)))))
 
 (defn- deflate-compress [s nowrap?]
   (let [out (ByteArrayOutputStream.)

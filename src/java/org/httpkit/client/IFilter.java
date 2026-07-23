@@ -43,7 +43,11 @@ public interface IFilter {
         }
 
         public boolean accept(DynamicBytes partialBody) {
-            return partialBody.length() <= length;
+            return acceptsLength(partialBody.length());
+        }
+
+        final boolean acceptsLength(int bodyLength) {
+            return bodyLength <= length;
         }
     }
 

@@ -241,7 +241,11 @@ public class RespListener implements IRespListener {
             return false;
         }
 
-        type = type.toLowerCase();
+        type = type.toLowerCase(java.util.Locale.ROOT);
+        int parameter = type.indexOf(';');
+        if (parameter >= 0) {
+            type = type.substring(0, parameter).trim();
+        }
 
         // TODO may miss something
         if (NON_TEXT_CONTENT_TYPES.contains(type)) {
@@ -251,7 +255,7 @@ public class RespListener implements IRespListener {
         }
     }
 
-    private DynamicBytes unzipBody() throws IOException {
+    private DynamicBytes unzipBody() throws IOException, AbortException {
         if (body.length() == 0) {
             return body;
         }
@@ -264,16 +268,26 @@ public class RespListener implements IRespListener {
         }
 
         BytesInputStream bis = new BytesInputStream(body.get(), body.length());
-        InputStream is =
-            ResponseCompression.createDecompressingStream(bis, compressionType);
-
-        DynamicBytes unzipped = new DynamicBytes(body.length() * 5);
-        byte[] buffer = new byte[4096];
-        int read;
-        while ((read = is.read(buffer)) != -1) {
-            unzipped.append(buffer, read);
+        IFilter.MaxBodyFilter maxBodyFilter = filter instanceof IFilter.MaxBodyFilter
+                ? (IFilter.MaxBodyFilter) filter : null;
+        long projectedLength = maxBodyFilter != null
+                ? body.length() : (long) body.length() * 5L;
+        int initialLength = projectedLength <= Integer.MAX_VALUE - 8
+                ? (int) projectedLength : body.length();
+        DynamicBytes unzipped = new DynamicBytes(initialLength);
+        try (InputStream is = ResponseCompression.createDecompressingStream(
+                bis, compressionType)) {
+            byte[] buffer = new byte[4096];
+            int read;
+            while ((read = is.read(buffer)) != -1) {
+                unzipped.append(buffer, read);
+                if (maxBodyFilter != null
+                        && !maxBodyFilter.acceptsLength(unzipped.length())) {
+                    throw new AbortException(
+                            "Rejected when decompressing body, length: " + unzipped.length());
+                }
+            }
         }
-        is.close();
         return unzipped;
     }
 
@@ -324,6 +338,40 @@ public class RespListener implements IRespListener {
         }
     }
 
+    private void submitBufferedCompletion() {
+        try {
+            pool.execute(new Runnable() {
+                public void run() {
+                    completeBufferedResponse();
+                }
+            });
+        } catch (RejectedExecutionException e) {
+            new Handler(handler, e).run();
+        }
+    }
+
+    private void completeBufferedResponse() {
+        try {
+            if (coercion == 0 || coercion == 5) {
+                Object b = coercion == 0 ? body : body.bytes();
+                new Handler(handler, status.getCode(), headers, b).run();
+                return;
+            }
+            DynamicBytes bytes = unzipBody();
+            if (coercion == 2 || (coercion == 1 && isText())) {
+                Charset charset = HttpUtils.detectCharset(headers, bytes);
+                String html = new String(bytes.get(), 0, bytes.length(), charset);
+                new Handler(handler, status.getCode(), headers, html).run();
+            } else {
+                BytesInputStream is = new BytesInputStream(bytes.get(), bytes.length());
+                Object result = coercion == 4 ? is.bytes() : is;
+                new Handler(handler, status.getCode(), headers, result).run();
+            }
+        } catch (Exception e) {
+            new Handler(handler, e).run();
+        }
+    }
+
     private void streamResponseChunk(byte[] buf, int length)
             throws AbortException {
         if (responseStream == null) {
@@ -364,36 +412,14 @@ public class RespListener implements IRespListener {
             responseStream.complete();
             return;
         }
-        try {
-            if (immediatelyStreaming()) {
-                // An empty response has no compression representation to decode.
-                if (startStreamingResponse(null)) {
-                    responseStream.complete();
-                }
-                return;
+        if (immediatelyStreaming()) {
+            // An empty response has no compression representation to decode.
+            if (startStreamingResponse(null)) {
+                responseStream.complete();
             }
-            if (coercion == 0 || coercion == 5) { // 0=> none, 5=> raw-byte-array
-                Object b = coercion == 0 ? body : body.bytes();
-                submitHandler(new Handler(handler, status.getCode(), headers, b));
-                return;
-            }
-            DynamicBytes bytes = unzipBody();
-            // 1=> auto, 2=>text, 3=>buffered stream, 4=>byte-array
-            if (coercion == 2 || (coercion == 1 && isText())) {
-                Charset charset = HttpUtils.detectCharset(headers, bytes);
-                String html = new String(bytes.get(), 0, bytes.length(), charset);
-                submitHandler(new Handler(handler, status.getCode(), headers, html));
-            } else {
-                BytesInputStream is = new BytesInputStream(bytes.get(), bytes.length());
-                if (coercion == 4) { // byte-array
-                    submitHandler(new Handler(handler, status.getCode(), headers, is.bytes()));
-                } else {
-                    submitHandler(new Handler(handler, status.getCode(), headers, is));
-                }
-            }
-        } catch (IOException e) {
-            handler.onThrowable(e);
+            return;
         }
+        submitBufferedCompletion();
     }
 
     public void onThrowable(Throwable t) {
