@@ -10,6 +10,7 @@
    [java.net InetSocketAddress]
    [java.nio ByteBuffer]
    [java.nio.channels ServerSocketChannel]
+   [java.util Base64]
    [java.util.concurrent ArrayBlockingQueue ThreadPoolExecutor TimeUnit]
    java.security.MessageDigest))
 
@@ -226,14 +227,36 @@
 (def ^{:deprecated "v2.4.0 (2020-07-30)" :no-doc true} accept
   "DEPRECATED: prefer `sec-websocket-accept`" sec-websocket-accept)
 
+(defn- header-has-token? [headers header token]
+  (when-let [value (get headers header)]
+    (some #(= token (str/lower-case (str/trim %)))
+      (str/split value #","))))
+
+(defn- valid-websocket-key? [key]
+  (and
+    (string? key)
+    (try
+      (let [decoded (.decode (Base64/getDecoder) ^String key)]
+        (and
+          (= 16 (alength decoded))
+          (= key (.encodeToString (Base64/getEncoder) decoded))))
+      (catch IllegalArgumentException _ false))))
+
 (defn websocket-handshake-check
   "Returns `sec-ws-accept` string iff given Ring request is a valid
   WebSocket handshake."
   [ring-req]
-  (when-let [sec-ws-key (get-in ring-req [:headers "sec-websocket-key"])]
-    (try
-      (sec-websocket-accept sec-ws-key)
-      (catch Exception _ nil))))
+  (let [headers    (:headers ring-req)
+        sec-ws-key (get headers "sec-websocket-key")]
+    (when
+      (and
+        (= :get (:request-method ring-req))
+        (= "HTTP/1.1" (:protocol ring-req))
+        (header-has-token? headers "upgrade" "websocket")
+        (header-has-token? headers "connection" "upgrade")
+        (= "13" (get headers "sec-websocket-version"))
+        (valid-websocket-key? sec-ws-key))
+      (sec-websocket-accept sec-ws-key))))
 
 (defn send-checked-websocket-handshake!
   "Given an AsyncChannel and `sec-ws-accept` string, unconditionally

@@ -21,8 +21,8 @@ public class WSDecoder {
     private final int maxSize;
 
     private State state = State.FRAME_START;
-    private byte[] content;
-    private int idx = 0;
+    private byte[] content; // Content accumulated across fragmented data frames
+    private byte[] frameContent;
 
     private int payloadLength;
     private int payloadRead;
@@ -59,13 +59,25 @@ public class WSDecoder {
                     byte b = buffer.get(); // FIN, RSV, OPCODE
                     finalFlag = (b & 0x80) != 0;
 
-                    int tmpOp = b & 0x0F;
-                    if (opcode != -1 && tmpOp != opcode) {
-                        // TODO ping frame in fragmented text frame
-                        throw new ProtocolException("opcode mismatch: pre: " + opcode + ", now: "
-                                + tmpOp);
+                    if ((b & 0x70) != 0) {
+                        throw new ProtocolException("unsupported websocket extension data");
                     }
-                    opcode = tmpOp;
+
+                    opcode = b & 0x0F;
+                    if (!isSupportedOpcode(opcode)) {
+                        throw new ProtocolException("unsupported websocket opcode: " + opcode);
+                    }
+                    if (isControlFrame(opcode)) {
+                        if (!finalFlag) {
+                            throw new ProtocolException("fragmented websocket control frame");
+                        }
+                    } else if (opcode == OPCODE_CONT) {
+                        if (fragmentedOpCode == -1) {
+                            throw new ProtocolException("unexpected websocket continuation frame");
+                        }
+                    } else if (fragmentedOpCode != -1) {
+                        throw new ProtocolException("new data frame while fragmented message is open");
+                    }
                     state = State.READ_LENGTH;
                     break;
                 case READ_LENGTH:
@@ -75,6 +87,9 @@ public class WSDecoder {
                         throw new ProtocolException("unmasked client to server frame");
                     }
                     payloadLength = b & 0x7F;
+                    if (isControlFrame(opcode) && payloadLength > 125) {
+                        throw new ProtocolException("websocket control frame payload is too large");
+                    }
                     if (payloadLength == 126) {
                         state = State.READ_2_LENGTH;
                     } else if (payloadLength == 127) {
@@ -111,18 +126,14 @@ public class WSDecoder {
                     if (isAvailable(buffer, 4)) {
                         maskingKey = tmpBuffer.getInt();
                         tmpBuffer.clear();
-                        if (content == null) {
-                            content = new byte[payloadLength];
-                        } else if (payloadLength > 0) {
-                            abortIfTooLarge(content.length + payloadLength);
-                            /*
-                             * TODO if an attacker sent many fragmented frames, only one
-                             * byte of data per frame, server end up reallocate many
-                             * times. may not be a problem
-                             */
-                            // resize
-                            content = Arrays.copyOf(content, content.length + payloadLength);
+                        if (!isControlFrame(opcode)) {
+                            long messageLength = payloadLength;
+                            if (opcode == OPCODE_CONT) {
+                                messageLength += content.length;
+                            }
+                            abortIfTooLarge(messageLength);
                         }
+                        frameContent = new byte[payloadLength];
                         framePayloadIndex = 0; // reset
                         state = State.PAYLOAD;
                         // No break. since payloadLength can be 0
@@ -132,45 +143,50 @@ public class WSDecoder {
                 case PAYLOAD:
                     int read = Math.min(buffer.remaining(), payloadLength - payloadRead);
                     if (read > 0) {
-                        buffer.get(content, idx, read);
+                        buffer.get(frameContent, payloadRead, read);
 
                         byte[] mask = ByteBuffer.allocate(4).putInt(maskingKey).array();
                         for (int i = 0; i < read; i++) {
-                            content[i + idx] = (byte) (content[i + idx] ^ mask[(framePayloadIndex + i) % 4]);
+                            int frameIndex = payloadRead + i;
+                            frameContent[frameIndex] = (byte) (frameContent[frameIndex]
+                                    ^ mask[(framePayloadIndex + i) % 4]);
                         }
 
                         payloadRead += read;
-                        idx += read;
                     }
                     framePayloadIndex += read;
 
                     // all read (this frame)
                     if (payloadRead == payloadLength) {
-                        if (finalFlag) {
-                            if (fragmentedOpCode > 0)
-                              opcode = fragmentedOpCode;
-                            fragmentedOpCode = -1;
+                        if (isControlFrame(opcode)) {
                             switch (opcode) {
-                                case OPCODE_TEXT:
-                                    return new Frame.TextFrame(content);
-                                case OPCODE_BINARY:
-                                    return new Frame.BinaryFrame(content);
                                 case OPCODE_PING:
-                                    return new Frame.PingFrame(content);
+                                    return new Frame.PingFrame(frameContent);
                                 case OPCODE_PONG:
-                                    return new Frame.PongFrame(content);
+                                    return new Frame.PongFrame(frameContent);
                                 case OPCODE_CLOSE:
-                                    return new Frame.CloseFrame(content);
+                                    return new Frame.CloseFrame(frameContent);
                                 default:
-                                    throw new ProtocolException("not impl for opcode: " + opcode);
+                                    throw new AssertionError("unsupported control opcode: " + opcode);
                             }
-                        } else {
-                            state = State.FRAME_START;
-                            payloadRead = 0;
-                            if (opcode > 0)
-                              fragmentedOpCode = opcode;
-                            opcode = -1;
                         }
+
+                        if (opcode == OPCODE_CONT) {
+                            appendFrameContent();
+                            if (finalFlag) {
+                                int completedOpcode = fragmentedOpCode;
+                                byte[] completedContent = content;
+                                fragmentedOpCode = -1;
+                                content = null;
+                                return dataFrame(completedOpcode, completedContent);
+                            }
+                        } else if (finalFlag) {
+                            return dataFrame(opcode, frameContent);
+                        } else {
+                            fragmentedOpCode = opcode;
+                            content = frameContent;
+                        }
+                        resetFrame();
                     }
                     break;
             }
@@ -178,18 +194,48 @@ public class WSDecoder {
         return null; // wait for more bytes
     }
 
+    private static boolean isSupportedOpcode(int opcode) {
+        return opcode == OPCODE_CONT || opcode == OPCODE_TEXT || opcode == OPCODE_BINARY
+                || opcode == OPCODE_CLOSE || opcode == OPCODE_PING || opcode == OPCODE_PONG;
+    }
+
+    private static boolean isControlFrame(int opcode) {
+        return opcode >= OPCODE_CLOSE;
+    }
+
+    private void appendFrameContent() {
+        int previousLength = content.length;
+        content = Arrays.copyOf(content, previousLength + frameContent.length);
+        System.arraycopy(frameContent, 0, content, previousLength, frameContent.length);
+    }
+
+    private Frame dataFrame(int opcode, byte[] data) throws ProtocolException {
+        switch (opcode) {
+            case OPCODE_TEXT:
+                return new Frame.TextFrame(data);
+            case OPCODE_BINARY:
+                return new Frame.BinaryFrame(data);
+            default:
+                throw new ProtocolException("invalid fragmented message opcode: " + opcode);
+        }
+    }
+
     public void abortIfTooLarge(long length) throws ProtocolException {
         if (length > maxSize) { // drop if message is too big
-            throw new ProtocolException("Max payload length 4m, get: " + length);
+            throw new ProtocolException("Max payload length " + maxSize + ", got: " + length);
         }
     }
 
     public void reset() {
+        resetFrame();
+    }
+
+    private void resetFrame() {
         state = State.FRAME_START;
+        payloadLength = 0;
         payloadRead = 0;
-        idx = 0;
         opcode = -1;
-        content = null;
+        frameContent = null;
         framePayloadIndex = 0;
     }
 }

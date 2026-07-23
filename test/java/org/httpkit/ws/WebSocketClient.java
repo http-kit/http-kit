@@ -70,22 +70,25 @@ public class WebSocketClient {
     public void sendFragmentedMesg(String message, int frameCount) {
         int length = message.length();
         int frame = length / frameCount;
+        ch.write(new TextWebSocketFrame(false, 0, message.substring(0, frame)));
         int i;
-        for (i = 0; i < length - frame; i += frame) {
-            ch.write(new TextWebSocketFrame(false, 0, message.substring(i, i + frame)));
+        for (i = frame; i < length - frame; i += frame) {
+            ch.write(new ContinuationWebSocketFrame(false, 0, message.substring(i, i + frame)));
         }
-        ch.write(new TextWebSocketFrame(message.substring(i)));
+        ch.write(new ContinuationWebSocketFrame(true, 0, message.substring(i)));
     }
 
 
     public void sendFragmentedMesg(String message) {
         int length = message.length();
-        int perframe = Math.min(4000, new Random().nextInt(length / 2) + 40);
+        int perframe = Math.min(length - 1,
+                Math.min(4000, new Random().nextInt(length / 2) + 40));
+        ch.write(new TextWebSocketFrame(false, 0, message.substring(0, perframe)));
         int i;
-        for (i = 0; i < length - perframe; i += perframe) {
-            ch.write(new TextWebSocketFrame(false, 0, message.substring(i, i + perframe)));
+        for (i = perframe; i < length - perframe; i += perframe) {
+            ch.write(new ContinuationWebSocketFrame(false, 0, message.substring(i, i + perframe)));
         }
-        ch.write(new TextWebSocketFrame(message.substring(i)));
+        ch.write(new ContinuationWebSocketFrame(true, 0, message.substring(i)));
     }
 
     public void sendBinaryData(byte[] data) {

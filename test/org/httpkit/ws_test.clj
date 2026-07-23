@@ -8,11 +8,14 @@
    org.httpkit.server)
 
   (:require
+   [clojure.string       :as str]
    [http.async.client :as h]
    [ring.websocket    :as ws]
    [hato.websocket    :as hato])
 
   (:import
+   [java.io ByteArrayOutputStream InputStream]
+   [java.net Socket]
    [org.httpkit.ws WebSocketClient]
    [org.httpkit  SpecialHttpClient]))
 
@@ -85,6 +88,162 @@
 
 (comment (def server (run-server (site test-routes) {:port 4348}))
          (def client1 (WebSocketClient. "ws://localhost:4348/ws")))
+
+(def ^:private valid-handshake
+  {:request-method :get
+   :protocol "HTTP/1.1"
+   :headers
+   {"upgrade"               "websocket"
+    "connection"            "Upgrade"
+    "sec-websocket-version" "13"
+    "sec-websocket-key"     "dGhlIHNhbXBsZSBub25jZQ=="}})
+
+(deftest test-websocket-handshake-validation
+  (let [expected (sec-websocket-accept
+                   (get-in valid-handshake [:headers "sec-websocket-key"]))]
+    (is (= expected (websocket-handshake-check valid-handshake)))
+    (is (= expected
+          (websocket-handshake-check
+            (-> valid-handshake
+              (assoc-in [:headers "upgrade"] "WebSocket")
+              (assoc-in [:headers "connection"] "keep-alive, UpGrAdE")))))
+    (doseq [[description request]
+            [["non-GET method"        (assoc valid-handshake :request-method :post)]
+             ["non-HTTP/1.1 protocol" (assoc valid-handshake :protocol "HTTP/1.0")]
+             ["missing Upgrade"       (update valid-handshake :headers dissoc "upgrade")]
+             ["wrong Upgrade"         (assoc-in valid-handshake [:headers "upgrade"] "h2c")]
+             ["missing Connection"    (update valid-handshake :headers dissoc "connection")]
+             ["wrong Connection"      (assoc-in valid-handshake [:headers "connection"] "keep-alive")]
+             ["missing version"       (update valid-handshake :headers dissoc "sec-websocket-version")]
+             ["wrong version"         (assoc-in valid-handshake [:headers "sec-websocket-version"] "12")]
+             ["missing key"           (update valid-handshake :headers dissoc "sec-websocket-key")]
+             ["malformed key"         (assoc-in valid-handshake [:headers "sec-websocket-key"] "not base64")]
+             ["non-canonical key"     (assoc-in valid-handshake [:headers "sec-websocket-key"] "dGhlIHNhbXBsZSBub25jZQ")]
+             ["wrong-length key"      (assoc-in valid-handshake [:headers "sec-websocket-key"] "dG9vIHNob3J0")]]]
+      (testing description
+        (is (nil? (websocket-handshake-check request)))))))
+
+(defn- read-http-head [^InputStream in]
+  (loop [bytes []]
+    (let [b (.read in)
+          bytes (conj bytes b)]
+      (when (= -1 b)
+        (throw (java.io.EOFException. "EOF during WebSocket handshake")))
+      (if (= [13 10 13 10] (take-last 4 bytes))
+        (String. (byte-array (map unchecked-byte bytes)) "UTF-8")
+        (recur bytes)))))
+
+(defn- raw-websocket []
+  (let [socket (doto (Socket. "localhost" 4348) (.setSoTimeout 2000))
+        out    (.getOutputStream socket)
+        request
+        (str "GET /echo HTTP/1.1\r\n"
+          "Host: localhost\r\n"
+          "Upgrade: websocket\r\n"
+          "Connection: Upgrade\r\n"
+          "Sec-WebSocket-Version: 13\r\n"
+          "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n")]
+    (.write out (.getBytes request "UTF-8"))
+    (.flush out)
+    (let [head (read-http-head (.getInputStream socket))]
+      (when-not (str/includes? head " 101 ")
+        (.close socket)
+        (throw (ex-info "WebSocket handshake failed" {:response head}))))
+    socket))
+
+(defn- masked-frame [final? rsv opcode payload]
+  (let [^bytes payload (if (string? payload) (.getBytes ^String payload "UTF-8") payload)
+        length         (alength payload)
+        mask           (byte-array [1 2 3 4])
+        out            (ByteArrayOutputStream.)]
+    (.write out (bit-or (if final? 0x80 0) rsv opcode))
+    (cond
+      (<= length 125)
+      (.write out (bit-or 0x80 length))
+
+      (<= length 0xffff)
+      (do (.write out (bit-or 0x80 126))
+          (.write out (bit-shift-right length 8))
+          (.write out length))
+
+      :else
+      (throw (IllegalArgumentException. "test frame is too large")))
+    (.write out mask)
+    (dotimes [idx length]
+      (.write out
+        (bit-xor (bit-and 0xff (aget payload idx))
+          (bit-and 0xff (aget mask (mod idx 4))))))
+    (.toByteArray out)))
+
+(defn- write-frames! [^Socket socket frames]
+  (let [out (.getOutputStream socket)]
+    (doseq [frame frames] (.write out ^bytes frame))
+    (.flush out)))
+
+(defn- read-byte! [^InputStream in]
+  (let [b (.read in)]
+    (when (= -1 b) (throw (java.io.EOFException. "EOF during WebSocket frame")))
+    b))
+
+(defn- read-frame [^Socket socket]
+  (let [in     (.getInputStream socket)
+        first  (read-byte! in)
+        second (read-byte! in)
+        length-code (bit-and second 0x7f)
+        length (case length-code
+                 126 (+ (bit-shift-left (read-byte! in) 8) (read-byte! in))
+                 127 (throw (IllegalArgumentException. "test frame is too large"))
+                 length-code)
+        body (byte-array length)]
+    (loop [offset 0]
+      (when (< offset length)
+        (let [read (.read in body offset (- length offset))]
+          (when (= -1 read) (throw (java.io.EOFException. "EOF during WebSocket payload")))
+          (recur (+ offset read)))))
+    {:final? (not (zero? (bit-and first 0x80)))
+     :opcode (bit-and first 0x0f)
+     :body body}))
+
+(defn- server-closes-after? [frames]
+  (with-open [^Socket socket (raw-websocket)]
+    (write-frames! socket frames)
+    (= -1 (.read (.getInputStream socket)))))
+
+(deftest test-interleaved-websocket-control-frames
+  (with-open [^Socket socket (raw-websocket)]
+    (write-frames! socket
+      [(masked-frame false 0 0x1 "hel")
+       (masked-frame true  0 0x9 "ping")
+       (masked-frame true  0 0xa "ignored")
+       (masked-frame true  0 0x0 "lo")])
+    (let [pong (read-frame socket)
+          echo (read-frame socket)]
+      (is (= 0xa (:opcode pong)))
+      (is (= "ping" (String. ^bytes (:body pong) "UTF-8")))
+      (is (= 0x1 (:opcode echo)))
+      (is (= "hello" (String. ^bytes (:body echo) "UTF-8")))))
+
+  (with-open [^Socket socket (raw-websocket)]
+    (write-frames! socket
+      [(masked-frame false 0 0x1 "unfinished")
+       (masked-frame true  0 0x8 (byte-array 0))])
+    (is (= 0x8 (:opcode (read-frame socket))))))
+
+(deftest test-invalid-websocket-frame-sequences
+  (doseq [[description frames]
+          [["RSV bit"
+            [(masked-frame true 0x40 0x1 "bad")]]
+           ["fragmented control frame"
+            [(masked-frame false 0 0x9 "bad")]]
+           ["oversized control frame"
+            [(masked-frame true 0 0x9 (byte-array 126))]]
+           ["unexpected continuation"
+            [(masked-frame true 0 0x0 "bad")]]
+           ["new data frame during fragmented message"
+            [(masked-frame false 0 0x1 "open")
+             (masked-frame true  0 0x2 "bad")]]]]
+    (testing description
+      (is (server-closes-after? frames)))))
 
 (deftest test-websocket
   (doseq [_ (range 1 4)]
