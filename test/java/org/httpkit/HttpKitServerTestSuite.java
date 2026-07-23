@@ -4,6 +4,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Suite;
 
 import org.httpkit.server.*;
+import org.httpkit.timer.TimerServiceTest;
 
 /* in progress:
  * this is a temporary scaffold to move towards cleaner tests
@@ -20,6 +21,11 @@ import org.httpkit.server.*;
 @RunWith(Suite.class)
 @Suite.SuiteClasses({
   RingHandlerTest.class,
+  HttpDecoderTest.class,
+  RingResponseTest.class,
+  AsyncChannelCloseTest.class,
+  HttpServerProtocolTest.class,
+  TimerServiceTest.class,
   ThreadPoolTest.class
 })
 public class HttpKitServerTestSuite { }

@@ -29,6 +29,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.httpkit.HeaderMap;
+import org.httpkit.HttpMethod;
 import org.httpkit.LineTooLargeException;
 import org.httpkit.ProtocolException;
 import org.httpkit.RequestTooLargeException;
@@ -52,6 +53,7 @@ class PendingKey {
     }
 
     public static final int OP_WRITE = -1;
+    public static final int RESPONSE_COMPLETE = -2;
 }
 
 public class HttpServer implements Runnable {
@@ -129,7 +131,8 @@ public class HttpServer implements Runnable {
         this.maxLine = maxLine;
         this.maxBody = maxBody;
         this.maxWs = maxWs;
-        this.proxyProtocolOption = proxyProtocolOption;
+        this.proxyProtocolOption = proxyProtocolOption == null
+            ? ProxyProtocolOption.DISABLED : proxyProtocolOption;
         this.legacyUnsafeRemoteAddr = legacyUnsafeRemoteAddr;
         this.serverHeader = serverHeader;
 
@@ -158,7 +161,8 @@ public class HttpServer implements Runnable {
             this.maxLine = maxLine;
             this.maxBody = maxBody;
             this.maxWs = maxWs;
-            this.proxyProtocolOption = proxyProtocolOption;
+            this.proxyProtocolOption = proxyProtocolOption == null
+                ? ProxyProtocolOption.DISABLED : proxyProtocolOption;
             this.legacyUnsafeRemoteAddr = legacyUnsafeRemoteAddr;
             this.serverHeader = serverHeader;
             this.socketAddress = addressFinder.findAddress();
@@ -204,12 +208,82 @@ public class HttpServer implements Runnable {
         }
     }
 
-    private void decodeHttp(HttpAtta atta, SelectionKey key, SocketChannel ch) {
-        try {
-            do {
-                HttpRequest request = atta.decoder.decode(buffer);
+    private void savePendingInput(ServerAtta atta, ByteBuffer input) {
+        if (input.hasRemaining()) {
+            if (atta.pendingInput == null) {
+                atta.pendingInput = ByteBuffer.allocate(
+                    Math.min(buffer.capacity(), Math.max(1024, input.remaining())));
+            } else if (atta.pendingInput.remaining() < input.remaining()) {
+                int capacity = Math.min(buffer.capacity(), Math.max(
+                    atta.pendingInput.position() + input.remaining(), atta.pendingInput.capacity() * 2));
+                ByteBuffer expanded = ByteBuffer.allocate(capacity);
+                atta.pendingInput.flip();
+                expanded.put(atta.pendingInput);
+                atta.pendingInput = expanded;
+            }
+            atta.pendingInput.put(input);
+        }
+    }
 
-                if (request != null) {
+    private boolean canReadWhileInProgress(ServerAtta atta) {
+        return atta.pendingInput == null || atta.pendingInput.position() < buffer.capacity();
+    }
+
+    private void updateInterestOps(SelectionKey key) {
+        if (!key.isValid()) {
+            return;
+        }
+
+        ServerAtta atta = (ServerAtta) key.attachment();
+        boolean close = false;
+        synchronized (atta) {
+            int readOp = atta.requestInProgress && canReadWhileInProgress(atta) ? OP_READ : 0;
+            if (!atta.toWrites.isEmpty()) {
+                key.interestOps(OP_WRITE | readOp);
+            } else if (atta.requestInProgress) {
+                key.interestOps(readOp);
+            } else if (atta.isKeepAlive()) {
+                key.interestOps(OP_READ);
+                keptAlive.put(key, true);
+            } else {
+                close = true;
+            }
+        }
+        if (close) {
+            closeKey(key, CLOSE_NORMAL);
+        }
+    }
+
+    private void resumeAfterResponse(SelectionKey key) {
+        if (!key.isValid()) {
+            return;
+        }
+
+        ServerAtta atta = (ServerAtta) key.attachment();
+        if (!atta.requestInProgress) {
+            return;
+        }
+        atta.requestInProgress = false;
+
+        ByteBuffer pendingInput = atta.pendingInput;
+        atta.pendingInput = null;
+        if (pendingInput != null && atta.isKeepAlive()) {
+            pendingInput.flip();
+            SocketChannel ch = (SocketChannel) key.channel();
+            if (atta instanceof HttpAtta) {
+                decodeHttp((HttpAtta) atta, key, ch, pendingInput);
+            } else {
+                decodeWs((WsAtta) atta, key, pendingInput);
+            }
+        }
+        updateInterestOps(key);
+    }
+
+    private void decodeHttp(HttpAtta atta, SelectionKey key, SocketChannel ch, ByteBuffer input) {
+        try {
+            HttpRequest request = atta.decoder.decode(input);
+
+            if (request != null) {
 
                     // Get AsyncChannel to associate with this request.
                     // Logic has had subtle issues in the past.
@@ -223,51 +297,67 @@ public class HttpServer implements Runnable {
                     //    different logical requests.
 
                     // Is this reasonable?
-                    AsyncChannel channel = atta.channel.isClosed() ? new AsyncChannel(key, this) : atta.channel;
+                AsyncChannel channel = atta.channel.isClosed() ? new AsyncChannel(key, this) : atta.channel;
+                atta.channel = channel;
 
-                    if (status.get() != Status.RUNNING) {
-                        request.isKeepAlive = false;
-                    }
-
-                    request.setStartTime(System.nanoTime());
-                    channel.reset(request);
-
-                    if (request.isWebSocket) {
-                        key.attach(new WsAtta(channel, maxWs));
-                    } else {
-                        atta.keepalive = request.isKeepAlive;
-                    }
-                    request.channel = channel;
-                    // can't call socket() on anything else
-                    if (socketAddress instanceof InetSocketAddress){
-                        request.remoteAddr = (InetSocketAddress) ch.socket().getRemoteSocketAddress();
-                    }
-                    handler.handle(request, new RespCallback(key, this));
-                    // pipelining not supported : need queue to ensure order
-                    atta.decoder.reset();
-                } else if (atta.decoder.requiresContinue()) {
-                    tryWrite(key, HttpEncode(100, new HeaderMap(), null, serverHeader));
-                    atta.decoder.setSentContinue();
+                if (status.get() != Status.RUNNING) {
+                    request.isKeepAlive = false;
                 }
-            } while (buffer.hasRemaining()); // consume all
+
+                request.setStartTime(System.nanoTime());
+                channel.reset(request);
+
+                ServerAtta activeAtta;
+                if (request.isWebSocket) {
+                    request.isKeepAlive = false;
+                    activeAtta = new WsAtta(channel, maxWs);
+                    key.attach(activeAtta);
+                } else {
+                    atta.keepalive = request.isKeepAlive;
+                    activeAtta = atta;
+                }
+                request.channel = channel;
+                // can't call socket() on anything else
+                if (socketAddress instanceof InetSocketAddress){
+                    request.remoteAddr = (InetSocketAddress) ch.socket().getRemoteSocketAddress();
+                }
+
+                activeAtta.requestInProgress = true;
+                savePendingInput(activeAtta, input);
+                atta.decoder.reset();
+                updateInterestOps(key);
+                handler.handle(request, new RespCallback(key, this));
+            } else if (atta.decoder.requiresContinue()) {
+                tryWrite(key, HttpEncode(100, new HeaderMap(), null, serverHeader));
+                atta.decoder.setSentContinue();
+            }
         } catch (ProtocolException e) {
-            tryWrite(key, HttpEncode(400, new HeaderMap(), e.getMessage(), serverHeader));
-            closeKey(key, CLOSE_NORMAL);
+            atta.keepalive = false;
+            tryWriteHttpResponse(key, atta, HttpEncode(400, new HeaderMap(), e.getMessage(), serverHeader));
         } catch (RequestTooLargeException e) {
             atta.keepalive = false;
             eventLogger.log(eventNames.serverStatus413);
-            tryWrite(key, HttpEncode(413, new HeaderMap(), e.getMessage(), serverHeader));
+            tryWriteHttpResponse(key, atta, HttpEncode(413, new HeaderMap(), e.getMessage(), serverHeader));
         } catch (LineTooLargeException e) {
             atta.keepalive = false; // close after write
             eventLogger.log(eventNames.serverStatus414);
-            tryWrite(key, HttpEncode(414, new HeaderMap(), e.getMessage(), serverHeader));
+            tryWriteHttpResponse(key, atta, HttpEncode(414, new HeaderMap(), e.getMessage(), serverHeader));
         }
     }
 
-    private void decodeWs(WsAtta atta, SelectionKey key) {
+    private void tryWriteHttpResponse(SelectionKey key, HttpAtta atta, ByteBuffer[] buffers) {
+        HttpRequest request = atta.decoder.request;
+        if (request != null && request.method == HttpMethod.HEAD) {
+            tryWrite(key, buffers[0]);
+        } else {
+            tryWrite(key, buffers);
+        }
+    }
+
+    private void decodeWs(WsAtta atta, SelectionKey key, ByteBuffer input) {
         try {
             do {
-                Frame frame = atta.decoder.decode(buffer);
+                Frame frame = atta.decoder.decode(input);
                 if (frame instanceof TextFrame || frame instanceof BinaryFrame) {
                     handler.handle(atta.channel, frame);
                     atta.decoder.reset();
@@ -293,7 +383,7 @@ public class HttpServer implements Runnable {
                         tryWrite(key, WsEncode(WSDecoder.OPCODE_CLOSE, frame.data));
                     }
                 }
-            } while (buffer.hasRemaining()); // consume all
+            } while (input.hasRemaining()); // consume all
         } catch (ProtocolException e) {
             warnLogger.log(null, e);
             eventLogger.log(eventNames.serverWsDecodeError);
@@ -304,18 +394,29 @@ public class HttpServer implements Runnable {
     private void doRead(final SelectionKey key) {
         SocketChannel ch = (SocketChannel) key.channel();
         try {
+            final ServerAtta atta = (ServerAtta) key.attachment();
+            if (atta.requestInProgress && !canReadWhileInProgress(atta)) {
+                updateInterestOps(key);
+                return;
+            }
+
             buffer.clear(); // clear for read
+            if (atta.requestInProgress && atta.pendingInput != null) {
+                buffer.limit(buffer.capacity() - atta.pendingInput.position());
+            }
             int read = ch.read(buffer);
             if (read == -1) {
                 // remote entity shut the socket down cleanly.
                 closeKey(key, CLOSE_AWAY);
             } else if (read > 0) {
                 buffer.flip(); // flip for read
-                final ServerAtta atta = (ServerAtta) key.attachment();
-                if (atta instanceof HttpAtta) {
-                    decodeHttp((HttpAtta) atta, key, ch);
+                if (atta.requestInProgress) {
+                    savePendingInput(atta, buffer);
+                    updateInterestOps(key);
+                } else if (atta instanceof HttpAtta) {
+                    decodeHttp((HttpAtta) atta, key, ch, buffer);
                 } else {
-                    decodeWs((WsAtta) atta, key);
+                    decodeWs((WsAtta) atta, key, buffer);
                 }
             }
         } catch (IOException e) { // the remote forcibly closed the connection
@@ -350,8 +451,12 @@ public class HttpServer implements Runnable {
                 // all done
                 if (toWrites.size() == 0) {
                     if (atta.isKeepAlive()) {
-                        key.interestOps(OP_READ);
-                        keptAlive.put(key, true);
+                        if (atta.requestInProgress) {
+                            key.interestOps(canReadWhileInProgress(atta) ? OP_READ : 0);
+                        } else {
+                            key.interestOps(OP_READ);
+                            keptAlive.put(key, true);
+                        }
                     } else {
                         closeKey(key, CLOSE_NORMAL);
                     }
@@ -402,6 +507,29 @@ public class HttpServer implements Runnable {
         }
     }
 
+    void responseComplete(SelectionKey key) {
+        pending.add(new PendingKey(key, PendingKey.RESPONSE_COMPLETE));
+        selector.wakeup();
+    }
+
+    void closeAfterResponse(SelectionKey key) {
+        ServerAtta atta = (ServerAtta) key.attachment();
+        synchronized (atta) {
+            atta.keepalive = false;
+        }
+    }
+
+    void finishCloseDelimitedResponse(SelectionKey key) {
+        ServerAtta atta = (ServerAtta) key.attachment();
+        synchronized (atta) {
+            atta.keepalive = false;
+            atta.chunkedResponseInprogress(false);
+            pending.add(new PendingKey(key,
+                atta.toWrites.isEmpty() ? CLOSE_NORMAL : PendingKey.OP_WRITE));
+            selector.wakeup();
+        }
+    }
+
     public void run() {
         while (true) {
             try {
@@ -410,8 +538,10 @@ public class HttpServer implements Runnable {
                     k = pending.poll();
                     if (k.Op == PendingKey.OP_WRITE) {
                         if (k.key.isValid()) {
-                            k.key.interestOps(OP_WRITE);
+                            updateInterestOps(k.key);
                         }
+                    } else if (k.Op == PendingKey.RESPONSE_COMPLETE) {
+                        resumeAfterResponse(k.key);
                     } else {
                         closeKey(k.key, k.Op);
                     }

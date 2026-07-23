@@ -10,6 +10,15 @@ public class TimerService implements Runnable {
 
     private final PriorityQueue<CancelableFutureTask> queue = new PriorityQueue<CancelableFutureTask>();
     private final AtomicBoolean started = new AtomicBoolean(false);
+    private final long idleTimeoutMs;
+
+    public TimerService() {
+        this(1000 * 120);
+    }
+
+    TimerService(long idleTimeoutMs) {
+        this.idleTimeoutMs = idleTimeoutMs;
+    }
 
     public CancelableFutureTask scheduleTask(int timeout, IFn task) {
         CancelableFutureTask t = new CancelableFutureTask(timeout, task, queue);
@@ -42,22 +51,23 @@ public class TimerService implements Runnable {
         while (true) {
             synchronized (queue) {
                 task = queue.peek();
-            }
-            if (task == null) {
-                synchronized (queue) {
+                if (task == null) {
                     // wait 2 minute before kill self
                     if (emptyQueueWaited) {
-                        started.compareAndSet(true, false);
-                        break; // die, will restart
+                        started.set(false);
+                        return; // die, will restart
                     } else {
                         try {
-                            queue.wait(1000 * 120);
+                            queue.wait(idleTimeoutMs);
                             emptyQueueWaited = true; // queue is empty
                         } catch (InterruptedException ignore) {
                         }
+                        continue;
                     }
                 }
-            } else {
+            }
+
+            if (task != null) {
                 emptyQueueWaited = false;
                 long due = task.timeoutTs - System.currentTimeMillis();
                 // schedule to run in 1000ms, maybe run in 1000ms, 1001ms, ...

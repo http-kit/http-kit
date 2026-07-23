@@ -54,6 +54,7 @@ public class HttpDecoder {
     private String xForwardedFor;
     private String xForwardedProto;
     private int xForwardedPort;
+    private boolean proxyLineParsed;
     HttpRequest request; // package visible
     private Map<String, Object> headers = new TreeMap<String, Object>();
     byte[] content;
@@ -69,7 +70,7 @@ public class HttpDecoder {
         this.proxyProtocolOption = (proxyProtocolOption == null)
             ? ProxyProtocolOption.DISABLED : proxyProtocolOption;
 
-        this.state = (proxyProtocolOption == ProxyProtocolOption.DISABLED)
+        this.state = (this.proxyProtocolOption == ProxyProtocolOption.DISABLED)
             ? State.READ_INITIAL : State.CONNECTION_OPEN;
     }
 
@@ -129,20 +130,28 @@ public class HttpDecoder {
         cStart = findNonWhitespace(sb, bEnd);
         cEnd = findEndOfString(sb, cStart);
 
-        if (cStart < cEnd) {
-            try {
-                HttpMethod method = HttpMethod.valueOf(sb.substring(aStart, aEnd).toUpperCase());
-                HttpVersion version = HTTP_1_1;
-                if ("HTTP/1.0".equals(sb.substring(cStart, cEnd))) {
-                    version = HTTP_1_0;
-                }
-                request = new HttpRequest(method, sb.substring(bStart, bEnd), version, legacyUnsafeRemoteAddr);
-            } catch (Exception e) {
-                throw new ProtocolException("method not understand");
-            }
-        } else {
+        if (cStart >= cEnd) {
             throw new ProtocolException("not http?");
         }
+
+        final HttpMethod method;
+        try {
+            method = HttpMethod.valueOf(sb.substring(aStart, aEnd).toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new ProtocolException("method not understand");
+        }
+
+        final String versionString = sb.substring(cStart, cEnd);
+        final HttpVersion version;
+        if ("HTTP/1.1".equals(versionString)) {
+            version = HTTP_1_1;
+        } else if ("HTTP/1.0".equals(versionString)) {
+            version = HTTP_1_0;
+        } else {
+            throw new ProtocolException("Unsupported HTTP version: " + versionString);
+        }
+
+        request = new HttpRequest(method, sb.substring(bStart, bEnd), version, legacyUnsafeRemoteAddr);
     }
 
     public boolean requiresContinue() {
@@ -173,6 +182,7 @@ public class HttpDecoder {
                         // or throws ProtocolException, if the PROXY line is malformed or unsupported.
                         if (parseProxyLine(line)) {
                             // valid proxy header
+                            proxyLineParsed = true;
                             state = State.READ_INITIAL;
                         } else if (proxyProtocolOption == ProxyProtocolOption.OPTIONAL) {
                             // did not parse as a proxy header, try to create a request from it
@@ -226,12 +236,10 @@ public class HttpDecoder {
                     }
                     break;
                 case READ_CHUNK_FOOTER:
-                    readEmptyLine(buffer);
-                    finish();
+                    readTrailers(buffer);
                     break;
                 case READ_CHUNK_DELIMITER:
-                    readEmptyLine(buffer);
-                    state = State.READ_CHUNK_SIZE;
+                    readEmptyLine(buffer, State.READ_CHUNK_SIZE);
                     break;
             }
         }
@@ -243,10 +251,27 @@ public class HttpDecoder {
         request.setBody(content, readCount);
     }
 
-    void readEmptyLine(ByteBuffer buffer) {
-        byte b = buffer.get();
-        if (b == CR && buffer.hasRemaining()) {
-            buffer.get(); // should be LF
+    private void readEmptyLine(ByteBuffer buffer, State nextState)
+            throws LineTooLargeException, ProtocolException {
+        String line = lineReader.readLine(buffer);
+        if (line != null) {
+            if (!line.isEmpty()) {
+                throw new ProtocolException("Expected an empty line, but found " + line);
+            }
+            state = nextState;
+        }
+    }
+
+    private void readTrailers(ByteBuffer buffer)
+            throws LineTooLargeException, ProtocolException {
+        String line = lineReader.readLine(buffer);
+        while (line != null) {
+            if (line.isEmpty()) {
+                finish();
+                return;
+            }
+            HttpUtils.splitAndAddHeader(line, headers);
+            line = lineReader.readLine(buffer);
         }
     }
 
@@ -259,12 +284,6 @@ public class HttpDecoder {
 
     private void readHeaders(ByteBuffer buffer) throws LineTooLargeException,
             RequestTooLargeException, ProtocolException {
-        if (proxyProtocolOption == ProxyProtocolOption.OPTIONAL
-            || proxyProtocolOption == ProxyProtocolOption.ENABLED) {
-            headers.put("x-forwarded-for", xForwardedFor);
-            headers.put("x-forwarded-proto", xForwardedProto);
-            headers.put("x-forwarded-port", xForwardedPort);
-        }
         String line = lineReader.readLine(buffer);
         while (line != null && !line.isEmpty()) {
             HttpUtils.splitAndAddHeader(line, headers);
@@ -275,15 +294,33 @@ public class HttpDecoder {
             return;
         }
 
+        if (proxyLineParsed) {
+            headers.put("x-forwarded-for", xForwardedFor);
+            if (xForwardedProto != null) {
+                headers.put("x-forwarded-proto", xForwardedProto);
+            }
+            headers.put("x-forwarded-port", Integer.toString(xForwardedPort));
+            request.setProxyRemoteAddr(xForwardedFor);
+        }
+
         request.setHeaders(headers);
 
         String te = HttpUtils.getStringValue(headers, TRANSFER_ENCODING);
-        if (CHUNKED.equals(te)) {
+        String cl = HttpUtils.getStringValue(headers, CONTENT_LENGTH);
+        if (te != null) {
+            if (cl != null) {
+                throw new ProtocolException("Request contains both Transfer-Encoding and Content-Length");
+            }
+            if (!CHUNKED.equalsIgnoreCase(te.trim())) {
+                throw new ProtocolException("Unsupported Transfer-Encoding: " + te);
+            }
             state = State.READ_CHUNK_SIZE;
         } else {
-            String cl = HttpUtils.getStringValue(headers, CONTENT_LENGTH);
             if (cl != null) {
                 try {
+                    if (!isUnsignedDecimal(cl)) {
+                        throw new ProtocolException("Invalid Content-Length: " + cl);
+                    }
                     readRemaining = Integer.parseInt(cl);
                     if (readRemaining > 0) {
                         throwIfBodyIsTooLarge();
@@ -301,6 +338,19 @@ public class HttpDecoder {
         }
     }
 
+    private static boolean isUnsignedDecimal(String value) {
+        if (value.isEmpty()) {
+            return false;
+        }
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c < '0' || c > '9') {
+                return false;
+            }
+        }
+        return true;
+    }
+
     public void reset() {
         state = State.READ_INITIAL;
         headers = new TreeMap<String, Object>();
@@ -311,8 +361,9 @@ public class HttpDecoder {
     }
 
     private void throwIfBodyIsTooLarge() throws RequestTooLargeException {
-        if (readCount + readRemaining > maxBody) {
-            throw new RequestTooLargeException("request body " + (readCount + readRemaining)
+        long total = (long) readCount + readRemaining;
+        if (total > maxBody) {
+            throw new RequestTooLargeException("request body " + total
                     + "; max request body " + maxBody);
         }
     }

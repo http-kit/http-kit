@@ -9,6 +9,7 @@ import static org.httpkit.server.ClojureRing.HEADERS;
 import static org.httpkit.server.ClojureRing.buildRequestMap;
 import static org.httpkit.server.ClojureRing.getStatus;
 
+import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -20,6 +21,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.httpkit.HeaderMap;
+import org.httpkit.HttpMethod;
 import org.httpkit.PrefixThreadFactory;
 import org.httpkit.logger.ContextLogger;
 import org.httpkit.logger.EventNames;
@@ -100,10 +102,10 @@ class ClojureRing {
 }
 
 class ErrorResponse {
-    static final HeaderMap headers;
-    static {
-        headers = new HeaderMap();
+    static HeaderMap headers() {
+        HeaderMap headers = new HeaderMap();
         headers.put("Content-Type", "text/plain; charset=utf-8");
+        return headers;
     }
 }
 
@@ -177,28 +179,44 @@ class HttpHandler implements Runnable {
 
     private void handleResponse(Map resp) throws Throwable {
         if (resp == null) { // handler return null
-            cb.run(HttpEncode(404, new HeaderMap(), null, this.serverHeader, this.legacyContentLength));
+            HeaderMap headers = new HeaderMap();
+            addConnectionHeader(headers);
+            cb.run(HttpEncode(404, headers, null, this.serverHeader, this.legacyContentLength));
             eventLogger.log(eventNames.serverStatus404);
         } else {
             Object body = resp.get(BODY);
             if (!(body instanceof AsyncChannel)) { // hijacked
                 HeaderMap headers = HeaderMap.camelCase((Map) resp.get(HEADERS));
-                if (req.version == HTTP_1_0 && req.isKeepAlive) {
-                    headers.put("Connection", "Keep-Alive");
-                } else if (req.version == HTTP_1_1 && !req.isKeepAlive) {
-                    headers.put("Connection", "Close");
-                }
+                addConnectionHeader(headers);
                 final int status = getStatus(resp);
-                cb.run(HttpEncode(status, headers, body, this.serverHeader, this.legacyContentLength));
+                sendResponse(HttpEncode(status, headers, body, this.serverHeader, this.legacyContentLength));
                 eventLogger.log(eventNames.serverStatusPrefix + status);
             }
+        }
+    }
+
+    private void addConnectionHeader(HeaderMap headers) {
+        if (req.version == HTTP_1_0 && req.isKeepAlive) {
+            headers.putOrReplace("Connection", "Keep-Alive");
+        } else if (req.version == HTTP_1_1 && !req.isKeepAlive) {
+            headers.putOrReplace("Connection", "Close");
+        }
+    }
+
+    private void sendResponse(ByteBuffer[] encoded) {
+        if (req.method == HttpMethod.HEAD) {
+            cb.run(encoded[0]);
+        } else {
+            cb.run(encoded);
         }
     }
 
     private void handleError(Throwable e) {
         errorLogger.log(req.method + " " + req.uri, e);
         eventLogger.log(eventNames.serverStatus500);
-        cb.run(HttpEncode(500, ErrorResponse.headers, e.getMessage(), this.serverHeader, this.legacyContentLength));
+        HeaderMap headers = ErrorResponse.headers();
+        addConnectionHeader(headers);
+        sendResponse(HttpEncode(500, headers, e.getMessage(), this.serverHeader, this.legacyContentLength));
     }
 }
 
@@ -313,7 +331,12 @@ public class RingHandler implements IHandler {
         } catch (RejectedExecutionException e) {
             errorLogger.log("failed to submit task to executor service", e);
             eventLogger.log(eventNames.serverStatus503);
-            cb.run(HttpEncode(503, ErrorResponse.headers, "Server unavailable, please try again", this.serverHeader, true));
+            ByteBuffer[] encoded = HttpEncode(503, ErrorResponse.headers(), "Server unavailable, please try again", this.serverHeader, true);
+            if (req.method == HttpMethod.HEAD) {
+                cb.run(encoded[0]);
+            } else {
+                cb.run(encoded);
+            }
         }
     }
 
@@ -387,21 +410,19 @@ public class RingHandler implements IHandler {
                     For websocket and long polling with closeHandler registered, we exec closeHandler
                     in the current thread. Get this idea from @pyr, by #155
                      */
-                    if (execs.isShutdown()) {
-                        try {
-                            channel.onClose(status, reason);  // do it in current thread
-                        } catch (Exception e1) {
-                            errorLogger.log("on close handler", e);
-                            eventLogger.log(eventNames.serverChannelCloseError);
-                        }
-                    } else {
+                    if (!execs.isShutdown()) {
                         errorLogger.log("increase :queue-size if this happens often", e);
                         eventLogger.log(eventNames.serverStatus503Todo);
                     }
+                    try {
+                        channel.onClose(status, reason);
+                    } catch (Exception e1) {
+                        errorLogger.log("on close handler", e1);
+                        eventLogger.log(eventNames.serverChannelCloseError);
+                    }
                 }
             } else {
-                // no close handler, mark the connection as closed
-                channel.closedRan.set(false);
+                channel.onClose(status, reason);
             }
         }
     }

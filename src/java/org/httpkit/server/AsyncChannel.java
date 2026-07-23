@@ -4,6 +4,7 @@ import clojure.lang.IFn;
 import clojure.lang.Keyword;
 import org.httpkit.DynamicBytes;
 import org.httpkit.HeaderMap;
+import org.httpkit.HttpMethod;
 import org.httpkit.HttpVersion;
 
 import java.io.IOException;
@@ -29,12 +30,17 @@ public class AsyncChannel {
     private final HttpServer server;
 
     final public AtomicBoolean closedRan = new AtomicBoolean();
-    final private AtomicReference<IFn> closeHandler = new AtomicReference<>(null);
-    final private AtomicReference<IFn> closeRingHandler = new AtomicReference<>(null);
+    private IFn closeHandler;
+    private IFn closeRingHandler;
 
     final private AtomicReference<IFn> receiveHandler = new AtomicReference<>(null);
     final private AtomicReference<IFn> pingHandler = new AtomicReference<>(null);
     final private AtomicReference<IFn> pongHandler = new AtomicReference<>(null);
+    final private Object closeLock = new Object();
+
+    private int closeStatus;
+    private int closeRingStatus;
+    private String closeReason = "";
 
     private HttpRequest request;     // package private, for http 1.0 keep-alive
 
@@ -55,9 +61,14 @@ public class AsyncChannel {
         serialTask = null;
 
         headerSent = false;
-        closedRan.set(false);
-        closeHandler.set(null);
-        closeRingHandler.set(null);
+        synchronized (closeLock) {
+            closedRan.set(false);
+            closeHandler = null;
+            closeRingHandler = null;
+            closeStatus = 0;
+            closeRingStatus = 0;
+            closeReason = "";
+        }
         receiveHandler.set(null);
         pingHandler.set(null);
         pongHandler.set(null);
@@ -86,36 +97,52 @@ public class AsyncChannel {
             headers = new HeaderMap();
         }
 
+        if (request.method == HttpMethod.HEAD || isBodyForbidden(status)) {
+            close = true;
+        }
+
         if (headers.isEmpty()) { // default 200 and text/html
             headers.put("Content-Type", "text/html; charset=utf-8");
         }
 
-        if (request.isKeepAlive && request.version == HttpVersion.HTTP_1_0) {
+        boolean closeDelimited = !close && request.version == HttpVersion.HTTP_1_0;
+        if (closeDelimited) {
+            headers.putOrReplace("Connection", "Close");
+            server.closeAfterResponse(key);
+        } else if (request.isKeepAlive && request.version == HttpVersion.HTTP_1_0) {
             headers.put("Connection", "Keep-Alive");
         }
 
         if (close) { // normal response, Content-Length. Every http client understand it
             buffers = HttpEncode(status, headers, body, server.serverHeader);
+            if (request.method == HttpMethod.HEAD && buffers.length > 1) {
+                buffers = new ByteBuffer[]{buffers[0]};
+            }
         } else {
             if (request.version == HttpVersion.HTTP_1_1) {
-                headers.put("Transfer-Encoding", "chunked"); // first chunk
-            }
-            ByteBuffer[] bb = HttpEncode(status, headers, body, server.serverHeader);
-            if (body == null) {
-                buffers = bb;
+                headers.putOrReplace("Transfer-Encoding", "chunked"); // first chunk
+                ByteBuffer[] bb = HttpEncode(status, headers, body, server.serverHeader);
+                if (body == null) {
+                    buffers = bb;
+                } else {
+                    buffers = new ByteBuffer[]{
+                            bb[0], // header
+                            chunkSize(bb[1].remaining()), // chunk size
+                            bb[1], // chunk data
+                            ByteBuffer.wrap(newLineBytes) // terminating CRLF sequence
+                    };
+                }
             } else {
-                buffers = new ByteBuffer[]{
-                        bb[0], // header
-                        chunkSize(bb[1].remaining()), // chunk size
-                        bb[1], // chunk data
-                        ByteBuffer.wrap(newLineBytes) // terminating CRLF sequence
-                };
+                buffers = HttpEncodeCloseDelimited(status, headers, body, server.serverHeader);
             }
         }
         if (close) {
             onClose(0);
         }
         server.tryWrite(key, !close, buffers);
+        if (close) {
+            server.responseComplete(key);
+        }
     }
 
     // for streaming, send a chunk of data to client
@@ -126,12 +153,17 @@ public class AsyncChannel {
         if (body != null) { // null is ignored
             ByteBuffer t = bodyBuffer(body);
             if (t.hasRemaining()) {
-                ByteBuffer[] buffers = new ByteBuffer[]{
-                        chunkSize(t.remaining()),
-                        t,  // actual data
-                        ByteBuffer.wrap(newLineBytes) // terminating CRLF sequence
-                };
-                server.tryWrite(key, !close, buffers);
+                ByteBuffer[] buffers;
+                if (request.version == HttpVersion.HTTP_1_1) {
+                    buffers = new ByteBuffer[]{
+                            chunkSize(t.remaining()),
+                            t,  // actual data
+                            ByteBuffer.wrap(newLineBytes) // terminating CRLF sequence
+                    };
+                } else {
+                    buffers = new ByteBuffer[]{t};
+                }
+                server.tryWrite(key, true, buffers);
             }
         }
         if (close) {
@@ -184,24 +216,46 @@ public class AsyncChannel {
     public void sendHandshake(Map<String, Object> headers) {
         HeaderMap map = HeaderMap.camelCase(headers);
         server.tryWrite(key, HttpEncode(101, map, null));
+        server.responseComplete(key);
     }
 
     public boolean hasCloseHandler() {
-        return closeHandler.get() != null || closeRingHandler.get() != null;
+        synchronized (closeLock) {
+            return closeHandler != null || closeRingHandler != null;
+        }
     }
 
     public void setCloseHandler(IFn fn) {
-        if (!closeHandler.compareAndSet(null, fn)) { // only once
-            throw new IllegalStateException("close handler exist: " + closeHandler);
+        boolean invoke;
+        int status;
+        synchronized (closeLock) {
+            if (closeHandler != null) { // only once
+                throw new IllegalStateException("close handler exist: " + closeHandler);
+            }
+            closeHandler = fn;
+            invoke = closedRan.get();
+            status = closeStatus;
         }
-        if (closedRan.get()) { // no handler, but already closed
-            fn.invoke(K_UNKNOWN);
+        if (invoke) {
+            fn.invoke(readable(status));
         }
     }
 
     public void setCloseRingHandler(IFn fn) {
-        if (!closeRingHandler.compareAndSet(null, fn)) { // only once
-            throw new IllegalStateException("close ring handler exist: " + closeRingHandler);
+        boolean invoke;
+        int status;
+        String reason;
+        synchronized (closeLock) {
+            if (closeRingHandler != null) { // only once
+                throw new IllegalStateException("close ring handler exist: " + closeRingHandler);
+            }
+            closeRingHandler = fn;
+            invoke = closedRan.get();
+            status = closeRingStatus;
+            reason = closeReason;
+        }
+        if (invoke) {
+            fn.invoke(status, reason);
         }
     }
 
@@ -210,15 +264,23 @@ public class AsyncChannel {
     }
 
     public void onClose(int status, String reason) {
-        if (closedRan.compareAndSet(false, true)) {
-            IFn f = closeHandler.get();
-            if (f != null) {
-                f.invoke(readable(status));
+        IFn handler;
+        IFn ringHandler;
+        synchronized (closeLock) {
+            if (!closedRan.compareAndSet(false, true)) {
+                return;
             }
-            f = closeRingHandler.get();
-            if (f != null) {
-                f.invoke(status, reason);
-            }
+            closeStatus = status;
+            closeRingStatus = status;
+            closeReason = reason;
+            handler = closeHandler;
+            ringHandler = closeRingHandler;
+        }
+        if (handler != null) {
+            handler.invoke(readable(status));
+        }
+        if (ringHandler != null) {
+            ringHandler.invoke(status, reason);
         }
     }
 
@@ -228,22 +290,34 @@ public class AsyncChannel {
 
     // also sent CloseFrame a final Chunk
     public boolean serverClose(int status, String reason) {
-        if (!closedRan.compareAndSet(false, true)) {
-            return false; // already closed
+        IFn handler;
+        IFn ringHandler;
+        synchronized (closeLock) {
+            if (!closedRan.compareAndSet(false, true)) {
+                return false; // already closed
+            }
+            closeStatus = 0;
+            closeRingStatus = status;
+            closeReason = reason;
+            handler = closeHandler;
+            ringHandler = closeRingHandler;
         }
         if (isWebSocket()) {
             server.tryWrite(key, WsEncode(OPCODE_CLOSE, ByteBuffer.allocate(2)
                     .putShort((short) status).array()));
+        } else if (request.version == HttpVersion.HTTP_1_0) {
+            server.finishCloseDelimitedResponse(key);
         } else {
             server.tryWrite(key, false, ByteBuffer.wrap(finalChunkBytes));
         }
-        IFn f = closeHandler.get();
-        if (f != null) {
-            f.invoke(readable(0)); // server close is 0
+        if (!isWebSocket()) {
+            server.responseComplete(key);
         }
-        f = closeRingHandler.get();
-        if (f != null) {
-            f.invoke(status, reason);
+        if (handler != null) {
+            handler.invoke(readable(0)); // server close is 0
+        }
+        if (ringHandler != null) {
+            ringHandler.invoke(status, reason);
         }
         return true;
     }

@@ -6,6 +6,9 @@ import java.util.LinkedList;
 public abstract class ServerAtta {
     final LinkedList<ByteBuffer> toWrites = new LinkedList<ByteBuffer>();
 
+    ByteBuffer pendingInput;
+    boolean requestInProgress;
+
     protected AsyncChannel channel;
 
     // close the connection after write?

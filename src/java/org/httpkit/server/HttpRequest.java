@@ -18,6 +18,7 @@ public class HttpRequest {
 
     private byte[] body;
     private final boolean legacyUnsafeRemoteAddr;
+    private String proxyRemoteAddr;
 
     // package visible
     int serverPort = 80;
@@ -66,6 +67,9 @@ public class HttpRequest {
     }
 
     public String getRemoteAddr() {
+        if (proxyRemoteAddr != null) {
+            return proxyRemoteAddr;
+        }
         if (legacyUnsafeRemoteAddr) {
             // legacy behavior: use X-Forwarded-For if present (INSECURE - allows spoofing)
             String h = getStringValue(headers, X_FORWARDED_FOR);
@@ -92,6 +96,10 @@ public class HttpRequest {
         this.contentLength = count;
     }
 
+    void setProxyRemoteAddr(String remoteAddr) {
+        this.proxyRemoteAddr = remoteAddr;
+    }
+
     public void setHeaders(Map<String, Object> headers) throws ProtocolException {
         String h = getStringValue(headers, "host");
         if (h != null && !h.equals("")) {
@@ -105,7 +113,16 @@ public class HttpRequest {
                 String serverPortCandidate = h.substring(idx + 1);
                 if (!serverPortCandidate.isEmpty()) {
                     try {
+                        for (int i = 0; i < serverPortCandidate.length(); i++) {
+                            char c = serverPortCandidate.charAt(i);
+                            if (c < '0' || c > '9') {
+                                throw new NumberFormatException("port is not decimal");
+                            }
+                        }
                         serverPort = Integer.parseInt(serverPortCandidate);
+                        if (serverPort < 0 || serverPort > 65535) {
+                            throw new NumberFormatException("port out of range");
+                        }
                     } catch (NumberFormatException e) {
                         throw new ProtocolException("Invalid host header (bad port): " + h);
                     }

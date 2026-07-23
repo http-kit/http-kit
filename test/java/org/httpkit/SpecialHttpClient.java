@@ -24,6 +24,7 @@ public class SpecialHttpClient {
 
         Socket s = new Socket();
         s.connect(addr);
+        s.setSoTimeout(2000);
         OutputStream os = s.getOutputStream();
 
         String request = "GET " + HttpUtils.getPath(uri)
@@ -35,9 +36,29 @@ public class SpecialHttpClient {
         InputStream is = s.getInputStream();
 
         byte[] buffer = new byte[8096];
-        int read = is.read(buffer);
+        StringBuilder response = new StringBuilder();
+        try {
+            while (occurrences(response, "hello world") < 2) {
+                int read = is.read(buffer);
+                if (read == -1) {
+                    break;
+                }
+                response.append(new String(buffer, 0, read));
+            }
+        } catch (SocketTimeoutException ignore) {
+        }
         s.close();
-        return new String(buffer, 0, read);
+        return response.toString();
+    }
+
+    private static int occurrences(StringBuilder text, String target) {
+        int count = 0;
+        int offset = 0;
+        while ((offset = text.indexOf(target, offset)) != -1) {
+            count++;
+            offset += target.length();
+        }
+        return count;
     }
 
     public static String http10(String url) throws Exception {
@@ -147,7 +168,9 @@ public class SpecialHttpClient {
 
             byte[] buffer = new byte[8096];
             String request = "GET " + HttpUtils.getPath(uri)
-                    + " HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\nSec-WebSocket-Key: x3JJHMbDL1EzLkh9GBhXDw==\r\n\r\n";
+                    + " HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\n"
+                    + "Connection: Upgrade\r\nSec-WebSocket-Version: 13\r\n"
+                    + "Sec-WebSocket-Key: x3JJHMbDL1EzLkh9GBhXDw==\r\n\r\n";
             os.write(request.getBytes());
             int read = is.read(buffer);
             if (!new String(buffer, 0, read).contains("websocket")) {

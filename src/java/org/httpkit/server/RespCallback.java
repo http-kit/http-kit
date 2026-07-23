@@ -14,6 +14,10 @@ public class RespCallback {
 
     // maybe in another thread :worker thread
     public void run(ByteBuffer... buffers) {
+        if (key.attachment() instanceof WsAtta) {
+            server.closeAfterResponse(key);
+        }
         server.tryWrite(key, buffers);
+        server.responseComplete(key);
     }
 }

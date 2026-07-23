@@ -215,18 +215,23 @@ public class HttpUtils {
     }
 
     public static int getChunkSize(String hex) throws ProtocolException {
-        hex = hex.trim();
-        for (int i = 0; i < hex.length(); i++) {
-            char c = hex.charAt(i);
-            if (c == ';' || Character.isWhitespace(c) || Character.isISOControl(c)) {
-                hex = hex.substring(0, i);
-                break;
+        int extension = hex.indexOf(';');
+        String sizeToken = extension < 0 ? hex : hex.substring(0, extension);
+        if (sizeToken.isEmpty()) {
+            throw new ProtocolException("Expected a non-negative chunk size, got " + sizeToken);
+        }
+        for (int i = 0; i < sizeToken.length(); i++) {
+            char c = sizeToken.charAt(i);
+            if (!((c >= '0' && c <= '9') ||
+                  (c >= 'a' && c <= 'f') ||
+                  (c >= 'A' && c <= 'F'))) {
+                throw new ProtocolException("Expected a non-negative chunk size, got " + sizeToken);
             }
         }
         try {
-            return Integer.parseInt(hex, 16);
+            return Integer.parseInt(sizeToken, 16);
         } catch (Exception e) {
-            throw new ProtocolException("Expect chunk size to be a number, get" + hex);
+            throw new ProtocolException("Expected a non-negative chunk size, got " + sizeToken);
         }
     }
 
@@ -298,7 +303,11 @@ public class HttpUtils {
             fs = new FileInputStream(f);
             int offset = 0;
             while (offset < length) {
-                offset += fs.read(bytes, offset, length - offset);
+                int read = fs.read(bytes, offset, length - offset);
+                if (read < 0) {
+                    throw new EOFException("Unexpected end of file while reading " + f);
+                }
+                offset += read;
             }
         } finally {
             if (fs != null) {
@@ -466,11 +475,32 @@ public class HttpUtils {
     }
 
     public static ByteBuffer[] HttpEncode(int status, HeaderMap headers, Object body, String serverHeader, boolean legacyContentLength) {
+        return HttpEncode(status, headers, body, serverHeader, legacyContentLength, false);
+    }
+
+    public static ByteBuffer[] HttpEncodeCloseDelimited(int status, HeaderMap headers, Object body, String serverHeader) {
+        return HttpEncode(status, headers, body, serverHeader, true, true);
+    }
+
+    private static ByteBuffer[] HttpEncode(int status, HeaderMap headers, Object body, String serverHeader,
+                                           boolean legacyContentLength, boolean closeDelimited) {
         ByteBuffer bodyBuffer;
         try {
-            bodyBuffer = bodyBuffer(body);
+            boolean bodyForbidden = isBodyForbidden(status);
+            bodyBuffer = bodyForbidden ? null : bodyBuffer(body);
+            if (closeDelimited) {
+                headers.remove(CONTENT_LENGTH);
+                headers.remove("Transfer-Encoding");
+            }
+            if (status / 100 == 1 || status == 204) {
+                headers.remove(CONTENT_LENGTH);
+                headers.remove("Transfer-Encoding");
+            } else if (status == 205) {
+                headers.remove("Transfer-Encoding");
+                headers.putOrReplace(CONTENT_LENGTH, "0");
+            }
             // only write length if not chunked
-            if (!CHUNKED.equals(headers.get("Transfer-Encoding"))) {
+            if (!bodyForbidden && !closeDelimited && !CHUNKED.equals(headers.get("Transfer-Encoding"))) {
                 if (legacyContentLength) {
                     // Legacy behavior: always calculate and override Content-Length
                     if (bodyBuffer != null) {
@@ -515,6 +545,10 @@ public class HttpUtils {
             return new ByteBuffer[]{headBuffer, bodyBuffer};
         else
             return new ByteBuffer[]{headBuffer};
+    }
+
+    public static boolean isBodyForbidden(int status) {
+        return status / 100 == 1 || status == 204 || status == 205 || status == 304;
     }
 
     public static ByteBuffer WsEncode(byte opcode, byte[] data, int length) {

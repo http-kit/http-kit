@@ -46,6 +46,24 @@ public class HeaderMap {
         put(key, obj);
     }
 
+    public void remove(String key) {
+        for (int i = 0; i < size;) {
+            int offset = i * 2;
+            if (key.equalsIgnoreCase((String) arrays[offset])) {
+                int next = offset + 2;
+                int remaining = (size * 2) - next;
+                if (remaining > 0) {
+                    System.arraycopy(arrays, next, arrays, offset, remaining);
+                }
+                size--;
+                arrays[size * 2] = null;
+                arrays[size * 2 + 1] = null;
+            } else {
+                i++;
+            }
+        }
+    }
+
     public Object get(String key) {
         final int total = size << 1; // * 2
         for (int i = 0; i < total; i += 2) {
