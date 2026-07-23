@@ -18,13 +18,15 @@
 
   prep-deps
   {:task
-   (when-not (fs/exists? "../../target/classes")
-     (clojure "-X:deps prep"))}
+   (clojure "-X:deps prep :force true")}
 
   build-uberjar
   {:depends [prep-deps]
    :task
-   (when (seq (fs/modified-since jar ["src"]))
+   (when (seq (fs/modified-since jar
+                ["src" "deps.edn" "build.clj"
+                 "../src" "../resources" "../deps.edn"
+                 "../project.clj" "../build.clj"]))
      (clojure "-T:build uber"))}
 
   compile-native-image

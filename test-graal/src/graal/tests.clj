@@ -2,9 +2,13 @@
   (:require
    [org.httpkit.client     :as hk-client]
    [org.httpkit.server     :as hk-server]
-   [org.httpkit.sni-client :as sni-client]
-   [clojure.test           :as test :refer [is]])
+   [org.httpkit.sni-client :as sni-client])
   (:gen-class))
+
+(defn- check= [expected actual]
+  (when-not (= expected actual)
+    (throw (ex-info "Graal smoke-test failure"
+             {:expected expected, :actual actual}))))
 
 (defn -main [& _args]
   (let [server_ (atom nil)]
@@ -15,19 +19,21 @@
             {:status  200
              :body    "response"
              :headers {"content-type" "text/plain"}})
-          {:port 12233
+          {:port 0
            :legacy-return-value? false}))
 
-      (is (= "response" (:body @(hk-client/get "http://localhost:12233"))))
-      (is (= "response" (:body @(hk-client/get "http://localhost:12233"
-                                  {:client @sni-client/default-client}))))
+      (let [url (str "http://localhost:" (hk-server/server-port @server_))]
+        (check= "response" (:body @(hk-client/get url)))
+        (check= "response" (:body @(hk-client/get url
+                                     {:client @sni-client/default-client}))))
 
-      (println "Graal tests succesful!")
+      (println "Graal tests successful!")
 
       (catch Throwable t
-        (println t)
-        (System/exit 1))
+        (.printStackTrace t)
+        (throw t))
 
       (finally
-        (hk-server/server-stop! @server_)
+        (when-let [server @server_]
+          (hk-server/server-stop! server))
         (shutdown-agents)))))
