@@ -391,6 +391,7 @@ public class HttpServer implements Runnable {
                     if (!closed) {
                         tryWrite(key, WsEncode(WSDecoder.OPCODE_CLOSE, frame.data));
                     }
+                    return;
                 }
             } while (input.hasRemaining()); // consume all
         } catch (WebSocketException e) {

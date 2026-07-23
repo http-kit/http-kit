@@ -80,6 +80,11 @@ public abstract class Frame {
             this.msg = new String(data, HttpUtils.UTF_8);
         }
 
+        TextFrame(byte[] data, String msg) {
+            super(data);
+            this.msg = msg;
+        }
+
         public String getText() {
             return msg;
         }

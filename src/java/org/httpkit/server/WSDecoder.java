@@ -148,11 +148,11 @@ public class WSDecoder {
                     if (read > 0) {
                         buffer.get(frameContent, payloadRead, read);
 
-                        byte[] mask = ByteBuffer.allocate(4).putInt(maskingKey).array();
                         for (int i = 0; i < read; i++) {
                             int frameIndex = payloadRead + i;
+                            int shift = 24 - (((framePayloadIndex + i) & 3) << 3);
                             frameContent[frameIndex] = (byte) (frameContent[frameIndex]
-                                    ^ mask[(framePayloadIndex + i) % 4]);
+                                    ^ (byte) (maskingKey >>> shift));
                         }
 
                         payloadRead += read;
@@ -215,8 +215,7 @@ public class WSDecoder {
     private Frame dataFrame(int opcode, byte[] data) throws ProtocolException {
         switch (opcode) {
             case OPCODE_TEXT:
-                validateUtf8(data, 0, data.length);
-                return new Frame.TextFrame(data);
+                return new Frame.TextFrame(data, decodeUtf8(data, 0, data.length));
             case OPCODE_BINARY:
                 return new Frame.BinaryFrame(data);
             default:
@@ -240,7 +239,7 @@ public class WSDecoder {
             if (!isValidCloseStatus(status)) {
                 throw new WebSocketException(1002, "Invalid websocket close status: " + status);
             }
-            validateUtf8(data, 2, data.length - 2);
+            decodeUtf8(data, 2, data.length - 2);
         }
     }
 
@@ -250,13 +249,13 @@ public class WSDecoder {
                 && status != 1006 && status != 1015;
     }
 
-    private static void validateUtf8(byte[] data, int offset, int length)
+    private static String decodeUtf8(byte[] data, int offset, int length)
             throws WebSocketException {
         try {
-            StandardCharsets.UTF_8.newDecoder()
+            return StandardCharsets.UTF_8.newDecoder()
                     .onMalformedInput(CodingErrorAction.REPORT)
                     .onUnmappableCharacter(CodingErrorAction.REPORT)
-                    .decode(ByteBuffer.wrap(data, offset, length));
+                    .decode(ByteBuffer.wrap(data, offset, length)).toString();
         } catch (CharacterCodingException e) {
             throw new WebSocketException(1007, "Invalid UTF-8 websocket payload");
         }

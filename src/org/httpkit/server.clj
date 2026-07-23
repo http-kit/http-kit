@@ -230,7 +230,7 @@
 (defn- header-has-token? [headers header token]
   (when-let [value (get headers header)]
     (some #(= token (str/lower-case (str/trim %)))
-      (str/split value #","))))
+      (str/split value #"[,\n]"))))
 
 (defn- valid-websocket-key? [key]
   (and
@@ -272,7 +272,8 @@
   "Returns true iff successfully upgraded a valid WebSocket request."
   [^AsyncChannel ch ring-req]
   (when-let [sec-ws-accept (websocket-handshake-check ring-req)]
-    (send-checked-websocket-handshake! ch sec-ws-accept)))
+    (send-checked-websocket-handshake! ch sec-ws-accept)
+    true))
 
 ;;;; Channel API
 
