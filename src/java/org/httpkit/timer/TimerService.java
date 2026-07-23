@@ -47,16 +47,17 @@ public class TimerService implements Runnable {
     public void run() {
         // if 2 checks of the queue, find it empty, stop self
         boolean emptyQueueWaited = false;
-        CancelableFutureTask task;
         while (true) {
+            CancelableFutureTask task;
             synchronized (queue) {
-                task = queue.peek();
-                if (task == null) {
-                    // wait 2 minute before kill self
-                    if (emptyQueueWaited) {
-                        started.set(false);
-                        return; // die, will restart
-                    } else {
+                while (true) {
+                    task = queue.peek();
+                    if (task == null) {
+                        // wait 2 minute before kill self
+                        if (emptyQueueWaited) {
+                            started.set(false);
+                            return; // die, will restart
+                        }
                         try {
                             queue.wait(idleTimeoutMs);
                             emptyQueueWaited = true; // queue is empty
@@ -64,34 +65,28 @@ public class TimerService implements Runnable {
                         }
                         continue;
                     }
-                }
-            }
 
-            if (task != null) {
-                emptyQueueWaited = false;
-                long due = task.timeoutTs - System.currentTimeMillis();
-                // schedule to run in 1000ms, maybe run in 1000ms, 1001ms, ...
-                if (due <= 0) {
-                    try {
-                        task.runTask();
-                    } catch (Exception e) {
-                        HttpUtils.printError("In timer: " + task, e);
-                    }
-                    synchronized (queue) { // remove
-                        if (task == queue.peek()) {
-                            queue.poll(); // much faster
-                        } else {
-                            queue.remove(task);
-                        }
-                    }
-                } else {
-                    synchronized (queue) {
+                    emptyQueueWaited = false;
+                    long due = task.timeoutTs - System.currentTimeMillis();
+                    if (due <= 0) {
+                        queue.poll();
+                        break;
+                    } else {
                         try {
                             queue.wait(due); // others may notify you
                         } catch (InterruptedException ignore) {
                             // maybe more urgent job come in
                         }
                     }
+                }
+            }
+
+            try {
+                task.runTask();
+            } catch (Throwable e) {
+                try {
+                    HttpUtils.printError("In timer: " + task, e);
+                } catch (Throwable ignored) {
                 }
             }
         }
