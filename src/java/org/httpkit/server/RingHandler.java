@@ -9,7 +9,6 @@ import static org.httpkit.server.ClojureRing.HEADERS;
 import static org.httpkit.server.ClojureRing.buildRequestMap;
 import static org.httpkit.server.ClojureRing.getStatus;
 
-import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -181,7 +180,8 @@ class HttpHandler implements Runnable {
         if (resp == null) { // handler return null
             HeaderMap headers = new HeaderMap();
             addConnectionHeader(headers);
-            cb.run(HttpEncode(404, headers, null, this.serverHeader, this.legacyContentLength));
+            cb.run(HttpEncode(404, headers, null, this.serverHeader,
+                this.legacyContentLength, req.method == HttpMethod.HEAD));
             eventLogger.log(eventNames.serverStatus404);
         } else {
             Object body = resp.get(BODY);
@@ -189,7 +189,8 @@ class HttpHandler implements Runnable {
                 HeaderMap headers = HeaderMap.camelCase((Map) resp.get(HEADERS));
                 addConnectionHeader(headers);
                 final int status = getStatus(resp);
-                sendResponse(HttpEncode(status, headers, body, this.serverHeader, this.legacyContentLength));
+                cb.run(HttpEncode(status, headers, body, this.serverHeader,
+                    this.legacyContentLength, req.method == HttpMethod.HEAD));
                 eventLogger.log(eventNames.serverStatusPrefix + status);
             }
         }
@@ -203,20 +204,13 @@ class HttpHandler implements Runnable {
         }
     }
 
-    private void sendResponse(ByteBuffer[] encoded) {
-        if (req.method == HttpMethod.HEAD) {
-            cb.run(encoded[0]);
-        } else {
-            cb.run(encoded);
-        }
-    }
-
     private void handleError(Throwable e) {
         errorLogger.log(req.method + " " + req.uri, e);
         eventLogger.log(eventNames.serverStatus500);
         HeaderMap headers = ErrorResponse.headers();
         addConnectionHeader(headers);
-        sendResponse(HttpEncode(500, headers, e.getMessage(), this.serverHeader, this.legacyContentLength));
+        cb.run(HttpEncode(500, headers, e.getMessage(), this.serverHeader,
+            this.legacyContentLength, req.method == HttpMethod.HEAD));
     }
 }
 
@@ -326,17 +320,15 @@ public class RingHandler implements IHandler {
     }
 
     public void handle(HttpRequest req, RespCallback cb) {
+        req.legacyContentLength = legacyContentLength;
         try {
             execs.submit(new HttpHandler(req, cb, handler, isRingAsync, errorLogger, eventLogger, eventNames, this.serverHeader, this.legacyContentLength));
         } catch (RejectedExecutionException e) {
             errorLogger.log("failed to submit task to executor service", e);
             eventLogger.log(eventNames.serverStatus503);
-            ByteBuffer[] encoded = HttpEncode(503, ErrorResponse.headers(), "Server unavailable, please try again", this.serverHeader, true);
-            if (req.method == HttpMethod.HEAD) {
-                cb.run(encoded[0]);
-            } else {
-                cb.run(encoded);
-            }
+            cb.run(HttpEncode(503, ErrorResponse.headers(),
+                "Server unavailable, please try again", this.serverHeader,
+                true, req.method == HttpMethod.HEAD));
         }
     }
 

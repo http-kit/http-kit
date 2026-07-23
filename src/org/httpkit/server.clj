@@ -108,8 +108,8 @@
     :event-logger               ; (fn [ev-name]) -> log events
     :event-names                ; Map of http-kit event names to loggable event names
 
-    :legacy-content-length? ; When true (default), http-kit always calculates Content-Length headers.
-                            ; When false, respects handler-provided Content-Length headers if provided.
+    :legacy-content-length? ; When true (default), calculates HEAD Content-Length from its body.
+                            ; When false, a HEAD handler may provide Content-Length without a body.
 
     ;; These opts may be used for Unix Domain Socket (UDS) support, see README:
     :address-finder             ; (fn []) -> `java.net.SocketAddress` (ip/port ignored)

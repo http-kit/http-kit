@@ -16,8 +16,7 @@
            [java.net InetSocketAddress]
            [java.nio.channels ServerSocketChannel]
            (java.nio.file Files)
-           (java.util.concurrent CountDownLatch ThreadPoolExecutor TimeUnit ArrayBlockingQueue)
-           (org.apache.http ConnectionClosedException)))
+           (java.util.concurrent CountDownLatch ThreadPoolExecutor TimeUnit ArrayBlockingQueue)))
 
 (defn file-handler [req]
   {:status 200
@@ -287,7 +286,26 @@
         (finally
           (server-stop! server)))))
 
-  (testing "Content-Length mismatch behavior with new settings"
+  (testing "New behavior also applies to asynchronous HEAD responses"
+    (let [test-port 4349
+          async-handler
+          (fn [req]
+            (as-channel req
+              {:on-open
+               #(send! % {:status 200
+                          :headers {"Content-Length" "1234"}
+                          :body nil})}))
+          server (run-server async-handler {:port test-port
+                                            :legacy-return-value? false
+                                            :legacy-content-length? false})]
+      (try
+        (is (= (get-in (http/head (str "http://localhost:" test-port))
+                       [:headers "content-length"])
+               "1234"))
+        (finally
+          (server-stop! server)))))
+
+  (testing "Body-bearing responses use their actual Content-Length"
     (let [test-port 4350
           mismatch-handler (fn [req]
                              {:status 200
@@ -298,9 +316,9 @@
                                                :legacy-return-value? false
                                                :legacy-content-length? false})]
       (try
-        (is (thrown-with-msg? ConnectionClosedException
-                              #"Premature end of Content-Length delimited message body.*"
-                              (http/get (str "http://localhost:" test-port))))
+        (let [response (http/get (str "http://localhost:" test-port))]
+          (is (= "5" (get-in response [:headers "content-length"])))
+          (is (= "hello" (:body response))))
         (finally
           (server-stop! server)))))
 

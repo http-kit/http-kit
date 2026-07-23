@@ -1,5 +1,6 @@
 package org.httpkit.server;
 
+import clojure.lang.PersistentVector;
 import org.httpkit.HeaderMap;
 import org.junit.Test;
 
@@ -133,6 +134,13 @@ public class HttpServerProtocolTest {
                 if ("/first".equals(request.uri)) {
                     firstChannel.set(request.channel);
                     try {
+                        Map<Object, Object> response = new HashMap<Object, Object>();
+                        Map<String, Object> headers = new HashMap<String, Object>();
+                        headers.put("Content-Length", "999");
+                        headers.put("Transfer-Encoding", "gzip");
+                        response.put(ClojureRing.HEADERS, headers);
+                        response.put(ClojureRing.BODY, PersistentVector.EMPTY);
+                        request.channel.send(response, false);
                         request.channel.send("first", false);
                     } catch (IOException e) {
                         throw new RuntimeException(e);
@@ -193,7 +201,10 @@ public class HttpServerProtocolTest {
                 assertTrue(thirdStarted.await(2, TimeUnit.SECONDS));
 
                 String response = new String(readAll(socket.getInputStream()), StandardCharsets.US_ASCII);
+                String firstHeaders = response.substring(
+                    0, response.indexOf("\r\n\r\n") + 4).toLowerCase();
                 assertTrue(response.contains("Transfer-Encoding: chunked"));
+                assertFalse(firstHeaders.contains("content-length:"));
                 assertTrue(response.contains(
                     "5\r\nfirst\r\n4\r\ndone\r\n0\r\n\r\nHTTP/1.1 200"));
                 assertTrue(response.contains("\r\n\r\nsecondHTTP/1.1 200"));

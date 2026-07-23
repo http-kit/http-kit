@@ -244,8 +244,18 @@ http-kit 2.9+ provides control over Content-Length header behavior through the `
                            :legacy-content-length? false})
 ```
 
-- **`:legacy-content-length? true`** (default): http-kit always calculates the Content-Length from the response body and sets the header automatically. Any Content-Length header provided by your handler will be overridden. This behavior exists for backwards compatibility.
-- **`:legacy-content-length? false`**: http-kit respects Content-Length headers provided by your handler. If no Content-Length is provided, http-kit calculates it from the body.
+- **`:legacy-content-length? true`** (default): http-kit calculates a HEAD
+  response's Content-Length from the handler body. Any Content-Length provided
+  by the handler is overridden. This behavior exists for backwards
+  compatibility.
+- **`:legacy-content-length? false`**: http-kit respects a Content-Length
+  provided for a HEAD response. If none is provided, it calculates the length
+  from the handler body.
+
+For body-bearing responses, http-kit always sets Content-Length from the body it
+sends. Responses such as 304 may retain a length describing representation
+metadata. Streaming responses similarly use server-controlled framing. This
+prevents a handler header from disagreeing with the actual response boundaries.
 
 The primary use case is [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110.html#section-8.6-6) compliant HEAD responses. The HTTP specification requires that HEAD responses include the same Content-Length that would be sent for a GET request, but without the body:
 
@@ -267,10 +277,3 @@ The primary use case is [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110.html#s
 ```
 
 This allows you to return the correct Content-Length for HEAD requests without generating the expensive response body.
-
-- http-kit does NOT validate Content-Length values (e.g., non-numeric, negative)
-- Does NOT detect or warn about duplicate Content-Length headers
-- Does NOT enforce that Content-Length matches actual body size
-- When multiple Content-Length headers exist (matched case-insensitively), returns one of them, which one is undefined
-
-This follows the principle that invalid headers indicate a middleware bug that is not http-kit's responsibility to fix. When `:legacy-content-length? false`, you have full control and responsibility for Content-Length correctness.

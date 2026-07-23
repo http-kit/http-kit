@@ -118,34 +118,30 @@ public class HttpDecoder {
     }
 
     private void createRequest(String sb) throws ProtocolException {
-        int aStart;
-        int aEnd;
-        int bStart;
-        int bEnd;
-        int cStart;
-        int cEnd;
-
-        aStart = findNonWhitespace(sb, 0);
-        aEnd = findWhitespace(sb, aStart);
-
-        bStart = findNonWhitespace(sb, aEnd);
-        bEnd = findWhitespace(sb, bStart);
-
-        cStart = findNonWhitespace(sb, bEnd);
-        cEnd = findEndOfString(sb, cStart);
-
-        if (cStart >= cEnd) {
-            throw new ProtocolException("not http?");
+        int methodEnd = sb.indexOf(' ');
+        int targetEnd = methodEnd < 0 ? -1 : sb.indexOf(' ', methodEnd + 1);
+        if (methodEnd <= 0 || targetEnd <= methodEnd + 1
+                || targetEnd == sb.length() - 1 || sb.indexOf(' ', targetEnd + 1) >= 0) {
+            throw new ProtocolException("Malformed HTTP request line");
         }
 
         final HttpMethod method;
         try {
-            method = HttpMethod.valueOf(sb.substring(aStart, aEnd).toUpperCase());
+            method = HttpMethod.valueOf(sb.substring(0, methodEnd));
         } catch (IllegalArgumentException e) {
-            throw new ProtocolException("method not understand");
+            throw new ProtocolException("Unsupported HTTP method");
         }
 
-        final String versionString = sb.substring(cStart, cEnd);
+        String target = sb.substring(methodEnd + 1, targetEnd);
+        for (int i = 0; i < target.length(); i++) {
+            char c = target.charAt(i);
+            if (Character.isISOControl(c) || Character.isWhitespace(c)
+                    || Character.isSpaceChar(c)) {
+                throw new ProtocolException("Invalid HTTP request target");
+            }
+        }
+
+        final String versionString = sb.substring(targetEnd + 1);
         final HttpVersion version;
         if ("HTTP/1.1".equals(versionString)) {
             version = HTTP_1_1;
@@ -155,7 +151,7 @@ public class HttpDecoder {
             throw new ProtocolException("Unsupported HTTP version: " + versionString);
         }
 
-        request = new HttpRequest(method, sb.substring(bStart, bEnd), version, legacyUnsafeRemoteAddr);
+        request = new HttpRequest(method, target, version, legacyUnsafeRemoteAddr);
     }
 
     public boolean requiresContinue() {

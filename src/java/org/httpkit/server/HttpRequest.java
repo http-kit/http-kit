@@ -35,6 +35,7 @@ public class HttpRequest {
     String charset = "utf8";
     boolean isKeepAlive = false;
     boolean isWebSocket = false;
+    boolean legacyContentLength = true;
     long startTime;
     boolean sentContinue = false;
 

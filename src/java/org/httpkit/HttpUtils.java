@@ -515,21 +515,38 @@ public class HttpUtils {
     }
 
     public static ByteBuffer[] HttpEncode(int status, HeaderMap headers, Object body, String serverHeader, boolean legacyContentLength) {
-        return HttpEncode(status, headers, body, serverHeader, legacyContentLength, false);
+        return HttpEncode(status, headers, body, serverHeader, legacyContentLength, false, false, false);
+    }
+
+    public static ByteBuffer[] HttpEncode(int status, HeaderMap headers, Object body, String serverHeader,
+                                          boolean legacyContentLength, boolean headRequest) {
+        return HttpEncode(status, headers, body, serverHeader, legacyContentLength, headRequest, false, false);
+    }
+
+    public static ByteBuffer[] HttpEncodeChunked(int status, HeaderMap headers, Object body, String serverHeader) {
+        return HttpEncode(status, headers, body, serverHeader, true, false, false, true);
     }
 
     public static ByteBuffer[] HttpEncodeCloseDelimited(int status, HeaderMap headers, Object body, String serverHeader) {
-        return HttpEncode(status, headers, body, serverHeader, true, true);
+        return HttpEncode(status, headers, body, serverHeader, true, false, true, false);
     }
 
     private static ByteBuffer[] HttpEncode(int status, HeaderMap headers, Object body, String serverHeader,
-                                           boolean legacyContentLength, boolean closeDelimited) {
+                                           boolean legacyContentLength, boolean headRequest,
+                                           boolean closeDelimited, boolean chunked) {
         ByteBuffer bodyBuffer;
         try {
             boolean bodyForbidden = isBodyForbidden(status);
+            String userContentLength = headers.getUserContentLength();
             bodyBuffer = bodyForbidden ? null : bodyBuffer(body);
             if (closeDelimited) {
                 headers.remove(CONTENT_LENGTH);
+                headers.remove("Transfer-Encoding");
+            } else if (chunked) {
+                headers.remove(CONTENT_LENGTH);
+                headers.remove("Transfer-Encoding");
+                headers.put("Transfer-Encoding", CHUNKED);
+            } else {
                 headers.remove("Transfer-Encoding");
             }
             if (status / 100 == 1 || status == 204) {
@@ -537,36 +554,28 @@ public class HttpUtils {
                 headers.remove("Transfer-Encoding");
             } else if (status == 205) {
                 headers.remove("Transfer-Encoding");
-                headers.putOrReplace(CONTENT_LENGTH, "0");
+                headers.remove(CONTENT_LENGTH);
+                headers.put(CONTENT_LENGTH, "0");
             }
-            // only write length if not chunked
-            if (!bodyForbidden && !closeDelimited && !CHUNKED.equals(headers.get("Transfer-Encoding"))) {
-                if (legacyContentLength) {
-                    // Legacy behavior: always calculate and override Content-Length
-                    if (bodyBuffer != null) {
-                        // trust the computed length
-                        headers.putOrReplace(CONTENT_LENGTH, Integer.toString(bodyBuffer.remaining()));
-                    } else if ((status / 100) != 1 && status != 204) {
-                        headers.putOrReplace(CONTENT_LENGTH, "0");
-                    }
-                } else {
-                    // New behavior: if present, respect Content-Length provided by the user from the handler by not touching that header
-                    String userContentLength = headers.getUserContentLength();
-                    if (userContentLength == null) {
-                        // No user-provided Content-Length, calculate it
-                        if (bodyBuffer != null) {
-                            headers.putOrReplace(CONTENT_LENGTH, Integer.toString(bodyBuffer.remaining()));
-                        } else if ((status / 100) != 1 && status != 204) {
-                            headers.putOrReplace(CONTENT_LENGTH, "0");
-                        }
-                    }
-                }
+            if (!bodyForbidden && !closeDelimited && !chunked) {
+                int length = bodyBuffer == null ? 0 : bodyBuffer.remaining();
+                String contentLength = !legacyContentLength && headRequest
+                    && userContentLength != null ? userContentLength : Integer.toString(length);
+                headers.remove(CONTENT_LENGTH);
+                headers.put(CONTENT_LENGTH, contentLength);
+            } else if (status == 304 && !closeDelimited && userContentLength != null) {
+                headers.remove(CONTENT_LENGTH);
+                headers.put(CONTENT_LENGTH, userContentLength);
             }
         } catch (IOException e) {
             byte[] b = e.getMessage().getBytes(ASCII);
             status = 500;
             headers.clear();
-            headers.put(CONTENT_LENGTH, Integer.toString(b.length));
+            if (chunked) {
+                headers.put("Transfer-Encoding", CHUNKED);
+            } else if (!closeDelimited) {
+                headers.put(CONTENT_LENGTH, Integer.toString(b.length));
+            }
             bodyBuffer = ByteBuffer.wrap(b);
         }
         if (serverHeader != null && !headers.containsKey("Server")) {
@@ -581,7 +590,7 @@ public class HttpUtils {
         headers.encodeHeaders(bytes);
         ByteBuffer headBuffer = ByteBuffer.wrap(bytes.get(), 0, bytes.length());
 
-        if (bodyBuffer != null)
+        if (bodyBuffer != null && !headRequest)
             return new ByteBuffer[]{headBuffer, bodyBuffer};
         else
             return new ByteBuffer[]{headBuffer};

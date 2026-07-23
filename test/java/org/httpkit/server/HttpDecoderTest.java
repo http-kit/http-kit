@@ -13,6 +13,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 public class HttpDecoderTest {
 
@@ -23,6 +24,47 @@ public class HttpDecoderTest {
     private HttpRequest decode(HttpDecoder decoder, String request)
             throws LineTooLargeException, ProtocolException, RequestTooLargeException {
         return decoder.decode(ByteBuffer.wrap(request.getBytes()));
+    }
+
+    private void rejectRequestLine(String line)
+            throws LineTooLargeException, RequestTooLargeException {
+        try {
+            decode(decoder(ProxyProtocolOption.DISABLED), line + "\r\nHost: localhost\r\n\r\n");
+            fail("Expected request line to be rejected: " + line);
+        } catch (ProtocolException expected) {
+        }
+    }
+
+    @Test
+    public void acceptsStandardRequestTargetForms()
+            throws LineTooLargeException, ProtocolException, RequestTooLargeException {
+        assertEquals("*", decode(decoder(ProxyProtocolOption.DISABLED),
+            "OPTIONS * HTTP/1.1\r\nHost: localhost\r\n\r\n").uri);
+        assertEquals("example.com:443", decode(decoder(ProxyProtocolOption.DISABLED),
+            "CONNECT example.com:443 HTTP/1.1\r\nHost: example.com:443\r\n\r\n").uri);
+        HttpRequest absolute = decode(decoder(ProxyProtocolOption.DISABLED),
+            "GET http://example.com/path?q=1 HTTP/1.0\r\n\r\n");
+        assertEquals("http://example.com/path", absolute.uri);
+        assertEquals("q=1", absolute.queryString);
+    }
+
+    @Test
+    public void rejectsMalformedRequestLines()
+            throws LineTooLargeException, RequestTooLargeException {
+        String[] lines = new String[] {
+            " GET / HTTP/1.1",
+            "GET\t/\tHTTP/1.1",
+            "GET  / HTTP/1.1",
+            "GET /  HTTP/1.1",
+            "GET / HTTP/1.1 ",
+            "get / HTTP/1.1",
+            "GET /bad\u0001target HTTP/1.1",
+            "GET /bad\u0085target HTTP/1.1",
+            "GET /bad\u00a0target HTTP/1.1"
+        };
+        for (String line : lines) {
+            rejectRequestLine(line);
+        }
     }
 
     @Test

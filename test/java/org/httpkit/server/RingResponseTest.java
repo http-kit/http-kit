@@ -62,6 +62,12 @@ public class RingResponseTest {
     private String respond(HttpRequest request, final int status,
                            final Map<String, Object> headers, final Object body,
                            String serverHeader) {
+        return respond(request, status, headers, body, serverHeader, true);
+    }
+
+    private String respond(HttpRequest request, final int status,
+                           final Map<String, Object> headers, final Object body,
+                           String serverHeader, boolean legacyContentLength) {
         final Map<Keyword, Object> response = new HashMap<Keyword, Object>();
         response.put(ClojureRing.STATUS, status);
         response.put(ClojureRing.HEADERS, headers);
@@ -75,7 +81,7 @@ public class RingResponseTest {
         CapturingCallback callback = new CapturingCallback();
         new HttpHandler(request, callback, handler, false,
             ContextLogger.ERROR_PRINTER, EventLogger.NOP, EventNames.DEFAULT,
-            serverHeader, true).run();
+            serverHeader, legacyContentLength).run();
         return callback.response();
     }
 
@@ -117,6 +123,47 @@ public class RingResponseTest {
 
         assertFalse(response.toLowerCase().contains("transfer-encoding:"));
         assertTrue(response.toLowerCase().contains("content-length: 0\r\n"));
+        assertEquals(response.length(), headerEnd(response));
+    }
+
+    @Test
+    public void bufferedResponsesUseActualBodyFraming() throws Exception {
+        Map<String, Object> headers = new HashMap<String, Object>();
+        headers.put("Transfer-Encoding", "chunked");
+        headers.put("Content-Length", "999");
+
+        String response = respond(request("GET"), 200, headers, "hello",
+            "test-server", false);
+        String responseHeaders = response.substring(0, headerEnd(response)).toLowerCase();
+
+        assertFalse(responseHeaders.contains("transfer-encoding:"));
+        assertTrue(responseHeaders.contains("content-length: 5\r\n"));
+        assertEquals("hello", response.substring(headerEnd(response)));
+    }
+
+    @Test
+    public void headMayReportExplicitRepresentationLength() throws Exception {
+        Map<String, Object> headers = new HashMap<String, Object>();
+        headers.put("Content-Length", "999");
+
+        String response = respond(request("HEAD"), 200, headers, null,
+            "test-server", false);
+
+        assertTrue(response.toLowerCase().contains("content-length: 999\r\n"));
+        assertEquals(response.length(), headerEnd(response));
+    }
+
+    @Test
+    public void notModifiedMayReportRepresentationLength() throws Exception {
+        Map<String, Object> headers = new HashMap<String, Object>();
+        headers.put("Content-Length", "999");
+        headers.put("Transfer-Encoding", "chunked");
+
+        String response = respond(request("GET"), 304, headers, "ignored",
+            "test-server", false);
+
+        assertTrue(response.toLowerCase().contains("content-length: 999\r\n"));
+        assertFalse(response.toLowerCase().contains("transfer-encoding:"));
         assertEquals(response.length(), headerEnd(response));
     }
 

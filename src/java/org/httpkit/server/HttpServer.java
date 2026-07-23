@@ -337,28 +337,26 @@ public class HttpServer implements Runnable {
         } catch (HeadersTooLargeException e) {
             atta.keepalive = false;
             eventLogger.log(eventNames.serverStatusPrefix + 431);
-            tryWriteHttpResponse(key, atta, HttpEncode(431, new HeaderMap(), e.getMessage(), serverHeader));
+            tryWriteHttpResponse(key, atta, 431, e.getMessage());
         } catch (ProtocolException e) {
             atta.keepalive = false;
-            tryWriteHttpResponse(key, atta, HttpEncode(400, new HeaderMap(), e.getMessage(), serverHeader));
+            tryWriteHttpResponse(key, atta, 400, e.getMessage());
         } catch (RequestTooLargeException e) {
             atta.keepalive = false;
             eventLogger.log(eventNames.serverStatus413);
-            tryWriteHttpResponse(key, atta, HttpEncode(413, new HeaderMap(), e.getMessage(), serverHeader));
+            tryWriteHttpResponse(key, atta, 413, e.getMessage());
         } catch (LineTooLargeException e) {
             atta.keepalive = false; // close after write
             eventLogger.log(eventNames.serverStatus414);
-            tryWriteHttpResponse(key, atta, HttpEncode(414, new HeaderMap(), e.getMessage(), serverHeader));
+            tryWriteHttpResponse(key, atta, 414, e.getMessage());
         }
     }
 
-    private void tryWriteHttpResponse(SelectionKey key, HttpAtta atta, ByteBuffer[] buffers) {
+    private void tryWriteHttpResponse(SelectionKey key, HttpAtta atta,
+                                      int status, String message) {
         HttpRequest request = atta.decoder.request;
-        if (request != null && request.method == HttpMethod.HEAD) {
-            tryWrite(key, buffers[0]);
-        } else {
-            tryWrite(key, buffers);
-        }
+        tryWrite(key, HttpEncode(status, new HeaderMap(), message, serverHeader, true,
+            request != null && request.method == HttpMethod.HEAD));
     }
 
     private void decodeWs(WsAtta atta, SelectionKey key, ByteBuffer input) {
