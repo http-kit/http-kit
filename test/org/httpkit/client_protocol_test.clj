@@ -4,8 +4,8 @@
    [clojure.test :refer [deftest is testing]]
    [org.httpkit.client :as client])
   (:import
-   [java.io ByteArrayOutputStream]
-   [java.net InetSocketAddress ServerSocket Socket SocketTimeoutException]
+   [java.io ByteArrayInputStream ByteArrayOutputStream]
+   [java.net InetSocketAddress ServerSocket Socket SocketException SocketTimeoutException]
    [java.nio.channels SocketChannel]
    [java.nio.charset StandardCharsets]
    [org.httpkit.client HttpClient]))
@@ -173,6 +173,142 @@
       (is (not (str/includes? request header))))
     @(:done server)))
 
+(deftest redirects-respect-origin-and-method-boundaries
+  (testing "cross-origin redirects drop credentials and explicit Host"
+    (let [redirected-request (promise)
+          target
+          (raw-server
+            (fn [^ServerSocket server]
+              (with-open [socket (.accept server)]
+                (deliver redirected-request (read-request socket))
+                (write! socket
+                  "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok"))))
+          source
+          (one-response
+            (str "HTTP/1.1 302 Found\r\nLocation: " (url target) "/target\r\n"
+                 "Content-Length: 0\r\nConnection: close\r\n\r\n"))
+          response @(client/get (url source)
+                     {:basic-auth ["user" "secret"]
+                      :headers {"Cookie" "session=secret"
+                                "Host" "explicit.invalid"}
+                      :as :text})
+          request (str/lower-case @redirected-request)]
+      (is (= 200 (:status response)))
+      (is (not (str/includes? request "authorization:")))
+      (is (not (str/includes? request "cookie:")))
+      (is (str/includes? request (str "host: 127.0.0.1:" (:port target))))
+      (is (not (str/includes? request "explicit.invalid")))
+      @(:done source)
+      @(:done target)))
+
+  (testing "HEAD remains HEAD after redirect"
+    (let [redirected-request (promise)
+          server
+          (raw-server
+            (fn [^ServerSocket server]
+              (with-open [socket (.accept server)]
+                (read-request socket)
+                (write! socket
+                  "HTTP/1.1 302 Found\r\nLocation: /target\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"))
+              (with-open [socket (.accept server)]
+                (deliver redirected-request (read-request socket))
+                (write! socket
+                  "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"))))
+          response @(client/head (url server))]
+      (is (= 200 (:status response)))
+      (is (.startsWith ^String @redirected-request "HEAD /target HTTP/1.1\r\n"))
+      @(:done server)))
+
+  (testing "one-shot bodies are not silently replayed"
+    (let [accepted (atom 0)
+          server
+          (raw-server
+            (fn [^ServerSocket server]
+              (.setSoTimeout server 300)
+              (with-open [socket (.accept server)]
+                (swap! accepted inc)
+                (read-request socket)
+                (write! socket
+                  "HTTP/1.1 307 Temporary Redirect\r\nLocation: /target\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"))
+              (try
+                (with-open [socket (.accept server)]
+                  (swap! accepted inc))
+                (catch SocketTimeoutException _))))
+          response @(client/post (url server)
+                     {:body (ByteArrayInputStream. (.getBytes "body" "UTF-8"))})]
+      (is (:error response))
+      @(:done server)
+      (is (= 1 @accepted)))))
+
+(deftest activity-and-pool-limits-remain-live
+  (testing "small periodic response chunks refresh idle timeout"
+    (let [server
+          (raw-server
+            (fn [^ServerSocket server]
+              (with-open [socket (.accept server)]
+                (read-request socket)
+                (write! socket
+                  "HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: close\r\n\r\n")
+                (doseq [b (.getBytes "hello" "UTF-8")]
+                  (.write (.getOutputStream socket) (byte-array [(byte b)]))
+                  (.flush (.getOutputStream socket))
+                  (Thread/sleep 40)))))
+          response @(client/get (url server) {:idle-timeout 100 :as :text})]
+      (is (= "hello" (:body response)))
+      @(:done server)))
+
+  (testing "idle connections do not block another origin at the limit"
+    (let [server-a
+          (raw-server
+            (fn [^ServerSocket server]
+              (with-open [socket (.accept server)]
+                (read-request socket)
+                (write! socket "HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\na")
+                (.read (.getInputStream socket)))))
+          server-b (one-response
+                     "HTTP/1.1 200 OK\r\nContent-Length: 1\r\nConnection: close\r\n\r\nb")
+          http-client (client/make-client {:max-connections 1})]
+      (try
+        (is (= "a" (:body @(client/get (url server-a)
+                             {:client http-client :as :text}))))
+        (is (= "b" (:body @(client/get (url server-b)
+                             {:client http-client :as :text
+                              :connect-timeout 300}))))
+        @(:done server-a)
+        @(:done server-b)
+        (finally
+          (.stop ^HttpClient http-client)
+          ((:close server-a))
+          ((:close server-b))))))
+
+  (testing "queued requests retain their connect timeout"
+    (let [release (promise)
+          server-a
+          (raw-server
+            (fn [^ServerSocket server]
+              (with-open [socket (.accept server)]
+                (read-request socket)
+                @release)))
+          server-b
+          (raw-server
+            (fn [^ServerSocket server]
+              (try
+                (with-open [socket (.accept server)])
+                (catch SocketException _))))
+          http-client (client/make-client {:max-connections 1})]
+      (try
+        (client/get (url server-a) {:client http-client})
+        (let [response (deref (client/get (url server-b)
+                                {:client http-client :connect-timeout 100})
+                         1000 ::timeout)]
+          (is (not= ::timeout response))
+          (is (:error response)))
+        (finally
+          (deliver release true)
+          (.stop ^HttpClient http-client)
+          ((:close server-a))
+          ((:close server-b)))))))
+
 (deftest nonpersistent-responses-are-not-reused
   (doseq [response-line ["HTTP/1.1 200 OK\r\nConnection: close"
                          "HTTP/1.0 200 OK"]]
@@ -318,4 +454,17 @@
                       {:client http-client
                        :proxy-url "https://proxy.test:8443"})))
         (is (= "https://proxy.test:8443" (str @configured_)))
-        (finally (.stop ^HttpClient http-client))))))
+        (finally (.stop ^HttpClient http-client)))))
+
+  (testing "header injection is rejected before connecting"
+    (let [http-client
+          (client/make-client
+            {:address-finder (fn [_] (InetSocketAddress. "127.0.0.1" 9))})]
+      (try
+        (is (instance? IllegalArgumentException
+              (:error @(client/get "http://example.test"
+                        {:client http-client
+                         :headers {"X-Test" "safe\r\nInjected: yes"}}))))
+        (finally (.stop ^HttpClient http-client)))))
+
+)

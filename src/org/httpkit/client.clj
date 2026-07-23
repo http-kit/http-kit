@@ -11,7 +11,9 @@
    [org.httpkit.logger ContextLogger EventLogger EventNames]
    [org.httpkit HttpMethod PrefixThreadFactory HttpUtils]
    [java.util.concurrent ThreadPoolExecutor LinkedBlockingQueue TimeUnit]
+   [java.io InputStream]
    [java.net URI URLEncoder]
+   [java.nio ByteBuffer]
    [org.httpkit.client ClientSslEngineFactory MultipartEntity]
    [javax.net.ssl SSLContext SSLEngine]))
 
@@ -42,6 +44,9 @@
 (def ^:private entity-header-names
   #{"content-encoding" "content-length" "content-type" "transfer-encoding"})
 
+(def ^:private origin-header-names
+  #{"authorization" "cookie" "host"})
+
 (defn- remove-entity-headers [headers]
   (when headers
     (reduce-kv
@@ -52,6 +57,37 @@
           (assoc m k v)))
       (empty headers)
       headers)))
+
+(defn- remove-origin-headers [headers]
+  (when headers
+    (reduce-kv
+      (fn [m k v]
+        (if (contains? origin-header-names
+              (str/lower-case (str (name* k))))
+          m
+          (assoc m k v)))
+      (empty headers)
+      headers)))
+
+(defn- origin [url]
+  (let [^URI uri (URI. url)]
+    [(some-> (.getScheme uri) str/lower-case)
+     (some-> (.getHost uri) str/lower-case)
+     (HttpUtils/getPort uri)]))
+
+(defn- one-shot-body? [body]
+  (or (instance? InputStream body)
+      (instance? ByteBuffer body)))
+
+(defn- non-repeatable-request? [{:keys [body multipart]}]
+  (or (one-shot-body? body)
+      (some (comp one-shot-body? :content) multipart)))
+
+(defn- close-response-body! [body]
+  (when (instance? InputStream body)
+    (try
+      (.close ^InputStream body)
+      (catch Exception _))))
 
 (defn- nested-param
   "{:a {:b 1 :c [1 2 3]}} => {\"a[b]\" 1, \"a[c]\" [1 2 3]}, etc."
@@ -347,34 +383,47 @@ Value may be a delay. See also `make-client`."}
             (if-let [follow-redirect? (and follow-redirects (#{301 302 303 307 308} status))]
 
               ;; Follow redirect
-              (if (> max-redirects (count trace-redirects))
-                (if-let [^String location-header (.get headers "location")]
+              (do
+                (close-response-body! body)
+                (if (> max-redirects (count trace-redirects))
+                  (if-let [^String location-header (.get headers "location")]
 
-                  (let [redirect-location (str (.resolve (URI. url) location-header))
-                        change-to-get? (and (not allow-unsafe-redirect-methods) (#{301 302 303} status))]
+                    (let [redirect-location (str (.resolve (URI. url) location-header))
+                          change-to-get? (and (not= method HttpMethod/HEAD)
+                                              (not allow-unsafe-redirect-methods)
+                                              (#{301 302 303} status))
+                          cross-origin? (not= (origin url) (origin redirect-location))]
 
-                    (request
-                      (cond->
-                        (assoc opts
-                          :client          client ; Retain current dynamic client, Ref. #464
-                          :url             redirect-location
-                          :response        response
-                          :query-params    (if change-to-get?  nil (:query-params opts))
-                          :method          (if change-to-get? :get (:method       opts))
-                          :trace-redirects (conj trace-redirects url))
-                        change-to-get?
-                        (->
-                          (dissoc :body :form-params :multipart :multipart-mixed?)
-                          (update :headers remove-entity-headers)))
-                      callback))
+                      (if (and (not change-to-get?) (non-repeatable-request? opts))
+                        (deliver-resp
+                          {:opts  (dissoc opts :response)
+                           :error (Exception. "Cannot replay one-shot request body across redirect")})
+                        (request
+                          (cond->
+                            (assoc opts
+                              :client          client ; Retain current dynamic client, Ref. #464
+                              :url             redirect-location
+                              :response        response
+                              :query-params    (if change-to-get?  nil (:query-params opts))
+                              :method          (if change-to-get? :get (:method       opts))
+                              :trace-redirects (conj trace-redirects url))
+                            change-to-get?
+                            (->
+                              (dissoc :body :form-params :multipart :multipart-mixed?)
+                              (update :headers remove-entity-headers))
+                            cross-origin?
+                            (->
+                              (dissoc :basic-auth :oauth-token)
+                              (update :headers remove-origin-headers)))
+                          callback)))
+
+                    (deliver-resp
+                      {:opts  (dissoc opts :response)
+                       :error (Exception. "No location header is present on redirect response")}))
 
                   (deliver-resp
                     {:opts  (dissoc opts :response)
-                     :error (Exception. (str "No location header is present on redirect response"))}))
-
-                (deliver-resp
-                  {:opts  (dissoc opts :response)
-                   :error (Exception. (str "too many redirects: " (count trace-redirects)))}))
+                     :error (Exception. (str "too many redirects: " (count trace-redirects)))})))
 
               ;; Don't follow redirect
               (deliver-resp

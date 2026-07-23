@@ -217,6 +217,10 @@ class StreamingHandler implements Runnable {
                 ResponseCompression.createDecompressingStream(body, encoding);
             new Handler(handler, status, headers, decoded).run();
         } catch (IOException e) {
+            try {
+                body.close();
+            } catch (IOException ignored) {
+            }
             handler.onThrowable(e);
         }
     }

@@ -28,10 +28,12 @@ public class HttpsRequest extends Request {
     private ByteBuffer myNetData = ByteBuffer.allocate(40 * 1024);
     private ByteBuffer peerNetData = ByteBuffer.allocate(40 * 1024);
     boolean handshaken = false;
+    private int ioProgress;
 
     final int unwrapRead(ByteBuffer peerAppData) throws IOException {
         // TODO, make sure peerNetData has remaining place
         int read = ((SocketChannel) key.channel()).read(peerNetData), unwrapped = 0;
+        recordIo(read);
         if (read > 0) {
             peerNetData.flip();
             SSLEngineResult res;
@@ -67,10 +69,10 @@ public class HttpsRequest extends Request {
 
     final void writeWrappedRequest() throws IOException {
         if (myNetData.hasRemaining()) {
-            ((SocketChannel) key.channel()).write(myNetData);
+            recordIo(((SocketChannel) key.channel()).write(myNetData));
         } else if (request[request.length - 1].hasRemaining()) {
             wrapRequest();
-            ((SocketChannel) key.channel()).write(myNetData);
+            recordIo(((SocketChannel) key.channel()).write(myNetData));
         }
         if (myNetData.hasRemaining() || request[request.length - 1].hasRemaining()) {
             // need more write
@@ -89,7 +91,7 @@ public class HttpsRequest extends Request {
     final int doHandshake(ByteBuffer peerAppData) throws IOException {
         SocketChannel channel = (SocketChannel) key.channel();
         if (myNetData.hasRemaining()) {
-            channel.write(myNetData);
+            recordIo(channel.write(myNetData));
             if (myNetData.hasRemaining()) {
                 return 0;
             }
@@ -109,6 +111,7 @@ public class HttpsRequest extends Request {
                 case NEED_UNWRAP:
                     key.interestOps(SelectionKey.OP_READ);
                     int read = channel.read(peerNetData);
+                    recordIo(read);
                     if (read < 0) {
                         return -1;
                     } else {
@@ -133,7 +136,7 @@ public class HttpsRequest extends Request {
                         throw new SSLException("Failed to wrap TLS handshake: " + res.getStatus());
                     }
                     myNetData.flip();
-                    channel.write(myNetData);
+                    recordIo(channel.write(myNetData));
                     if (myNetData.hasRemaining()) {
                         key.interestOps(SelectionKey.OP_WRITE);
                         return 0;
@@ -156,6 +159,18 @@ public class HttpsRequest extends Request {
         return 0;
     }
 
+    final int consumeIoProgress() {
+        int progress = ioProgress;
+        ioProgress = 0;
+        return progress;
+    }
+
+    private void recordIo(int bytes) {
+        if (bytes > 0) {
+            ioProgress += bytes;
+        }
+    }
+
     public void recycle(Request old) throws SSLException {
         super.recycle(old);
         this.engine = ((HttpsRequest) old).engine;
@@ -172,5 +187,6 @@ public class HttpsRequest extends Request {
         myNetData.clear();
         myNetData.flip();
         peerNetData.clear();
+        ioProgress = 0;
     }
 }

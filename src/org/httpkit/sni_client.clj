@@ -38,7 +38,7 @@
          hostname (.getHost uri)
          sni?     (and sni? (not (ip-host? hostname)))]
 
-     (.setEndpointIdentificationAlgorithm ssl-params (when (and sni? hostname-verification?) "HTTPS"))
+     (.setEndpointIdentificationAlgorithm ssl-params (when hostname-verification? "HTTPS"))
      (.setServerNames                     ssl-params (when sni? [(SNIHostName. hostname)]))
 
      (when (and

@@ -25,6 +25,7 @@ public class Request implements Comparable<Request> {
     SelectionKey key; // for timeout, close connection
 
     private long timeoutTs; // future time this request timeout, ms
+    private boolean timeoutStarted;
 
     public Request(SocketAddress addr, String host, ByteBuffer[] request, IRespListener handler,
                    PriorityQueue<Request> clients, RequestConfig config) {
@@ -47,18 +48,29 @@ public class Request implements Comparable<Request> {
 
           // Switch timeout type
           long timeout = isConnected ? cfg.idleTimeout : cfg.connTimeout;
-          clients.remove(this);
           timeoutTs = timeout + System.currentTimeMillis();
-          clients.offer(this);
+          if (timeoutStarted) {
+              clients.remove(this);
+              clients.offer(this);
+          }
         }
     }
 
     public void onProgress(long now) {
+        if (isDone.get()) {
+            return;
+        }
         long timeout = isConnected ? cfg.idleTimeout : cfg.connTimeout;
-        if (timeout + now - timeoutTs > 800) {
-            // Extend timeout on activity
+        timeoutTs = timeout + now;
+        if (timeoutStarted) {
             clients.remove(this);
-            timeoutTs = timeout + now;
+            clients.offer(this);
+        }
+    }
+
+    public void startTimeout() {
+        if (!timeoutStarted && !isDone.get()) {
+            timeoutStarted = true;
             clients.offer(this);
         }
     }
@@ -86,13 +98,17 @@ public class Request implements Comparable<Request> {
     }
 
     public int compareTo(Request o) {
-        return (int) (timeoutTs - o.timeoutTs);
+        return Long.compare(timeoutTs, o.timeoutTs);
+    }
+
+    public boolean isDone() {
+        return isDone.get();
     }
 
     public void recycle(Request old) throws SSLException {
         this.key = old.key;
         isReuseConn = true;
-        clients.offer(this);
+        startTimeout();
         setConnected(true); // since we're re-using a keepalive conn, set the timeout as if we're already connected
     }
 
@@ -102,6 +118,5 @@ public class Request implements Comparable<Request> {
         }
         isReuseConn = false;
         setConnected(false);
-        clients.remove(this); // setConnected adds to timeouts queue, but we shouldn't time this out anymore
     }
 }

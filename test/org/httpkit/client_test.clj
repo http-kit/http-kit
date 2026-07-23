@@ -411,6 +411,16 @@
             (is (= "HTTPS" (.getEndpointIdentificationAlgorithm params))
                 "EndpointIdentificationAlgorithm should be HTTPS by default on Java 11+")))))
 
+    (testing "hostname verification remains enabled for IP addresses"
+      (when (utils/java-version>= 11)
+        (let [ssl-context (javax.net.ssl.SSLContext/getDefault)
+              engine (.createSSLEngine ssl-context "127.0.0.1" 443)
+              uri (java.net.URI. "https://127.0.0.1/")]
+          (sni/ssl-configurer {} engine uri)
+          (let [params (.getSSLParameters engine)]
+            (is (= "HTTPS" (.getEndpointIdentificationAlgorithm params)))
+            (is (nil? (.getServerNames params)))))))
+
     (testing ":insecure? true works with hostname-mismatched certificates"
       (let [resp @(hkc/get "https://wrong.host.badssl.com/" {:insecure? true})]
         (is (contains? resp :status)

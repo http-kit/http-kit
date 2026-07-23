@@ -42,7 +42,7 @@ public class PersistentConn implements Comparable<PersistentConn> {
     }
 
     public int compareTo(PersistentConn o) {
-        return (int) (timeoutTs - o.timeoutTs);
+        return Long.compare(timeoutTs, o.timeoutTs);
     }
 
     public boolean isTimeout(long now) {

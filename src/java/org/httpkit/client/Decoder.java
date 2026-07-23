@@ -24,6 +24,8 @@ public class Decoder {
     // package visible
     final IRespListener listener;
     private final LineReader lineReader;
+    private static final int MAX_HEADER_BYTES = 64 * 1024;
+    private int headerBytes = 0;
     long readRemaining = 0;
     State state = READ_INITIAL;
     private final HttpMethod method;
@@ -105,7 +107,7 @@ public class Decoder {
         while (buffer.hasRemaining() && state != State.ALL_READ) {
             switch (state) {
                 case READ_INITIAL:
-                    if ((line = lineReader.readLine(buffer)) != null) {
+                    if ((line = readHeaderLine(buffer)) != null) {
                         parseInitialLine(line);
                     }
                     break;
@@ -133,7 +135,7 @@ public class Decoder {
                     readBody(buffer, READ_CHUNK_DELIMITER);
                     break;
                 case READ_CHUNK_TRAILER:
-                    String trLine = lineReader.readLine(buffer);
+                    String trLine = readHeaderLine(buffer);
                     while (trLine != null) {
                         if (trLine.isEmpty()) {
                             if (trailerReceived) {
@@ -142,9 +144,15 @@ public class Decoder {
                             state = ALL_READ;
                             break;
                         }
+                        int colon = trLine.indexOf(':');
+                        String name = colon > 0
+                                ? trLine.substring(0, colon).toLowerCase(Locale.ROOT) : "";
+                        if (HttpUtils.isForbiddenTrailer(name)) {
+                            throw new ProtocolException("Forbidden trailer field: " + name);
+                        }
                         HttpUtils.splitAndAddHeader(trLine, headers);
                         trailerReceived = true;
-                        trLine = lineReader.readLine(buffer);
+                        trLine = readHeaderLine(buffer);
                     }
                     break;
                 case READ_CHUNK_DELIMITER:
@@ -232,10 +240,10 @@ public class Decoder {
     }
 
     private void readHeaders(ByteBuffer buffer) throws LineTooLargeException, AbortException, ProtocolException {
-        String line = lineReader.readLine(buffer);
+        String line = readHeaderLine(buffer);
         while (line != null && !line.isEmpty()) {
             HttpUtils.splitAndAddHeader(line, headers);
-            line = lineReader.readLine(buffer);
+            line = readHeaderLine(buffer);
         }
         if (line == null)
             return; // data is not received enough. for next run
@@ -281,5 +289,17 @@ public class Decoder {
 
     boolean completesOnEof() {
         return state == READ_VARIABLE_LENGTH_CONTENT;
+    }
+
+    private String readHeaderLine(ByteBuffer buffer)
+            throws LineTooLargeException, ProtocolException {
+        String line = lineReader.readLine(buffer);
+        if (line != null) {
+            headerBytes += line.length() + 2;
+            if (headerBytes > MAX_HEADER_BYTES) {
+                throw new HeadersTooLargeException("HTTP headers exceed " + MAX_HEADER_BYTES + " bytes");
+            }
+        }
+        return line;
     }
 }

@@ -167,6 +167,8 @@ public class HttpClient implements Runnable {
                 r.finish(new TimeoutException(msg + timeout + "ms"));
                 if (r.key != null) {
                     closeQuietly(r.key);
+                } else {
+                    pending.remove(r);
                 }
             } else {
                 break;
@@ -234,6 +236,11 @@ public class HttpClient implements Runnable {
             req.finish(e);
         }
 
+        if (req instanceof HttpsRequest
+                && ((HttpsRequest) req).consumeIoProgress() > 0) {
+            req.onProgress(now);
+        }
+
         if (read == -1) { // read all, remote closed it cleanly
             if (!cleanAndRetryIfBroken(key, req)) {
                 if (req.decoder.completesOnEof()) {
@@ -243,7 +250,9 @@ public class HttpClient implements Runnable {
                 }
             }
         } else if (read > 0) {
-            req.onProgress(now);
+            if (!(req instanceof HttpsRequest)) {
+                req.onProgress(now);
+            }
             buffer.flip();
             try {
                 State oldState = req.decoder.state;
@@ -289,7 +298,6 @@ public class HttpClient implements Runnable {
     }
 
     private void doWrite(SelectionKey key, long now) {
-        // TODO [#327]: call `onProgress(now)` on write progress?
         Request req = (Request) key.attachment();
         SocketChannel ch = (SocketChannel) key.channel();
         try {
@@ -307,7 +315,10 @@ public class HttpClient implements Runnable {
                 }
             } else {
                 ByteBuffer[] buffers = req.request;
-                ch.write(buffers);
+                long written = ch.write(buffers);
+                if (written > 0) {
+                    req.onProgress(now);
+                }
                 if (!buffers[buffers.length - 1].hasRemaining()) {
                     key.interestOps(OP_READ);
                 }
@@ -319,6 +330,10 @@ public class HttpClient implements Runnable {
         } catch (Exception e) { // rarely happen
             closeQuietly(key);
             req.finish(e);
+        }
+        if (req instanceof HttpsRequest
+                && ((HttpsRequest) req).consumeIoProgress() > 0) {
+            req.onProgress(now);
         }
     }
 
@@ -420,15 +435,16 @@ public class HttpClient implements Runnable {
         if ((proxyUri == null && "https".equals(scheme))
             || (proxyUri != null && "https".equals(proxyUri.getScheme()))) {
             try {
+                URI tlsUri = proxyUri != null && "https".equals(proxyUri.getScheme())
+                        ? proxyUri : uri;
                 if (engine == null) {
-                    engine = getDefaultContext().createSSLEngine();
+                    engine = getDefaultContext().createSSLEngine(
+                            tlsUri.getHost(), HttpUtils.getPort(tlsUri));
                     engine.setUseClientMode(true);
                 }
                 if(!engine.getUseClientMode())
                     engine.setUseClientMode(true);
 
-                URI tlsUri = proxyUri != null && "https".equals(proxyUri.getScheme())
-                        ? proxyUri : uri;
                 sslEngineUriConfigurer.configure(engine, tlsUri);
 
                 submit(new HttpsRequest(addr, host, request, cb, requests, cfg, engine));
@@ -483,8 +499,16 @@ public class HttpClient implements Runnable {
     }
 
     private void processPending() {
+        for (Request queued : pending) {
+            queued.startTimeout();
+        }
         Request job = pending.peek();
         if (job != null) {
+            if (job.isDone()) {
+                pending.poll();
+                return;
+            }
+            job.startTimeout();
             if (job.cfg.keepAlive > 0) {
                 PersistentConn con = keepalives.remove(job);
                 if (con != null) { // keep alive
@@ -507,6 +531,12 @@ public class HttpClient implements Runnable {
                     }
                 }
             }
+            if (maxConnections != -1 && numConnections >= maxConnections) {
+                PersistentConn idle = keepalives.poll();
+                if (idle != null) {
+                    closeQuietly(idle.key);
+                }
+            }
             if (maxConnections == -1 || numConnections < maxConnections) {
                 SocketChannel ch = null;
                 try {
@@ -516,8 +546,6 @@ public class HttpClient implements Runnable {
                       ch.bind(bindAddress);
                     }
                     ch.configureBlocking(false);
-                    // save key for timeout check
-                    requests.offer(job);
                     boolean connected = ch.connect(job.addr);
                     job.setConnected(connected);
                     // if connection is established immediatelly, should wait for write. Fix #98
