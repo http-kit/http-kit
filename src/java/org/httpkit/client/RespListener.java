@@ -270,11 +270,7 @@ public class RespListener implements IRespListener {
         BytesInputStream bis = new BytesInputStream(body.get(), body.length());
         IFilter.MaxBodyFilter maxBodyFilter = filter instanceof IFilter.MaxBodyFilter
                 ? (IFilter.MaxBodyFilter) filter : null;
-        long projectedLength = maxBodyFilter != null
-                ? body.length() : (long) body.length() * 5L;
-        int initialLength = projectedLength <= Integer.MAX_VALUE - 8
-                ? (int) projectedLength : body.length();
-        DynamicBytes unzipped = new DynamicBytes(initialLength);
+        DynamicBytes unzipped = new DynamicBytes(body.length());
         try (InputStream is = ResponseCompression.createDecompressingStream(
                 bis, compressionType)) {
             byte[] buffer = new byte[4096];

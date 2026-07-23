@@ -92,8 +92,7 @@ public class MultipartEntity {
                 DynamicBytes b = HttpUtils.readAll((InputStream) e.content);
                 bytes.append(b.get(), b.length());
             } else if (e.content instanceof File) {
-                byte[] b = HttpUtils.readContent((File) e.content, (int) ((File) e.content).length());
-                bytes.append(b, b.length);
+                bytes.append(HttpUtils.readAll((File) e.content));
             } else if (e.content instanceof ByteBuffer) {
                 bytes.append((ByteBuffer) e.content);
             } else if (e.content instanceof byte[]) {

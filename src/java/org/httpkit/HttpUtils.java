@@ -149,7 +149,7 @@ public class HttpUtils {
             if (seq == null) {
                 return null;
             } else {
-                DynamicBytes b = new DynamicBytes(seq.count() * 512);
+                DynamicBytes b = new DynamicBytes(512);
                 while (seq != null) {
                     b.append(seq.first().toString(), UTF_8);
                     seq = seq.next();
@@ -349,12 +349,15 @@ public class HttpUtils {
     }
 
     public static ByteBuffer readAll(File f) throws IOException {
-        int length = (int) f.length();
+        long fileLength = f.length();
+        if (fileLength > Integer.MAX_VALUE) {
+            throw new ContentTooLargeException("File is too large to buffer: " + f);
+        }
+        int length = (int) fileLength;
         if (length >= MAPPED_BUFFER_THRESH_SIZE_BYTES) {
-            FileInputStream fs = new FileInputStream(f);
-            MappedByteBuffer buffer = fs.getChannel().map(MapMode.READ_ONLY, 0, length);
-            fs.close();
-            return buffer;
+            try (FileInputStream fs = new FileInputStream(f)) {
+                return fs.getChannel().map(MapMode.READ_ONLY, 0, length);
+            }
         } else {
             return ByteBuffer.wrap(readContent(f, length));
         }
@@ -621,7 +624,9 @@ public class HttpUtils {
                 headers.put(CONTENT_LENGTH, userContentLength);
             }
         } catch (IOException e) {
-            byte[] b = e.getMessage().getBytes(ASCII);
+            String message = e.getMessage();
+            byte[] b = (message == null ? "I/O error encoding response" : message)
+                    .getBytes(ASCII);
             status = 500;
             headers.clear();
             if (chunked) {
@@ -661,7 +666,8 @@ public class HttpUtils {
         byte b0 = 0;
         b0 |= 1 << 7; // FIN
         b0 |= opcode;
-        ByteBuffer buffer = ByteBuffer.allocate(length + 10); // max
+        int headerLength = length <= 125 ? 2 : length <= 0xFFFF ? 4 : 10;
+        ByteBuffer buffer = ByteBuffer.allocate(length + headerLength);
         buffer.put(b0);
 
         if (length <= 125) {
