@@ -8,7 +8,7 @@ import org.httpkit.logger.EventLogger;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
-import javax.net.ssl.SSLException;
+import java.io.EOFException;
 import java.io.IOException;
 import java.net.*;
 import java.nio.ByteBuffer;
@@ -42,6 +42,7 @@ public class HttpClient implements Runnable {
     private final long maxConnections;
     private volatile long numConnections = 0;
     private volatile boolean running = true;
+    private Thread loopThread;
 
     // shared, single thread
     private final ByteBuffer buffer = ByteBuffer.allocateDirect(1024 * 64);
@@ -132,6 +133,7 @@ public class HttpClient implements Runnable {
 
         Thread t = new Thread(this, name);
         t.setDaemon(true);
+        loopThread = t;
         t.start();
     }
     public HttpClient(long maxConnections, AddressFinder addressFinder, SSLEngineURIConfigurer sslEngineUriConfigurer,
@@ -194,7 +196,8 @@ public class HttpClient implements Runnable {
         closeQuietly(key);
         keepalives.remove(key);
         // keep-alived connection, remote server close it without sending byte
-        if (req.isReuseConn && req.decoder.state == READ_INITIAL) {
+        if (req.isReuseConn && req.decoder.state == READ_INITIAL
+                && (req.cfg.method == HttpMethod.GET || req.cfg.method == HttpMethod.HEAD)) {
             req.unrecycle();
             pending.offer(req); // queue for retry
             selector.wakeup();
@@ -227,12 +230,17 @@ public class HttpClient implements Runnable {
             // java.security.InvalidAlgorithmParameterException: Prime size must be multiple of 64, and can only range from 512 to 1024 (inclusive)
             // java.lang.RuntimeException: Could not generate DH keypair
         } catch (Exception e) {
+            closeQuietly(key);
             req.finish(e);
         }
 
         if (read == -1) { // read all, remote closed it cleanly
             if (!cleanAndRetryIfBroken(key, req)) {
-                req.finish();
+                if (req.decoder.completesOnEof()) {
+                    req.finish();
+                } else {
+                    req.finish(new ProtocolException("Unexpected EOF before response completed"));
+                }
             }
         } else if (read > 0) {
             req.onProgress(now);
@@ -241,7 +249,9 @@ public class HttpClient implements Runnable {
                 State oldState = req.decoder.state;
                 if (req.decoder.decode(buffer) == ALL_READ) {
                     req.finish();
-                    if (req.cfg.keepAlive > 0) {
+                    boolean tlsClosed = req instanceof HttpsRequest
+                            && ((HttpsRequest) req).isConnectionClosed();
+                    if (req.cfg.keepAlive > 0 && req.decoder.isPersistent() && !tlsClosed) {
                         // Ensure that the key is added to keepalives exactly once on a state transition. There could be cases where decoder reaches
                         // ALL_READ state multiple times.
                         if (oldState != ALL_READ) {
@@ -264,12 +274,18 @@ public class HttpClient implements Runnable {
     }
 
     private void closeQuietly(SelectionKey key) {
+        boolean closed = false;
         try {
             // TODO engine.closeInbound
-            key.channel().close();
+            if (key != null && key.channel().isOpen()) {
+                key.channel().close();
+                closed = true;
+            }
         } catch (Exception ignore) {
         }
-        numConnections--;
+        if (closed) {
+            numConnections--;
+        }
     }
 
     private void doWrite(SelectionKey key, long now) {
@@ -285,7 +301,8 @@ public class HttpClient implements Runnable {
                 } else {
                     buffer.clear();
                     if (httpsReq.doHandshake(buffer) < 0) {
-                        req.finish(); // will be a No status exception
+                        closeQuietly(key);
+                        req.finish(new EOFException("EOF during TLS handshake"));
                     }
                 }
             } else {
@@ -300,13 +317,28 @@ public class HttpClient implements Runnable {
                 req.finish(e);
             }
         } catch (Exception e) { // rarely happen
+            closeQuietly(key);
             req.finish(e);
+        }
+    }
+
+    private synchronized void submit(Request request) {
+        if (running) {
+            pending.offer(request);
+            selector.wakeup();
+        } else {
+            request.finish(new IOException("HTTP client is stopped"));
         }
     }
 
 
 
     public void exec(String url, RequestConfig cfg, SSLEngine engine, IRespListener cb) {
+        if (!running) {
+            cb.onThrowable(new IOException("HTTP client is stopped"));
+            return;
+        }
+
         String host = null;
         URI uri,proxyUri = null;
         try {
@@ -340,7 +372,7 @@ public class HttpClient implements Runnable {
                 addr = addressFinder.findAddress(proxyUri);
                 host = proxyUri.getHost() + uri.getHost();
             }
-        } catch (UnknownHostException e) {
+        } catch (Exception e) {
             cb.onThrowable(e);
             return;
         }
@@ -380,30 +412,34 @@ public class HttpClient implements Runnable {
                     return;
                 }
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             cb.onThrowable(e);
             return;
         }
 
         if ((proxyUri == null && "https".equals(scheme))
             || (proxyUri != null && "https".equals(proxyUri.getScheme()))) {
-            if (engine == null) {
-                engine = getDefaultContext().createSSLEngine();
-                engine.setUseClientMode(true);
+            try {
+                if (engine == null) {
+                    engine = getDefaultContext().createSSLEngine();
+                    engine.setUseClientMode(true);
+                }
+                if(!engine.getUseClientMode())
+                    engine.setUseClientMode(true);
+
+                URI tlsUri = proxyUri != null && "https".equals(proxyUri.getScheme())
+                        ? proxyUri : uri;
+                sslEngineUriConfigurer.configure(engine, tlsUri);
+
+                submit(new HttpsRequest(addr, host, request, cb, requests, cfg, engine));
+            } catch (Exception e) {
+                cb.onThrowable(e);
             }
-            if(!engine.getUseClientMode())
-                engine.setUseClientMode(true);
-
-            // configure SSLEngine with URI
-            sslEngineUriConfigurer.configure(engine, uri);
-
-            pending.offer(new HttpsRequest(addr, host, request, cb, requests, cfg, engine));
         } else {
-            pending.offer(new Request(addr, host, request, cb, requests, cfg));
+            submit(new Request(addr, host, request, cb, requests, cfg));
         }
 
 //        pending.offer(new Request(addr, request, cb, requests, cfg));
-        selector.wakeup();
     }
 
     private ByteBuffer[] encode(HttpMethod method, HeaderMap headers, Object body,
@@ -440,7 +476,7 @@ public class HttpClient implements Runnable {
                     ((HttpsRequest) req).engine.beginHandshake();
                 }
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             closeQuietly(key); // not added to kee-alive yet;
             req.finish(e);
         }
@@ -461,9 +497,9 @@ public class HttpClient implements Runnable {
                             key.interestOps(OP_WRITE);
                             pending.poll();
                             return;
-                        } catch (SSLException e) {
+                        } catch (Exception e) {
                             job.unrecycle();
-                            closeQuietly(key); // https wrap SSLException, start from fresh
+                            closeQuietly(key);
                         }
                     } else {
                         // this should not happen often
@@ -472,9 +508,10 @@ public class HttpClient implements Runnable {
                 }
             }
             if (maxConnections == -1 || numConnections < maxConnections) {
+                SocketChannel ch = null;
                 try {
                     pending.poll();
-                    SocketChannel ch = channelFactory.createChannel(job.addr);
+                    ch = channelFactory.createChannel(job.addr);
                     if (bindAddress != null) {
                       ch.bind(bindAddress);
                     }
@@ -483,10 +520,16 @@ public class HttpClient implements Runnable {
                     requests.offer(job);
                     boolean connected = ch.connect(job.addr);
                     job.setConnected(connected);
-                    numConnections++;
                     // if connection is established immediatelly, should wait for write. Fix #98
                     job.key = ch.register(selector, connected ? OP_WRITE : OP_CONNECT, job);
-                } catch (IOException e) {
+                    numConnections++;
+                } catch (Exception e) {
+                    if (ch != null) {
+                        try {
+                            ch.close();
+                        } catch (IOException ignore) {
+                        }
+                    }
                     job.finish(e);
                     // HttpUtils.printError("Try to connect " + job.addr, e);
                 }
@@ -510,6 +553,7 @@ public class HttpClient implements Runnable {
                     Iterator<SelectionKey> ite = selectedKeys.iterator();
                     while (ite.hasNext()) {
                         SelectionKey key = ite.next();
+                        ite.remove();
                         if (!key.isValid()) {
                             continue;
                         }
@@ -520,7 +564,6 @@ public class HttpClient implements Runnable {
                         } else if (key.isWritable()) {
                             doWrite(key, now);
                         }
-                        ite.remove();
                     }
                 }
                 clearTimeout(now);
@@ -532,9 +575,34 @@ public class HttpClient implements Runnable {
         }
     }
 
-    public void stop() throws IOException {
+    public synchronized void stop() throws IOException {
         running = false;
-        if (selector != null) {
+        selector.wakeup();
+
+        if (Thread.currentThread() != loopThread) {
+            boolean interrupted = false;
+            while (loopThread.isAlive()) {
+                try {
+                    loopThread.join();
+                } catch (InterruptedException e) {
+                    interrupted = true;
+                }
+            }
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        IOException stopped = new IOException("HTTP client is stopped");
+        Request request;
+        while ((request = pending.poll()) != null) {
+            request.finish(stopped);
+        }
+        while ((request = requests.poll()) != null) {
+            request.finish(stopped);
+        }
+
+        if (selector.isOpen()) {
             for (SelectionKey selectionKey : selector.keys()) {
                 selectionKey.channel().close();
             }

@@ -6,6 +6,7 @@ import javax.net.ssl.SSLException;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Request implements Comparable<Request> {
 
@@ -17,7 +18,7 @@ public class Request implements Comparable<Request> {
     private final PriorityQueue<Request> clients; // update timeout
 
     // is modify from the loop thread. ensure only called once
-    private boolean isDone = false;
+    private final AtomicBoolean isDone = new AtomicBoolean(false);
 
     boolean isReuseConn = false; // a reused socket sent the request
     private boolean isConnected = false;
@@ -63,10 +64,9 @@ public class Request implements Comparable<Request> {
     }
 
     public void finish() {
-        clients.remove(this);
-        if (isDone)
+        if (!isDone.compareAndSet(false, true))
             return;
-        isDone = true;
+        clients.remove(this);
         decoder.listener.onCompleted();
     }
 
@@ -79,10 +79,9 @@ public class Request implements Comparable<Request> {
     }
 
     public void finish(Throwable t) {
-        clients.remove(this);
-        if (isDone)
+        if (!isDone.compareAndSet(false, true))
             return;
-        isDone = true;
+        clients.remove(this);
         decoder.listener.onThrowable(t);
     }
 

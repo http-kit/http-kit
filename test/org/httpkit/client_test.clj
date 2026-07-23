@@ -19,11 +19,15 @@
    [org.httpkit.utils      :as utils])
 
   (:import
+   [java.io ByteArrayOutputStream IOException InputStream]
+   [java.net ServerSocket]
    [java.nio.channels SocketChannel]
+   [java.util Arrays]
+   [java.util.zip Deflater DeflaterOutputStream]
    java.nio.ByteBuffer
    java.nio.charset.StandardCharsets
    [org.httpkit DynamicBytes HttpMethod HttpStatus HttpUtils HttpVersion]
-   [org.httpkit.client ClientSslEngineFactory Decoder IRespListener]))
+   [org.httpkit.client ClientSslEngineFactory Decoder HttpClient IRespListener]))
 
 (comment
   (remove-ns      'org.httpkit.client-test)
@@ -34,14 +38,16 @@
 
 (deftest ssl-engine-factory-race-condition
   (testing ""
-    (let [errors (atom 0)]
-      (dotimes [_ 8]
-        (future
-          (dotimes [_ 8]
-            (try
-              (ClientSslEngineFactory/trustAnybody)
-              (catch Throwable _ (swap! errors inc))))))
-      (Thread/sleep 10)
+    (let [errors (atom 0)
+          workers
+          (doall
+            (repeatedly 8
+              #(future
+                 (dotimes [_ 8]
+                   (try
+                     (ClientSslEngineFactory/trustAnybody)
+                     (catch Throwable _ (swap! errors inc)))))))]
+      (run! deref workers)
       (is (zero? @errors)))))
 
 (defroutes test-routes
@@ -60,6 +66,12 @@
                                   "&code=" code)}}))))
 
   (ANY "/redirect-nil" [] (fn [req] {:status 302 :headers nil :body ""}))
+  (ANY "/redirect-with-body" [] {:status 302 :headers {"location" "/redirect-target"} :body ""})
+  (ANY "/redirect-target" []
+    (fn [{:keys [request-method body headers]}]
+      {:headers {"content-type" "application/edn"}
+       :body (pr-str [request-method (some-> body slurp)
+                      (get headers "content-length")])}))
   (POST "/multipart"   []
     (fn [req]
       (->> req
@@ -110,6 +122,12 @@
          :headers {"Content-Type" "text/plain"
                    "Content-Encoding" "gzip"
                    "Content-Length" (str (alength compressed))}})))
+
+  (GET "/empty-gzip" []
+    {:status 200
+     :body ""
+     :headers {"Content-Type" "text/plain"
+               "Content-Encoding" "gzip"}})
 
   (GET "/accept-encoding" []
     (fn [req]
@@ -267,6 +285,16 @@
   (is (:status @(hkc/get "http://127.0.0.1:4347/get" ; should ok
                   {:filter (hkc/max-body-filter 30000)}))))
 
+(deftest test-stream-max-body-filter
+  (let [url "http://127.0.0.1:4347/get"]
+    (is (:error @(hkc/get url
+                  {:as :stream :filter (hkc/max-body-filter 3)})))
+    (let [{:keys [body status]}
+          @(hkc/get url
+             {:as :stream :filter (hkc/max-body-filter 10)})]
+      (is (= 200 status))
+      (is (= "hello" (slurp body))))))
+
 (deftest test-http-method
   (doseq [m [:get :post :put :delete :head]]
     (is (= m (-> @(hkc/request {:method m
@@ -393,9 +421,9 @@
 (deftest test-multiple-https-calls-with-same-engine
   (let [opts {:client hkc/legacy-client
               :sslengine (ClientSslEngineFactory/trustAnybody)}]
-    (is (= (:status @(hkc/get "https://localhost:9898" opts) 404)))
-    (is (= (:status @(hkc/get "https://localhost:9898" opts) 404)))
-    (is (= (:status @(hkc/get "https://localhost:9898" opts) 404)))))
+    (is (= 404 (:status @(hkc/get "https://localhost:9898" opts))))
+    (is (= 404 (:status @(hkc/get "https://localhost:9898" opts))))
+    (is (= 404 (:status @(hkc/get "https://localhost:9898" opts))))))
 
 (deftest test-default-sni-client
   (testing "`sni/default-client` behaves similarly to `URL.openStream()`"
@@ -481,8 +509,9 @@
   (testing "When location header is"
     (testing "present"
       (let [url "http://localhost:4347/redirect?total=5&n=0"]
-        (is (:error @(hkc/get url {:max-redirects 3})))        ;; too many redirects
-        (is (= 200 (:status @(hkc/get url {:max-redirects 6}))))
+        (is (:error @(hkc/get url {:max-redirects 0})))
+        (is (:error @(hkc/get url {:max-redirects 4})))
+        (is (= 200 (:status @(hkc/get url {:max-redirects 5}))))
         (is (= 302 (:status @(hkc/get url {:follow-redirects false}))))
         (is (= "get" (:body @(hkc/post url {:as :text}))))     ; should switch to get method
         (is (= "post" (:body @(hkc/post url {:as :text :allow-unsafe-redirect-methods true})))) ; should not change method
@@ -490,7 +519,56 @@
 
     (testing "nil"
       (let [url "http://localhost:4347/redirect-nil"]
-        (is (:error  @(hkc/get url)))))))
+        (is (:error  @(hkc/get url)))))
+
+    (testing "drops request bodies when switching to GET"
+      (let [url "http://localhost:4347/redirect-with-body"]
+        (doseq [opts [{:body "secret"}
+                      {:form-params {:secret "value"}}
+                      {:multipart [{:name "secret" :content "value"}]}]]
+          (is (= [:get nil nil]
+                (read-string (:body @(hkc/post url (assoc opts :as :text)))))))))))
+
+(deftest stopping-client-realizes-requests
+  (let [started  (promise)
+        release  (promise)
+        callbacks_ (atom {})
+        server
+        (hks/run-server
+          (fn [_]
+            (deliver started true)
+            @release
+            {:status 200 :body "ok"})
+          {:port 0})
+        port (:local-port (meta server))
+        url (str "http://127.0.0.1:" port)
+        client (hkc/make-client {:max-connections 1})
+        callback
+        (fn [id]
+          (fn [resp]
+            (swap! callbacks_ update id (fnil inc 0))
+            resp))]
+    (try
+      (let [active (hkc/get url {:client client} (callback :active))
+            _ @started
+            queued (hkc/get url {:client client} (callback :queued))]
+        (.stop ^HttpClient client)
+
+        (doseq [response [active queued]]
+          (let [result (deref response 2000 ::timeout)]
+            (is (not= ::timeout result))
+            (is (instance? IOException (:error result)))))
+
+        (let [stopped (hkc/get url {:client client} (callback :stopped))
+              result (deref stopped 2000 ::timeout)]
+          (is (not= ::timeout result))
+          (is (instance? IOException (:error result))))
+
+        (is (= {:active 1 :queued 1 :stopped 1} @callbacks_)))
+      (finally
+        (deliver release true)
+        (.stop ^HttpClient client)
+        (server)))))
 
 (deftest test-multipart
   (let [{:keys [status body]}
@@ -679,6 +757,173 @@
   (testing "Client correctly decompresses gzip response in stream mode"
     (let [{:keys [body]} @(hkc/get "http://localhost:4347/manual-gzip" {:as :stream})]
       (is (= "This is manually gzipped content" (slurp body))))))
+
+(defn- deflate-compress [s nowrap?]
+  (let [out (ByteArrayOutputStream.)
+        deflater (Deflater. Deflater/DEFAULT_COMPRESSION (boolean nowrap?))]
+    (try
+      (with-open [stream (DeflaterOutputStream. out deflater)]
+        (.write stream (.getBytes ^String s "UTF-8")))
+      (.toByteArray out)
+      (finally
+        (.end deflater)))))
+
+(defn- read-request-head [^InputStream input]
+  (let [end (int-array [13 10 13 10])]
+    (loop [matched 0]
+      (when (< matched (alength end))
+        (let [b (.read input)]
+          (when-not (= -1 b)
+            (recur
+              (long
+                (cond
+                  (= b (aget end matched)) (inc matched)
+                  (= b (aget end 0))      1
+                  :else                   0)))))))))
+
+(defn- start-raw-response [chunks pause-ms keep-open-ms]
+  (let [server (ServerSocket. 0)
+        worker
+        (future
+          (with-open [socket (.accept server)
+                      input (.getInputStream socket)
+                      output (.getOutputStream socket)]
+            (.setTcpNoDelay socket true)
+            (read-request-head input)
+            (doseq [[index chunk] (map-indexed vector chunks)]
+              (.write output ^bytes chunk)
+              (.flush output)
+              (when (< index (dec (count chunks)))
+                (Thread/sleep (long pause-ms))))
+            (when (pos? keep-open-ms)
+              (Thread/sleep (long keep-open-ms)))))]
+    {:url (str "http://127.0.0.1:" (.getLocalPort server))
+     :server server
+     :worker worker}))
+
+(defn- stop-raw-response [{:keys [^ServerSocket server worker]}]
+  (.close server)
+  (when (= ::timeout (deref worker 1000 ::timeout))
+    (future-cancel worker)))
+
+(defn- compressed-response-chunks [encoding bytes]
+  [(.getBytes
+     (str "HTTP/1.1 200 OK\r\n"
+          "Content-Encoding: " encoding "\r\n"
+          "Content-Length: " (alength ^bytes bytes) "\r\n"
+          "Connection: close\r\n\r\n")
+     "US-ASCII")
+   (Arrays/copyOfRange ^bytes bytes 0 1)
+   (Arrays/copyOfRange ^bytes bytes 1 (alength ^bytes bytes))])
+
+(deftest test-split-stream-compression
+  (let [content "split compression headers"]
+    (doseq [[encoding bytes]
+            [["gzip"    (gzip-compress content)]
+             ["deflate" (deflate-compress content false)]
+             ["deflate" (deflate-compress content true)]]]
+      (let [raw (start-raw-response
+                  (compressed-response-chunks encoding bytes) 100 0)
+            ^HttpClient client (hkc/make-client {})]
+        (try
+          (let [{:keys [body error status]}
+                (deref (hkc/get (:url raw)
+                         {:as :stream :client client :timeout 2000})
+                  3000 {:error ::timeout})]
+            (is (= 200 status))
+            (is (nil? error))
+            (is (= content (slurp body))))
+          (finally
+            (.stop client)
+            (stop-raw-response raw)))))))
+
+(deftest test-empty-stream-responses
+  (doseq [request
+          [(hkc/get  "http://localhost:4347/204" {:as :stream})
+           (hkc/head "http://localhost:4347/get" {:as :stream})
+           (hkc/get  "http://localhost:4347/accept-encoding" {:as :stream})]]
+    (let [{:keys [body error]} (deref request 2000 {:error ::timeout})]
+      (is (nil? error))
+      (is (instance? InputStream body))
+      (is (= "" (slurp body)))))
+
+  (doseq [as [:text :stream]]
+    (let [{:keys [body error]}
+          @(hkc/get "http://localhost:4347/empty-gzip" {:as as})]
+      (is (nil? error))
+      (is (= "" (if (= as :stream) (slurp body) body))))))
+
+(deftest test-unread-stream-does-not-block-client
+  (let [^HttpClient client (hkc/make-client {})
+        first-response
+        (deref
+          (hkc/get "http://localhost:4347/length?length=131072"
+            {:as :stream :client client})
+          2000 {:error ::timeout})]
+    (try
+      (is (= 200 (:status first-response)))
+      (let [second-response
+            (deref (hkc/get "http://localhost:4347/get" {:client client})
+              2000 {:error ::timeout})]
+        (is (= 200 (:status second-response)))
+        (is (= "hello" (:body second-response))))
+      (finally
+        (when-let [^InputStream body (:body first-response)]
+          (.close body))
+        (.stop client)))))
+
+(deftest test-stream-propagates-transport-failure
+  (let [head (.getBytes
+               (str "HTTP/1.1 200 OK\r\n"
+                    "Content-Length: 10\r\n\r\n")
+               "US-ASCII")
+        raw (start-raw-response [head (.getBytes "ok" "UTF-8")] 0 5000)
+        ^HttpClient client (hkc/make-client {})
+        ^java.util.concurrent.ExecutorService
+        pool (:pool (hkc/new-worker
+                      {:n-min-threads 1 :n-max-threads 1}))]
+    (try
+      (let [^InputStream body
+            (:body
+              (deref (hkc/get (:url raw)
+                       {:as :stream
+                        :client client
+                        :worker-pool pool
+                        :idle-timeout 100})
+                2000 {:error ::timeout}))]
+        (is (= (int \o) (.read body)))
+        (is (= (int \k) (.read body)))
+        (let [read-result
+              (future
+                (try
+                  (.read body)
+                  (catch IOException e e)))
+              result (deref read-result 2000 ::timeout)]
+          (when (= result ::timeout)
+            (future-cancel read-result))
+          (is (instance? IOException result))))
+      (finally
+        (.shutdownNow pool)
+        (.stop client)
+        (stop-raw-response raw)))))
+
+(deftest rejected-worker-tasks-realize-response
+  (let [pool (java.util.concurrent.Executors/newSingleThreadExecutor)]
+    (.shutdownNow pool)
+    (doseq [as [:text :stream]]
+      (let [response
+            (deref (hkc/get "http://localhost:4347/get"
+                     {:as as :worker-pool pool})
+              2000 ::timeout)]
+        (is (not= ::timeout response))
+        (is (instance? java.util.concurrent.RejectedExecutionException
+              (:error response)))))))
+
+(deftest unsupported-request-bodies-realize-response
+  (let [request (hkc/post "http://localhost:4347/post" {:body (Object.)})
+        response (deref request 2000 ::timeout)]
+    (is (not= ::timeout response))
+    (is (instance? RuntimeException (:error response)))))
 
 (deftest adding-accept-encoding-header
   (testing "if no Accept-Encoding header present, and not explicitly disabling auto compressing response, Accept-encoding header is automatically appended"

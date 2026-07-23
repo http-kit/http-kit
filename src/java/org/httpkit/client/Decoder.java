@@ -3,6 +3,7 @@ package org.httpkit.client;
 import org.httpkit.*;
 
 import java.nio.ByteBuffer;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -23,12 +24,16 @@ public class Decoder {
     // package visible
     final IRespListener listener;
     private final LineReader lineReader;
-    int readRemaining = 0;
+    long readRemaining = 0;
     State state = READ_INITIAL;
     private final HttpMethod method;
 
     private boolean emptyBodyExpected = false;
-    private boolean chunkTrailerExpected = false;
+    private boolean interimResponse = false;
+    private boolean persistent = false;
+    private boolean trailerReceived = false;
+    private HttpVersion version = HTTP_1_1;
+    private int statusCode = 0;
 
     public Decoder(IRespListener listener, HttpMethod method) {
         this.listener = listener;
@@ -57,19 +62,30 @@ public class Decoder {
                 // Account for buggy web servers that omit Reason-Phrase from Status-Line.
                 // http://www.w3.org/Protocols/HTTP/1.0/draft-ietf-http-spec.html#Response
                 || (cStart == cEnd && bStart < bEnd)) {
+            String versionToken = sb.substring(aStart, aEnd);
+            String statusToken = sb.substring(bStart, bEnd);
+            if (!"HTTP/1.0".equals(versionToken) && !"HTTP/1.1".equals(versionToken)) {
+                throw new ProtocolException("Unsupported HTTP version: " + versionToken);
+            }
+            if (statusToken.length() != 3
+                    || !isAsciiDigit(statusToken.charAt(0))
+                    || !isAsciiDigit(statusToken.charAt(1))
+                    || !isAsciiDigit(statusToken.charAt(2))) {
+                throw new ProtocolException("Invalid HTTP status code: " + statusToken);
+            }
             try {
-                int status = Integer.parseInt(sb.substring(bStart, bEnd));
-                // status is not 1xx, 204 or 304, then the body is unbounded.
-                // RFC2616, section 4.4
-                emptyBodyExpected = status / 100 == 1 || status == 204 || status == 304;
+                int status = Integer.parseInt(statusToken);
+                statusCode = status;
+                emptyBodyExpected = method == HttpMethod.HEAD || status / 100 == 1
+                        || status == 204 || status == 205 || status == 304;
+                interimResponse = status / 100 == 1 && status != 101;
                 HttpStatus s = HttpStatus.valueOf(status);
 
-                HttpVersion version = HTTP_1_1;
-                if ("HTTP/1.0".equals(sb.substring(aStart, aEnd))) {
-                    version = HTTP_1_0;
-                }
+                version = "HTTP/1.0".equals(versionToken) ? HTTP_1_0 : HTTP_1_1;
 
-                listener.onInitialLineReceived(version, s);
+                if (!interimResponse) {
+                    listener.onInitialLineReceived(version, s);
+                }
                 state = READ_HEADER;
             } catch (NumberFormatException e) {
                 throw new ProtocolException("not http protocol? " + sb);
@@ -77,6 +93,10 @@ public class Decoder {
         } else {
             throw new ProtocolException("not http protocol? " + sb);
         }
+    }
+
+    private static boolean isAsciiDigit(char c) {
+        return c >= '0' && c <= '9';
     }
 
     public State decode(ByteBuffer buffer) throws LineTooLargeException, ProtocolException,
@@ -96,6 +116,9 @@ public class Decoder {
                     line = lineReader.readLine(buffer);
                     if (line != null && !line.isEmpty()) {
                         readRemaining = getChunkSize(line);
+                        if (readRemaining < 0) {
+                            throw new ProtocolException("Invalid negative chunk size");
+                        }
                         if (readRemaining == 0) {
                             state = READ_CHUNK_TRAILER;
                         } else {
@@ -110,19 +133,18 @@ public class Decoder {
                     readBody(buffer, READ_CHUNK_DELIMITER);
                     break;
                 case READ_CHUNK_TRAILER:
-                    // Ref. RFC9112 §7.1, §7.1.3 re: optional trailer section
-                    if (!chunkTrailerExpected) {
-                        readEmptyLine(buffer, ALL_READ);
-                    } else {
-                        String trLine = lineReader.readLine(buffer);
-                        while (trLine != null && !trLine.isEmpty()) {
-                            // We may later want to ignore invalid trailer fields (e.g. RFC7230 §4.1.2),
-                            // but this is probably sufficient for now
-                            HttpUtils.splitAndAddHeader(trLine, headers);
-                            trLine = lineReader.readLine(buffer);
-                         }
-                        listener.onHeadersReceived(headers);
-                        state = ALL_READ;
+                    String trLine = lineReader.readLine(buffer);
+                    while (trLine != null) {
+                        if (trLine.isEmpty()) {
+                            if (trailerReceived) {
+                                listener.onHeadersReceived(headers);
+                            }
+                            state = ALL_READ;
+                            break;
+                        }
+                        HttpUtils.splitAndAddHeader(trLine, headers);
+                        trailerReceived = true;
+                        trLine = lineReader.readLine(buffer);
                     }
                     break;
                 case READ_CHUNK_DELIMITER:
@@ -137,7 +159,7 @@ public class Decoder {
     }
 
     private void readBody(ByteBuffer buffer, State nextState) throws AbortException {
-        int toRead = Math.min(buffer.remaining(), readRemaining);
+        int toRead = (int) Math.min(buffer.remaining(), readRemaining);
         byte[] bytes = new byte[toRead];
         buffer.get(bytes, 0, toRead);
         listener.onBodyReceived(bytes, toRead);
@@ -160,25 +182,53 @@ public class Decoder {
         }
     }
 
-    private int parseContentLength() {
+    private long parseContentLength() throws ProtocolException {
         String cl = HttpUtils.getStringValue(headers, CONTENT_LENGTH);
         if (cl == null) {
-            // response does not have content length
-            // it either has no body or is variable length
             return -1;
         }
 
-        try {
-          return Integer.parseInt(cl);
-        } catch (NumberFormatException ex) {
-          long parsed = Long.parseLong(cl);
-          if (parsed > Integer.MAX_VALUE) {
-            // Content is is larger that Integer.MAX_VALUE
-            // Let's pretend it has variable length.
-            return -1;
-          }
-          throw ex;
+        for (int i = 0; i < cl.length(); i++) {
+            if (!isAsciiDigit(cl.charAt(i))) {
+                throw new ProtocolException("Invalid Content-Length: " + cl);
+            }
         }
+        if (cl.isEmpty()) {
+            throw new ProtocolException("Invalid Content-Length: " + cl);
+        }
+
+        try {
+            long parsed = Long.parseLong(cl);
+            return parsed;
+        } catch (NumberFormatException e) {
+            throw new ProtocolException("Invalid Content-Length: " + cl);
+        }
+    }
+
+    private boolean isChunkedTransferEncoding() throws ProtocolException {
+        String te = HttpUtils.getStringValue(headers, TRANSFER_ENCODING);
+        if (te == null) {
+            return false;
+        }
+
+        String[] codings = te.toLowerCase(Locale.ROOT).split(",", -1);
+        if (codings.length == 1 && CHUNKED.equals(codings[0].trim())) {
+            return true;
+        }
+        throw new ProtocolException("Unsupported Transfer-Encoding: " + te);
+    }
+
+    private boolean hasConnectionToken(String token) {
+        String connection = HttpUtils.getStringValue(headers, CONNECTION);
+        if (connection == null) {
+            return false;
+        }
+        for (String value : connection.split("[,\\n]")) {
+            if (token.equalsIgnoreCase(value.trim())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void readHeaders(ByteBuffer buffer) throws LineTooLargeException, AbortException, ProtocolException {
@@ -189,19 +239,26 @@ public class Decoder {
         }
         if (line == null)
             return; // data is not received enough. for next run
+
+        if (interimResponse) {
+            headers.clear();
+            interimResponse = false;
+            state = READ_INITIAL;
+            return;
+        }
+
         listener.onHeadersReceived(headers);
-        if (method == HttpMethod.HEAD) {
+        persistent = version == HTTP_1_1 && statusCode != 101
+                && !hasConnectionToken("close");
+        if (emptyBodyExpected) {
             state = ALL_READ;
             return;
         }
 
-        String te = HttpUtils.getStringValue(headers, TRANSFER_ENCODING);
-        if (CHUNKED.equals(te)) {
+        if (isChunkedTransferEncoding()) {
             state = READ_CHUNK_SIZE;
-            if (headers.containsKey(TRAILER))
-              chunkTrailerExpected = true;
         } else {
-            int cl = parseContentLength();
+            long cl = parseContentLength();
             if (cl >= 0) {
                 readRemaining = cl;
                 if (readRemaining == 0) {
@@ -210,13 +267,19 @@ public class Decoder {
                     state = READ_FIXED_LENGTH_CONTENT;
                 }
 
-            } else if (emptyBodyExpected) {
-                state = ALL_READ;
             } else {
                 state = READ_VARIABLE_LENGTH_CONTENT;
-                // for readBody min
-                readRemaining = Integer.MAX_VALUE;
+                readRemaining = Long.MAX_VALUE;
+                persistent = false;
             }
         }
+    }
+
+    boolean isPersistent() {
+        return persistent;
+    }
+
+    boolean completesOnEof() {
+        return state == READ_VARIABLE_LENGTH_CONTENT;
     }
 }

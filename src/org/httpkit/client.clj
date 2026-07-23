@@ -39,6 +39,20 @@
 
 (defn- name* [v] (if (instance? clojure.lang.Named v) (name v) v))
 
+(def ^:private entity-header-names
+  #{"content-encoding" "content-length" "content-type" "transfer-encoding"})
+
+(defn- remove-entity-headers [headers]
+  (when headers
+    (reduce-kv
+      (fn [m k v]
+        (if (contains? entity-header-names
+              (str/lower-case (str (name* k))))
+          m
+          (assoc m k v)))
+      (empty headers)
+      headers)))
+
 (defn- nested-param
   "{:a {:b 1 :c [1 2 3]}} => {\"a[b]\" 1, \"a[c]\" [1 2 3]}, etc."
   [params style]
@@ -333,21 +347,25 @@ Value may be a delay. See also `make-client`."}
             (if-let [follow-redirect? (and follow-redirects (#{301 302 303 307 308} status))]
 
               ;; Follow redirect
-              (if (>= max-redirects (count trace-redirects))
+              (if (> max-redirects (count trace-redirects))
                 (if-let [^String location-header (.get headers "location")]
 
                   (let [redirect-location (str (.resolve (URI. url) location-header))
                         change-to-get? (and (not allow-unsafe-redirect-methods) (#{301 302 303} status))]
 
                     (request
-                      (assoc opts
-                        :client          client ; Retain current dynamic client, Ref. #464
-                        :url             redirect-location
-                        :response        response
-                        :query-params    (if change-to-get?  nil (:query-params opts))
-                        :form-params     (if change-to-get?  nil (:form-params  opts))
-                        :method          (if change-to-get? :get (:method       opts))
-                        :trace-redirects (conj trace-redirects url))
+                      (cond->
+                        (assoc opts
+                          :client          client ; Retain current dynamic client, Ref. #464
+                          :url             redirect-location
+                          :response        response
+                          :query-params    (if change-to-get?  nil (:query-params opts))
+                          :method          (if change-to-get? :get (:method       opts))
+                          :trace-redirects (conj trace-redirects url))
+                        change-to-get?
+                        (->
+                          (dissoc :body :form-params :multipart :multipart-mixed?)
+                          (update :headers remove-entity-headers)))
                       callback))
 
                   (deliver-resp

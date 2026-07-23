@@ -2,6 +2,7 @@
   (:require [clojure.test :refer [deftest is]])
   (:import
    [org.httpkit HttpUtilsTest]
+   [org.httpkit.client HttpClientDecoderTest RespListenerTest]
    [org.httpkit.server AsyncChannelCloseTest HttpDecoderTest
     HttpServerProtocolTest RingResponseTest]
    [org.httpkit.timer TimerServiceTest]
@@ -11,7 +12,8 @@
   (let [result
         (JUnitCore/runClasses
           (into-array Class
-            [HttpUtilsTest AsyncChannelCloseTest HttpDecoderTest
-             HttpServerProtocolTest RingResponseTest TimerServiceTest]))]
+            [HttpUtilsTest HttpClientDecoderTest RespListenerTest
+             AsyncChannelCloseTest HttpDecoderTest HttpServerProtocolTest
+             RingResponseTest TimerServiceTest]))]
     (is (.wasSuccessful result)
       (pr-str (map str (.getFailures result))))))

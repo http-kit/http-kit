@@ -2,7 +2,8 @@ package org.httpkit.client;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.PipedInputStream;
+import java.io.PushbackInputStream;
+import java.util.Locale;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.Inflater;
 import java.util.zip.Deflater;
@@ -27,11 +28,16 @@ class ResponseCompression {
      * @return The detected Type
      */
     protected static Type detect(String encoding, byte[] firstBytes) {
+        return detect(encoding, firstBytes,
+            firstBytes == null ? 0 : firstBytes.length);
+    }
+
+    protected static Type detect(String encoding, byte[] firstBytes, int length) {
         if (encoding == null || encoding.trim().isEmpty()) {
             return Type.NONE;
         }
 
-        encoding = encoding.toLowerCase().trim();
+        encoding = encoding.toLowerCase(Locale.ENGLISH).trim();
 
         // Handle GZIP types
         if ("gzip".equals(encoding) || "x-gzip".equals(encoding)) {
@@ -40,7 +46,7 @@ class ResponseCompression {
 
         // Handle DEFLATE types - need to examine the firstBytes to distinguish
         if ("deflate".equals(encoding) || "x-deflate".equals(encoding)) {
-            if (firstBytes == null || firstBytes.length < 2) {
+            if (firstBytes == null || length < 2) {
                 // Not enough data to determine, default to DEFLATE_NO_WRAP
                 // which is the more common case for HTTP
                 return Type.DEFLATE_NO_WRAP;
@@ -114,5 +120,40 @@ class ResponseCompression {
             default:
                 return baseStream;
         }
+    }
+
+    protected static InputStream createDecompressingStream(
+            InputStream baseStream,
+            String encoding) throws IOException {
+        if (encoding == null || encoding.trim().isEmpty()) {
+            return baseStream;
+        }
+
+        encoding = encoding.toLowerCase(Locale.ENGLISH).trim();
+        if ("gzip".equals(encoding) || "x-gzip".equals(encoding)) {
+            return new GZIPInputStream(baseStream);
+        }
+        if (!"deflate".equals(encoding) && !"x-deflate".equals(encoding)) {
+            return baseStream;
+        }
+
+        PushbackInputStream input = new PushbackInputStream(baseStream, 2);
+        byte[] firstBytes = new byte[2];
+        int length = 0;
+        while (length < firstBytes.length) {
+            int read = input.read(firstBytes, length, firstBytes.length - length);
+            if (read == -1) {
+                break;
+            }
+            length += read;
+        }
+        if (length == 0) {
+            return input;
+        }
+        input.unread(firstBytes, 0, length);
+
+        Type type = length < 2
+            ? Type.DEFLATE_NO_WRAP : detectDeflateType(firstBytes);
+        return createDecompressingStream(input, type);
     }
 }

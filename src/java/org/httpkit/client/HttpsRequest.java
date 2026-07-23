@@ -20,6 +20,7 @@ public class HttpsRequest extends Request {
         super(addr, host, request, handler, clients, config);
         this.engine = engine;
         this.engineOriginal = engine;
+        myNetData.flip();
     }
 
     SSLEngine engine; // package private
@@ -47,7 +48,7 @@ public class HttpsRequest extends Request {
                 case CLOSED:
                     return unwrapped > 0 ? unwrapped : -1;
                 case BUFFER_OVERFLOW:
-                    return -1; // can't => peerAppData is 64k
+                    throw new SSLException("TLS response buffer overflow");
             }
             return unwrapped;
         } else {
@@ -59,7 +60,7 @@ public class HttpsRequest extends Request {
         myNetData.clear();
         SSLEngineResult res = engine.wrap(request, myNetData);
         if (res.getStatus() != Status.OK) {
-            // TODO larger buffer, uberflow?
+            throw new SSLException("Failed to wrap TLS request: " + res.getStatus());
         }
         myNetData.flip();
     }
@@ -81,7 +82,21 @@ public class HttpsRequest extends Request {
         }
     }
 
+    final boolean isConnectionClosed() {
+        return engine.isInboundDone() || engine.isOutboundDone();
+    }
+
     final int doHandshake(ByteBuffer peerAppData) throws IOException {
+        SocketChannel channel = (SocketChannel) key.channel();
+        if (myNetData.hasRemaining()) {
+            channel.write(myNetData);
+            if (myNetData.hasRemaining()) {
+                return 0;
+            }
+            myNetData.clear();
+            myNetData.flip();
+        }
+
         SSLEngineResult.HandshakeStatus hs = engine.getHandshakeStatus();
         while (!handshaken) {
             switch (hs) {
@@ -92,7 +107,8 @@ public class HttpsRequest extends Request {
                     }
                     break;
                 case NEED_UNWRAP:
-                    int read = ((SocketChannel) key.channel()).read(peerNetData);
+                    key.interestOps(SelectionKey.OP_READ);
+                    int read = channel.read(peerNetData);
                     if (read < 0) {
                         return -1;
                     } else {
@@ -100,8 +116,8 @@ public class HttpsRequest extends Request {
                         SSLEngineResult res = engine.unwrap(peerNetData, peerAppData);
                         peerNetData.compact();
                         switch (res.getStatus()) {
-                            case BUFFER_OVERFLOW: // Not possible, peerAppData is 64k
-                                break;
+                            case BUFFER_OVERFLOW:
+                                throw new SSLException("TLS handshake buffer overflow");
                             case CLOSED:
                                 return -1;
                             case BUFFER_UNDERFLOW: // need more data from peer
@@ -111,13 +127,19 @@ public class HttpsRequest extends Request {
                     }
                     break;
                 case NEED_WRAP:
+                    myNetData.clear();
                     SSLEngineResult res = engine.wrap(EMPTY_BUFFER, myNetData);
+                    if (res.getStatus() != Status.OK) {
+                        throw new SSLException("Failed to wrap TLS handshake: " + res.getStatus());
+                    }
                     myNetData.flip();
-                    ((SocketChannel) key.channel()).write(myNetData);
+                    channel.write(myNetData);
                     if (myNetData.hasRemaining()) {
-                        // TODO, make sure data get written
+                        key.interestOps(SelectionKey.OP_WRITE);
+                        return 0;
                     } else {
                         myNetData.clear();
+                        myNetData.flip();
                         if (res.getHandshakeStatus() != SSLEngineResult.HandshakeStatus.NEED_WRAP)
                             key.interestOps(SelectionKey.OP_READ);
                     }
@@ -148,6 +170,7 @@ public class HttpsRequest extends Request {
         this.engine = this.engineOriginal;
         this.handshaken = false;
         myNetData.clear();
+        myNetData.flip();
         peerNetData.clear();
     }
 }

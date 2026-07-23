@@ -70,7 +70,8 @@ public class HttpClientDecoderTest {
             }
         }, HttpMethod.POST);
 
-        List<byte[]> chunks = Utils.readAll("chunk_split_1", "chunk_split_2", "chunk_split_3");
+        List<byte[]> chunks = Utils.readAll(
+            "java/chunk_split_1", "java/chunk_split_2", "java/chunk_split_3");
         int i = 0;
         while (i < chunks.size() - 1) {
             State state = decoder.decode(ByteBuffer.wrap(chunks.get(i)));

@@ -4,13 +4,13 @@ import org.httpkit.*;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.PipedInputStream;
-import java.io.PipedOutputStream;
 import java.nio.charset.Charset;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
 
 import static org.httpkit.HttpUtils.CONTENT_ENCODING;
 import static org.httpkit.HttpUtils.CONTENT_TYPE;
@@ -48,6 +48,180 @@ class Handler implements Runnable {
     }
 }
 
+class ResponseStream extends InputStream {
+
+    private static final int MAX_QUEUED_BYTES = 8 * 1024 * 1024;
+
+    private static class Entry {
+        final byte[] bytes;
+        final Throwable failure;
+
+        Entry(byte[] bytes, Throwable failure) {
+            this.bytes = bytes;
+            this.failure = failure;
+        }
+    }
+
+    private static final Entry EOF = new Entry(null, null);
+
+    private final LinkedBlockingQueue<Entry> entries =
+        new LinkedBlockingQueue<Entry>();
+
+    private byte[] current;
+    private int currentIndex;
+    private Throwable readFailure;
+    private boolean eof;
+    private volatile boolean closed;
+    private boolean terminated;
+    private int queuedBytes;
+
+    synchronized boolean add(byte[] bytes, int length) {
+        if (closed || terminated || length > MAX_QUEUED_BYTES - queuedBytes) {
+            return false;
+        }
+        byte[] chunk = length == bytes.length
+            ? bytes : Arrays.copyOf(bytes, length);
+        entries.offer(new Entry(chunk, null));
+        queuedBytes += length;
+        return true;
+    }
+
+    private synchronized void consumed(int length) {
+        queuedBytes = Math.max(0, queuedBytes - length);
+    }
+
+    synchronized void complete() {
+        if (!terminated) {
+            terminated = true;
+            entries.offer(EOF);
+        }
+    }
+
+    synchronized void fail(Throwable failure) {
+        if (!terminated) {
+            terminated = true;
+            entries.offer(new Entry(null, failure));
+        }
+    }
+
+    private boolean nextChunk() throws IOException {
+        if (closed) {
+            return false;
+        }
+        while (current == null || currentIndex == current.length) {
+            if (readFailure != null) {
+                throw failureException(readFailure);
+            }
+            if (closed || eof) {
+                return false;
+            }
+
+            final Entry entry;
+            try {
+                entry = entries.take();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IOException("Interrupted while reading response stream", e);
+            }
+
+            if (entry == EOF) {
+                eof = true;
+                return false;
+            }
+            if (entry.failure != null) {
+                readFailure = entry.failure;
+                throw failureException(readFailure);
+            }
+
+            current = entry.bytes;
+            consumed(current.length);
+            currentIndex = 0;
+        }
+        return true;
+    }
+
+    private IOException failureException(Throwable failure) {
+        if (failure instanceof IOException) {
+            return (IOException) failure;
+        }
+        return new IOException("Response stream failed", failure);
+    }
+
+    @Override
+    public int read() throws IOException {
+        if (!nextChunk()) {
+            return -1;
+        }
+        return current[currentIndex++] & 0xFF;
+    }
+
+    @Override
+    public int read(byte[] bytes, int offset, int length) throws IOException {
+        if (bytes == null) {
+            throw new NullPointerException();
+        }
+        if (offset < 0 || length < 0 || length > bytes.length - offset) {
+            throw new IndexOutOfBoundsException();
+        }
+        if (length == 0) {
+            return 0;
+        }
+        if (!nextChunk()) {
+            return -1;
+        }
+
+        int read = Math.min(length, current.length - currentIndex);
+        System.arraycopy(current, currentIndex, bytes, offset, read);
+        currentIndex += read;
+        return read;
+    }
+
+    @Override
+    public int available() {
+        return closed || current == null ? 0 : current.length - currentIndex;
+    }
+
+    @Override
+    public synchronized void close() {
+        if (!closed) {
+            closed = true;
+            terminated = true;
+            queuedBytes = 0;
+            entries.clear();
+            entries.offer(EOF);
+        }
+    }
+}
+
+class StreamingHandler implements Runnable {
+
+    private final IResponseHandler handler;
+    private final int status;
+    private final Map<String, Object> headers;
+    private final InputStream body;
+    private final String encoding;
+
+    StreamingHandler(IResponseHandler handler, int status,
+                     Map<String, Object> headers, InputStream body,
+                     String encoding) {
+        this.handler = handler;
+        this.status = status;
+        this.headers = headers;
+        this.body = body;
+        this.encoding = encoding;
+    }
+
+    public void run() {
+        try {
+            InputStream decoded =
+                ResponseCompression.createDecompressingStream(body, encoding);
+            new Handler(handler, status, headers, decoded).run();
+        } catch (IOException e) {
+            handler.onThrowable(e);
+        }
+    }
+}
+
 /**
  * Accumulate all the response, call upper logic at once, for easy use
  */
@@ -74,9 +248,13 @@ public class RespListener implements IRespListener {
     }
 
     private DynamicBytes unzipBody() throws IOException {
+        if (body.length() == 0) {
+            return body;
+        }
+
         String encoding = HttpUtils.getStringValue(headers, CONTENT_ENCODING);
         ResponseCompression.Type compressionType =
-            ResponseCompression.detect(encoding, body.get());
+            ResponseCompression.detect(encoding, body.get(), body.length());
         if (compressionType == ResponseCompression.Type.NONE) {
             return body;
         }
@@ -105,8 +283,8 @@ public class RespListener implements IRespListener {
     private final ExecutorService pool;
     final int coercion;
 
-    // only used if coercion has type stream
-    private OutputStream responseStreamer;
+    // only used for immediate streaming
+    private ResponseStream responseStream;
 
     public RespListener(IResponseHandler handler, IFilter filter, ExecutorService pool, int coercion) {
         body = new DynamicBytes(1024 * 8);
@@ -116,44 +294,51 @@ public class RespListener implements IRespListener {
         this.pool = pool;
     }
 
-    private OutputStream startStreamingResponse(byte[] firstBytes) throws AbortException {
+    private boolean immediatelyStreaming() {
+        return coercion == 3 &&
+            (filter == null || filter == IFilter.ACCEPT_ALL);
+    }
+
+    private boolean startStreamingResponse(String encoding) {
+        responseStream = new ResponseStream();
         try {
-            PipedInputStream is = new PipedInputStream(1024 * 8);
-            PipedOutputStream os = new PipedOutputStream(is);
-            // Immediately write to output stream so that GZIPInputStream doesn't block
-            os.write(firstBytes, 0, firstBytes.length);
-
-            // create input stream that handles compression if necessary
-            String encoding = HttpUtils.getStringValue(headers, CONTENT_ENCODING);
-            ResponseCompression.Type compressionType =
-                ResponseCompression.detect(encoding, firstBytes);
-            InputStream handlerStream =
-                ResponseCompression.createDecompressingStream(is, compressionType);
-
-            pool.submit(
-                new Handler(handler, status.getCode(), headers, handlerStream)
-            );
-            return os;
-        } catch (IOException ex) {
-            throw new AbortException("Failed to start streaming response");
+            pool.execute(new StreamingHandler(
+                handler, status.getCode(), headers, responseStream, encoding));
+            return true;
+        } catch (RejectedExecutionException e) {
+            responseStream.close();
+            new Handler(handler, e).run();
+            return false;
         }
     }
 
-    private void streamResponseChunk(byte[] buf, int length) throws AbortException {
-        if (responseStreamer == null) {
-            responseStreamer = startStreamingResponse(buf);
-            return;
-        }
+    private void submitHandler(Handler task) {
         try {
-            responseStreamer.write(buf, 0, length);
-        } catch (IOException ex) {
-            throw new AbortException("Failed to stream response");
+            pool.execute(task);
+        } catch (RejectedExecutionException e) {
+            new Handler(handler, e).run();
+        }
+    }
+
+    private void streamResponseChunk(byte[] buf, int length)
+            throws AbortException {
+        if (responseStream == null) {
+            if (!startStreamingResponse(
+                    HttpUtils.getStringValue(headers, CONTENT_ENCODING))) {
+                throw new AbortException("Response worker pool rejected task");
+            }
+        }
+        if (!responseStream.add(buf, length)) {
+            throw new AbortException(
+                "Response stream is closed or its unread buffer limit was exceeded");
         }
     }
 
     public void onBodyReceived(byte[] buf, int length) throws AbortException {
-        if (coercion == 3) {
-            // result type is stream, pipe the chunk and exit
+        if (immediatelyStreaming()) {
+            if (length == 0) {
+                return;
+            }
             streamResponseChunk(buf, length);
             return;
         }
@@ -165,37 +350,41 @@ public class RespListener implements IRespListener {
     }
 
     public void onCompleted() {
-        if (pool.isShutdown()) { return; }
         if (status == null) {
-            pool.submit(new Handler(handler, new ProtocolException("No status")));
+            submitHandler(new Handler(handler,
+                new ProtocolException("No status")));
+            return;
+        }
+
+        if (immediatelyStreaming() && responseStream != null) {
+            responseStream.complete();
             return;
         }
         try {
-            if (coercion == 3) {
-                // 3=>stream
-                // stream has already been submitted
-                if (responseStreamer != null) {
-                  responseStreamer.close();
+            if (immediatelyStreaming()) {
+                // An empty response has no compression representation to decode.
+                if (startStreamingResponse(null)) {
+                    responseStream.complete();
                 }
                 return;
             }
             if (coercion == 0 || coercion == 5) { // 0=> none, 5=> raw-byte-array
                 Object b = coercion == 0 ? body : body.bytes();
-                pool.submit(new Handler(handler, status.getCode(), headers, b));
+                submitHandler(new Handler(handler, status.getCode(), headers, b));
                 return;
             }
             DynamicBytes bytes = unzipBody();
-            // 1=> auto, 2=>text, 4=>byte-array
+            // 1=> auto, 2=>text, 3=>buffered stream, 4=>byte-array
             if (coercion == 2 || (coercion == 1 && isText())) {
                 Charset charset = HttpUtils.detectCharset(headers, bytes);
                 String html = new String(bytes.get(), 0, bytes.length(), charset);
-                pool.submit(new Handler(handler, status.getCode(), headers, html));
+                submitHandler(new Handler(handler, status.getCode(), headers, html));
             } else {
                 BytesInputStream is = new BytesInputStream(bytes.get(), bytes.length());
                 if (coercion == 4) { // byte-array
-                    pool.submit(new Handler(handler, status.getCode(), headers, is.bytes()));
+                    submitHandler(new Handler(handler, status.getCode(), headers, is.bytes()));
                 } else {
-                    pool.submit(new Handler(handler, status.getCode(), headers, is));
+                    submitHandler(new Handler(handler, status.getCode(), headers, is));
                 }
             }
         } catch (IOException e) {
@@ -204,8 +393,11 @@ public class RespListener implements IRespListener {
     }
 
     public void onThrowable(Throwable t) {
-        if (pool.isShutdown()) { return; }
-        pool.submit(new Handler(handler, t));
+        if (responseStream != null) {
+            responseStream.fail(t);
+            return;
+        }
+        submitHandler(new Handler(handler, t));
     }
 
     public void onHeadersReceived(Map<String, Object> headers) throws AbortException {
