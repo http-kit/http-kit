@@ -263,14 +263,17 @@ public class Decoder {
                     "Response contains both Transfer-Encoding and Content-Length");
         }
         listener.onHeadersReceived(headers);
-        persistent = version == HTTP_1_1 && statusCode != 101
-                && !hasConnectionToken("close");
+        persistent = statusCode != 101 && !hasConnectionToken("close")
+                && (version == HTTP_1_1 || hasConnectionToken("keep-alive"));
         if (emptyBodyExpected) {
             state = ALL_READ;
             return;
         }
 
         if (isChunkedTransferEncoding()) {
+            if (version == HTTP_1_0) {
+                persistent = false;
+            }
             state = READ_CHUNK_SIZE;
         } else {
             long cl = parseContentLength();

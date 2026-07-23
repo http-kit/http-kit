@@ -433,6 +433,63 @@
             (.close socket))
           ((:close server)))))))
 
+(deftest explicit-http10-keepalive-is-reused
+  (let [accepted (atom 0)
+        server
+        (raw-server
+          (fn [^ServerSocket server]
+            (with-open [socket (.accept server)]
+              (swap! accepted inc)
+              (read-request socket)
+              (write! socket
+                (str "HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n"
+                     "Content-Length: 3\r\nConnection: keep-alive\r\n\r\none"))
+              (read-request socket)
+              (write! socket
+                (str "HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n"
+                     "Content-Length: 3\r\nConnection: close\r\n\r\ntwo")))))
+        http-client (client/make-client {:max-connections 1})]
+    (try
+      (is (= "one" (:body @(client/get (url server)
+                             {:as :text :client http-client}))))
+      (is (= "two" (:body @(client/get (url server)
+                             {:as :text :client http-client}))))
+      (is (= 1 @accepted))
+      @(:done server)
+      (finally
+        (.stop ^HttpClient http-client)
+        ((:close server))))))
+
+(deftest invalid-http10-chunked-response-is-not-reused
+  (let [accepted (atom 0)
+        server
+        (raw-server
+          (fn [^ServerSocket server]
+            (with-open [first (.accept server)]
+              (swap! accepted inc)
+              (read-request first)
+              (write! first
+                (str "HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n"
+                     "Transfer-Encoding: chunked\r\n"
+                     "Connection: keep-alive\r\n\r\n3\r\none\r\n0\r\n\r\n")))
+            (with-open [second (.accept server)]
+              (swap! accepted inc)
+              (read-request second)
+              (write! second
+                (str "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n"
+                     "Content-Length: 3\r\nConnection: close\r\n\r\ntwo")))))
+        http-client (client/make-client {:max-connections 1})]
+    (try
+      (is (= "one" (:body @(client/get (url server)
+                             {:as :text :client http-client}))))
+      (is (= "two" (:body @(client/get (url server)
+                             {:as :text :client http-client}))))
+      (is (= 2 @accepted))
+      @(:done server)
+      (finally
+        (.stop ^HttpClient http-client)
+        ((:close server))))))
+
 (deftest surplus-response-bytes-prevent-reuse
   (testing "bytes remaining after a response close the connection"
     (let [reused? (promise)
