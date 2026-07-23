@@ -272,6 +272,9 @@ public class HttpStatus {
     public static final HttpStatus NOT_EXTENDED = new HttpStatus(510, "Not Extended");
 
     public static HttpStatus valueOf(int code) {
+        if (code < 100 || code > 999) {
+            throw new IllegalArgumentException("Invalid HTTP status code: " + code);
+        }
         switch (code) {
             case 100:
                 return CONTINUE;

@@ -22,11 +22,30 @@ import static java.lang.Math.min;
 import static java.net.InetAddress.getByName;
 
 class DateFormatter {
-    private static ZoneId GMT = ZoneId.of("GMT");
-    private static DateTimeFormatter formatter = DateTimeFormatter.RFC_1123_DATE_TIME.withLocale(Locale.US);
+    private static final DateTimeFormatter FORMATTER = DateTimeFormatter
+            .ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'", Locale.US)
+            .withZone(ZoneOffset.UTC);
+    private static volatile CachedDate cached = new CachedDate(Long.MIN_VALUE, "");
+
+    private static class CachedDate {
+        final long epochSecond;
+        final String value;
+
+        CachedDate(long epochSecond, String value) {
+            this.epochSecond = epochSecond;
+            this.value = value;
+        }
+    }
 
     public static String getDate() {
-        return ZonedDateTime.now(GMT).format(formatter);
+        long epochSecond = Math.floorDiv(System.currentTimeMillis(), 1000L);
+        CachedDate current = cached;
+        if (current.epochSecond != epochSecond) {
+            current = new CachedDate(epochSecond,
+                    FORMATTER.format(Instant.ofEpochSecond(epochSecond)));
+            cached = current;
+        }
+        return current.value;
     }
 }
 
@@ -635,6 +654,10 @@ public class HttpUtils {
     }
 
     public static ByteBuffer WsEncode(byte opcode, byte[] data, int length) {
+        if ((opcode & 0x08) != 0 && length > 125) {
+            throw new IllegalArgumentException(
+                    "Websocket control frame payload exceeds 125 bytes");
+        }
         byte b0 = 0;
         b0 |= 1 << 7; // FIN
         b0 |= opcode;

@@ -1,9 +1,11 @@
 (ns org.httpkit.utils-test
   (:use clojure.test)
   (:require [clojure.java.io :as io])
-  (:import org.httpkit.HttpUtils
+  (:import org.httpkit.BytesInputStream
            org.httpkit.DynamicBytes
            org.httpkit.HeaderMap
+           org.httpkit.HttpStatus
+           org.httpkit.HttpUtils
            java.net.URI
            java.nio.charset.Charset))
 
@@ -30,6 +32,13 @@
   (is (= (charset "gb2312")
          (detect-charset {} (slurp (io/resource "resources/html_gb2312"))))))
 
+(deftest test-charset-parameter
+  (is (= (charset "utf-8")
+         (HttpUtils/parseCharset "text/plain; Charset=\"UTF-8\"; version=1")))
+  (is (= (charset "iso-8859-1")
+         (HttpUtils/parseCharset "text/plain; foo=x; charset = ISO-8859-1")))
+  (is (nil? (HttpUtils/parseCharset "text/plain; notcharset=utf-8"))))
+
 (deftest test-dynamicbytes
   (let [d (DynamicBytes. 1)]
     (doseq [i (range 1 1232)]
@@ -50,6 +59,31 @@
   (is (= "%E6%B2%88%E9%94%8B0" (HttpUtils/encodeURI "沈锋0")))
   (is (= "%20!%22#$%&'()*+,-./0123456789:;%3C=%3E?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[%5C]%5E_%60abcdefghijklmnopqrstuvwxyz%7B%7C%7D~"
          (HttpUtils/encodeURI " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"))))
+
+(deftest test-request-targets
+  (is (= "/p?q=%E6%B2%88%E9%94%8B%20x"
+         (HttpUtils/getPath (URI. "http://example.com/p?q=沈锋%20x#fragment"))))
+  (is (= "http://example.com/p?q=%E6%B2%88%E9%94%8B%20x"
+         (HttpUtils/getProxyTarget
+           (URI. "http://example.com/p?q=沈锋%20x#fragment")))))
+
+(deftest test-http-status-bounds
+  (is (thrown? IllegalArgumentException (HttpStatus/valueOf 99)))
+  (is (thrown? IllegalArgumentException (HttpStatus/valueOf 1000))))
+
+(deftest test-control-frame-bounds
+  (is (thrown? IllegalArgumentException
+        (HttpUtils/WsEncode (byte 8) (byte-array 126) 126))))
+
+(deftest test-bytes-input-stream-contract
+  (let [stream (BytesInputStream. (byte-array 0) 0)]
+    (is (zero? (.read stream (byte-array 0) 0 0)))
+    (is (= -1 (.read stream (byte-array 1) 0 1)))
+    (is (thrown? NullPointerException (.read stream nil 0 0)))
+    (is (thrown? IndexOutOfBoundsException
+          (.read stream (byte-array 1) 1 1))))
+  (is (thrown? IndexOutOfBoundsException
+        (BytesInputStream. (byte-array 1) 2))))
 
 (deftest test-get-host
   (is (= "shenfeng.me" (HttpUtils/getHost (URI. "http://shenfeng.me/what"))))

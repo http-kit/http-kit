@@ -77,6 +77,9 @@ public class Decoder {
             }
             try {
                 int status = Integer.parseInt(statusToken);
+                if (status < 100) {
+                    throw new ProtocolException("Invalid HTTP status code: " + statusToken);
+                }
                 statusCode = status;
                 emptyBodyExpected = method == HttpMethod.HEAD || status / 100 == 1
                         || status == 204 || status == 205 || status == 304;

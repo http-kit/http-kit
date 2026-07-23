@@ -189,7 +189,18 @@
     (is (= :http (:scheme req)))
     (is (= :post (:request-method  req)))
     (is (= "application/x-www-form-urlencoded" (:content-type req)))
-    (is (= "utf8" (:character-encoding req)))))
+    (is (= "utf8" (:character-encoding req))))
+  (let [req (-> (http/get "http://localhost:4347/spec"
+                  {:headers {"content-type" "application/example; version=1"}})
+                :body read-string)]
+    (is (= "application/example; version=1" (:content-type req)))
+    (is (= "utf8" (:character-encoding req))))
+  (let [req (-> (http/get "http://localhost:4347/spec"
+                  {:headers {"content-type"
+                             "text/plain; version=1; Charset=\"UTF-8\""}})
+                :body read-string)]
+    (is (= "text/plain" (:content-type req)))
+    (is (= "UTF-8" (:character-encoding req)))))
 
 (deftest test-legacy-unsafe-remote-addr-option
   (let [req {:headers {"X-Forwarded-For" "1.2.3.4"}

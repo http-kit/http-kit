@@ -143,15 +143,11 @@ public class HttpRequest {
 
         String ct = getStringValue(headers, CONTENT_TYPE);
         if (ct != null) {
-            int idx = ct.indexOf(";");
-            if (idx != -1) {
-                int cidx = ct.indexOf(CHARSET, idx);
-                if (cidx != -1) {
-                    contentType = ct.substring(0, idx);
-                    charset = ct.substring(cidx + CHARSET.length());
-                } else {
-                    contentType = ct;
-                }
+            String charsetName = parseCharsetName(ct);
+            if (charsetName != null && !charsetName.isEmpty()) {
+                int idx = ct.indexOf(";");
+                contentType = idx < 0 ? ct : ct.substring(0, idx);
+                charset = charsetName;
             } else {
                 contentType = ct;
             }
