@@ -1,7 +1,12 @@
 package org.httpkit.server;
 
+import clojure.lang.AFn;
+import clojure.lang.IFn;
 import clojure.lang.PersistentVector;
 import org.httpkit.HeaderMap;
+import org.httpkit.logger.ContextLogger;
+import org.httpkit.logger.EventLogger;
+import org.httpkit.logger.EventNames;
 import org.junit.Test;
 
 import java.io.ByteArrayOutputStream;
@@ -13,6 +18,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -571,6 +578,158 @@ public class HttpServerProtocolTest {
                 assertEquals(HttpServer.Status.RUNNING, server.getStatus());
             } finally {
                 second.close();
+            }
+        } finally {
+            if (server.getStatus() == HttpServer.Status.RUNNING) server.stop(1000);
+            server.join();
+        }
+    }
+
+    @Test
+    public void responseConnectionCloseStopsPipelining() throws Exception {
+        final AtomicInteger requests = new AtomicInteger();
+        final ExecutorService workers = Executors.newSingleThreadExecutor();
+        IFn application = new AFn() {
+            @Override
+            public Object invoke(Object ignored) {
+                requests.incrementAndGet();
+                Map<Object, Object> response = new HashMap<Object, Object>();
+                Map<String, Object> headers = new HashMap<String, Object>();
+                headers.put("Connection", "Close");
+                response.put(ClojureRing.HEADERS, headers);
+                response.put(ClojureRing.BODY, "first");
+                return response;
+            }
+        };
+        RingHandler handler = new RingHandler(application, false, workers);
+        HttpServer server = new HttpServer("127.0.0.1", 0, handler,
+            1024, 1024, 1024, ProxyProtocolOption.DISABLED);
+        server.start();
+
+        try {
+            Socket socket = new Socket("127.0.0.1", server.getPort());
+            socket.setSoTimeout(10000);
+            try {
+                socket.getOutputStream().write((
+                    "GET /first HTTP/1.0\r\nHost: localhost\r\nConnection: keep-alive\r\n\r\n" +
+                    "GET /second HTTP/1.0\r\nHost: localhost\r\nConnection: close\r\n\r\n"
+                ).getBytes(StandardCharsets.US_ASCII));
+                String response = new String(readAll(socket.getInputStream()),
+                    StandardCharsets.US_ASCII);
+                assertEquals(1, count(response, "HTTP/1.1 200"));
+                assertTrue(response.contains("Connection: Close\r\n"));
+                assertFalse(response.contains("Connection: Keep-Alive\r\n"));
+                assertEquals(1, requests.get());
+            } finally {
+                socket.close();
+            }
+        } finally {
+            if (server.getStatus() == HttpServer.Status.RUNNING) server.stop(1000);
+            server.join();
+        }
+    }
+
+    @Test
+    public void startedChannelResponseIsNotFollowedByError() throws Exception {
+        final ExecutorService workers = Executors.newSingleThreadExecutor();
+        IFn application = new AFn() {
+            @Override
+            public Object invoke(Object request) {
+                AsyncChannel channel = (AsyncChannel)
+                    ((Map<?, ?>) request).get(ClojureRing.ASYC_CHANNEL);
+                Map<Object, Object> response = new HashMap<Object, Object>();
+                response.put(ClojureRing.BODY, "only");
+                try {
+                    channel.send(response, true);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+                throw new IllegalStateException("after response started");
+            }
+        };
+        ContextLogger<String, Throwable> logger =
+            new ContextLogger<String, Throwable>() {
+                @Override
+                public void log(String message, Throwable error) {
+                }
+            };
+        RingHandler handler = new RingHandler(application, false, workers,
+            logger, EventLogger.NOP, EventNames.DEFAULT, "http-kit", true);
+        HttpServer server = new HttpServer("127.0.0.1", 0, handler,
+            1024, 1024, 1024, ProxyProtocolOption.DISABLED);
+        server.start();
+
+        try {
+            Socket socket = new Socket("127.0.0.1", server.getPort());
+            socket.setSoTimeout(10000);
+            try {
+                socket.getOutputStream().write(
+                    "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
+                    .getBytes(StandardCharsets.US_ASCII));
+                String response = new String(readAll(socket.getInputStream()),
+                    StandardCharsets.US_ASCII);
+                assertEquals(1, count(response, "HTTP/1.1 "));
+                assertTrue(response.startsWith("HTTP/1.1 200"));
+                assertTrue(response.endsWith("only"));
+            } finally {
+                socket.close();
+            }
+        } finally {
+            if (server.getStatus() == HttpServer.Status.RUNNING) server.stop(1000);
+            server.join();
+        }
+    }
+
+    @Test
+    public void streamingConnectionCloseStopsPipelining() throws Exception {
+        final AtomicInteger requests = new AtomicInteger();
+        final ExecutorService workers = Executors.newSingleThreadExecutor();
+        IFn application = new AFn() {
+            @Override
+            public Object invoke(Object request) {
+                int requestNumber = requests.incrementAndGet();
+                Map<Object, Object> response = new HashMap<Object, Object>();
+                if (requestNumber == 1) {
+                    AsyncChannel channel = (AsyncChannel)
+                        ((Map<?, ?>) request).get(ClojureRing.ASYC_CHANNEL);
+                    Map<String, Object> headers = new HashMap<String, Object>();
+                    headers.put("Connection", "Close");
+                    response.put(ClojureRing.HEADERS, headers);
+                    response.put(ClojureRing.BODY, "first");
+                    try {
+                        channel.send(response, false);
+                        channel.send("done", true);
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                    response.put(ClojureRing.BODY, channel);
+                } else {
+                    response.put(ClojureRing.BODY, "second");
+                }
+                return response;
+            }
+        };
+        RingHandler handler = new RingHandler(application, false, workers);
+        HttpServer server = new HttpServer("127.0.0.1", 0, handler,
+            1024, 1024, 1024, ProxyProtocolOption.DISABLED);
+        server.start();
+
+        try {
+            Socket socket = new Socket("127.0.0.1", server.getPort());
+            socket.setSoTimeout(10000);
+            try {
+                socket.getOutputStream().write((
+                    "GET /first HTTP/1.1\r\nHost: localhost\r\n\r\n" +
+                    "GET /second HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
+                ).getBytes(StandardCharsets.US_ASCII));
+                String response = new String(readAll(socket.getInputStream()),
+                    StandardCharsets.US_ASCII);
+                assertEquals(1, count(response, "HTTP/1.1 200"));
+                assertTrue(response.contains("Connection: Close\r\n"));
+                assertTrue(response.endsWith("5\r\nfirst\r\n4\r\ndone\r\n0\r\n\r\n"));
+                assertEquals(1, requests.get());
+            } finally {
+                socket.close();
             }
         } finally {
             if (server.getStatus() == HttpServer.Status.RUNNING) server.stop(1000);

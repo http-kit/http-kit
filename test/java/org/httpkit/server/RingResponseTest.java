@@ -23,6 +23,7 @@ public class RingResponseTest {
 
     private static class CapturingCallback extends RespCallback {
         private byte[] bytes;
+        private int responses;
 
         CapturingCallback() {
             super(null, null);
@@ -30,6 +31,7 @@ public class RingResponseTest {
 
         @Override
         public void run(ByteBuffer... buffers) {
+            responses++;
             int length = 0;
             for (ByteBuffer buffer : buffers) {
                 length += buffer.remaining();
@@ -46,6 +48,10 @@ public class RingResponseTest {
 
         String response() {
             return new String(bytes);
+        }
+
+        int responses() {
+            return responses;
         }
     }
 
@@ -238,5 +244,30 @@ public class RingResponseTest {
             EventLogger.NOP, EventNames.DEFAULT, "test-server", true).run();
 
         assertTrue(callback.response().contains("Connection: Close\r\n"));
+    }
+
+    @Test
+    public void asyncHandlersCompleteOnlyOnce() throws Exception {
+        final Map<Keyword, Object> response = new HashMap<Keyword, Object>();
+        response.put(ClojureRing.STATUS, 200);
+        response.put(ClojureRing.BODY, "first");
+        IFn handler = new AFn() {
+            @Override
+            public Object invoke(Object ignored, Object respond, Object raise) {
+                ((IFn) respond).invoke(response);
+                ((IFn) respond).invoke(response);
+                ((IFn) raise).invoke(new IllegalStateException("late error"));
+                throw new IllegalStateException("late throw");
+            }
+        };
+        CapturingCallback callback = new CapturingCallback();
+
+        new HttpHandler(request("GET"), callback, handler, true,
+            ContextLogger.ERROR_PRINTER, EventLogger.NOP, EventNames.DEFAULT,
+            "test-server", true).run();
+
+        assertEquals(1, callback.responses());
+        assertTrue(callback.response().startsWith("HTTP/1.1 200 "));
+        assertTrue(callback.response().endsWith("first"));
     }
 }

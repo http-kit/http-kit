@@ -17,6 +17,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.httpkit.HeaderMap;
@@ -121,6 +122,7 @@ class HttpHandler implements Runnable {
     final EventNames eventNames;
     final String serverHeader;
     final boolean legacyContentLength;
+    final AtomicBoolean completed = new AtomicBoolean(false);
 
     public HttpHandler(HttpRequest req, RespCallback cb, IFn handler, boolean isRingAsync,
                        ContextLogger<String, Throwable> errorLogger, EventLogger<String> eventLogger, EventNames eventNames, String serverHeader, boolean legacyContentLength) {
@@ -146,9 +148,9 @@ class HttpHandler implements Runnable {
 
     private void runSync() {
         try {
-            handleResponse((Map) handler.invoke(buildRequestMap(req)));
+            completeResponse(handler.invoke(buildRequestMap(req)));
         } catch (Throwable e) {
-            handleError(e);
+            completeError(e);
         }
     }
 
@@ -157,23 +159,41 @@ class HttpHandler implements Runnable {
             handler.invoke(buildRequestMap(req),
                            new AFn() {
                                public Object invoke(Object resp) {
-                                   try {
-                                       handleResponse((Map) resp);
-                                   } catch (Throwable e) {
-                                       handleError(e);
-                                   }
+                                   completeResponse(resp);
                                    return null;
                                }
                            },
                            new AFn() {
                                public Object invoke(Object e) {
-                                   handleError((Throwable) e);
+                                   completeError(e);
                                    return null;
                                }
                            });
         } catch (Throwable e) {
+            completeError(e);
+        }
+    }
+
+    private void completeResponse(Object resp) {
+        if (!completed.compareAndSet(false, true)) {
+            return;
+        }
+        try {
+            handleResponse((Map) resp);
+        } catch (Throwable e) {
             handleError(e);
         }
+    }
+
+    private void completeError(Throwable e) {
+        if (completed.compareAndSet(false, true)) {
+            handleError(e);
+        }
+    }
+
+    private void completeError(Object error) {
+        completeError(error instanceof Throwable ? (Throwable) error
+            : new ClassCastException("Ring async raise value must be a Throwable"));
     }
 
     private void handleResponse(Map resp) throws Throwable {
@@ -182,7 +202,7 @@ class HttpHandler implements Runnable {
             addConnectionHeader(headers);
             cb.run(HttpEncode(404, headers, null, this.serverHeader,
                 this.legacyContentLength, req.method == HttpMethod.HEAD));
-            eventLogger.log(eventNames.serverStatus404);
+            Telemetry.log(eventLogger, eventNames.serverStatus404);
         } else {
             Object body = resp.get(BODY);
             if (!(body instanceof AsyncChannel)) { // hijacked
@@ -191,22 +211,29 @@ class HttpHandler implements Runnable {
                 final int status = getStatus(resp);
                 cb.run(HttpEncode(status, headers, body, this.serverHeader,
                     this.legacyContentLength, req.method == HttpMethod.HEAD));
-                eventLogger.log(eventNames.serverStatusPrefix + status);
+                Telemetry.log(eventLogger, eventNames.serverStatusPrefix + status);
             }
         }
     }
 
     private void addConnectionHeader(HeaderMap headers) {
-        if (req.version == HTTP_1_0 && req.isKeepAlive) {
+        boolean close = headers.containsToken("Connection", "close");
+        if (req.version == HTTP_1_0 && req.isKeepAlive && !close) {
             headers.putOrReplace("Connection", "Keep-Alive");
         } else if (req.version == HTTP_1_1 && !req.isKeepAlive) {
             headers.putOrReplace("Connection", "Close");
         }
+        if (close || headers.containsToken("Connection", "close")) {
+            cb.closeAfterResponse();
+        }
     }
 
     private void handleError(Throwable e) {
-        errorLogger.log(req.method + " " + req.uri, e);
-        eventLogger.log(eventNames.serverStatus500);
+        Telemetry.log(errorLogger, req.method + " " + req.uri, e);
+        if (req.channel != null && req.channel.isResponseStarted()) {
+            return;
+        }
+        Telemetry.log(eventLogger, eventNames.serverStatus500);
         HeaderMap headers = ErrorResponse.headers();
         addConnectionHeader(headers);
         cb.run(HttpEncode(500, headers, e.getMessage(), this.serverHeader,
@@ -264,11 +291,12 @@ class WSHandler implements Runnable {
             } else if (frame instanceof PongFrame) {
                 channel.pongReceived(frame.data);
             } else {
-                errorLogger.log("Unknown frame received in websocket handler " + frame, null);
+                Telemetry.log(errorLogger,
+                        "Unknown frame received in websocket handler " + frame, null);
             }
         } catch (Throwable e) {
-            errorLogger.log("handle websocket frame " + frame, e);
-            eventLogger.log(eventNames.serverWsFrameError);
+            Telemetry.log(errorLogger, "handle websocket frame " + frame, e);
+            Telemetry.log(eventLogger, eventNames.serverWsFrameError);
         }
     }
 }
@@ -324,8 +352,8 @@ public class RingHandler implements IHandler {
         try {
             execs.submit(new HttpHandler(req, cb, handler, isRingAsync, errorLogger, eventLogger, eventNames, this.serverHeader, this.legacyContentLength));
         } catch (RejectedExecutionException e) {
-            errorLogger.log("failed to submit task to executor service", e);
-            eventLogger.log(eventNames.serverStatus503);
+            Telemetry.log(errorLogger, "failed to submit task to executor service", e);
+            Telemetry.log(eventLogger, eventNames.serverStatus503);
             cb.run(HttpEncode(503, ErrorResponse.headers(),
                 "Server unavailable, please try again", this.serverHeader,
                 true, req.method == HttpMethod.HEAD));
@@ -370,8 +398,8 @@ public class RingHandler implements IHandler {
         } catch (RejectedExecutionException e) {
             channel.serialTask = null;
             channel.serverClose(1013, "Server overloaded");
-            errorLogger.log("increase :queue-size if this happens often", e);
-            eventLogger.log(eventNames.serverStatus503Todo);
+            Telemetry.log(errorLogger, "increase :queue-size if this happens often", e);
+            Telemetry.log(eventLogger, eventNames.serverStatus503Todo);
         }
     }
 
@@ -390,8 +418,8 @@ public class RingHandler implements IHandler {
                             try {
                                 channel.onClose(status, reason);
                             } catch (Exception e) {
-                                errorLogger.log("on close handler", e);
-                                eventLogger.log(eventNames.serverChannelCloseError);
+                                Telemetry.log(errorLogger, "on close handler", e);
+                                Telemetry.log(eventLogger, eventNames.serverChannelCloseError);
                             }
                         }
                     });
@@ -407,14 +435,14 @@ public class RingHandler implements IHandler {
                     in the current thread. Get this idea from @pyr, by #155
                      */
                     if (!execs.isShutdown()) {
-                        errorLogger.log("increase :queue-size if this happens often", e);
-                        eventLogger.log(eventNames.serverStatus503Todo);
+                        Telemetry.log(errorLogger, "increase :queue-size if this happens often", e);
+                        Telemetry.log(eventLogger, eventNames.serverStatus503Todo);
                     }
                     try {
                         channel.onClose(status, reason);
                     } catch (Exception e1) {
-                        errorLogger.log("on close handler", e1);
-                        eventLogger.log(eventNames.serverChannelCloseError);
+                        Telemetry.log(errorLogger, "on close handler", e1);
+                        Telemetry.log(eventLogger, eventNames.serverChannelCloseError);
                     }
                 }
             } else {

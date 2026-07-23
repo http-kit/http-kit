@@ -136,12 +136,22 @@ public class HttpServer implements Runnable {
         this.legacyUnsafeRemoteAddr = legacyUnsafeRemoteAddr;
         this.serverHeader = serverHeader;
 
-        this.selector = Selector.open();
-        this.serverChannel = ServerSocketChannel.open();
-        serverChannel.configureBlocking(false);
         this.socketAddress = new InetSocketAddress(ip, port);
-        serverChannel.socket().bind(socketAddress);
-        serverChannel.register(selector, OP_ACCEPT);
+
+        Selector openedSelector = Selector.open();
+        ServerSocketChannel openedChannel = null;
+        try {
+            openedChannel = ServerSocketChannel.open();
+            openedChannel.configureBlocking(false);
+            openedChannel.socket().bind(socketAddress);
+            openedChannel.register(openedSelector, OP_ACCEPT);
+        } catch (IOException | RuntimeException | Error e) {
+            closeSetupResource(openedChannel);
+            closeSetupResource(openedSelector);
+            throw e;
+        }
+        this.selector = openedSelector;
+        this.serverChannel = openedChannel;
     }
 
 
@@ -166,11 +176,30 @@ public class HttpServer implements Runnable {
             this.legacyUnsafeRemoteAddr = legacyUnsafeRemoteAddr;
             this.serverHeader = serverHeader;
             this.socketAddress = addressFinder.findAddress();
-            this.serverChannel = channelFactory.createChannel(socketAddress);
-            serverChannel.configureBlocking(false);
-            this.selector = Selector.open();
-            serverChannel.bind(socketAddress);
-            serverChannel.register(selector, OP_ACCEPT);
+
+            ServerSocketChannel openedChannel = channelFactory.createChannel(socketAddress);
+            Selector openedSelector = null;
+            try {
+                openedChannel.configureBlocking(false);
+                openedSelector = Selector.open();
+                openedChannel.bind(socketAddress);
+                openedChannel.register(openedSelector, OP_ACCEPT);
+            } catch (IOException | RuntimeException | Error e) {
+                closeSetupResource(openedChannel);
+                closeSetupResource(openedSelector);
+                throw e;
+            }
+            this.serverChannel = openedChannel;
+            this.selector = openedSelector;
+    }
+
+    private static void closeSetupResource(Closeable resource) {
+        if (resource != null) {
+            try {
+                resource.close();
+            } catch (IOException ignored) {
+            }
+        }
     }
 
     void accept(SelectionKey key) {
@@ -178,15 +207,20 @@ public class HttpServer implements Runnable {
         SocketChannel s;
         try {
             while ((s = ch.accept()) != null) {
-                s.configureBlocking(false);
-                HttpAtta atta = new HttpAtta(maxBody, maxLine, proxyProtocolOption, legacyUnsafeRemoteAddr);
-                SelectionKey k = s.register(selector, OP_READ, atta);
-                atta.channel = new AsyncChannel(k, this);
+                try {
+                    s.configureBlocking(false);
+                    HttpAtta atta = new HttpAtta(maxBody, maxLine, proxyProtocolOption, legacyUnsafeRemoteAddr);
+                    SelectionKey k = s.register(selector, OP_READ, atta);
+                    atta.channel = new AsyncChannel(k, this);
+                } catch (IOException | RuntimeException | Error e) {
+                    closeSetupResource(s);
+                    throw e;
+                }
             }
         } catch (Exception e) {
             // eg: too many open files. do not quit
-            errorLogger.log("accept incoming request", e);
-            eventLogger.log(eventNames.serverAcceptError);
+            Telemetry.log(errorLogger, "accept incoming request", e);
+            Telemetry.log(eventLogger, eventNames.serverAcceptError);
         }
     }
 
@@ -197,7 +231,7 @@ public class HttpServer implements Runnable {
         try {
             key.channel().close();
         } catch (Exception ex) {
-            warnLogger.log("failed to close key", ex);
+            Telemetry.log(warnLogger, "failed to close key", ex);
         }
 
         ServerAtta att = (ServerAtta) key.attachment();
@@ -336,26 +370,28 @@ public class HttpServer implements Runnable {
             }
         } catch (HeadersTooLargeException e) {
             atta.keepalive = false;
-            eventLogger.log(eventNames.serverStatusPrefix + 431);
+            Telemetry.log(eventLogger, eventNames.serverStatusPrefix + 431);
             tryWriteHttpResponse(key, atta, 431, e.getMessage());
         } catch (ProtocolException e) {
             atta.keepalive = false;
             tryWriteHttpResponse(key, atta, 400, e.getMessage());
         } catch (RequestTooLargeException e) {
             atta.keepalive = false;
-            eventLogger.log(eventNames.serverStatus413);
+            Telemetry.log(eventLogger, eventNames.serverStatus413);
             tryWriteHttpResponse(key, atta, 413, e.getMessage());
         } catch (LineTooLargeException e) {
             atta.keepalive = false; // close after write
-            eventLogger.log(eventNames.serverStatus414);
+            Telemetry.log(eventLogger, eventNames.serverStatus414);
             tryWriteHttpResponse(key, atta, 414, e.getMessage());
         }
     }
 
     private void tryWriteHttpResponse(SelectionKey key, HttpAtta atta,
                                       int status, String message) {
+        HeaderMap headers = new HeaderMap();
+        headers.put("Connection", "Close");
         HttpRequest request = atta.decoder.request;
-        tryWrite(key, HttpEncode(status, new HeaderMap(), message, serverHeader, true,
+        tryWrite(key, HttpEncode(status, headers, message, serverHeader, true,
             request != null && request.method == HttpMethod.HEAD));
     }
 
@@ -401,8 +437,8 @@ public class HttpServer implements Runnable {
 
     private void failWebSocket(WsAtta atta, SelectionKey key, int status,
                                ProtocolException error) {
-        warnLogger.log(null, error);
-        eventLogger.log(eventNames.serverWsDecodeError);
+        Telemetry.log(warnLogger, null, error);
+        Telemetry.log(eventLogger, eventNames.serverWsDecodeError);
         atta.keepalive = false;
         atta.closeStatus = status;
         atta.closeReason = error.getMessage();
@@ -595,12 +631,9 @@ public class HttpServer implements Runnable {
                 // do not exits the while IO event loop. if exits, then will not process any IO event
                 // jvm can catch any exception, including OOM
             } catch (Throwable e) {
-                try {
-                    errorLogger.log("http server loop error, see stack trace for details", e);
-                    eventLogger.log(eventNames.serverLoopError);
-                } catch (Throwable ignored) {
-                    // Logging must not obscure the original loop failure.
-                }
+                Telemetry.log(errorLogger,
+                        "http server loop error, see stack trace for details", e);
+                Telemetry.log(eventLogger, eventNames.serverLoopError);
                 if (e instanceof Error) {
                     status.set(Status.STOPPED);
                     closeAndWarn(selector);
@@ -706,7 +739,8 @@ public class HttpServer implements Runnable {
         try {
             closable.close();
         } catch (IOException ex) {
-            warnLogger.log(String.format("failed to close %s", closable.getClass().getName()), ex);
+            Telemetry.log(warnLogger,
+                    String.format("failed to close %s", closable.getClass().getName()), ex);
         }
     }
 

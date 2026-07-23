@@ -20,4 +20,10 @@ public class RespCallback {
         server.tryWrite(key, buffers);
         server.responseComplete(key);
     }
+
+    void closeAfterResponse() {
+        if (server != null) {
+            server.closeAfterResponse(key);
+        }
+    }
 }

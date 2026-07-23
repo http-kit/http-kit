@@ -95,6 +95,39 @@ public class HeaderMap {
         return null;
     }
 
+    public boolean containsToken(String key, String token) {
+        final int total = size * 2;
+        for (int i = 0; i < total; i += 2) {
+            if (key.equalsIgnoreCase((String) arrays[i])) {
+                Object value = arrays[i + 1];
+                if (value instanceof Seqable) {
+                    ISeq seq = ((Seqable) value).seq();
+                    while (seq != null) {
+                        if (containsToken(seq.first(), token)) {
+                            return true;
+                        }
+                        seq = seq.next();
+                    }
+                } else if (containsToken(value, token)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean containsToken(Object value, String token) {
+        if (value == null) {
+            return false;
+        }
+        for (String part : value.toString().split(",")) {
+            if (token.equalsIgnoreCase(part.trim())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public void clear() {
         this.size = 0;
     }

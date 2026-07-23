@@ -107,17 +107,23 @@ public class AsyncChannel {
             headers.put("Content-Type", "text/html; charset=utf-8");
         }
 
+        boolean closeAfterResponse = false;
         if (isWebSocketCandidate() && !websocketUpgraded) {
             close = true;
             headers.putOrReplace("Connection", "Close");
-            server.closeAfterResponse(key);
+            closeAfterResponse = true;
+        }
+
+        if (headers.containsToken("Connection", "close")) {
+            closeAfterResponse = true;
         }
 
         boolean closeDelimited = !close && request.version == HttpVersion.HTTP_1_0;
         if (closeDelimited) {
             headers.putOrReplace("Connection", "Close");
-            server.closeAfterResponse(key);
-        } else if (request.isKeepAlive && request.version == HttpVersion.HTTP_1_0) {
+            closeAfterResponse = true;
+        } else if (request.isKeepAlive && request.version == HttpVersion.HTTP_1_0
+                && !headers.containsToken("Connection", "close")) {
             headers.put("Connection", "Keep-Alive");
         }
 
@@ -141,12 +147,17 @@ public class AsyncChannel {
                 buffers = HttpEncodeCloseDelimited(status, headers, body, server.serverHeader);
             }
         }
-        if (close) {
-            onClose(0);
+        headerSent = true;
+        if (closeAfterResponse) {
+            server.closeAfterResponse(key);
         }
         server.tryWrite(key, !close, buffers);
         if (close) {
-            server.responseComplete(key);
+            try {
+                onClose(0);
+            } finally {
+                server.responseComplete(key);
+            }
         }
     }
 
@@ -157,7 +168,7 @@ public class AsyncChannel {
         }
         if (body != null) { // null is ignored
             ByteBuffer t = bodyBuffer(body);
-            if (t.hasRemaining()) {
+            if (t != null && t.hasRemaining()) {
                 ByteBuffer[] buffers;
                 if (request.version == HttpVersion.HTTP_1_1) {
                     buffers = new ByteBuffer[]{
@@ -368,7 +379,6 @@ public class AsyncChannel {
                 writeChunk(data, close);
             }
             else {
-                headerSent = true;
                 firstWrite(data, close);
             }
         }
@@ -402,6 +412,10 @@ public class AsyncChannel {
 
     public boolean isClosed() {
         return closedRan.get();
+    }
+
+    boolean isResponseStarted() {
+        return headerSent || websocketUpgraded;
     }
 
     static Keyword K_BY_SERVER = Keyword.intern("server-close");
