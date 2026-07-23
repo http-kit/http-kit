@@ -255,6 +255,10 @@ public class Decoder {
             return;
         }
 
+        if (headers.containsKey(TRANSFER_ENCODING) && headers.containsKey(CONTENT_LENGTH)) {
+            throw new ProtocolException(
+                    "Response contains both Transfer-Encoding and Content-Length");
+        }
         listener.onHeadersReceived(headers);
         persistent = version == HTTP_1_1 && statusCode != 101
                 && !hasConnectionToken("close");

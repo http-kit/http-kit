@@ -400,13 +400,14 @@ Value may be a delay. See also `make-client`."}
                            :error (Exception. "Cannot replay one-shot request body across redirect")})
                         (request
                           (cond->
-                            (assoc opts
-                              :client          client ; Retain current dynamic client, Ref. #464
-                              :url             redirect-location
-                              :response        response
-                              :query-params    (if change-to-get?  nil (:query-params opts))
-                              :method          (if change-to-get? :get (:method       opts))
-                              :trace-redirects (conj trace-redirects url))
+                            (->
+                              (assoc opts
+                                :client          client ; Retain current dynamic client, Ref. #464
+                                :url             redirect-location
+                                :response        response
+                                :method          (if change-to-get? :get (:method       opts))
+                                :trace-redirects (conj (vec trace-redirects) url))
+                              (dissoc :query-params))
                             change-to-get?
                             (->
                               (dissoc :body :form-params :multipart :multipart-mixed?)

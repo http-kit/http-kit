@@ -8,6 +8,7 @@
    [java.net InetSocketAddress ServerSocket Socket SocketException SocketTimeoutException]
    [java.nio.channels SocketChannel]
    [java.nio.charset StandardCharsets]
+   [org.httpkit ProtocolException]
    [org.httpkit.client HttpClient]))
 
 (defn- read-request [^Socket socket]
@@ -64,8 +65,9 @@
       (is (nil? (:x-interim (:headers response))))
       @(:done server)))
 
-  (testing "bodyless responses ignore framing headers"
-    (doseq [[method status] [[:head 200] [:get 204] [:get 205] [:get 304]]]
+  (testing "bodyless responses ignore individual framing headers"
+    (doseq [[method status] [[:head 200] [:get 204] [:get 205] [:get 304]]
+            header ["Content-Length: 999" "Transfer-Encoding: invalid"]]
       (let [release (promise)
             server
             (raw-server
@@ -74,7 +76,7 @@
                   (read-request socket)
                   (write! socket
                     (str "HTTP/1.1 " status " Bodyless\r\n"
-                         "Content-Length: 999\r\nTransfer-Encoding: invalid\r\n\r\n"))
+                         header "\r\n\r\n"))
                   @release)))
             request ((case method :head client/head client/get) (url server))
             response (deref request 500 ::timeout)]
@@ -82,6 +84,16 @@
         (is (not= ::timeout response))
         (is (= status (:status response)))
         @(:done server))))
+
+  (testing "ambiguous response framing is rejected"
+    (let [server
+          (one-response
+            (str "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n"
+                 "Transfer-Encoding: chunked\r\nConnection: close\r\n\r\n"
+                 "2\r\nok\r\n0\r\n\r\n"))
+          response @(client/get (url server))]
+      (is (:error response))
+      @(:done server)))
 
   (testing "chunked coding is case-insensitive"
     (let [server
@@ -161,8 +173,7 @@
                     {:body "request body"
                      :headers {"cOnTeNt-LeNgTh" "12"
                                "CONTENT-TYPE" "text/plain"
-                               "Content-Encoding" "gzip"
-                               "transfer-ENCODING" "chunked"}
+                               "Content-Encoding" "gzip"}
                      :as :text})
         request (str/lower-case @redirected-request)]
     (is (= 200 (:status response)))
@@ -171,6 +182,84 @@
     (doseq [header ["content-length:" "content-type:"
                     "content-encoding:" "transfer-encoding:"]]
       (is (not (str/includes? request header))))
+    @(:done server)))
+
+(deftest request-framing
+  (testing "chunked requests are rejected"
+    (doseq [body [nil "body"]]
+      (let [response @(client/request
+                       {:url "http://127.0.0.1:9"
+                        :method :post
+                        :body body
+                        :headers {"Transfer-Encoding" "chunked"}})]
+        (is (instance? ProtocolException (:error response))))))
+
+  (testing "bodyless requests require a valid zero content length"
+    (doseq [content-length ["" "-1" "+1" "1" "18446744073709551616"]]
+      (let [response @(client/get
+                       "http://127.0.0.1:9"
+                       {:headers {"Content-Length" content-length}})]
+        (is (instance? ProtocolException (:error response))))))
+
+  (testing "singleton request headers cannot be duplicated"
+    (doseq [headers [{"Host" "one.test" "host" "two.test"}
+                     {"Content-Length" "0" "content-length" "0"}
+                     {"Host" ["one.test" "two.test"]}]]
+      (let [response @(client/get "http://127.0.0.1:9" {:headers headers})]
+        (is (instance? ProtocolException (:error response))))))
+
+  (testing "request body length is computed by the client"
+    (doseq [[body expected-length] [["abc" "3"] [[] "0"]]]
+      (let [received (promise)
+            server
+            (raw-server
+              (fn [^ServerSocket server]
+                (with-open [socket (.accept server)]
+                  (deliver received (read-request socket))
+                  (write! socket
+                    "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"))))
+            response @(client/post (url server)
+                       {:body body :headers {"content-length" "999"}})
+            request (str/lower-case @received)]
+        (is (= 200 (:status response)))
+        (is (= 1 (count (re-seq #"content-length:" request))))
+        (is (str/includes? request
+              (str "content-length: " expected-length "\r\n")))
+        @(:done server))))
+
+  (testing "an explicit zero length is allowed without a body"
+    (let [server (one-response
+                   "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+          response @(client/get (url server)
+                     {:headers {"Content-Length" "0"}})]
+      (is (= 200 (:status response)))
+      @(:done server))))
+
+(deftest redirects-do-not-reapply-query-params
+  (let [requests (atom [])
+        server
+        (raw-server
+          (fn [^ServerSocket server]
+            (doseq [response
+                    [(str "HTTP/1.1 307 Temporary Redirect\r\n"
+                          "Location: /middle?m=2\r\nContent-Length: 0\r\n"
+                          "Connection: close\r\n\r\n")
+                     (str "HTTP/1.1 307 Temporary Redirect\r\n"
+                          "Location: /target?t=3\r\nContent-Length: 0\r\n"
+                          "Connection: close\r\n\r\n")
+                     "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"]]
+              (with-open [socket (.accept server)]
+                (swap! requests conj (read-request socket))
+                (write! socket response)))))
+        base-url (str (url server) "/start")
+        response @(client/get base-url {:query-params {:q 1}})]
+    (is (= 200 (:status response)))
+    (is (= ["GET /start?q=1 HTTP/1.1"
+            "GET /middle?m=2 HTTP/1.1"
+            "GET /target?t=3 HTTP/1.1"]
+          (mapv #(first (str/split-lines %)) @requests)))
+    (is (= [(str base-url "?q=1") (str (url server) "/middle?m=2")]
+          (:trace-redirects (:opts response))))
     @(:done server)))
 
 (deftest redirects-respect-origin-and-method-boundaries
@@ -342,6 +431,78 @@
           (.stop ^HttpClient http-client)
           (when-let [^Socket socket @first-socket]
             (.close socket))
+          ((:close server)))))))
+
+(deftest surplus-response-bytes-prevent-reuse
+  (testing "bytes remaining after a response close the connection"
+    (let [reused? (promise)
+          server
+          (raw-server
+            (fn [^ServerSocket server]
+              (let [socket (.accept server)]
+                (try
+                  (read-request socket)
+                  (write! socket
+                    "HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\noneextra")
+                  (.setSoTimeout socket 1000)
+                  (let [request (try
+                                  (read-request socket)
+                                  (catch SocketTimeoutException _ "")
+                                  (catch SocketException _ ""))
+                        reused (not (str/blank? request))]
+                    (deliver reused? reused)
+                    (if reused
+                      (write! socket
+                        "HTTP/1.1 200 OK\r\nContent-Length: 3\r\nConnection: close\r\n\r\ntwo")
+                      (with-open [next-socket (.accept server)]
+                        (read-request next-socket)
+                        (write! next-socket
+                          "HTTP/1.1 200 OK\r\nContent-Length: 3\r\nConnection: close\r\n\r\ntwo"))))
+                  (finally
+                    (.close socket))))))
+          http-client (client/make-client {:max-connections 1})]
+      (try
+        (is (= "one" (:body @(client/get (url server)
+                               {:as :text :client http-client}))))
+        (is (= "two" (:body @(client/get (url server)
+                               {:as :text :client http-client}))))
+        (is (false? @reused?))
+        (finally
+          (.stop ^HttpClient http-client)
+          ((:close server))))))
+
+  (testing "unexpected bytes close an already idle connection"
+    (let [send-extra (promise)
+          idle-closed (promise)
+          server
+          (raw-server
+            (fn [^ServerSocket server]
+              (with-open [socket (.accept server)]
+                (read-request socket)
+                (write! socket "HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\none")
+                @send-extra
+                (write! socket "extra")
+                (.setSoTimeout socket 1000)
+                (try
+                  (deliver idle-closed (= -1 (.read (.getInputStream socket))))
+                  (catch SocketTimeoutException _
+                    (deliver idle-closed false))
+                  (catch SocketException _
+                    (deliver idle-closed true))))
+              (with-open [socket (.accept server)]
+                (read-request socket)
+                (write! socket
+                  "HTTP/1.1 200 OK\r\nContent-Length: 3\r\nConnection: close\r\n\r\ntwo"))))
+          http-client (client/make-client {:max-connections 1})]
+      (try
+        (is (= "one" (:body @(client/get (url server)
+                               {:as :text :client http-client}))))
+        (deliver send-extra true)
+        (is (true? (deref idle-closed 1500 false)))
+        (is (= "two" (:body @(client/get (url server)
+                               {:as :text :client http-client}))))
+        (finally
+          (.stop ^HttpClient http-client)
           ((:close server)))))))
 
 (deftest stale-connections-retry-only-safe-methods

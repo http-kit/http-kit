@@ -1,5 +1,7 @@
 package org.httpkit.client;
 
+import clojure.lang.ISeq;
+import clojure.lang.Seqable;
 import org.httpkit.*;
 import org.httpkit.ProtocolException;
 import org.httpkit.logger.ContextLogger;
@@ -15,7 +17,9 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -210,6 +214,11 @@ public class HttpClient implements Runnable {
 
     private void doRead(SelectionKey key, long now) {
         Request req = (Request) key.attachment();
+        if (req.isDone()) {
+            keepalives.remove(key);
+            closeQuietly(key);
+            return;
+        }
         SocketChannel ch = (SocketChannel) key.channel();
         int read = 0;
         try {
@@ -257,10 +266,12 @@ public class HttpClient implements Runnable {
             try {
                 State oldState = req.decoder.state;
                 if (req.decoder.decode(buffer) == ALL_READ) {
+                    boolean unexpectedBytes = buffer.hasRemaining();
                     req.finish();
                     boolean tlsClosed = req instanceof HttpsRequest
                             && ((HttpsRequest) req).isConnectionClosed();
-                    if (req.cfg.keepAlive > 0 && req.decoder.isPersistent() && !tlsClosed) {
+                    if (!unexpectedBytes && req.cfg.keepAlive > 0
+                            && req.decoder.isPersistent() && !tlsClosed) {
                         // Ensure that the key is added to keepalives exactly once on a state transition. There could be cases where decoder reaches
                         // ALL_READ state multiple times.
                         if (oldState != ALL_READ) {
@@ -398,23 +409,17 @@ public class HttpClient implements Runnable {
             return;
         }
 
-        // copy to modify, normalize header
-        HeaderMap headers = HeaderMap.camelCase(cfg.headers);
-
-        if (!headers.containsKey("Host")) // if caller set it explicitly, let he do it
-            headers.put("Host", HttpUtils.getHost(uri));
-        /**
-         * commented on 2014/3/18: Accept is not required
-         */
-//        if (!headers.containsKey("Accept")) // allow override
-//            headers.put("Accept", "*/*");
-        if (!headers.containsKey("User-Agent")) // allow override
-            headers.put("User-Agent", RequestConfig.DEFAULT_USER_AGENT); // default
-        if (!headers.containsKey("Accept-Encoding") && cfg.autoCompression)
-            headers.put("Accept-Encoding", "gzip, deflate"); // compression is good
-
+        HeaderMap headers;
         ByteBuffer request[];
         try {
+            headers = requestHeaders(cfg.headers);
+            if (!headers.containsKey("Host")) // if caller set it explicitly, let he do it
+                headers.put("Host", HttpUtils.getHost(uri));
+            if (!headers.containsKey("User-Agent")) // allow override
+                headers.put("User-Agent", RequestConfig.DEFAULT_USER_AGENT);
+            if (!headers.containsKey("Accept-Encoding") && cfg.autoCompression)
+                headers.put("Accept-Encoding", "gzip, deflate");
+
             if (proxyUri == null) {
                 request = encode(cfg.method, headers, cfg.body, HttpUtils.getPath(uri));
             } else {
@@ -465,12 +470,14 @@ public class HttpClient implements Runnable {
     }
 
     private ByteBuffer[] encode(HttpMethod method, HeaderMap headers, Object body,
-                                String path) throws IOException {
+                                String path) throws IOException, ProtocolException {
         ByteBuffer bodyBuffer = HttpUtils.bodyBuffer(body);
 
         if (body != null) {
-            String value = Integer.toString(bodyBuffer.remaining());
+            String value = Integer.toString(bodyBuffer == null ? 0 : bodyBuffer.remaining());
             headers.putOrReplace("Content-Length", value);
+        } else {
+            validateEmptyRequestContentLength(headers.getUserContentLength());
         }
 
         DynamicBytes bytes = new DynamicBytes(196);
@@ -483,6 +490,64 @@ public class HttpClient implements Runnable {
             return new ByteBuffer[]{headBuffer};
         } else {
             return new ByteBuffer[]{headBuffer, bodyBuffer};
+        }
+    }
+
+    private HeaderMap requestHeaders(Map<String, Object> source) throws ProtocolException {
+        HeaderMap headers = new HeaderMap();
+        if (source == null) {
+            return headers;
+        }
+
+        Set<String> singletons = new HashSet<String>();
+        for (Map.Entry<String, Object> entry : source.entrySet()) {
+            String name = HttpUtils.camelCase(entry.getKey());
+            if ("Transfer-Encoding".equals(name)) {
+                throw new ProtocolException("Chunked request bodies are not supported");
+            }
+
+            Object value = entry.getValue();
+            if ("Host".equals(name) || "Content-Length".equals(name)) {
+                if (!singletons.add(name)) {
+                    throw new ProtocolException("Duplicate request header: " + name);
+                }
+                value = singleHeaderValue(name, value);
+            }
+            headers.put(name, value);
+        }
+        return headers;
+    }
+
+    private Object singleHeaderValue(String name, Object value) throws ProtocolException {
+        if (value instanceof Seqable) {
+            ISeq values = ((Seqable) value).seq();
+            if (values == null || values.next() != null) {
+                throw new ProtocolException("Request header must have one value: " + name);
+            }
+            value = values.first();
+        }
+        if (value == null) {
+            throw new ProtocolException("Request header must have one value: " + name);
+        }
+        return value;
+    }
+
+    private void validateEmptyRequestContentLength(String value) throws ProtocolException {
+        if (value == null) {
+            return;
+        }
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c < '0' || c > '9') {
+                throw new ProtocolException("Invalid Content-Length: " + value);
+            }
+        }
+        try {
+            if (value.isEmpty() || Long.parseLong(value) != 0) {
+                throw new ProtocolException("Content-Length without a request body must be 0");
+            }
+        } catch (NumberFormatException e) {
+            throw new ProtocolException("Invalid Content-Length: " + value);
         }
     }
 
