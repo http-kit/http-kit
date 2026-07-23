@@ -34,21 +34,51 @@ public class MultipartEntity {
         return "----HttpKitFormBoundary" + System.currentTimeMillis();
     }
 
+    private static void validateHeaderValue(String value, String field) {
+        if (value == null) {
+            throw new IllegalArgumentException("Multipart " + field + " must not be null");
+        }
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c == '\r' || c == '\n' || c == 0
+                    || (c < 32 && c != '\t') || c == 127) {
+                throw new IllegalArgumentException(
+                        "Invalid character in multipart " + field);
+            }
+        }
+    }
+
+    private static String quoted(String value, String field) {
+        validateHeaderValue(value, field);
+        StringBuilder result = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c == '"' || c == '\\') {
+                result.append('\\');
+            }
+            result.append(c);
+        }
+        return result.toString();
+    }
+
     public static ByteBuffer encode(String boundary, List<MultipartEntity> entities, Boolean multipartMixed) throws IOException {
         DynamicBytes bytes = new DynamicBytes(entities.size() * 1024);
         for (MultipartEntity e : entities) {
             bytes.append("--").append(boundary).append(HttpUtils.CR, HttpUtils.LF);
             if (multipartMixed == null || !multipartMixed) {
                 bytes.append("Content-Disposition: form-data; name=\"");
-                bytes.append(e.name, HttpUtils.UTF_8);
+                bytes.append(quoted(e.name, "name"), HttpUtils.UTF_8);
                 if (e.filename != null) {
-                    bytes.append("\"; filename=\"").append(e.filename, HttpUtils.UTF_8).append("\"\r\n");
+                    bytes.append("\"; filename=\"")
+                            .append(quoted(e.filename, "filename"), HttpUtils.UTF_8)
+                            .append("\"\r\n");
                 } else {
                     bytes.append("\"\r\n");
                 }
             }
 
             if (e.contentType != null) {
+                validateHeaderValue(e.contentType, "content type");
                 bytes.append("Content-Type: ").append(e.contentType).append("\r\n\r\n");
             } else if (e.content instanceof File || e.content instanceof InputStream) {
                 bytes.append("Content-Type: application/octet-stream\r\n\r\n");
@@ -65,9 +95,7 @@ public class MultipartEntity {
                 byte[] b = HttpUtils.readContent((File) e.content, (int) ((File) e.content).length());
                 bytes.append(b, b.length);
             } else if (e.content instanceof ByteBuffer) {
-                while (((ByteBuffer) e.content).hasRemaining()) {
-                    bytes.append(((ByteBuffer) e.content).get()); // copy
-                }
+                bytes.append((ByteBuffer) e.content);
             } else if (e.content instanceof byte[]) {
                 byte[] contentBytes = (byte[])e.content;
                 bytes.append(contentBytes, contentBytes.length);

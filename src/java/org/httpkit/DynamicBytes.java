@@ -1,5 +1,6 @@
 package org.httpkit;
 
+import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.Arrays;
 import org.httpkit.ContentTooLargeException;
@@ -65,6 +66,14 @@ public class DynamicBytes {
     public DynamicBytes append(byte[] d, int length) {
         expandIfNeeded(length);
         System.arraycopy(d, 0, data, idx, length);
+        idx += length;
+        return this;
+    }
+
+    public DynamicBytes append(ByteBuffer buffer) {
+        int length = buffer.remaining();
+        expandIfNeeded(length);
+        buffer.get(data, idx, length);
         idx += length;
         return this;
     }

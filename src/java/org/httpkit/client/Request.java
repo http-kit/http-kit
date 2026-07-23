@@ -14,6 +14,7 @@ public class Request implements Comparable<Request> {
     final String host;
     final Decoder decoder;
     final ByteBuffer[] request; // HTTP request
+    private final int[] requestPositions;
     final RequestConfig cfg;
     private final PriorityQueue<Request> clients; // update timeout
 
@@ -32,6 +33,10 @@ public class Request implements Comparable<Request> {
         this.cfg = config;
         this.decoder = new Decoder(handler, config.method);
         this.request = request;
+        this.requestPositions = new int[request.length];
+        for (int i = 0; i < request.length; i++) {
+            requestPositions[i] = request[i].position();
+        }
         this.clients = clients;
         this.addr = addr;
         this.host = host;
@@ -113,8 +118,8 @@ public class Request implements Comparable<Request> {
     }
 
     public void unrecycle() {
-        for (ByteBuffer b : request) {
-            b.position(0); // reset for retry
+        for (int i = 0; i < request.length; i++) {
+            request[i].position(requestPositions[i]);
         }
         isReuseConn = false;
         setConnected(false);

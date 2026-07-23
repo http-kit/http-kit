@@ -28,46 +28,44 @@
                      (str (first basic-auth) ":" (second basic-auth)))]
     (str "Basic " (base64-encode (utf8-bytes basic-auth)))))
 
+(defn- name* [v] (if (instance? clojure.lang.Named v) (name v) v))
+
+(defn- remove-headers-ci [headers names]
+  (when headers
+    (reduce-kv
+      (fn [m k v]
+        (if (contains? names (str/lower-case (str (name* k))))
+          m
+          (assoc m k v)))
+      (empty headers)
+      headers)))
+
+(defn- assoc-header-ci [headers header-name value]
+  (assoc (or (remove-headers-ci headers #{(str/lower-case header-name)}) {})
+    header-name value))
+
 (defn- prepare-request-headers
   [{:keys [headers form-params basic-auth oauth-token user-agent] :as req}]
   (cond-> headers
-    form-params (assoc "Content-Type"  "application/x-www-form-urlencoded")
-    basic-auth  (assoc "Authorization" (basic-auth-value basic-auth))
-    oauth-token (assoc "Authorization" (str "Bearer " oauth-token))
-    user-agent  (assoc "User-Agent"    user-agent)))
+    form-params (assoc-header-ci "Content-Type"  "application/x-www-form-urlencoded")
+    basic-auth  (assoc-header-ci "Authorization" (basic-auth-value basic-auth))
+    oauth-token (assoc-header-ci "Authorization" (str "Bearer " oauth-token))
+    user-agent  (assoc-header-ci "User-Agent"    user-agent)))
 
 (defn- prepare-response-headers [headers]
   (reduce (fn [m [k v]] (assoc m (keyword k) v)) {} headers))
 
-(defn- name* [v] (if (instance? clojure.lang.Named v) (name v) v))
+(defn- add-query-string [^String url query]
+  (let [fragment-idx (.indexOf url (int \#))
+        base         (if (neg? fragment-idx) url (.substring url 0 fragment-idx))
+        fragment     (if (neg? fragment-idx) ""  (.substring url fragment-idx))]
+    (str base (if (neg? (.indexOf base (int \?))) "?" "&") query fragment)))
 
 (def ^:private entity-header-names
   #{"content-encoding" "content-length" "content-type" "transfer-encoding"})
 
 (def ^:private origin-header-names
   #{"authorization" "cookie" "host"})
-
-(defn- remove-entity-headers [headers]
-  (when headers
-    (reduce-kv
-      (fn [m k v]
-        (if (contains? entity-header-names
-              (str/lower-case (str (name* k))))
-          m
-          (assoc m k v)))
-      (empty headers)
-      headers)))
-
-(defn- remove-origin-headers [headers]
-  (when headers
-    (reduce-kv
-      (fn [m k v]
-        (if (contains? origin-header-names
-              (str/lower-case (str (name* k))))
-          m
-          (assoc m k v)))
-      (empty headers)
-      headers)))
 
 (defn- origin [url]
   (let [^URI uri (URI. url)]
@@ -134,9 +132,8 @@
   [{:keys [url method body query-params form-params multipart multipart-mixed? nested-param-style] :as req}]
   (let [r (assoc req
                  :url (if query-params
-                        (if (neg? (.indexOf ^String url (int \?)))
-                          (str url "?" (query-string query-params nested-param-style))
-                          (str url "&" (query-string query-params nested-param-style)))
+                        (add-query-string url
+                          (query-string query-params nested-param-style))
                         url)
                  :method    (HttpMethod/fromKeyword (or method :get))
                  :headers   (prepare-request-headers req)
@@ -145,11 +142,11 @@
     (if multipart
       (let [entities (into (map (fn [{:keys [name content filename content-type]}]
                                   (MultipartEntity. name content filename content-type)) multipart)
-                           (map (fn [[k v]] (MultipartEntity. k v nil nil)) form-params))
+                           (map (fn [[k v]] (MultipartEntity. (str (name* k)) v nil nil)) form-params))
             boundary (MultipartEntity/genBoundary entities)]
         (-> r
-            (assoc-in [:headers "Content-Type"]
-                      (str "multipart/" (if multipart-mixed? "mixed" "form-data")"; boundary=" boundary))
+            (update :headers assoc-header-ci "Content-Type"
+                    (str "multipart/" (if multipart-mixed? "mixed" "form-data")"; boundary=" boundary))
             (assoc :body (MultipartEntity/encode boundary entities multipart-mixed?))))
       r)))
 
@@ -419,11 +416,11 @@ Value may be a delay. See also `make-client`."}
                             change-to-get?
                             (->
                               (dissoc :body :form-params :multipart :multipart-mixed?)
-                              (update :headers remove-entity-headers))
+                              (update :headers remove-headers-ci entity-header-names))
                             cross-origin?
                             (->
                               (dissoc :basic-auth :oauth-token)
-                              (update :headers remove-origin-headers)))
+                              (update :headers remove-headers-ci origin-header-names)))
                           callback)))
 
                     (deliver-resp

@@ -265,7 +265,9 @@
     (is (= p1 (:body @(hkc/get  "http://127.0.0.1:4347/params"     query-params))))
     (is (= p1 (:body @(hkc/post "http://127.0.0.1:4347/params"     query-params))))
     (is (= p1 (:body @(hkc/get  "http://127.0.0.1:4347/params?a=b" query-params))))
-    (is (= p1 (:body @(hkc/post "http://127.0.0.1:4347/params?a=b" query-params))))))
+    (is (= p1 (:body @(hkc/post "http://127.0.0.1:4347/params?a=b" query-params))))
+    (is (= p1 (:body @(hkc/get  "http://127.0.0.1:4347/params#fragment"
+                         query-params))))))
 
 (deftest test-jetty-204-decode-properly
   ;; fix #52
@@ -589,7 +591,11 @@
         (server)))))
 
 (deftest test-multipart
-  (let [{:keys [status body]}
+  (let [^ByteBuffer direct-buffer (ByteBuffer/allocateDirect 6)
+        _put-direct (.put direct-buffer (.getBytes "direct" "UTF-8"))
+        _flip-direct (.flip direct-buffer)
+        heap-buffer (ByteBuffer/wrap (.getBytes "heap" "UTF-8"))
+        {:keys [status body]}
         @(hkc/post "http://localhost:4347/multipart"
            {:multipart
             [{:name         "comment"
@@ -599,6 +605,10 @@
               :filename     "project.clj"}
              {:name         "bytes"
               :content      (.getBytes "httpkit's project.clj" "UTF-8")}
+             {:name         "direct-buffer"
+              :content      direct-buffer}
+             {:name         "heap-buffer"
+              :content      heap-buffer}
              {:name         "custom-content-type"
               :content      (clojure.java.io/file "LICENSE.txt")
               :filename     "LICENSE.txt"
@@ -609,9 +619,23 @@
             :comment             "httpkit's project.clj"
             :custom-content-type {:content-type "text/plain"
                                   :filename     "LICENSE.txt"}
+            :direct-buffer       "direct"
             :file                {:content-type "application/octet-stream"
-                                  :filename     "project.clj"}}
-           (read-string body)))))
+                                  :filename     "project.clj"}
+            :heap-buffer         "heap"}
+           (read-string body)))
+    (is (= (.limit direct-buffer) (.position direct-buffer)))
+    (is (= (.limit heap-buffer) (.position heap-buffer))))
+
+  (testing "Multipart metadata cannot inject headers"
+    (doseq [part [{:name "field\r\nX-Injected: yes" :content "value"}
+                  {:name "field" :filename "file\r\nX-Injected: yes"
+                   :content "value"}
+                  {:name "field" :content-type "text/plain\r\nX-Injected: yes"
+                   :content "value"}]]
+      (is (thrown? IllegalArgumentException
+            (hkc/post "http://localhost:4347/multipart"
+              {:multipart [part]}))))))
 
 (deftest test-coerce-req
   (testing "Headers should be the same regardless of multipart"

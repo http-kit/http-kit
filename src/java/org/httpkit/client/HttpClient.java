@@ -39,6 +39,9 @@ public class HttpClient implements Runnable {
 
     // queue request, for only issue connection in the IO thread
     private final Queue<Request> pending = new ConcurrentLinkedQueue<Request>();
+    // register request timeouts once, from the IO thread
+    private final Queue<Request> timeoutRegistrations =
+            new ConcurrentLinkedQueue<Request>();
     // ongoing requests, saved for timeout check
     private final PriorityQueue<Request> requests = new PriorityQueue<Request>();
     // reuse TCP connection
@@ -275,7 +278,8 @@ public class HttpClient implements Runnable {
                         // Ensure that the key is added to keepalives exactly once on a state transition. There could be cases where decoder reaches
                         // ALL_READ state multiple times.
                         if (oldState != ALL_READ) {
-                            keepalives.offer(new PersistentConn(now + req.cfg.keepAlive, req.addr, req.host, key));
+                            keepalives.offer(new PersistentConn(now + req.cfg.keepAlive,
+                                    req.addr, req.host, req instanceof HttpsRequest, key));
                         }
                     } else {
                         closeQuietly(key);
@@ -287,8 +291,7 @@ public class HttpClient implements Runnable {
             } catch (Exception e) {
                 closeQuietly(key);
                 req.finish(e);
-                errorLogger.log("should not happen", e); // decoding
-                eventLogger.log(eventNames.clientImpossible);
+                logImpossible("should not happen", e); // decoding
             }
         }
     }
@@ -351,6 +354,7 @@ public class HttpClient implements Runnable {
     private synchronized void submit(Request request) {
         if (running) {
             pending.offer(request);
+            timeoutRegistrations.offer(request);
             selector.wakeup();
         } else {
             request.finish(new IOException("HTTP client is stopped"));
@@ -383,10 +387,29 @@ public class HttpClient implements Runnable {
         }
 
         String scheme = uri.getScheme();
+        scheme = scheme == null ? null : scheme.toLowerCase(java.util.Locale.ROOT);
         if (!"http".equals(scheme) && !"https".equals(scheme)) {
             String message = (scheme == null) ? "No protocol specified" : scheme + " is not supported";
             cb.onThrowable(new ProtocolException(message));
             return;
+        }
+
+        String proxyScheme = null;
+        if (proxyUri != null) {
+            if (proxyUri.getHost() == null) {
+                cb.onThrowable(new IllegalArgumentException(
+                        "proxy host is null: " + cfg.proxy_url));
+                return;
+            }
+            proxyScheme = proxyUri.getScheme();
+            proxyScheme = proxyScheme == null ? null
+                    : proxyScheme.toLowerCase(java.util.Locale.ROOT);
+            if (!"http".equals(proxyScheme) && !"https".equals(proxyScheme)) {
+                String message = proxyScheme == null ? "No proxy protocol specified"
+                        : proxyScheme + " for proxy is not supported";
+                cb.onThrowable(new ProtocolException(message));
+                return;
+            }
         }
 
         if (proxyUri != null && cfg.tunnel) {
@@ -423,10 +446,10 @@ public class HttpClient implements Runnable {
             if (proxyUri == null) {
                 request = encode(cfg.method, headers, cfg.body, HttpUtils.getPath(uri));
             } else {
-                String proxyScheme = proxyUri.getScheme();
                 headers.put("Proxy-Connection","Keep-Alive");
                 if (("http".equals(proxyScheme) && ! "https".equals(scheme)) || cfg.tunnel == false)  {
-                    request = encode(cfg.method, headers, cfg.body, uri.toString());
+                    request = encode(cfg.method, headers, cfg.body,
+                            HttpUtils.getProxyTarget(uri));
                 } else if ( "https".equals(proxyScheme) || "https".equals(scheme) ){
                     headers.put("Host", HttpUtils.getProxyHost(uri));
                     headers.put("Protocol","https");
@@ -444,9 +467,9 @@ public class HttpClient implements Runnable {
         }
 
         if ((proxyUri == null && "https".equals(scheme))
-            || (proxyUri != null && "https".equals(proxyUri.getScheme()))) {
+            || (proxyUri != null && "https".equals(proxyScheme))) {
             try {
-                URI tlsUri = proxyUri != null && "https".equals(proxyUri.getScheme())
+                URI tlsUri = proxyUri != null && "https".equals(proxyScheme)
                         ? proxyUri : uri;
                 if (engine == null) {
                     engine = getDefaultContext().createSSLEngine(
@@ -570,9 +593,6 @@ public class HttpClient implements Runnable {
     }
 
     private void processPending() {
-        for (Request queued : pending) {
-            queued.startTimeout();
-        }
         Request job = pending.peek();
         if (job != null) {
             if (job.isDone()) {
@@ -637,6 +657,24 @@ public class HttpClient implements Runnable {
         }
     }
 
+    private void registerTimeouts() {
+        Request request;
+        while ((request = timeoutRegistrations.poll()) != null) {
+            request.startTimeout();
+        }
+    }
+
+    private void logImpossible(String message, Throwable error) {
+        try {
+            errorLogger.log(message, error);
+        } catch (Throwable ignored) {
+        }
+        try {
+            eventLogger.log(eventNames.clientImpossible);
+        } catch (Throwable ignored) {
+        }
+    }
+
     public void run() {
         while (running) {
             try {
@@ -665,11 +703,11 @@ public class HttpClient implements Runnable {
                         }
                     }
                 }
+                registerTimeouts();
                 clearTimeout(now);
                 processPending();
             } catch (Throwable e) { // catch any exception (including OOM), print it: do not exits the loop
-                errorLogger.log("select exception, should not happen", e);
-                eventLogger.log(eventNames.clientImpossible);
+                logImpossible("select exception, should not happen", e);
             }
         }
     }
@@ -700,6 +738,7 @@ public class HttpClient implements Runnable {
         while ((request = requests.poll()) != null) {
             request.finish(stopped);
         }
+        timeoutRegistrations.clear();
 
         if (selector.isOpen()) {
             for (SelectionKey selectionKey : selector.keys()) {

@@ -15,6 +15,9 @@ public class BytesInputStream extends InputStream {
     private int pos;
 
     public BytesInputStream(byte[] data, int length) {
+        if (length < 0 || length > data.length) {
+            throw new IndexOutOfBoundsException();
+        }
         this.buf = data;
         this.count = length;
         this.pos = 0;
@@ -38,6 +41,15 @@ public class BytesInputStream extends InputStream {
     }
 
     public int read(byte[] b, int off, int len) throws IOException {
+        if (b == null) {
+            throw new NullPointerException();
+        }
+        if (off < 0 || len < 0 || len > b.length - off) {
+            throw new IndexOutOfBoundsException();
+        }
+        if (len == 0) {
+            return 0;
+        }
         if (pos >= count) {
             return -1;
         }

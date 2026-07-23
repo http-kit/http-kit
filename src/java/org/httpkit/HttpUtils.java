@@ -44,6 +44,9 @@ public class HttpUtils {
     public static final Charset UTF_8 = Charset.forName("utf8");
 
     public static final String CHARSET = "charset=";
+    private static final Pattern CHARSET_PARAMETER = Pattern.compile(
+            "(?:^|;)\\s*charset\\s*=\\s*(?:\"((?:\\\\.|[^\"])*)\"|([^;\\s]*))",
+            Pattern.CASE_INSENSITIVE);
     // Colon ':'
     public static final byte COLON = 58;
 
@@ -259,13 +262,19 @@ public class HttpUtils {
         if (query == null)
             return path;
         else
-            return path + "?" + query;
+            return path + "?" + encodeURI(query);
+    }
+
+    public static String getProxyTarget(URI uri) {
+        String target = uri.toASCIIString();
+        int fragment = target.indexOf('#');
+        return fragment < 0 ? target : target.substring(0, fragment);
     }
 
     public static int getPort(URI uri) {
         int port = uri.getPort();
         if (port == -1) {
-            if ("https".equals(uri.getScheme()))
+            if ("https".equalsIgnoreCase(uri.getScheme()))
                 port = 443;
             else
                 port = 80;
@@ -447,19 +456,44 @@ public class HttpUtils {
 
     /*----------------charset--------------------*/
 
-    public static Charset parseCharset(String type) {
-        if (type != null) {
-            try {
-                type = type.toLowerCase();
-                int i = type.indexOf(CHARSET);
-                if (i != -1) {
-                    String charset = type.substring(i + CHARSET.length()).trim();
-                    return Charset.forName(charset);
-                }
-            } catch (Exception ignore) {
+    public static String parseCharsetName(String type) {
+        if (type == null) {
+            return null;
+        }
+        Matcher matcher = CHARSET_PARAMETER.matcher(type);
+        if (!matcher.find()) {
+            return null;
+        }
+        String quoted = matcher.group(1);
+        if (quoted == null) {
+            return matcher.group(2);
+        }
+        StringBuilder value = new StringBuilder(quoted.length());
+        boolean escaped = false;
+        for (int i = 0; i < quoted.length(); i++) {
+            char c = quoted.charAt(i);
+            if (escaped) {
+                value.append(c);
+                escaped = false;
+            } else if (c == '\\') {
+                escaped = true;
+            } else {
+                value.append(c);
             }
         }
-        return null;
+        if (escaped) {
+            value.append('\\');
+        }
+        return value.toString();
+    }
+
+    public static Charset parseCharset(String type) {
+        try {
+            String charset = parseCharsetName(type);
+            return charset == null ? null : Charset.forName(charset);
+        } catch (Exception ignore) {
+            return null;
+        }
     }
 
     // <?xml version='1.0' encoding='GBK'?>
