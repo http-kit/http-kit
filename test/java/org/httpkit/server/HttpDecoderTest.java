@@ -176,6 +176,28 @@ public class HttpDecoderTest {
     }
 
     @Test
+    public void validatesNumericProxyAddresses()
+            throws LineTooLargeException, ProtocolException, RequestTooLargeException {
+        HttpRequest request = decode(decoder(ProxyProtocolOption.ENABLED),
+            "PROXY TCP4 0.255.10.1 255.0.1.2 1 65535\r\n" +
+            "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
+        assertEquals("0.255.10.1", request.getRemoteAddr());
+
+        String[] invalid = new String[] {
+            "256.0.0.1", "2000.0.0.1", "1.2.3.999"
+        };
+        for (String address : invalid) {
+            try {
+                decode(decoder(ProxyProtocolOption.ENABLED),
+                    "PROXY TCP4 " + address + " 192.0.2.1 1 443\r\n" +
+                    "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
+                fail("Expected invalid PROXY address to be rejected: " + address);
+            } catch (ProtocolException expected) {
+            }
+        }
+    }
+
+    @Test
     public void optionalProxyDoesNotInventForwardedHeaders()
             throws LineTooLargeException, ProtocolException, RequestTooLargeException {
         HttpRequest request = decode(decoder(ProxyProtocolOption.OPTIONAL),

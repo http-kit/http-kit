@@ -1,7 +1,5 @@
 package org.httpkit.server;
 
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Map;
@@ -29,10 +27,10 @@ public class HttpDecoder {
     }
 
     /**
-     * Pattern for matching numbers 0 to 255.  We use this in the IPV4 address pattern to prevent invalid sequences
-     * from be parsed by InetAddress.getByName and thus being treated as a name instead of an address.
+     * Pattern for matching numbers 0 to 255 so only numeric IPv4 addresses
+     * reach the PROXY protocol parser.
      */
-    private static final String IPV4SEG = "(?:0|1\\d{0,2}|2(?:[0-4]\\d*|5[0-5]?|[6-9])?|[3-9]\\d?)";
+    private static final String IPV4SEG = "(?:25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]?\\d)";
     private static final String IPV4ADDR = IPV4SEG + "(?:\\." + IPV4SEG + "){3}";
     /**
      * Pattern for a port number.  We are not as strict in our pattern matching as we are with ipv4 address
@@ -90,9 +88,6 @@ public class HttpDecoder {
         }
 
         try {
-            final InetAddress clientAddr = InetAddress.getByName(m.group(1));
-            final InetAddress proxyAddr = InetAddress.getByName(m.group(2));
-
             final int clientPort = Integer.parseInt(m.group(3), 10);
             final int proxyPort = Integer.parseInt(m.group(4), 10);
 
@@ -100,7 +95,7 @@ public class HttpDecoder {
                 throw new ProtocolException("Invalid port number: "+line);
             }
 
-            xForwardedFor = clientAddr.getHostAddress();
+            xForwardedFor = m.group(1);
             if (proxyPort == 80) {
                 xForwardedProto = "http";
             } else if (proxyPort == 443) {
@@ -112,8 +107,6 @@ public class HttpDecoder {
 
         } catch (NumberFormatException ex) {
             throw new ProtocolException("Malformed port in: "+line);
-        } catch (UnknownHostException ex) {
-            throw new ProtocolException("Malformed address in: "+line);
         }
     }
 
