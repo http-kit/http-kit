@@ -6,7 +6,6 @@ import static java.nio.channels.SelectionKey.OP_WRITE;
 import static org.httpkit.HttpUtils.HttpEncode;
 import static org.httpkit.HttpUtils.WsEncode;
 import static org.httpkit.server.Frame.CloseFrame.CLOSE_AWAY;
-import static org.httpkit.server.Frame.CloseFrame.CLOSE_MESG_BIG;
 import static org.httpkit.server.Frame.CloseFrame.CLOSE_NORMAL;
 
 import java.io.IOException;
@@ -29,6 +28,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.httpkit.HeaderMap;
+import org.httpkit.HeadersTooLargeException;
 import org.httpkit.HttpMethod;
 import org.httpkit.LineTooLargeException;
 import org.httpkit.ProtocolException;
@@ -204,7 +204,10 @@ public class HttpServer implements Runnable {
         if (att instanceof HttpAtta) {
             handler.clientClose(att.channel, -1);
         } else if (att != null) {
-            handler.clientClose(att.channel, status);
+            WsAtta wsAtta = (WsAtta) att;
+            handler.clientClose(att.channel,
+                    wsAtta.closeStatus == 0 ? status : wsAtta.closeStatus,
+                    wsAtta.closeReason);
         }
     }
 
@@ -331,6 +334,10 @@ public class HttpServer implements Runnable {
                 tryWrite(key, HttpEncode(100, new HeaderMap(), null, serverHeader));
                 atta.decoder.setSentContinue();
             }
+        } catch (HeadersTooLargeException e) {
+            atta.keepalive = false;
+            eventLogger.log(eventNames.serverStatusPrefix + 431);
+            tryWriteHttpResponse(key, atta, HttpEncode(431, new HeaderMap(), e.getMessage(), serverHeader));
         } catch (ProtocolException e) {
             atta.keepalive = false;
             tryWriteHttpResponse(key, atta, HttpEncode(400, new HeaderMap(), e.getMessage(), serverHeader));
@@ -372,6 +379,8 @@ public class HttpServer implements Runnable {
                     boolean closed = atta.channel.isClosed();
                     int status = ((CloseFrame) frame).getStatus();
                     String reason = ((CloseFrame) frame).getReason();
+                    atta.closeStatus = status;
+                    atta.closeReason = reason;
                     handler.clientClose(atta.channel, status, reason);
                     // close the TCP connection after sent
                     atta.keepalive = false;
@@ -384,11 +393,22 @@ public class HttpServer implements Runnable {
                     }
                 }
             } while (input.hasRemaining()); // consume all
+        } catch (WebSocketException e) {
+            failWebSocket(atta, key, e.getCloseStatus(), e);
         } catch (ProtocolException e) {
-            warnLogger.log(null, e);
-            eventLogger.log(eventNames.serverWsDecodeError);
-            closeKey(key, CLOSE_MESG_BIG); // TODO more specific error
+            failWebSocket(atta, key, 1002, e);
         }
+    }
+
+    private void failWebSocket(WsAtta atta, SelectionKey key, int status,
+                               ProtocolException error) {
+        warnLogger.log(null, error);
+        eventLogger.log(eventNames.serverWsDecodeError);
+        atta.keepalive = false;
+        atta.closeStatus = status;
+        atta.closeReason = error.getMessage();
+        byte[] payload = ByteBuffer.allocate(2).putShort((short) status).array();
+        tryWrite(key, WsEncode(WSDecoder.OPCODE_CLOSE, payload));
     }
 
     private void doRead(final SelectionKey key) {
@@ -550,7 +570,10 @@ public class HttpServer implements Runnable {
                     continue;
                 }
                 Set<SelectionKey> selectedKeys = selector.selectedKeys();
-                for (SelectionKey key : selectedKeys) {
+                Iterator<SelectionKey> iterator = selectedKeys.iterator();
+                while (iterator.hasNext()) {
+                    SelectionKey key = iterator.next();
+                    iterator.remove();
 
                     keptAlive.remove(key);
 
@@ -568,15 +591,23 @@ public class HttpServer implements Runnable {
                         doWrite(key);
                     }
                 }
-                selectedKeys.clear();
             } catch (ClosedSelectorException ignore) {
                 return; // stopped
                 // do not exits the while IO event loop. if exits, then will not process any IO event
                 // jvm can catch any exception, including OOM
-            } catch (Throwable e) { // catch any exception(including OOM), print it
-                status.set(Status.STOPPED);
-                errorLogger.log("http server loop error, see stack trace for details", e);
-                eventLogger.log(eventNames.serverLoopError);
+            } catch (Throwable e) {
+                try {
+                    errorLogger.log("http server loop error, see stack trace for details", e);
+                    eventLogger.log(eventNames.serverLoopError);
+                } catch (Throwable ignored) {
+                    // Logging must not obscure the original loop failure.
+                }
+                if (e instanceof Error) {
+                    status.set(Status.STOPPED);
+                    closeAndWarn(selector);
+                    closeAndWarn(serverChannel);
+                    return;
+                }
             }
         }
     }

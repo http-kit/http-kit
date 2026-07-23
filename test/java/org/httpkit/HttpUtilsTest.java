@@ -6,7 +6,23 @@ import java.io.EOFException;
 import java.io.File;
 import java.io.FileOutputStream;
 
+import static org.httpkit.HttpUtils.HttpEncode;
+
 public class HttpUtilsTest {
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectsInjectedResponseHeaders() {
+        HeaderMap headers = new HeaderMap();
+        headers.put("X-Test", "safe\r\nInjected: yes");
+        HttpEncode(200, headers, "body");
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectsInvalidResponseHeaderNames() {
+        HeaderMap headers = new HeaderMap();
+        headers.put("Bad Header", "value");
+        HttpEncode(200, headers, "body");
+    }
 
     @Test(expected = EOFException.class)
     public void reportsFileTruncationInsteadOfLooping() throws Exception {

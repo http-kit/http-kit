@@ -102,7 +102,15 @@ public class HttpRequest {
 
     public void setHeaders(Map<String, Object> headers) throws ProtocolException {
         String h = getStringValue(headers, "host");
-        if (h != null && !h.equals("")) {
+        if (version == HTTP_1_1 && (h == null || h.isEmpty())) {
+            throw new ProtocolException("HTTP/1.1 request is missing Host header");
+        }
+        if (h != null) {
+            if (h.isEmpty() || h.indexOf('\n') >= 0 || h.indexOf('@') >= 0
+                    || h.indexOf('/') >= 0 || h.indexOf('\\') >= 0
+                    || h.indexOf(' ') >= 0 || h.indexOf('\t') >= 0) {
+                throw new ProtocolException("Invalid host header: " + h);
+            }
             // the port is an integer following the last ':'
             // *unless* the last : is prior to the last ] which marks the end of an ipv6 address
             // https://en.wikipedia.org/wiki/IPv6_address#Literal_IPv6_addresses_in_network_resource_identifiers
@@ -149,12 +157,10 @@ public class HttpRequest {
         }
 
         String con = getStringValue(headers, CONNECTION);
-        if (con != null) {
-            con = con.toLowerCase();
-        }
-
-        isKeepAlive = (version == HTTP_1_1 && !"close".equals(con)) || "keep-alive".equals(con);
-        isWebSocket = "websocket".equalsIgnoreCase(getStringValue(headers, "upgrade"));
+        isKeepAlive = version == HTTP_1_1
+                ? !hasHeaderToken(con, "close")
+                : hasHeaderToken(con, "keep-alive") && !hasHeaderToken(con, "close");
+        isWebSocket = hasHeaderToken(getStringValue(headers, "upgrade"), "websocket");
         this.headers = headers;
     }
 }

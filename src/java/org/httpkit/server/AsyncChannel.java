@@ -46,6 +46,7 @@ public class AsyncChannel {
 
     // streaming
     private volatile boolean headerSent = false;
+    private volatile boolean websocketUpgraded = false;
 
     // messages sent from a WebSocket client should be handled orderly by server
     // Changed from a Single Thread(IO event thread), no volatile needed
@@ -56,11 +57,12 @@ public class AsyncChannel {
         this.server = server;
     }
 
-    public void reset(HttpRequest request) {
+    public synchronized void reset(HttpRequest request) {
         this.request = request;
         serialTask = null;
 
         headerSent = false;
+        websocketUpgraded = false;
         synchronized (closeLock) {
             closedRan.set(false);
             closeHandler = null;
@@ -103,6 +105,12 @@ public class AsyncChannel {
 
         if (headers.isEmpty()) { // default 200 and text/html
             headers.put("Content-Type", "text/html; charset=utf-8");
+        }
+
+        if (isWebSocketCandidate() && !websocketUpgraded) {
+            close = true;
+            headers.putOrReplace("Connection", "Close");
+            server.closeAfterResponse(key);
         }
 
         boolean closeDelimited = !close && request.version == HttpVersion.HTTP_1_0;
@@ -213,9 +221,11 @@ public class AsyncChannel {
         }
     }
 
-    public void sendHandshake(Map<String, Object> headers) {
+    public synchronized void sendHandshake(Map<String, Object> headers) {
         HeaderMap map = HeaderMap.camelCase(headers);
-        server.tryWrite(key, HttpEncode(101, map, null));
+        ByteBuffer[] response = HttpEncode(101, map, null);
+        websocketUpgraded = true;
+        server.tryWrite(key, response);
         server.responseComplete(key);
     }
 
@@ -289,7 +299,9 @@ public class AsyncChannel {
     }
 
     // also sent CloseFrame a final Chunk
-    public boolean serverClose(int status, String reason) {
+    public synchronized boolean serverClose(int status, String reason) {
+        boolean websocket = websocketUpgraded;
+        byte[] closePayload = websocket ? closePayload(status, reason) : null;
         IFn handler;
         IFn ringHandler;
         synchronized (closeLock) {
@@ -302,15 +314,14 @@ public class AsyncChannel {
             handler = closeHandler;
             ringHandler = closeRingHandler;
         }
-        if (isWebSocket()) {
-            server.tryWrite(key, WsEncode(OPCODE_CLOSE, ByteBuffer.allocate(2)
-                    .putShort((short) status).array()));
+        if (websocket) {
+            server.tryWrite(key, WsEncode(OPCODE_CLOSE, closePayload));
         } else if (request.version == HttpVersion.HTTP_1_0) {
             server.finishCloseDelimitedResponse(key);
         } else {
             server.tryWrite(key, false, ByteBuffer.wrap(finalChunkBytes));
         }
-        if (!isWebSocket()) {
+        if (!websocket) {
             server.responseComplete(key);
         }
         if (handler != null) {
@@ -322,12 +333,12 @@ public class AsyncChannel {
         return true;
     }
 
-    public boolean send(Object data, boolean close) throws IOException {
+    public synchronized boolean send(Object data, boolean close) throws IOException {
         if (closedRan.get()) {
             return false;
         }
 
-        if (isWebSocket()) {
+        if (websocketUpgraded) {
             if (data instanceof Map) { // only get the :body if map
                 Object tmp = ((Map<Keyword, Object>) data).get(BODY);
                 if (tmp != null) { // save contains(BODY) && get(BODY)
@@ -373,7 +384,23 @@ public class AsyncChannel {
     }
 
     public boolean isWebSocket() {
+        return isWebSocketCandidate();
+    }
+
+    private boolean isWebSocketCandidate() {
         return key.attachment() instanceof WsAtta;
+    }
+
+    private static byte[] closePayload(int status, String reason) {
+        if (!WSDecoder.isValidCloseStatus(status)) {
+            throw new IllegalArgumentException("Invalid websocket close status: " + status);
+        }
+        byte[] reasonBytes = (reason == null ? "" : reason).getBytes(UTF_8);
+        if (reasonBytes.length > 123) {
+            throw new IllegalArgumentException("Websocket close reason exceeds 123 bytes");
+        }
+        return ByteBuffer.allocate(2 + reasonBytes.length)
+                .putShort((short) status).put(reasonBytes).array();
     }
 
     public boolean isClosed() {

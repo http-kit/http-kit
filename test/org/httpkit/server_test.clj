@@ -340,10 +340,10 @@
                        {:headers {"host" "[::ffff:a9fe:a9fe]:80"}})]
     (is (= 200 (:status resp)))))
 
-(deftest ipv6-blank-host-header
+(deftest rejects-blank-host-header
   (let [resp (http/get "http://localhost:4347/"
-                       {:headers {"host" ""}})]
-    (is (= 200 (:status resp)))))
+                       {:headers {"host" ""} :throw-exceptions false})]
+    (is (= 400 (:status resp)))))
 
 (deftest test-host-header-port-validity
   (is (= 200 (:status (http/get "http://localhost:4347/" {:headers {"host" "localhost"}}))))

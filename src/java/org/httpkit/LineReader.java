@@ -1,6 +1,7 @@
 package org.httpkit;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 import static org.httpkit.HttpUtils.CR;
@@ -23,14 +24,15 @@ public class LineReader {
         while (buffer.hasRemaining() && more) {
             b = buffer.get();
 
-            if (readCR && b != LF) {
-                throw new ProtocolException("Expected LF after CR, but found " + b);
-            }
-
-            if (b == CR) {
+            if (readCR) {
+                if (b != LF) {
+                    throw new ProtocolException("Expected LF after CR, but found " + b);
+                }
+                more = false;
+            } else if (b == CR) {
                 readCR = true;
             } else if (b == LF) {
-                more = false;
+                throw new ProtocolException("Expected CR before LF");
             } else {
                 if (lineBufferIdx == maxLine - 2) {
                     throw new LineTooLargeException("exceed max line " + maxLine);
@@ -44,7 +46,7 @@ public class LineReader {
         }
         String line = null;
         if (!more) {
-            line = new String(lineBuffer, 0, lineBufferIdx);
+            line = new String(lineBuffer, 0, lineBufferIdx, StandardCharsets.ISO_8859_1);
             reset();
         }
         return line;

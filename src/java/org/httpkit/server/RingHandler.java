@@ -357,6 +357,9 @@ public class RingHandler implements IHandler {
     }
 
     public void handle(AsyncChannel channel, Frame frame) {
+        if (channel.isClosed()) {
+            return;
+        }
         WSHandler task = new WSHandler(channel, frame, errorLogger, eventLogger, eventNames);
 
         // messages from the same client are handled orderly
@@ -373,7 +376,8 @@ public class RingHandler implements IHandler {
                 }
             }
         } catch (RejectedExecutionException e) {
-            // TODO notify client if server is overloaded
+            channel.serialTask = null;
+            channel.serverClose(1013, "Server overloaded");
             errorLogger.log("increase :queue-size if this happens often", e);
             eventLogger.log(eventNames.serverStatus503Todo);
         }

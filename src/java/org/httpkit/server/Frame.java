@@ -47,9 +47,9 @@ public abstract class Frame {
 
         public int getStatus() {
             if (data.length >= 2) {
-                return ByteBuffer.wrap(data, 0, 2).getShort();
+                return ByteBuffer.wrap(data, 0, 2).getShort() & 0xffff;
             }
-            return CLOSE_NORMAL;
+            return 1005;
         }
 
         public String getReason() {

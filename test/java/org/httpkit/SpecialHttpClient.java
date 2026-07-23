@@ -93,9 +93,10 @@ public class SpecialHttpClient {
         s.connect(addr);
 
         String request = "GET " + HttpUtils.getPath(uri) + " HTTP/1.1\r\n";
+        request += "Host: " + HttpUtils.getHost(uri) + "\r\n";
         request += "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n";
         request += "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_0) AppleWebKit/537.17 (KHTML, like Gecko) Chrome/24.0.1312.52 Safari/537.17\r\n";
-        request += "Connection: close\n";
+        request += "Connection: close\r\n";
         request += "\r\n";
 
         byte[] bytes = request.getBytes();

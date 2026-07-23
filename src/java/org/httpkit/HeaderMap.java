@@ -118,25 +118,45 @@ public class HeaderMap {
             if (k == null || v == null) {
                 continue;
             }
+            validateName(k);
             // ring spec says it could be a seq
             if (v instanceof Seqable) {
                 ISeq seq = ((Seqable) v).seq();
                 while (seq != null) {
+                    String value = seq.first().toString();
+                    validateValue(value);
                     bytes.append(k);
                     bytes.append(COLON, SP);
-                    bytes.append(seq.first().toString(), HttpUtils.UTF_8);
+                    bytes.append(value, HttpUtils.UTF_8);
                     bytes.append(CR, LF);
                     seq = seq.next();
                 }
             } else {
+                String value = v.toString();
+                validateValue(value);
                 bytes.append(k);
                 bytes.append(COLON, SP);
                 // supposed to be ISO-8859-1, but utf-8 is compatible.
                 // filename in Content-Disposition can be utf8
-                bytes.append(v.toString(), HttpUtils.UTF_8);
+                bytes.append(value, HttpUtils.UTF_8);
                 bytes.append(CR, LF);
             }
         }
         bytes.append(CR, LF);
+    }
+
+    private static void validateName(String name) {
+        if (!HttpUtils.isToken(name)) {
+            throw new IllegalArgumentException("Invalid HTTP header name: " + name);
+        }
+    }
+
+    private static void validateValue(String value) {
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c == '\r' || c == '\n' || c == 0 || (c < 32 && c != '\t') || c == 127) {
+                throw new IllegalArgumentException("Invalid character in HTTP header value");
+            }
+        }
     }
 }

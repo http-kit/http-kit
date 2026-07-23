@@ -85,13 +85,13 @@ public class RingHandlerTest {
                 sb.append(requestLines[i]);
 
                 if (i != requestLength - 1) {
-                    sb.append("\n");
+                    sb.append("\r\n");
                 }
 
             }
             joinedRequest = sb.toString();
         }
-        return httpDecoder.decode(ByteBuffer.wrap((joinedRequest + "\n\n").getBytes()));
+        return httpDecoder.decode(ByteBuffer.wrap((joinedRequest + "\r\n\r\n").getBytes()));
     }
 
     private IPersistentMap aDummyResponse() {
@@ -104,7 +104,7 @@ public class RingHandlerTest {
     private HttpRequest aDummyRequest() throws ProtocolException, LineTooLargeException, RequestTooLargeException {
         return asHttpRequest(
                 "GET /foo/bar?query=baz HTTP/1.0",
-                "Host: github.com/http-kit/http-kit",
+                "Host: github.com",
                 "Content-Type: text/html",
                 "x-forwarded-for: 0.0.0.0:80");
     }

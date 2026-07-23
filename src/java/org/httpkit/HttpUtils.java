@@ -364,45 +364,85 @@ public class HttpUtils {
         System.err.print(str.getBuffer().toString());
     }
 
-    public static void splitAndAddHeader(String sb, Map<String, Object> headers) {
-        final int length = sb.length();
-        int nameStart;
-        int nameEnd;
-        int colonEnd;
-        int valueStart;
-        int valueEnd;
+    public static void splitAndAddHeader(String line, Map<String, Object> headers)
+            throws ProtocolException {
+        int colon = line.indexOf(':');
+        if (colon <= 0) {
+            throw new ProtocolException("Malformed HTTP header: " + line);
+        }
 
-        nameStart = findNonWhitespace(sb, 0);
-        for (nameEnd = nameStart; nameEnd < length; nameEnd++) {
-            char ch = sb.charAt(nameEnd);
-            if (ch == ':' || Character.isWhitespace(ch)) {
-                break;
+        String key = line.substring(0, colon);
+        if (!isToken(key)) {
+            throw new ProtocolException("Invalid HTTP header name: " + key);
+        }
+
+        int valueStart = colon + 1;
+        int valueEnd = line.length();
+        while (valueStart < valueEnd
+                && (line.charAt(valueStart) == ' ' || line.charAt(valueStart) == '\t')) {
+            valueStart++;
+        }
+        while (valueEnd > valueStart
+                && (line.charAt(valueEnd - 1) == ' ' || line.charAt(valueEnd - 1) == '\t')) {
+            valueEnd--;
+        }
+
+        String value = line.substring(valueStart, valueEnd);
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c == 0 || (c < 32 && c != '\t') || c == 127) {
+                throw new ProtocolException("Invalid character in HTTP header value");
             }
         }
 
-        for (colonEnd = nameEnd; colonEnd < length; colonEnd++) {
-            if (sb.charAt(colonEnd) == ':') {
-                colonEnd++;
-                break;
+        key = key.toLowerCase(Locale.ROOT);
+        Object previous = headers.get(key);
+        if (previous != null) {
+            value = previous.toString() + "\n" + value;
+        }
+        headers.put(key, value);
+    }
+
+    public static boolean isToken(String value) {
+        if (value == null || value.isEmpty()) {
+            return false;
+        }
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            boolean token = c >= '0' && c <= '9'
+                    || c >= 'A' && c <= 'Z'
+                    || c >= 'a' && c <= 'z'
+                    || "!#$%&'*+-.^_`|~".indexOf(c) >= 0;
+            if (!token) {
+                return false;
             }
         }
+        return true;
+    }
 
-        valueStart = findNonWhitespace(sb, colonEnd);
-        valueEnd = findEndOfString(sb, valueStart);
-
-        String key = sb.substring(nameStart, nameEnd);
-        if (valueStart > valueEnd) { // ignore
-            // logger.warn("header error: " + sb);
-        } else {
-            String value = sb.substring(valueStart, valueEnd);
-            key = key.toLowerCase();
-            Object v = headers.get(key);
-            if (v != null) {
-                // https://github.com/http-kit/http-kit/issues/108
-                value = v.toString() + "\n" + value;
-            }
-            headers.put(key, value);
+    public static boolean hasHeaderToken(String value, String token) {
+        if (value == null) {
+            return false;
         }
+        for (String part : value.split("[,\\n]")) {
+            if (token.equalsIgnoreCase(part.trim())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static boolean isForbiddenTrailer(String name) {
+        return "host".equals(name)
+                || CONTENT_LENGTH.equals(name)
+                || TRANSFER_ENCODING.equals(name)
+                || CONNECTION.equals(name)
+                || TRAILER.equals(name)
+                || "upgrade".equals(name)
+                || "authorization".equals(name)
+                || "proxy-authorization".equals(name)
+                || "cookie".equals(name)
+                || EXPECT.equals(name);
     }
 
     /*----------------charset--------------------*/

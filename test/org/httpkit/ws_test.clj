@@ -17,7 +17,8 @@
    [java.io ByteArrayOutputStream InputStream]
    [java.net Socket]
    [org.httpkit.ws WebSocketClient]
-   [org.httpkit  SpecialHttpClient]))
+   [org.httpkit  SpecialHttpClient]
+   [org.httpkit.server AsyncChannel]))
 
 (defn ws-handler [req]
   (as-channel req
@@ -79,7 +80,12 @@
   (GET "/binary" [] binary-ws-handler)
   (GET "/interleaved" [] not-interleave-handler)
   (GET "/order" [] messg-order-handler)
-  (GET "/ping-pong" [] ping-ws-handler))
+  (GET "/ping-pong" [] ping-ws-handler)
+  (GET "/close-reason" []
+    (fn [req]
+      (as-channel req
+        {:on-open (fn [^AsyncChannel ch]
+                    (.serverClose ch 1000 "bye"))}))))
 
 (use-fixtures :once (fn [f]
                       (let [server (run-server
@@ -133,12 +139,15 @@
         (String. (byte-array (map unchecked-byte bytes)) "UTF-8")
         (recur bytes)))))
 
-(defn- raw-websocket []
-  (let [socket (doto (Socket. "localhost" 4348) (.setSoTimeout 2000))
+(defn- raw-websocket
+  ([] (raw-websocket 4348 "/echo"))
+  ([path] (raw-websocket 4348 path))
+  ([port path]
+  (let [socket (doto (Socket. "localhost" (int port)) (.setSoTimeout 2000))
         out    (.getOutputStream socket)
         request
-        (str "GET /echo HTTP/1.1\r\n"
-          "Host: localhost\r\n"
+        (str "GET " path " HTTP/1.1\r\n"
+          "Host: localhost:" port "\r\n"
           "Upgrade: websocket\r\n"
           "Connection: Upgrade\r\n"
           "Sec-WebSocket-Version: 13\r\n"
@@ -149,7 +158,18 @@
       (when-not (str/includes? head " 101 ")
         (.close socket)
         (throw (ex-info "WebSocket handshake failed" {:response head}))))
-    socket))
+    socket)))
+
+(deftest invalid-upgrades-return-http-errors
+  (with-open [socket (doto (Socket. "localhost" 4348) (.setSoTimeout 2000))]
+    (let [out (.getOutputStream socket)]
+      (.write out (.getBytes
+                    (str "GET /echo HTTP/1.1\r\nHost: localhost\r\n"
+                      "Upgrade: websocket\r\nConnection: Upgrade\r\n\r\n")
+                    "UTF-8"))
+      (.flush out)
+      (is (str/includes? (read-http-head (.getInputStream socket))
+            "HTTP/1.1 400")))))
 
 (defn- masked-frame [final? rsv opcode payload]
   (let [^bytes payload (if (string? payload) (.getBytes ^String payload "UTF-8") payload)
@@ -180,6 +200,14 @@
     (doseq [frame frames] (.write out ^bytes frame))
     (.flush out)))
 
+(defn- max-ws-frames [opcode lengths]
+  (let [last-idx (dec (count lengths))]
+    (map-indexed
+      (fn [idx length]
+        (masked-frame (= idx last-idx) 0 (if (zero? idx) opcode 0)
+          (byte-array length (repeat (byte 97)))))
+      lengths)))
+
 (defn- read-byte! [^InputStream in]
   (let [b (.read in)]
     (when (= -1 b) (throw (java.io.EOFException. "EOF during WebSocket frame")))
@@ -204,10 +232,61 @@
      :opcode (bit-and first 0x0f)
      :body body}))
 
+(defn- close-status [{:keys [body]}]
+  (bit-or (bit-shift-left (bit-and 0xff (aget ^bytes body 0)) 8)
+    (bit-and 0xff (aget ^bytes body 1))))
+
+(defn- with-max-ws-server [max-ws f]
+  (let [server (run-server (site test-routes)
+                 {:port 0 :max-ws max-ws :warn-logger (fn [_ _])})]
+    (try
+      (f (:local-port (meta server)))
+      (finally (server)))))
+
+(deftest test-websocket-max-message-size
+  (doseq [[max-ws cases]
+          [[100 [[[100] true] [[101] false]]]
+           [200 [[[200] true] [[201] false]
+                 [[100 100] true] [[100 101] false]
+                 [[126 74] true] [[126 75] false]]]]]
+    (with-max-ws-server max-ws
+      (fn [port]
+        (doseq [opcode [0x1 0x2]
+                [lengths accepted?] cases]
+          (testing (str "max-ws=" max-ws ", opcode=" opcode ", lengths=" lengths)
+            (with-open [^Socket socket (raw-websocket port "/echo")]
+              (write-frames! socket (max-ws-frames opcode lengths))
+              (let [frame (read-frame socket)]
+                (if accepted?
+                  (do
+                    (is (= opcode (:opcode frame)))
+                    (is (= max-ws (alength ^bytes (:body frame)))))
+                  (do
+                    (is (= 0x8 (:opcode frame)))
+                    (is (= 1009 (close-status frame))))))))))))
+
+  (with-max-ws-server 4
+    (fn [port]
+      (with-open [^Socket socket (raw-websocket port "/echo")]
+        (write-frames! socket [(masked-frame true 0 0x9 "hello")])
+        (let [pong (read-frame socket)]
+          (is (= 0xa (:opcode pong)))
+          (is (= "hello" (String. ^bytes (:body pong) "UTF-8"))))))))
+
+(deftest server-close-preserves-reason
+  (with-open [^Socket socket (raw-websocket "/close-reason")]
+    (let [{:keys [opcode body]} (read-frame socket)]
+      (is (= 0x8 opcode))
+      (is (= 1000 (bit-or (bit-shift-left (bit-and 0xff (aget ^bytes body 0)) 8)
+                    (bit-and 0xff (aget ^bytes body 1)))))
+      (is (= "bye" (String. ^bytes body 2 (- (alength ^bytes body) 2) "UTF-8"))))))
+
 (defn- server-closes-after? [frames]
   (with-open [^Socket socket (raw-websocket)]
     (write-frames! socket frames)
-    (= -1 (.read (.getInputStream socket)))))
+    (let [close-frame (read-frame socket)]
+      (and (= 0x8 (:opcode close-frame))
+           (= -1 (.read (.getInputStream socket)))))))
 
 (deftest test-interleaved-websocket-control-frames
   (with-open [^Socket socket (raw-websocket)]
@@ -241,7 +320,11 @@
             [(masked-frame true 0 0x0 "bad")]]
            ["new data frame during fragmented message"
             [(masked-frame false 0 0x1 "open")
-             (masked-frame true  0 0x2 "bad")]]]]
+             (masked-frame true  0 0x2 "bad")]]
+           ["invalid UTF-8 text"
+            [(masked-frame true 0 0x1 (byte-array [(unchecked-byte 0xc3) 0x28]))]]
+           ["one-byte close payload"
+            [(masked-frame true 0 0x8 (byte-array [0]))]]]]
     (testing description
       (is (server-closes-after? frames)))))
 

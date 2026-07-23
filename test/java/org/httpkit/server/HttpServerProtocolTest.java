@@ -23,6 +23,16 @@ import static org.junit.Assert.assertTrue;
 
 public class HttpServerProtocolTest {
 
+    private static int count(String value, String needle) {
+        int found = 0;
+        int offset = 0;
+        while ((offset = value.indexOf(needle, offset)) >= 0) {
+            found++;
+            offset += needle.length();
+        }
+        return found;
+    }
+
     private static byte[] readAll(InputStream input) throws IOException {
         ByteArrayOutputStream response = new ByteArrayOutputStream();
         byte[] bytes = new byte[8192];
@@ -443,6 +453,116 @@ public class HttpServerProtocolTest {
             if (server.getStatus() == HttpServer.Status.RUNNING) {
                 server.stop(1000);
             }
+            server.join();
+        }
+    }
+
+    @Test
+    public void concurrentStreamingWritesEmitOneResponseHead() throws Exception {
+        IHandler handler = new IHandler() {
+            @Override
+            public void handle(final HttpRequest request, RespCallback callback) {
+                Thread[] writers = new Thread[8];
+                for (int i = 0; i < writers.length; i++) {
+                    writers[i] = new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                request.channel.send("x", false);
+                            } catch (IOException e) {
+                                throw new RuntimeException(e);
+                            }
+                        }
+                    });
+                    writers[i].start();
+                }
+                for (Thread writer : writers) {
+                    try {
+                        writer.join();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException(e);
+                    }
+                }
+                try {
+                    request.channel.send(null, true);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+
+            @Override public void handle(AsyncChannel channel, Frame frame) {}
+            @Override public void clientClose(AsyncChannel channel, int status) {}
+            @Override public void clientClose(AsyncChannel channel, int status, String reason) {}
+            @Override public void close(int timeoutMs) {}
+        };
+
+        HttpServer server = new HttpServer("127.0.0.1", 0, handler,
+            1024, 1024, 1024, ProxyProtocolOption.DISABLED);
+        server.start();
+        try {
+            Socket socket = new Socket("127.0.0.1", server.getPort());
+            socket.setSoTimeout(10000);
+            try {
+                socket.getOutputStream().write(
+                    "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
+                    .getBytes(StandardCharsets.US_ASCII));
+                String response = new String(readAll(socket.getInputStream()), StandardCharsets.US_ASCII);
+                assertEquals(1, count(response, "HTTP/1.1 200"));
+                assertEquals(8, count(response, "1\r\nx\r\n"));
+            } finally {
+                socket.close();
+            }
+        } finally {
+            if (server.getStatus() == HttpServer.Status.RUNNING) server.stop(1000);
+            server.join();
+        }
+    }
+
+    @Test
+    public void serverLoopRecoversFromRequestRuntimeException() throws Exception {
+        final AtomicInteger requests = new AtomicInteger();
+        IHandler handler = new IHandler() {
+            @Override
+            public void handle(HttpRequest request, RespCallback callback) {
+                if (requests.incrementAndGet() == 1) {
+                    throw new RuntimeException("first request failed");
+                }
+                callback.run(HttpEncode(200, new HeaderMap(), "ok"));
+            }
+
+            @Override public void handle(AsyncChannel channel, Frame frame) {}
+            @Override public void clientClose(AsyncChannel channel, int status) {}
+            @Override public void clientClose(AsyncChannel channel, int status, String reason) {}
+            @Override public void close(int timeoutMs) {}
+        };
+
+        HttpServer server = new HttpServer("127.0.0.1", 0, handler,
+            1024, 1024, 1024, ProxyProtocolOption.DISABLED);
+        server.start();
+        try {
+            Socket first = new Socket("127.0.0.1", server.getPort());
+            first.getOutputStream().write(
+                "GET /first HTTP/1.1\r\nHost: localhost\r\n\r\n"
+                .getBytes(StandardCharsets.US_ASCII));
+            first.getOutputStream().flush();
+            Thread.sleep(100);
+            first.close();
+
+            Socket second = new Socket("127.0.0.1", server.getPort());
+            second.setSoTimeout(2000);
+            try {
+                second.getOutputStream().write(
+                    "GET /second HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
+                    .getBytes(StandardCharsets.US_ASCII));
+                String response = new String(readAll(second.getInputStream()), StandardCharsets.US_ASCII);
+                assertTrue(response.startsWith("HTTP/1.1 200"));
+                assertEquals(HttpServer.Status.RUNNING, server.getStatus());
+            } finally {
+                second.close();
+            }
+        } finally {
+            if (server.getStatus() == HttpServer.Status.RUNNING) server.stop(1000);
             server.join();
         }
     }

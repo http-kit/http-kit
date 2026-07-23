@@ -52,7 +52,7 @@ public class RingResponseTest {
     private HttpRequest request(String method)
             throws LineTooLargeException, ProtocolException, RequestTooLargeException {
         HttpDecoder decoder = new HttpDecoder(1024, 1024, ProxyProtocolOption.DISABLED, false);
-        return decoder.decode(ByteBuffer.wrap((method + " / HTTP/1.1\r\n\r\n").getBytes()));
+        return decoder.decode(ByteBuffer.wrap((method + " / HTTP/1.1\r\nHost: localhost\r\n\r\n").getBytes()));
     }
 
     private String respond(HttpRequest request, final int status, final Object body, String serverHeader) {

@@ -12,6 +12,7 @@ import java.util.regex.Pattern;
 import org.httpkit.HttpMethod;
 import org.httpkit.HttpUtils;
 import org.httpkit.HttpVersion;
+import org.httpkit.HeadersTooLargeException;
 import org.httpkit.LineReader;
 import org.httpkit.LineTooLargeException;
 import org.httpkit.ProtocolException;
@@ -60,11 +61,14 @@ public class HttpDecoder {
     byte[] content;
 
     private final int maxBody;
+    private final int maxHeaderBytes;
     private final LineReader lineReader;
     private final boolean legacyUnsafeRemoteAddr;
+    private int headerBytes;
 
     public HttpDecoder(int maxBody, int maxLine, ProxyProtocolOption proxyProtocolOption, boolean legacyUnsafeRemoteAddr) {
         this.maxBody = maxBody;
+        this.maxHeaderBytes = Math.max(64 * 1024, maxLine);
         this.lineReader = new LineReader(maxLine);
         this.legacyUnsafeRemoteAddr = legacyUnsafeRemoteAddr;
         this.proxyProtocolOption = (proxyProtocolOption == null)
@@ -175,7 +179,7 @@ public class HttpDecoder {
                 case ALL_READ:
                     return request;
                 case CONNECTION_OPEN:
-                    line = lineReader.readLine(buffer);
+                    line = readHeaderLine(buffer);
                     if (line != null) {
                         // parseProxyLines returns true if the line parsed
                         // false if it was not a PROXY line
@@ -195,7 +199,7 @@ public class HttpDecoder {
                     }
                     break;
                 case READ_INITIAL:
-                    line = lineReader.readLine(buffer);
+                    line = readHeaderLine(buffer);
                     if (line != null) {
                         createRequest(line);
                         state = State.READ_HEADER;
@@ -264,14 +268,19 @@ public class HttpDecoder {
 
     private void readTrailers(ByteBuffer buffer)
             throws LineTooLargeException, ProtocolException {
-        String line = lineReader.readLine(buffer);
+        String line = readHeaderLine(buffer);
         while (line != null) {
             if (line.isEmpty()) {
                 finish();
                 return;
             }
+            int colon = line.indexOf(':');
+            String name = colon > 0 ? line.substring(0, colon).toLowerCase(java.util.Locale.ROOT) : "";
+            if (HttpUtils.isForbiddenTrailer(name)) {
+                throw new ProtocolException("Forbidden trailer field: " + name);
+            }
             HttpUtils.splitAndAddHeader(line, headers);
-            line = lineReader.readLine(buffer);
+            line = readHeaderLine(buffer);
         }
     }
 
@@ -284,10 +293,10 @@ public class HttpDecoder {
 
     private void readHeaders(ByteBuffer buffer) throws LineTooLargeException,
             RequestTooLargeException, ProtocolException {
-        String line = lineReader.readLine(buffer);
+        String line = readHeaderLine(buffer);
         while (line != null && !line.isEmpty()) {
             HttpUtils.splitAndAddHeader(line, headers);
-            line = lineReader.readLine(buffer);
+            line = readHeaderLine(buffer);
         }
 
         if (line == null) {
@@ -355,9 +364,22 @@ public class HttpDecoder {
         state = State.READ_INITIAL;
         headers = new TreeMap<String, Object>();
         readCount = 0;
+        headerBytes = 0;
         content = null;
         lineReader.reset();
         request = null;
+    }
+
+    private String readHeaderLine(ByteBuffer buffer)
+            throws LineTooLargeException, ProtocolException {
+        String line = lineReader.readLine(buffer);
+        if (line != null) {
+            headerBytes += line.length() + 2;
+            if (headerBytes > maxHeaderBytes) {
+                throw new HeadersTooLargeException("HTTP headers exceed " + maxHeaderBytes + " bytes");
+            }
+        }
+        return line;
     }
 
     private void throwIfBodyIsTooLarge() throws RequestTooLargeException {

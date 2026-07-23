@@ -1,9 +1,12 @@
 package org.httpkit.server;
 
+import org.httpkit.DynamicBytes;
 import org.httpkit.ProtocolException;
 
 import java.nio.ByteBuffer;
-import java.util.Arrays;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
+import java.nio.charset.StandardCharsets;
 
 public class WSDecoder {
 
@@ -21,7 +24,7 @@ public class WSDecoder {
     private final int maxSize;
 
     private State state = State.FRAME_START;
-    private byte[] content; // Content accumulated across fragmented data frames
+    private DynamicBytes content; // Content accumulated across fragmented data frames
     private byte[] frameContent;
 
     private int payloadLength;
@@ -129,7 +132,7 @@ public class WSDecoder {
                         if (!isControlFrame(opcode)) {
                             long messageLength = payloadLength;
                             if (opcode == OPCODE_CONT) {
-                                messageLength += content.length;
+                                messageLength += content.length();
                             }
                             abortIfTooLarge(messageLength);
                         }
@@ -165,6 +168,7 @@ public class WSDecoder {
                                 case OPCODE_PONG:
                                     return new Frame.PongFrame(frameContent);
                                 case OPCODE_CLOSE:
+                                    validateClose(frameContent);
                                     return new Frame.CloseFrame(frameContent);
                                 default:
                                     throw new AssertionError("unsupported control opcode: " + opcode);
@@ -175,7 +179,7 @@ public class WSDecoder {
                             appendFrameContent();
                             if (finalFlag) {
                                 int completedOpcode = fragmentedOpCode;
-                                byte[] completedContent = content;
+                                byte[] completedContent = content.bytes();
                                 fragmentedOpCode = -1;
                                 content = null;
                                 return dataFrame(completedOpcode, completedContent);
@@ -184,7 +188,8 @@ public class WSDecoder {
                             return dataFrame(opcode, frameContent);
                         } else {
                             fragmentedOpCode = opcode;
-                            content = frameContent;
+                            content = new DynamicBytes(frameContent.length);
+                            content.append(frameContent, frameContent.length);
                         }
                         resetFrame();
                     }
@@ -204,14 +209,13 @@ public class WSDecoder {
     }
 
     private void appendFrameContent() {
-        int previousLength = content.length;
-        content = Arrays.copyOf(content, previousLength + frameContent.length);
-        System.arraycopy(frameContent, 0, content, previousLength, frameContent.length);
+        content.append(frameContent, frameContent.length);
     }
 
     private Frame dataFrame(int opcode, byte[] data) throws ProtocolException {
         switch (opcode) {
             case OPCODE_TEXT:
+                validateUtf8(data, 0, data.length);
                 return new Frame.TextFrame(data);
             case OPCODE_BINARY:
                 return new Frame.BinaryFrame(data);
@@ -222,7 +226,39 @@ public class WSDecoder {
 
     public void abortIfTooLarge(long length) throws ProtocolException {
         if (length > maxSize) { // drop if message is too big
-            throw new ProtocolException("Max payload length " + maxSize + ", got: " + length);
+            throw new WebSocketException(1009,
+                    "Max payload length " + maxSize + ", got: " + length);
+        }
+    }
+
+    private static void validateClose(byte[] data) throws WebSocketException {
+        if (data.length == 1) {
+            throw new WebSocketException(1002, "Invalid one-byte websocket close payload");
+        }
+        if (data.length >= 2) {
+            int status = ByteBuffer.wrap(data, 0, 2).getShort() & 0xffff;
+            if (!isValidCloseStatus(status)) {
+                throw new WebSocketException(1002, "Invalid websocket close status: " + status);
+            }
+            validateUtf8(data, 2, data.length - 2);
+        }
+    }
+
+    static boolean isValidCloseStatus(int status) {
+        return status >= 1000 && status < 5000
+                && status != 1004 && status != 1005
+                && status != 1006 && status != 1015;
+    }
+
+    private static void validateUtf8(byte[] data, int offset, int length)
+            throws WebSocketException {
+        try {
+            StandardCharsets.UTF_8.newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT)
+                    .decode(ByteBuffer.wrap(data, offset, length));
+        } catch (CharacterCodingException e) {
+            throw new WebSocketException(1007, "Invalid UTF-8 websocket payload");
         }
     }
 
