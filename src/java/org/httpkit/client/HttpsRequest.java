@@ -17,14 +17,22 @@ public class HttpsRequest extends Request {
 
     public HttpsRequest(SocketAddress addr, String host, ByteBuffer[] request, IRespListener handler,
                         PriorityQueue<Request> clients, RequestConfig config, SSLEngine engine) {
+        this(addr, host, request, handler, clients, config, engine, null);
+    }
+
+    HttpsRequest(SocketAddress addr, String host, ByteBuffer[] request, IRespListener handler,
+                 PriorityQueue<Request> clients, RequestConfig config, SSLEngine engine,
+                 Object tlsPolicy) {
         super(addr, host, request, handler, clients, config);
         this.engine = engine;
         this.engineOriginal = engine;
+        this.tlsPolicy = tlsPolicy;
         myNetData.flip();
     }
 
     SSLEngine engine; // package private
     SSLEngine engineOriginal;
+    final Object tlsPolicy;
     private ByteBuffer myNetData = ByteBuffer.allocate(40 * 1024);
     private ByteBuffer peerNetData = ByteBuffer.allocate(40 * 1024);
     boolean handshaken = false;
@@ -39,6 +47,9 @@ public class HttpsRequest extends Request {
             SSLEngineResult res;
             while ((res = engine.unwrap(peerNetData, peerAppData)).getStatus() == Status.OK) {
                 unwrapped += res.bytesProduced();
+                if (res.bytesConsumed() == 0 && res.bytesProduced() == 0) {
+                    throw new SSLException("TLS engine made no progress while unwrapping response");
+                }
                 if (!peerNetData.hasRemaining())
                     break;
             }

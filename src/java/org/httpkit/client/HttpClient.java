@@ -10,6 +10,7 @@ import org.httpkit.logger.EventLogger;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLParameters;
 import java.io.EOFException;
 import java.io.IOException;
 import java.net.*;
@@ -34,6 +35,8 @@ import static org.httpkit.client.State.READ_INITIAL;
 
 public class HttpClient implements Runnable {
     private static final AtomicInteger ID = new AtomicInteger(0);
+    private static final Object DEFAULT_TLS_POLICY = new Object();
+    private static final Object INSECURE_TLS_POLICY = new Object();
 
     private static SSLContext defaultContext = null;
 
@@ -278,8 +281,11 @@ public class HttpClient implements Runnable {
                         // Ensure that the key is added to keepalives exactly once on a state transition. There could be cases where decoder reaches
                         // ALL_READ state multiple times.
                         if (oldState != ALL_READ) {
+                            Object tlsPolicy = req instanceof HttpsRequest
+                                    ? ((HttpsRequest) req).tlsPolicy : null;
                             keepalives.offer(new PersistentConn(now + req.cfg.keepAlive,
-                                    req.addr, req.host, req instanceof HttpsRequest, key));
+                                    req.addr, req.host, req instanceof HttpsRequest,
+                                    tlsPolicy, key));
                         }
                     } else {
                         closeQuietly(key);
@@ -471,6 +477,7 @@ public class HttpClient implements Runnable {
             try {
                 URI tlsUri = proxyUri != null && "https".equals(proxyScheme)
                         ? proxyUri : uri;
+                boolean suppliedEngine = engine != null;
                 if (engine == null) {
                     engine = getDefaultContext().createSSLEngine(
                             tlsUri.getHost(), HttpUtils.getPort(tlsUri));
@@ -481,7 +488,19 @@ public class HttpClient implements Runnable {
 
                 sslEngineUriConfigurer.configure(engine, tlsUri);
 
-                submit(new HttpsRequest(addr, host, request, cb, requests, cfg, engine));
+                if (cfg.insecure) {
+                    SSLParameters parameters = engine.getSSLParameters();
+                    // JSSE ignores null when updating existing parameters;
+                    // an empty algorithm explicitly disables identification.
+                    parameters.setEndpointIdentificationAlgorithm("");
+                    engine.setSSLParameters(parameters);
+                }
+
+                Object tlsPolicy = cfg.insecure ? INSECURE_TLS_POLICY
+                        : suppliedEngine ? engine : DEFAULT_TLS_POLICY;
+
+                submit(new HttpsRequest(addr, host, request, cb, requests, cfg,
+                        engine, tlsPolicy));
             } catch (Exception e) {
                 cb.onThrowable(e);
             }
@@ -639,6 +658,9 @@ public class HttpClient implements Runnable {
                     ch.configureBlocking(false);
                     boolean connected = ch.connect(job.addr);
                     job.setConnected(connected);
+                    if (connected && job instanceof HttpsRequest) {
+                        ((HttpsRequest) job).engine.beginHandshake();
+                    }
                     // if connection is established immediatelly, should wait for write. Fix #98
                     job.key = ch.register(selector, connected ? OP_WRITE : OP_CONNECT, job);
                     numConnections++;

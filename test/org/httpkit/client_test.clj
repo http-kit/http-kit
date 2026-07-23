@@ -438,6 +438,17 @@
         (is (nil? (:error resp))
             "Should not have an error")))))
 
+(deftest test-tls-pool-isolates-security-policy
+  (let [http-client (hkc/make-client {})
+        url "https://localhost:9898/get"]
+    (try
+      (let [insecure @(hkc/get url {:client http-client :insecure? true})
+            secure   @(hkc/get url {:client http-client})]
+        (is (= 200 (:status insecure)) (pr-str insecure))
+        (is (instance? javax.net.ssl.SSLHandshakeException (:error secure))))
+      (finally
+        (.stop ^HttpClient http-client)))))
+
 (deftest test-multiple-https-calls-with-same-engine
   (let [opts {:client hkc/legacy-client
               :sslengine (ClientSslEngineFactory/trustAnybody)}]

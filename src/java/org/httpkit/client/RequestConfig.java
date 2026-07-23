@@ -16,10 +16,19 @@ public class RequestConfig {
     final String proxy_url;
     final boolean tunnel;
     final boolean autoCompression;
+    final boolean insecure;
 
     public RequestConfig(HttpMethod method, Map<String, Object> headers, Object body,
                          int connTimeoutMs, int idleTimeoutMs, int keepAliveMs,
                          String proxy_url, boolean tunnel, boolean autoCompression) {
+        this(method, headers, body, connTimeoutMs, idleTimeoutMs, keepAliveMs,
+                proxy_url, tunnel, autoCompression, false);
+    }
+
+    public RequestConfig(HttpMethod method, Map<String, Object> headers, Object body,
+                         int connTimeoutMs, int idleTimeoutMs, int keepAliveMs,
+                         String proxy_url, boolean tunnel, boolean autoCompression,
+                         boolean insecure) {
         this.connTimeout = connTimeoutMs;
         this.idleTimeout = idleTimeoutMs;
         this.keepAlive = keepAliveMs;
@@ -29,6 +38,7 @@ public class RequestConfig {
         this.proxy_url = proxy_url;
         this.tunnel = tunnel;
         this.autoCompression = autoCompression;
+        this.insecure = insecure;
     }
 
     // needed for instrumentation

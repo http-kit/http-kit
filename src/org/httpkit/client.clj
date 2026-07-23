@@ -450,7 +450,8 @@ Value may be a delay. See also `make-client`."}
         connect-timeout (or timeout connect-timeout)
         idle-timeout    (or timeout idle-timeout)
         cfg (RequestConfig. method headers body connect-timeout idle-timeout
-              keepalive effective-proxy-url tunnel? auto-compression?)]
+              keepalive effective-proxy-url tunnel? auto-compression?
+              (boolean insecure?))]
 
     (.exec ^HttpClient client url cfg sslengine listener)
 
