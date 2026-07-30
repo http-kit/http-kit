@@ -2,6 +2,72 @@ This project uses [**Break Versioning**](https://www.taoensso.com/break-versioni
 
 ---
 
+# `v2.9.0-beta4` (2026-07-31)
+
+- **Dependency**: [on Clojars](https://clojars.org/http-kit/versions/2.9.0-beta4)
+- **Versioning**: [Break Versioning](https://www.taoensso.com/break-versioning)
+
+This is a **security and maintenance** pre-release with extensive protocol
+hardening across the server, client, and WebSocket implementations. It's
+expected to be stable, but the changes affect core networking paths: please
+**test carefully and report any unexpected problems**, thank you! 🙏
+
+See linked commits below for details, and big thanks to all contributors!
+
+\- [Peter Taoussanis](https://www.taoensso.com)
+
+## Security and compatibility note ⚠️
+
+This release rejects several malformed or ambiguous HTTP and WebSocket forms
+that were previously accepted, and fixes request, response, TLS, redirect,
+pooling, and resource-limit hazards.
+
+Configured `max-body-filter` limits now apply to both received and
+automatically decompressed response sizes. Buffered responses remain unlimited
+by default; use `max-body-filter` or `:as :stream` for untrusted content.
+
+Three uncommon behaviours intentionally change: malformed WebSocket handshakes
+are rejected, the server now owns wire response framing, and unsupported
+`:tunnel? true` proxy requests fail explicitly. Please see the BREAKING entries
+for affected users and remediation.
+
+## Since `v2.9.0-beta3` (2025-11-04)
+
+### BREAKING
+
+* \[mod] \[server] Harden HTTP boundaries \[4a37a56]
+* \[mod] \[server] \[GHSA-j9v4-rr7v-r6pw] WebSocket enforce protocol state (@hibrian827) \[08950e3]
+* \[mod] \[client] Proxy reject broken tunnels \[06c821f]
+
+### Fixes
+
+* \[sec] \[server] \[GHSA-qwg7-h8j3-975p] Preserve protocol integrity (@vartija) \[eb60ccf]
+* \[sec] \[server] \[GHSA-4gx4-prhm-c233] Enforce protocol boundaries (@koyokr) \[7876af2]
+* \[sec] \[client] Preserve protocol integrity \[973d386]
+* \[sec] \[client] Preserve request integrity \[f4b60dc]
+* \[sec] \[client] Enforce message integrity \[84c5035]
+* \[sec] \[client] \[GHSA-h7mc-gw66-cwmx] Enforce decoded max-body limits (@EQSTLab) \[af93798]
+* \[sec] \[client] Harden request handling \[b8f2a35]
+* \[sec] \[client] Isolate TLS policies \[f922167]
+* \[sec] \[server] WebSocket preserve close semantics \[3c6f1bd]
+* \[sec] \[server] Proxy validate numeric addresses \[7046202]
+* \[fix] \[server] Preserve response lifecycle \[c4a6ff4]
+* \[fix] \[server] \[client] Protocol normalize public contracts \[3283c05]
+* \[fix] \[server] \[client] Bodies reduce resource hazards \[c0f95e9]
+* \[fix] \[client] \[#609] \[#610] `make-client` to use default SSL configurer if available (@souenzzo) \[ef9172c]
+* \[fix] \[client] \[#607] \[#608] \[#611] Enable SNI with `:insecure? true` (@Ramblurr) (@souenzzo) \[3ba47b8]
+* \[prf] \[client] Reuse HTTP/1.0 connections \[410ec78]
+* \[fix] \[server] Timer preserve scheduler liveness \[2b122dc]
+* \[fix] \[server] \[client] Graal validate current builds \[944f97e]
+
+### New
+
+* \[new] \[client] \[#591] \[#593] \[#602] Make RespListener immediately stream response (@GAumala) \[c96eaea]
+* \[new] \[server] \[#606] \[#585] Return 400 for protocol exceptions (@caioguedes) \[772737f]
+* \[new] \[server] \[#613] Add `:protocol` to Ring requests to match Ring spec (@souenzzo) \[43f3bf1]
+
+---
+
 # `v2.9.0-beta3` (2025-11-04)
 
 - **Dependency**: [on Clojars](https://clojars.org/http-kit/versions/2.9.0-beta3)

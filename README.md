@@ -1,5 +1,5 @@
 <span><img src="http-kit-logo.png" alt="http-kit" width="140"/></span>  
-[**API**][cljdoc] | [**Wiki**][GitHub wiki] | [Slack][] | Latest releases: [v2.8.1](../../releases/tag/v2.8.1) or [v2.9.0-beta3](../../releases/tag/v2.9.0-beta3)
+[**API**][cljdoc] | [**Wiki**][GitHub wiki] | [Slack][] | Latest releases: [v2.8.1](../../releases/tag/v2.8.1) or [v2.9.0-beta4](../../releases/tag/v2.9.0-beta4)
 
 [![Main tests][Main tests SVG]][Main tests URL]
 [![Graal tests][Graal tests SVG]][Graal tests URL]
