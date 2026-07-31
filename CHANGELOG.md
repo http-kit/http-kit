@@ -2,6 +2,40 @@ This project uses [**Break Versioning**](https://www.taoensso.com/break-versioni
 
 ---
 
+# Unreleased
+
+## New: WebSocket `permessage-deflate` (RFC 7692)
+
+The server now accepts a client's `permessage-deflate` offer and compresses
+WebSocket messages with **context takeover**, so message N is compressed
+against messages 1..N-1. This is what makes it worth having for a stream of
+many small similar messages: compressing each message independently saves ~10%,
+while context takeover took a sample stream of 500 small JSON-ish messages from
+88 624 to 10 783 bytes (**-88%**).
+
+- Off unless the client offers it, so a connection that does not negotiate the
+  extension is byte-identical to before.
+- Bind `*websocket-compression?*` to false to refuse it. Worth doing when
+  payloads are already compressed (images, video), where deflate spends CPU to
+  make them slightly larger, or when per-connection memory matters more than
+  bandwidth -- context takeover keeps a deflate and an inflate window alive for
+  the life of each connection.
+- `*websocket-max-message-size*` bounds a message's size **after**
+  decompression. This is separate from `:max-ws`, which bounds the bytes
+  actually received and so says nothing about the size after inflation.
+
+A message whose compressed form is empty goes out as the single octet `0x00`
+per RFC 7692 7.2.3.6, not as zero bytes. Zero bytes round-trips fine on a fresh
+connection and desynchronises the stream mid-conversation, once there is
+compression history for it to corrupt.
+
+Not implemented: `server_max_window_bits`. `java.util.zip` does not expose
+zlib's windowBits, so the server cannot honour a smaller window and does not
+claim to -- the parameter is simply not echoed, which per RFC 7692 means a
+15-bit window. `client_max_window_bits` is accepted.
+
+---
+
 # `v2.9.0-beta4` (2026-07-31)
 
 - **Dependency**: [on Clojars](https://clojars.org/http-kit/versions/2.9.0-beta4)

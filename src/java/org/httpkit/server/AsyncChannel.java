@@ -47,6 +47,9 @@ public class AsyncChannel {
     // streaming
     private volatile boolean headerSent = false;
     private volatile boolean websocketUpgraded = false;
+    // Null unless permessage-deflate (RFC 7692) was negotiated. Guarded by the
+    // same monitor as send(), which is the only thing that touches it.
+    private PerMessageDeflate perMessageDeflate;
 
     // messages sent from a WebSocket client should be handled orderly by server
     // Changed from a Single Thread(IO event thread), no volatile needed
@@ -294,6 +297,14 @@ public class AsyncChannel {
             handler = closeHandler;
             ringHandler = closeRingHandler;
         }
+        // Deflater/Inflater hold native memory that is not reclaimed by GC
+        // promptly. A server holding many connections would otherwise leak it
+        // for as long as the objects stay reachable.
+        PerMessageDeflate pmd = getPerMessageDeflate();
+        if (pmd != null) {
+            setPerMessageDeflate(null);
+            pmd.end();
+        }
         if (handler != null) {
             handler.invoke(readable(status));
         }
@@ -341,6 +352,39 @@ public class AsyncChannel {
         return true;
     }
 
+    /**
+     * Install the negotiated permessage-deflate codec. Called once, from the
+     * handshake, before any frame is sent.
+     *
+     * <p>Also pushes it into the connection's decoder. The {@link WsAtta} that
+     * owns that decoder is created when the upgrade request is DECODED, which
+     * happens before the Ring handler and therefore before negotiation, so it
+     * cannot read the codec for itself -- both directions have to be wired from
+     * here, after there is something to wire.
+     */
+    public synchronized void setPerMessageDeflate(PerMessageDeflate pmd) {
+        this.perMessageDeflate = pmd;
+        Object atta = key.attachment();
+        if (atta instanceof WsAtta) {
+            ((WsAtta) atta).decoder.setPerMessageDeflate(pmd);
+        }
+    }
+
+    public synchronized PerMessageDeflate getPerMessageDeflate() {
+        return perMessageDeflate;
+    }
+
+    /** Frame a DATA payload, compressing it when the extension is active.
+     *  Control frames never come through here -- RFC 7692 6.1 forbids
+     *  compressing them. */
+    private ByteBuffer wsData(byte opcode, byte[] data, int length) {
+        if (perMessageDeflate != null) {
+            byte[] deflated = perMessageDeflate.compress(data, length);
+            return WsEncode(opcode, deflated, deflated.length, true);
+        }
+        return WsEncode(opcode, data, length);
+    }
+
     public synchronized boolean send(Object data, boolean close) throws IOException {
         if (closedRan.get()) {
             return false;
@@ -355,12 +399,14 @@ public class AsyncChannel {
             }
 
             if (data instanceof String) { // null is not allowed
-                server.tryWrite(key, WsEncode(OPCODE_TEXT, ((String) data).getBytes(UTF_8)));
+                byte[] bs = ((String) data).getBytes(UTF_8);
+                server.tryWrite(key, wsData(OPCODE_TEXT, bs, bs.length));
             } else if (data instanceof byte[]) {
-                server.tryWrite(key, WsEncode(OPCODE_BINARY, (byte[]) data));
+                byte[] bs = (byte[]) data;
+                server.tryWrite(key, wsData(OPCODE_BINARY, bs, bs.length));
             } else if (data instanceof InputStream) {
                 DynamicBytes bytes = readAll((InputStream) data);
-                server.tryWrite(key, WsEncode(OPCODE_BINARY, bytes.get(), bytes.length()));
+                server.tryWrite(key, wsData(OPCODE_BINARY, bytes.get(), bytes.length()));
             } else if (data instanceof Frame.PingFrame) {
                 server.tryWrite(key, WsEncode(OPCODE_PING, ((Frame) data).data));
             } else if (data instanceof Frame.PongFrame) {

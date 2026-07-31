@@ -19,3 +19,6 @@ native-test-0.0.1-standalone.build_artifacts.txt
 target
 .lein-repl-history
 /wiki/.git
+
+# clj CLI classpath cache
+.cpcache/
