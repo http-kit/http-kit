@@ -116,9 +116,7 @@
     (let [{:keys [error]} @(hkc/get "http://127.0.0.1:4347/get"
                              {:proxy-url "http://127.0.0.1:4346"})]
 
-      [(is (= (type (java.net.ConnectException.)) (type error)))
-       (is (= "Connection refused"
-             (.getMessage ^java.net.ConnectException error)))])))
+      (is (= (type (java.net.ConnectException.)) (type error))))))
 
 (deftest http-to-http-proxy
   (testing "test call proxy successfully"

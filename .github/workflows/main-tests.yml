@@ -18,7 +18,7 @@ jobs:
 
       - uses: DeLaGuardo/setup-clojure@13.6.0
         with:
-          lein: latest
+          lein: 2.12.0
 
       - uses: actions/cache@v5
         id: cache-deps

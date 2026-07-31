@@ -13,7 +13,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
-      - uses: graalvm/setup-graalvm@v1.5.2
+      - uses: graalvm/setup-graalvm@v1.6.3
         with:
           java-version: ${{ matrix.java }}
           distribution: graalvm-community
@@ -22,7 +22,7 @@ jobs:
 
       - uses: DeLaGuardo/setup-clojure@13.6.0
         with:
-          lein: latest
+          lein: 2.12.0
           bb: latest
 
       - uses: actions/cache@v5
