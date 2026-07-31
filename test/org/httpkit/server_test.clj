@@ -219,6 +219,18 @@
             (is (= "127.0.0.1" (:body resp))))
           (finally (server)))))))
 
+(deftest test-duplicate-request-headers ; Ref. #615
+  (let [request (promise)
+        handler (fn [req] (deliver request req) {:status 200})
+        server  (run-server handler {:port 0})
+        port    (:local-port (meta server))]
+    (try
+      @(client/get (str "http://localhost:" port)
+         {:headers {"x-dup" ["a" "b"] "Cookie" ["c1=1" "c2=2"]}})
+      (is (= {"x-dup" "a,b" "cookie" "c1=1;c2=2"}
+             (select-keys (:headers @request) ["x-dup" "cookie"])))
+      (finally (server)))))
+
 (deftest test-body-string
   (let [resp (http/get "http://localhost:4347/string")]
     (is (= (:status resp) 200))

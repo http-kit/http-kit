@@ -74,6 +74,21 @@ class ClojureRing {
         return status;
     }
 
+    private static Map<String, Object> ringHeaders(Map<String, Object> headers) {
+        Map<String, Object> joined = null; // Copy only if actually needed
+        for (Map.Entry<String, Object> e : headers.entrySet()) {
+            Object v = e.getValue();
+            if (v instanceof String && ((String) v).indexOf('\n') >= 0) {
+                if (joined == null) {
+                    joined = new TreeMap<String, Object>(headers);
+                }
+                String sep = "cookie".equals(e.getKey()) ? ";" : ",";
+                joined.put(e.getKey(), ((String) v).replace("\n", sep));
+            }
+        }
+        return joined != null ? joined : headers;
+    }
+
     public static IPersistentMap buildRequestMap(HttpRequest req) {
         // ring spec
         ITransientMap m = PersistentHashMap.EMPTY.asTransient();
@@ -91,8 +106,9 @@ class ClojureRing {
             .assoc(REQUEST_METHOD, req.method.KEY)
             .assoc(START_TIME, req.startTime)
 
-            // key is already lower cased, required by ring spec
-            .assoc(HEADERS, PersistentArrayMap.create(req.headers))
+            // Ring requires lowercase keys and joins duplicate headers with ",",
+            // except ";" for Cookie. Ref. #615
+            .assoc(HEADERS, PersistentArrayMap.create(ringHeaders(req.headers)))
             .assoc(CONTENT_TYPE, req.contentType)
             .assoc(CONTENT_LENGTH, req.contentLength)
             .assoc(CHARACTER_ENCODING, req.charset)

@@ -683,7 +683,7 @@
   (doseq [[sent expected] [["test" "test"]
                            [0 "0"]
                            ['(0) "0"]
-                           ['("a" "b") "a\nb"]]]
+                           ['("a" "b") "a,b"]]]
     (let [received (:body @(hkc/get "http://localhost:4347/test-header"
                              {:headers {"test-header" sent}}))]
       (is (= received expected)))))
