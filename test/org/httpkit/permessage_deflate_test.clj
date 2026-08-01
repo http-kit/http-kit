@@ -317,3 +317,51 @@
                 (finally (.end client))))
             (finally (.close ^java.net.Socket sock))))
         (finally (server))))))
+
+(deftest negotiation-grammar-is-strict
+  (testing "RFC 7692 7.1: an offer we cannot satisfy must be DECLINED, not
+            accepted with the offending parameter quietly dropped. Each of
+            these was accepted before."
+    (testing "server_max_window_bits must be declined outright — java.util.zip
+              does not expose windowBits, so we cannot honour a smaller window,
+              and accepting while omitting the parameter is not a valid
+              acceptance (7.1.2.1). A client sizing its inflate window at 1 KiB
+              against our 32 KiB-distance references corrupts silently."
+      (is (nil? (pmd "permessage-deflate; server_max_window_bits=10")))
+      (is (nil? (pmd "permessage-deflate; server_max_window_bits"))))
+
+    (testing "the no-context-takeover parameters take no value"
+      (is (nil? (pmd "permessage-deflate; server_no_context_takeover=x")))
+      (is (nil? (pmd "permessage-deflate; client_no_context_takeover=x"))))
+
+    (testing "duplicate parameter names must decline (7.1)"
+      (is (nil? (pmd "permessage-deflate; client_no_context_takeover; client_no_context_takeover"))))
+
+    (testing "window-bits values are 1*DIGIT, 8..15, no leading zeroes --
+              Integer.parseInt alone accepts \"08\" and \"+8\""
+      (is (nil? (pmd "permessage-deflate; client_max_window_bits=08")))
+      (is (nil? (pmd "permessage-deflate; client_max_window_bits=+8")))
+      (is (nil? (pmd "permessage-deflate; client_max_window_bits=7")))
+      (is (nil? (pmd "permessage-deflate; client_max_window_bits=16"))))
+
+    (testing "an empty parameter is not valid grammar"
+      (is (nil? (pmd "permessage-deflate;;"))))
+
+    (testing "and what browsers actually send is still accepted"
+      (is (some? (pmd "permessage-deflate; client_max_window_bits")))
+      (is (some? (pmd "permessage-deflate; client_max_window_bits=15")))
+      (is (some? (pmd "permessage-deflate")))
+      (is (some? (pmd "permessage-deflate; client_no_context_takeover")))
+      (testing "including skipping an unsatisfiable offer for a later one"
+        (is (some? (pmd "permessage-deflate; server_max_window_bits=10, permessage-deflate")))))))
+
+(deftest end-is-idempotent-and-safe
+  (testing "both close paths reach end(), and HttpServer.stop can close a
+            channel while the selector is still decoding, so end() must be
+            idempotent and must not leave a released Inflater reachable"
+    (let [p (pmd "permessage-deflate")]
+      (.end p)
+      (.end p)
+      (is (thrown? org.httpkit.server.WebSocketException
+                   (.decompress p (byte-array [0x00])))
+          "decompress after end fails cleanly rather than touching freed native memory"))))

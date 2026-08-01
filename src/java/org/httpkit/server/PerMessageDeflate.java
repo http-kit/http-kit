@@ -2,6 +2,8 @@ package org.httpkit.server;
 
 import org.httpkit.DynamicBytes;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.zip.DataFormatException;
 import java.util.zip.Deflater;
 import java.util.zip.Inflater;
@@ -9,10 +11,17 @@ import java.util.zip.Inflater;
 /**
  * The "permessage-deflate" WebSocket extension, RFC 7692.
  *
- * <p>One instance per connection. Not thread-safe, and does not need to be:
- * outbound frames are serialised by {@code AsyncChannel.send}, which is
- * {@code synchronized}, and inbound frames are decoded on the single IO event
- * thread that owns the connection's {@link WsAtta}.
+ * <p>One instance per connection, and internally synchronized.
+ *
+ * <p>An earlier version claimed synchronization was unnecessary because
+ * outbound frames are serialised by {@code AsyncChannel.send} and inbound
+ * frames are decoded on the single IO event thread owning the connection's
+ * {@link WsAtta}. Both are true and neither covers SHUTDOWN: {@code onClose}
+ * and {@code serverClose} run on whatever thread closed the channel, and
+ * {@code HttpServer.stop} closes keys from the stopping thread while the
+ * selector may still be mid-decode. That put {@code Inflater.end()} in a race
+ * with {@code Inflater.inflate()} over native memory, which is not a
+ * misbehaving-parse problem but a JVM-integrity one.
  *
  * <h3>What is implemented</h3>
  *
@@ -52,6 +61,9 @@ public class PerMessageDeflate {
     private final boolean serverNoContextTakeover;
     private final boolean clientNoContextTakeover;
     private final int maxSize;
+    private boolean ended;
+
+    private static final byte[] EMPTY = new byte[0];
 
     private PerMessageDeflate(boolean serverNoContextTakeover,
                               boolean clientNoContextTakeover,
@@ -79,38 +91,64 @@ public class PerMessageDeflate {
         // The header is a comma-separated list of offers, each of which the
         // server may accept or skip. Take the first one we can satisfy.
         for (String candidate : offer.split(",")) {
-            String[] parts = candidate.trim().split(";");
+            // Limit -1: split() drops TRAILING empty strings by default, so
+            // "permessage-deflate;;" arrived here as a clean single-element
+            // array and the empty-parameter check below never saw it.
+            String[] parts = candidate.trim().split(";", -1);
             if (parts.length == 0 || !NAME.equalsIgnoreCase(parts[0].trim())) {
                 continue;
             }
 
             boolean serverNoCtx = false, clientNoCtx = false, acceptable = true;
-            for (int i = 1; i < parts.length; i++) {
+            // RFC 7692 7.1: "the negotiation offer contains multiple extension
+            // parameters with the same name" is grounds to DECLINE, so names
+            // are tracked rather than last-one-wins.
+            Set<String> seen = new HashSet<String>();
+
+            for (int i = 1; i < parts.length && acceptable; i++) {
                 String p = parts[i].trim();
-                if (p.isEmpty()) continue;
+                // An empty parameter (`permessage-deflate;;`) is not valid
+                // grammar; it used to be skipped.
+                if (p.isEmpty()) { acceptable = false; break; }
                 int eq = p.indexOf('=');
                 String key = (eq < 0 ? p : p.substring(0, eq)).trim();
                 String val = eq < 0 ? null : unquote(p.substring(eq + 1).trim());
 
+                if (!seen.add(key.toLowerCase())) { acceptable = false; break; }
+
                 if ("server_no_context_takeover".equalsIgnoreCase(key)) {
+                    // Takes no value. `server_no_context_takeover=x` is invalid.
+                    if (val != null) { acceptable = false; break; }
                     serverNoCtx = true;
                 } else if ("client_no_context_takeover".equalsIgnoreCase(key)) {
+                    if (val != null) { acceptable = false; break; }
                     clientNoCtx = true;
                 } else if ("client_max_window_bits".equalsIgnoreCase(key)) {
-                    // Accepted but not echoed: it constrains the CLIENT's
-                    // deflater, and our inflater copes with any legal window.
-                    if (val != null && !isWindowBits(val)) acceptable = false;
+                    // Constrains the CLIENT's deflater. Our Inflater copes with
+                    // any legal window, so an offer is acceptable either as a
+                    // bare hint or with a value -- but a malformed value is not.
+                    if (val != null && !isWindowBits(val)) { acceptable = false; break; }
                 } else if ("server_max_window_bits".equalsIgnoreCase(key)) {
-                    // Cannot be honoured (see class docs). If the client merely
-                    // offered it we decline the parameter by not echoing it,
-                    // which per RFC 7692 means a 15-bit window. A value we do
-                    // not understand makes the whole offer unacceptable.
-                    if (val != null && !isWindowBits(val)) acceptable = false;
+                    // DECLINE. java.util.zip does not expose zlib's windowBits,
+                    // so the server cannot honour a smaller window.
+                    //
+                    // This used to accept the offer and simply omit the
+                    // parameter from the response. That is not a valid
+                    // acceptance: RFC 7692 7.1.2.1 says "a server declines an
+                    // extension negotiation offer with this parameter if the
+                    // server doesn't support it", and accepting requires
+                    // echoing the parameter with the same or a smaller value.
+                    // A client that offered server_max_window_bits=10 may size
+                    // its inflate window at 1 KiB while we emit 32 KiB-distance
+                    // references -- silent corruption, not a failed handshake.
+                    acceptable = false;
+                    break;
                 } else {
                     // An unknown parameter must make the offer unacceptable
                     // rather than be ignored -- ignoring it would mean agreeing
                     // to terms we did not implement.
                     acceptable = false;
+                    break;
                 }
             }
             if (acceptable) {
@@ -120,13 +158,17 @@ public class PerMessageDeflate {
         return null;
     }
 
+    /** RFC 7692: 1*DIGIT, a decimal integer 8..15 without leading zeroes.
+     *  Integer.parseInt is too lax on its own -- it accepts "+8" and "08". */
     private static boolean isWindowBits(String s) {
-        try {
-            int n = Integer.parseInt(s);
-            return n >= 8 && n <= 15;
-        } catch (NumberFormatException e) {
-            return false;
+        if (s.isEmpty() || s.length() > 2) return false;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c < '0' || c > '9') return false;
         }
+        if (s.length() > 1 && s.charAt(0) == '0') return false;   // no leading zeroes
+        int n = Integer.parseInt(s);
+        return n >= 8 && n <= 15;
     }
 
     private static String unquote(String s) {
@@ -148,7 +190,8 @@ public class PerMessageDeflate {
      * Compress one message. RFC 7692 7.2.1: deflate with SYNC_FLUSH, then drop
      * the 4-octet {@code 00 00 FF FF} tail that the flush appends.
      */
-    public byte[] compress(byte[] data, int length) {
+    public synchronized byte[] compress(byte[] data, int length) {
+        if (ended) return EMPTY;
         deflater.setInput(data, 0, length);
         DynamicBytes out = new DynamicBytes(Math.max(64, length));
         byte[] buf = new byte[4096];
@@ -196,9 +239,18 @@ public class PerMessageDeflate {
      * Decompress one message. RFC 7692 7.2.2: append the tail the sender
      * removed, then inflate.
      */
-    public byte[] decompress(byte[] data) throws WebSocketException {
+    public synchronized byte[] decompress(byte[] data) throws WebSocketException {
+        // The connection is closing underneath us; fail the frame rather than
+        // touch a released Inflater.
+        if (ended) throw new WebSocketException(1001, "Connection closing");
         inflater.setInput(data);
-        DynamicBytes out = new DynamicBytes(Math.max(64, data.length * 4));
+        // Bounded, and not by data.length*4: that overflows to a negative
+        // capacity on a large :max-ws, and lets a peer force a 16 MiB
+        // allocation with a 4 MiB frame whose output is tiny. DynamicBytes
+        // grows as needed, so a modest start costs a copy at worst.
+        DynamicBytes out = new DynamicBytes(
+                Math.max(64, Math.min(data.length * 2L, maxSize) > Integer.MAX_VALUE
+                        ? 65536 : (int) Math.min(data.length * 2L, 65536)));
         byte[] buf = new byte[4096];
         try {
             inflate(out, buf);
@@ -230,8 +282,12 @@ public class PerMessageDeflate {
         }
     }
 
-    /** Release the native zlib state. Called when the connection closes. */
-    public void end() {
+    /** Release the native zlib state. Called when the connection closes, from
+     *  whichever thread closed it -- hence synchronized, and idempotent: both
+     *  onClose and serverClose can reach it. */
+    public synchronized void end() {
+        if (ended) return;
+        ended = true;
         deflater.end();
         inflater.end();
     }

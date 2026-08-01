@@ -297,14 +297,7 @@ public class AsyncChannel {
             handler = closeHandler;
             ringHandler = closeRingHandler;
         }
-        // Deflater/Inflater hold native memory that is not reclaimed by GC
-        // promptly. A server holding many connections would otherwise leak it
-        // for as long as the objects stay reachable.
-        PerMessageDeflate pmd = getPerMessageDeflate();
-        if (pmd != null) {
-            setPerMessageDeflate(null);
-            pmd.end();
-        }
+        releasePerMessageDeflate();
         if (handler != null) {
             handler.invoke(readable(status));
         }
@@ -343,6 +336,7 @@ public class AsyncChannel {
         if (!websocket) {
             server.responseComplete(key);
         }
+        releasePerMessageDeflate();
         if (handler != null) {
             handler.invoke(readable(0)); // server close is 0
         }
@@ -350,6 +344,28 @@ public class AsyncChannel {
             ringHandler.invoke(status, reason);
         }
         return true;
+    }
+
+    /**
+     * Release the negotiated codec's native zlib state.
+     *
+     * <p>Called from BOTH close paths. It used to live only in {@code onClose},
+     * which leaked on every server-initiated close: {@code serverClose} sets
+     * {@code closedRan} itself, and {@code RingHandler} then suppresses
+     * {@code onClose} because the channel is already closed. That covers
+     * explicit close, send-and-close, the Ring WebSocket {@code -close},
+     * overload closure and timeouts -- so a retained closed channel held both
+     * a Deflater and an Inflater indefinitely.
+     *
+     * <p>{@code PerMessageDeflate.end()} is idempotent, so reaching here twice
+     * is harmless.
+     */
+    private void releasePerMessageDeflate() {
+        PerMessageDeflate pmd = getPerMessageDeflate();
+        if (pmd != null) {
+            setPerMessageDeflate(null);
+            pmd.end();
+        }
     }
 
     /**

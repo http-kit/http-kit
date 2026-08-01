@@ -29,10 +29,13 @@ per RFC 7692 7.2.3.6, not as zero bytes. Zero bytes round-trips fine on a fresh
 connection and desynchronises the stream mid-conversation, once there is
 compression history for it to corrupt.
 
-Not implemented: `server_max_window_bits`. `java.util.zip` does not expose
-zlib's windowBits, so the server cannot honour a smaller window and does not
-claim to -- the parameter is simply not echoed, which per RFC 7692 means a
-15-bit window. `client_max_window_bits` is accepted.
+Not implemented, and therefore DECLINED rather than silently accepted:
+`server_max_window_bits`. `java.util.zip` does not expose
+zlib's windowBits, so the server cannot honour a smaller window, and per RFC
+7692 7.1.2.1 a server that does not support the parameter declines the offer --
+accepting while omitting it is not valid, and would leave a client that sized
+its inflate window at 1 KiB reading 32 KiB-distance references.
+`client_max_window_bits` is accepted.
 
 ---
 

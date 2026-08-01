@@ -27,7 +27,7 @@ public class WSDecoder {
     private static final int RSV1 = 0x40;
 
     /** Null unless permessage-deflate was negotiated for this connection. */
-    private PerMessageDeflate perMessageDeflate;
+    private volatile PerMessageDeflate perMessageDeflate;
     /** Whether the message currently being assembled was sent compressed. */
     private boolean compressedMessage;
 
@@ -51,6 +51,8 @@ public class WSDecoder {
         this.maxSize = maxSize;
     }
 
+    /** Written from the handshake thread and from the close path, read on
+     *  the selector thread -- volatile so the null on close is actually seen. */
     public void setPerMessageDeflate(PerMessageDeflate pmd) {
         this.perMessageDeflate = pmd;
     }
@@ -243,7 +245,13 @@ public class WSDecoder {
     private byte[] inflateIfNeeded(byte[] data) throws ProtocolException {
         if (!compressedMessage) return data;
         compressedMessage = false;
-        return perMessageDeflate.decompress(data);
+        // Read ONCE. The close path nulls this field from another thread, so
+        // re-reading it after the check could dereference null.
+        PerMessageDeflate pmd = perMessageDeflate;
+        if (pmd == null) {
+            throw new ProtocolException("permessage-deflate codec released while decoding");
+        }
+        return pmd.decompress(data);
     }
 
     private void appendFrameContent() {
