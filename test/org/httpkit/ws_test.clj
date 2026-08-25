@@ -18,7 +18,7 @@
    [java.net Socket]
    [org.httpkit.ws WebSocketClient]
    [org.httpkit  SpecialHttpClient]
-   [org.httpkit.server AsyncChannel]))
+   [org.httpkit.server AsyncChannel WSDecoder]))
 
 (defn ws-handler [req]
   (as-channel req
@@ -73,6 +73,8 @@
                                             (repeatedly total (partial rand-int (* 1024 1024)))
                                             (range 10 1000)))))}))
 
+(def bad-close-outcome (atom nil))
+
 (defroutes test-routes
   (GET "/ws" [] ws-handler)
   (GET "/echo" [] ws-handler-async-client)
@@ -85,6 +87,15 @@
     (fn [req]
       (as-channel req
         {:on-open (fn [^AsyncChannel ch]
+                    (.serverClose ch 1000 "bye"))})))
+  (GET "/bad-close-code" []
+    (fn [req]
+      (as-channel req
+        {:on-open (fn [^AsyncChannel ch]
+                    (reset! bad-close-outcome
+                            (try (.serverClose ch 2000 "") :accepted
+                                 (catch IllegalArgumentException _ :rejected)))
+                    ;; The rejected attempt must have left the channel intact.
                     (.serverClose ch 1000 "bye"))}))))
 
 (use-fixtures :once (fn [f]
@@ -324,9 +335,53 @@
            ["invalid UTF-8 text"
             [(masked-frame true 0 0x1 (byte-array [(unchecked-byte 0xc3) 0x28]))]]
            ["one-byte close payload"
-            [(masked-frame true 0 0x8 (byte-array [0]))]]]]
+            [(masked-frame true 0 0x8 (byte-array [0]))]]
+
+           ;; RFC 6455 7.4.2 reserves 1000-2999 "for definition by this
+           ;; protocol", so a peer may only send codes that are actually
+           ;; registered. These four were echoed back verbatim instead of
+           ;; failing the connection -- Autobahn 7.9.6 through 7.9.9.
+           ["unassigned close status 1016"
+            [(masked-frame true 0 0x8 (byte-array [0x03 (unchecked-byte 0xF8)]))]]
+           ["unassigned close status 1100"
+            [(masked-frame true 0 0x8 (byte-array [0x04 0x4C]))]]
+           ["reserved close status 2000"
+            [(masked-frame true 0 0x8 (byte-array [0x07 (unchecked-byte 0xD0)]))]]
+           ["reserved close status 2999"
+            [(masked-frame true 0 0x8 (byte-array [0x0B (unchecked-byte 0xB7)]))]]]]
     (testing description
       (is (server-closes-after? frames)))))
+
+(deftest sending-an-unassigned-close-code-is-rejected
+  (testing "one rule for both directions. Sending an unassigned code is as
+            non-conformant as receiving one, and a peer that follows RFC 6455
+            will fail the connection over it, so surface it at the call site.
+            The send path already threw for 1004/1005/1006/1015; 1016-2999 was
+            simply missing from the set."
+    (reset! bad-close-outcome nil)
+    (with-open [^Socket socket (raw-websocket "/bad-close-code")]
+      (let [{:keys [opcode body]} (read-frame socket)]
+        (is (= :rejected @bad-close-outcome)
+            "close code 2000 is unassigned and must be refused")
+        (is (= 0x8 opcode))
+        (is (= 1000 (bit-or (bit-shift-left (bit-and 0xff (aget ^bytes body 0)) 8)
+                            (bit-and 0xff (aget ^bytes body 1))))
+            "and the refusal left the channel usable: validation happens before
+             the closedRan CAS, so nothing is half-closed")))))
+
+(deftest close-status-codes-registered-after-rfc-6455-are-accepted
+  (testing "1012 Service Restart, 1013 Try Again Later and 1014 Bad Gateway
+            were registered with IANA after RFC 6455 was published, so the
+            spec's own 1000-1011 list is not the whole valid set. Rejecting
+            everything above 1011 would fail the connection on codes real
+            peers legitimately send."
+    (doseq [status [1000 1001 1002 1003 1007 1008 1009 1010 1011
+                    1012 1013 1014 3000 3999 4000 4999]]
+      (is (true? (WSDecoder/isValidCloseStatus status))
+          (str status " must be accepted")))
+    (doseq [status [0 999 1004 1005 1006 1015 1016 1100 2000 2999 5000 65535]]
+      (is (false? (WSDecoder/isValidCloseStatus status))
+          (str status " must be rejected")))))
 
 (deftest test-websocket
   (doseq [_ (range 1 4)]

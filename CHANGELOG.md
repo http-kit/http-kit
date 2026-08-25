@@ -1,5 +1,22 @@
 This project uses [**Break Versioning**](https://www.taoensso.com/break-versioning).
 
+# Unreleased
+
+## Fix: reject unassigned WebSocket close codes
+
+A CLOSE frame carrying an unassigned status in 1016-2999 was echoed back
+verbatim instead of failing the connection with 1002. RFC 6455 7.4.2 reserves
+1000-2999 for the protocol, so only registered codes may be sent: 1000-1003,
+1007-1011, and 1012-1014 registered with IANA since. 1004, 1005, 1006 and 1015
+never appear on the wire. Autobahn Testsuite cases 7.9.6 through 7.9.9.
+
+One rule for both directions. **Breaking**: `close` with a status in 1016-2999
+now throws `IllegalArgumentException`, where before it silently sent a code a
+conformant peer will fail the connection over. It already threw for 1004, 1005,
+1006 and 1015.
+
+---
+
 ---
 
 # `v2.9.0-beta4` (2026-07-31)

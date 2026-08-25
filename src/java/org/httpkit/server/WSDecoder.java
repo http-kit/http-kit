@@ -243,10 +243,31 @@ public class WSDecoder {
         }
     }
 
-    static boolean isValidCloseStatus(int status) {
-        return status >= 1000 && status < 5000
-                && status != 1004 && status != 1005
-                && status != 1006 && status != 1015;
+    /**
+     * Close codes that may appear in a CLOSE frame, in either direction.
+     *
+     * <p>RFC 6455 7.4.2 reserves 1000-2999 "for definition by this protocol,
+     * its future revisions, and extensions specified in a permanent and
+     * readily available public specification", so neither endpoint may invent
+     * one in that range: only registered codes are valid. 7.4.1 defines
+     * 1000-1011, and IANA has since registered 1012 (Service Restart), 1013
+     * (Try Again Later) and 1014 (Bad Gateway) -- which is why this is not
+     * simply "<= 1011": rejecting those would fail connections over codes real
+     * peers legitimately send. 1004 is undefined, and 1005, 1006 and 1015
+     * "MUST NOT be set as a status code in a Close control frame by an
+     * endpoint" -- they exist only for an application's own reporting.
+     * 3000-3999 belong to libraries and frameworks, 4000-4999 to private use.
+     *
+     * <p>The old predicate accepted everything from 1000 to 4999 bar four
+     * codes, so an unassigned 1016, 1100, 2000 or 2999 was echoed back
+     * verbatim instead of failing the connection with 1002 -- Autobahn cases
+     * 7.9.6 through 7.9.9.
+     *
+     */
+    public static boolean isValidCloseStatus(int status) {
+        if (status >= 3000 && status <= 4999) return true;
+        return (status >= 1000 && status <= 1003)
+                || (status >= 1007 && status <= 1014);
     }
 
     private static String decodeUtf8(byte[] data, int offset, int length)
