@@ -224,6 +224,29 @@ public class HttpServer implements Runnable {
         }
     }
 
+    /** The server's {@code :max-ws}, i.e. the bound on RECEIVED WebSocket
+     *  bytes. Exposed so the handshake can default the post-decompression
+     *  bound to it rather than to an unrelated constant. */
+    public int getMaxWs() { return maxWs; }
+
+    // permessage-deflate settings, per server. Set once from run-server before
+    // start(), read on handler threads during each handshake.
+    private volatile boolean wsCompression;
+    private volatile int wsMaxMessageSize;
+    private volatile int wsCompressionThreshold;
+
+    /** Configure RFC 7692 permessage-deflate. {@code maxMessageSize} bounds a
+     *  message AFTER decompression; 0 means use {@code :max-ws}. */
+    public void setWebSocketCompression(boolean enabled, int maxMessageSize, int threshold) {
+        this.wsCompression = enabled;
+        this.wsMaxMessageSize = maxMessageSize > 0 ? maxMessageSize : maxWs;
+        this.wsCompressionThreshold = threshold;
+    }
+
+    public boolean isWebSocketCompression()     { return wsCompression; }
+    public int getWebSocketMaxMessageSize()     { return wsMaxMessageSize > 0 ? wsMaxMessageSize : maxWs; }
+    public int getWebSocketCompressionThreshold() { return wsCompressionThreshold; }
+
     private void closeKey(final SelectionKey key, int status) {
 
         keptAlive.remove(key);
@@ -235,6 +258,13 @@ public class HttpServer implements Runnable {
         }
 
         ServerAtta att = (ServerAtta) key.attachment();
+        // The socket is gone, so nothing can still be in flight: this is the
+        // one point where releasing the permessage-deflate codec is
+        // unconditionally safe, and the only one that always runs (serverClose
+        // sets closedRan, which suppresses onClose).
+        if (att != null && att.channel != null) {
+            att.channel.releasePerMessageDeflate();
+        }
         if (att instanceof HttpAtta) {
             handler.clientClose(att.channel, -1);
         } else if (att != null) {

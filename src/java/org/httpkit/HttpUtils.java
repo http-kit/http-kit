@@ -659,12 +659,22 @@ public class HttpUtils {
     }
 
     public static ByteBuffer WsEncode(byte opcode, byte[] data, int length) {
+        return WsEncode(opcode, data, length, false);
+    }
+
+    /**
+     * @param rsv1 set the RSV1 bit, which under RFC 7692 (permessage-deflate)
+     *             marks the message as compressed. Only ever legal on the first
+     *             frame of a data message, and never on a control frame.
+     */
+    public static ByteBuffer WsEncode(byte opcode, byte[] data, int length, boolean rsv1) {
         if ((opcode & 0x08) != 0 && length > 125) {
             throw new IllegalArgumentException(
                     "Websocket control frame payload exceeds 125 bytes");
         }
         byte b0 = 0;
         b0 |= 1 << 7; // FIN
+        if (rsv1) b0 |= 0x40;
         b0 |= opcode;
         int headerLength = length <= 125 ? 2 : length <= 0xFFFF ? 4 : 10;
         ByteBuffer buffer = ByteBuffer.allocate(length + headerLength);
@@ -685,6 +695,6 @@ public class HttpUtils {
     }
 
     public static ByteBuffer WsEncode(byte opcode, byte[] data) {
-        return WsEncode(opcode, data, data.length);
+        return WsEncode(opcode, data, data.length, false);
     }
 }

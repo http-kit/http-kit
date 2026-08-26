@@ -283,3 +283,82 @@ This allows you to return the correct Content-Length for HEAD requests without g
 http-kit passes QUERY requests to Ring handlers with `:request-method :query`. The request content and `Content-Type` header are available through the usual `:body` and `:headers` keys.
 
 [RFC 10008 sections 2 and 2.1](https://www.rfc-editor.org/rfc/rfc10008.html#section-2) require a server to reject a QUERY request when `Content-Type` is missing or inconsistent with the request content. The Ring handler must validate the media type and content for the resource. RFC 10008 recommends a 400 response for missing or inconsistent media type information and a 415 response for an unsupported media type.
+## WebSocket compression (permessage-deflate)
+
+http-kit's server implements [RFC 7692](https://www.rfc-editor.org/rfc/rfc7692.html)
+`permessage-deflate`. It is **off by default**; opt in per server:
+
+```clojure
+(hk-server/run-server my-handler
+  {:port 8080
+   :websocket-compression? true})
+```
+
+Compression only ever applies to a connection whose client offered the
+extension. A connection that does not negotiate it behaves exactly as it did
+before, byte for byte.
+
+### Options
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `:websocket-compression?` | `false` | Accept a client's `permessage-deflate` offer |
+| `:websocket-max-message-size` | `:max-ws` | Max message size **after** decompression, in bytes |
+| `:websocket-compression-threshold` | `0` | Send messages smaller than this uncompressed |
+
+`:max-ws` bounds the bytes actually *received*, which says nothing about the
+size after inflation, so `:websocket-max-message-size` is a separate limit. It
+defaults to `:max-ws` so that lowering that one knob keeps bounding memory for
+compressed clients too.
+
+### Context takeover, and why the threshold defaults to 0
+
+By default each message is compressed against the messages before it (context
+takeover). That is the whole point of the extension for a stream of many small
+similar messages: compressing each message independently saves little, while
+context takeover took a sample stream of 500 small JSON-ish messages from
+88 624 to 10 783 bytes (-88%).
+
+It also means **short messages compress best, not worst**. Measured over 200
+messages on one connection:
+
+| Payload | Repetitive JSON | English text | Random bytes |
+| --- | --- | --- | --- |
+| 16 B | 0.25x | 0.25x | 1.19x |
+| 64 B | 0.17x | 0.07x | 1.09x |
+| 2048 B | 0.01x | 0.01x | 1.00x |
+
+So `:websocket-compression-threshold` defaults to 0 (compress everything),
+unlike Node's `ws`, which defaults to 1024 — that would discard exactly the win
+the extension exists for. Raise it when your messages are small *and*
+incompressible; deflate then adds a few bytes per message rather than saving
+any.
+
+The decision is made on size *before* compressing, never by compressing and
+discarding a result that came out larger: feeding bytes to the deflater
+advances the LZ77 window that the peer's inflater mirrors, so discarding the
+output would desynchronise the stream.
+
+### Costs to be aware of
+
+- Context takeover keeps a deflate and an inflate window alive for the life of
+  each connection, so per-connection memory rises. Clients may ask to disable
+  it with `client_no_context_takeover` / `server_no_context_takeover`, which
+  http-kit honours.
+- Decompression runs on http-kit's IO thread. It is bounded by
+  `:websocket-max-message-size`, but a large message is real work on a thread
+  shared by every connection.
+- Already-compressed payloads (images, video, audio) do not benefit and cost
+  CPU to make marginally larger. Leave compression off, or raise the threshold.
+
+### What is not supported
+
+A *smaller* `server_max_window_bits`. `java.util.zip` does not expose zlib's
+`windowBits`, so the server cannot honour a window under 32 KiB and must not
+claim to; such an offer is declined rather than accepted-and-ignored, which
+would corrupt silently. `server_max_window_bits=15` is accepted and echoed,
+being satisfiable exactly, and `client_max_window_bits` is accepted at any
+value.
+
+A `Sec-WebSocket-Extensions` value that cannot be parsed yields an uncompressed
+connection rather than a failed handshake.

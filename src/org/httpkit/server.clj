@@ -5,7 +5,7 @@
    [org.httpkit.utils :as utils])
 
   (:import
-   [org.httpkit.server AsyncChannel HttpServer RingHandler ProxyProtocolOption HttpServer$AddressFinder HttpServer$ServerChannelFactory Frame$PingFrame Frame$PongFrame]
+   [org.httpkit.server AsyncChannel HttpServer RingHandler ProxyProtocolOption HttpServer$AddressFinder HttpServer$ServerChannelFactory Frame$PingFrame Frame$PongFrame PerMessageDeflate]
    [org.httpkit.logger ContextLogger EventLogger EventNames]
    [java.net InetSocketAddress]
    [java.nio ByteBuffer]
@@ -91,6 +91,14 @@
     :max-ws                     ; Max WebSocket message size in bytes (default: 4MB)
     :max-line                   ; Max HTTP header line size in bytes (default: 8KB)
 
+    :websocket-compression?     ; Accept a client's RFC 7692 `permessage-deflate`
+                                ; offer? (default: false)
+    :websocket-max-message-size ; Max WebSocket message size in bytes AFTER
+                                ; decompression (default: `:max-ws`)
+    :websocket-compression-threshold ; Send messages smaller than this many bytes
+                                ; uncompressed (default: 0, i.e. compress all).
+                                ; See the wiki for when to raise it.
+
     :proxy-protocol             ; Proxy protocol e/o #{:disable :enable :optional}
 
     :server-header              ; The \"Server\" header, disabled if nil. Default: \"http-kit\".
@@ -130,13 +138,18 @@
 
   [handler
    & [{:keys [ip port max-body max-ws max-line
+              websocket-compression? websocket-max-message-size
+              websocket-compression-threshold
               proxy-protocol worker-pool
               error-logger warn-logger event-logger event-names
               legacy-return-value? legacy-unsafe-remote-addr? legacy-content-length?
               server-header address-finder
               channel-factory ring-async?] :as opts
 
-       :or   {ip         "0.0.0.0"
+       :or   {websocket-compression? false
+              websocket-max-message-size 0   ; 0 => use :max-ws
+              websocket-compression-threshold 0
+              ip         "0.0.0.0"
               port       8090
               max-body   8388608
               max-ws     4194304
@@ -204,6 +217,10 @@
                        warn-logger
                        evt-logger
                        evt-names)]
+    (.setWebSocketCompression s
+      (boolean websocket-compression?)
+      (int websocket-max-message-size)
+      (int websocket-compression-threshold))
     (.start s)
 
     (if-not legacy-return-value?
@@ -258,21 +275,45 @@
         (valid-websocket-key? sec-ws-key))
       (sec-websocket-accept sec-ws-key))))
 
+(defn- negotiate-permessage-deflate!
+  "Negotiates RFC 7692 permessage-deflate against the client's offer and, when
+  accepted, installs the codec on `ch`. Returns the value for the response's
+  `Sec-WebSocket-Extensions` header, or nil.
+
+  Compression is only ever enabled when the client asks for it, so a client
+  that does not offer the extension sees byte-identical behaviour to before.
+
+  The codec has to be installed via `AsyncChannel`, which pushes it into the
+  connection's decoder: the `WsAtta` owning that decoder is created when the
+  upgrade request is DECODED, which is before the Ring handler runs and so
+  before this can negotiate anything."
+  [^AsyncChannel ch ring-req]
+  (when (.isWebSocketCompression ch)
+    (when-let [pmd (PerMessageDeflate/negotiate
+                     (get-in ring-req [:headers "sec-websocket-extensions"])
+                     (.getWebSocketMaxMessageSize ch)
+                     (.getWebSocketCompressionThreshold ch))]
+      (.setPerMessageDeflate ch pmd)
+      (.responseHeader pmd))))
+
 (defn send-checked-websocket-handshake!
   "Given an AsyncChannel and `sec-ws-accept` string, unconditionally
   sends handshake to upgrade given AsyncChannel to a WebSocket.
   See also `websocket-handshake-check`."
-  [^AsyncChannel ch ^String sec-ws-accept]
-  (.sendHandshake ch
-    {"Upgrade" "websocket"
-     "Connection" "Upgrade"
-     "Sec-WebSocket-Accept" sec-ws-accept}))
+  ([^AsyncChannel ch ^String sec-ws-accept] (send-checked-websocket-handshake! ch sec-ws-accept nil))
+  ([^AsyncChannel ch ^String sec-ws-accept ring-req]
+   (let [ext (when ring-req (negotiate-permessage-deflate! ch ring-req))]
+     (.sendHandshake ch
+       (cond-> {"Upgrade" "websocket"
+                "Connection" "Upgrade"
+                "Sec-WebSocket-Accept" sec-ws-accept}
+         ext (assoc "Sec-WebSocket-Extensions" ext))))))
 
 (defn send-websocket-handshake!
   "Returns true iff successfully upgraded a valid WebSocket request."
   [^AsyncChannel ch ring-req]
   (when-let [sec-ws-accept (websocket-handshake-check ring-req)]
-    (send-checked-websocket-handshake! ch sec-ws-accept)
+    (send-checked-websocket-handshake! ch sec-ws-accept ring-req)
     true))
 
 ;;;; Channel API
@@ -353,7 +394,7 @@
      (if (:websocket? ring-req#)
        (if-let [sec-ws-accept# (websocket-handshake-check ring-req#)]
          (do
-           (send-checked-websocket-handshake! ~ch-name sec-ws-accept#)
+           (send-checked-websocket-handshake! ~ch-name sec-ws-accept# ring-req#)
            ~@body
            {:body ~ch-name})
          {:status 400 :body "Bad Sec-WebSocket-Key header"})
@@ -418,7 +459,7 @@
         (do
           (when-let [f on-receive] (org.httpkit.server/on-receive ch (partial f ch)))
           (when-let [f on-ping]    (org.httpkit.server/on-ping    ch (partial f ch)))
-          (send-checked-websocket-handshake! ch sec-ws-accept)
+          (send-checked-websocket-handshake! ch sec-ws-accept ring-req)
           (when-let [f on-open] (f ch)))
         (when-let [f on-handshake-error] (f ch)))
       (when-let [f on-open] (f ch)))
@@ -460,10 +501,12 @@
             (.setReceiveHandler   ch (fn [msg]         (wsp/on-message l sock (if (string? msg) msg (ByteBuffer/wrap msg)))))
             (.setCloseRingHandler ch (fn [code reason] (wsp/on-close   l sock code reason)))
 
-            (let [headers
-                  {"Upgrade"              "websocket"
-                   "Connection"           "Upgrade"
-                   "Sec-WebSocket-Accept" sec-ws-accept}]
+            (let [ext (negotiate-permessage-deflate! ch rreq)
+                  headers
+                  (cond-> {"Upgrade"              "websocket"
+                           "Connection"           "Upgrade"
+                           "Sec-WebSocket-Accept" sec-ws-accept}
+                    ext (assoc "Sec-WebSocket-Extensions" ext))]
 
               (.sendHandshake ch
                 (if-let [protocol (:ring.websocket/protocol rresp)]

@@ -2,6 +2,23 @@ This project uses [**Break Versioning**](https://www.taoensso.com/break-versioni
 
 ---
 
+# Unreleased
+
+## New: WebSocket `permessage-deflate` (RFC 7692)
+
+The server can now accept a client's `permessage-deflate` offer and compress
+WebSocket messages, with context takeover in both directions.
+
+Opt in per server with `:websocket-compression? true`; it is **off by default**.
+Related options: `:websocket-max-message-size` (bounds a message after
+decompression, defaults to `:max-ws`) and `:websocket-compression-threshold`
+(send messages below a given size uncompressed, default 0).
+
+See [WebSocket compression](https://github.com/http-kit/http-kit/wiki/3-Server#websocket-compression-permessage-deflate)
+for what is and isn't supported, tuning guidance, and measured trade-offs.
+
+---
+
 # `v2.9.0-beta4` (2026-07-31)
 
 - **Dependency**: [on Clojars](https://clojars.org/http-kit/versions/2.9.0-beta4)

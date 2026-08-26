@@ -47,6 +47,18 @@ public class AsyncChannel {
     // streaming
     private volatile boolean headerSent = false;
     private volatile boolean websocketUpgraded = false;
+    // Null unless permessage-deflate (RFC 7692) was negotiated. An
+    // AtomicReference, not a field under this channel's monitor: the release
+    // path runs on the selector thread while it holds the connection's
+    // ServerAtta monitor. See releasePerMessageDeflate.
+    private final AtomicReference<PerMessageDeflate> perMessageDeflate =
+            new AtomicReference<PerMessageDeflate>();
+    /** Serialises codec install vs release. A leaf lock -- see
+     *  setPerMessageDeflate. */
+    private final Object codecLock = new Object();
+    /** Set once the codec has been released, so a handshake that finishes after
+     *  the connection died does not install one on a dead channel. */
+    private boolean codecReleased;
 
     // messages sent from a WebSocket client should be handled orderly by server
     // Changed from a Single Thread(IO event thread), no volatile needed
@@ -294,6 +306,7 @@ public class AsyncChannel {
             handler = closeHandler;
             ringHandler = closeRingHandler;
         }
+        releasePerMessageDeflate();
         if (handler != null) {
             handler.invoke(readable(status));
         }
@@ -332,6 +345,11 @@ public class AsyncChannel {
         if (!websocket) {
             server.responseComplete(key);
         }
+        // Deliberately NOT releasing the permessage-deflate codec here: we
+        // have only SENT our CLOSE, and the socket stays open until the peer's
+        // comes back (RFC 6455 5.5.1), so the peer may still be delivering
+        // compressed frames it sent before it saw ours. HttpServer.closeKey
+        // releases it once the socket is actually gone.
         if (handler != null) {
             handler.invoke(readable(0)); // server close is 0
         }
@@ -339,6 +357,115 @@ public class AsyncChannel {
             ringHandler.invoke(status, reason);
         }
         return true;
+    }
+
+    /**
+     * Release the negotiated codec's native zlib state.
+     *
+     * <p>Reached from {@code onClose} and from {@link HttpServer#closeKey},
+     * whichever comes first; both are needed, because {@code serverClose} sets
+     * {@code closedRan} itself and {@code RingHandler} then suppresses
+     * {@code onClose}, which would leak a Deflater and an Inflater on every
+     * server-initiated close.
+     *
+     * <p>This must never wait on THIS CHANNEL'S MONITOR. {@code closeKey} runs
+     * from {@code HttpServer.doWrite}, which holds the connection's
+     * {@code ServerAtta} monitor across the call, while {@code send} takes this
+     * channel's monitor and then asks {@code tryWrite} for that same
+     * {@code ServerAtta} monitor. A {@code synchronized} accessor here closes
+     * that cycle and deadlocks the single selector thread against an
+     * application thread -- on every connection, since this runs whether or not
+     * a codec was negotiated. Hence the {@link AtomicReference} and the
+     * separate {@link #codecLock}, which is a leaf.
+     */
+    public void releasePerMessageDeflate() {
+        PerMessageDeflate pmd;
+        synchronized (codecLock) {
+            codecReleased = true;
+            pmd = perMessageDeflate.getAndSet(null);
+            // Only touch the decoder if there was something wired into it. This
+            // runs on EVERY connection close, including plain HTTP ones that
+            // never negotiated anything.
+            if (pmd != null) wireDecoder(null);
+        }
+        if (pmd != null) pmd.end();
+    }
+
+    /**
+     * Install the negotiated permessage-deflate codec, from the handshake.
+     *
+     * <p>Installing and releasing are mutually exclusive under
+     * {@link #codecLock} because a connection can die while its handshake is
+     * still running ({@code HttpServer.stop} closes keys from the stopping
+     * thread). Interleaved, they would either leave this channel's reference
+     * null while the decoder still points at an ended codec, or install a codec
+     * on a dead channel that nothing will ever {@code end()}.
+     *
+     * <p>{@code codecLock} is a leaf: nothing under it calls {@code tryWrite},
+     * a close handler, or any other channel method, so it cannot take part in
+     * the cycle {@link #releasePerMessageDeflate} describes.
+     */
+    public void setPerMessageDeflate(PerMessageDeflate pmd) {
+        synchronized (codecLock) {
+            if (codecReleased) {
+                // The connection went away mid-handshake. Own the codec we were
+                // handed rather than installing it where nothing will free it.
+                if (pmd != null) pmd.end();
+                return;
+            }
+            perMessageDeflate.set(pmd);
+            wireDecoder(pmd);
+        }
+    }
+
+    /**
+     * Push the codec into the connection's decoder. The {@link WsAtta} that
+     * owns that decoder is created when the upgrade request is DECODED, which
+     * happens before the Ring handler and therefore before negotiation, so it
+     * cannot read the codec for itself -- both directions have to be wired from
+     * here, after there is something to wire.
+     */
+    private void wireDecoder(PerMessageDeflate pmd) {
+        // key is null in unit tests that exercise the close paths directly, and
+        // there is nothing to wire before registration anyway.
+        if (key == null) return;
+        Object atta = key.attachment();
+        if (atta instanceof WsAtta) {
+            ((WsAtta) atta).decoder.setPerMessageDeflate(pmd);
+        }
+    }
+
+    /** The server's {@code :max-ws}. See {@code HttpServer.getMaxWs}. */
+    public int getMaxWs() { return server.getMaxWs(); }
+
+    /** This server's permessage-deflate settings. See
+     *  {@code HttpServer.setWebSocketCompression}. */
+    public boolean isWebSocketCompression()       { return server.isWebSocketCompression(); }
+    public int getWebSocketMaxMessageSize()       { return server.getWebSocketMaxMessageSize(); }
+    public int getWebSocketCompressionThreshold() { return server.getWebSocketCompressionThreshold(); }
+
+    public PerMessageDeflate getPerMessageDeflate() {
+        return perMessageDeflate.get();
+    }
+
+    /** Frame a DATA payload, compressing it when the extension is active.
+     *  Control frames never come through here -- RFC 7692 6.1 forbids
+     *  compressing them. */
+    private ByteBuffer wsData(byte opcode, byte[] data, int length) {
+        // shouldCompress is asked BEFORE compressing, never after: a message
+        // skipped here never enters the deflate stream, so the peer's inflater
+        // stays in step. RSV1 is cleared for it, which RFC 7692 6.1 allows.
+        //
+        // Read once: the codec can be released concurrently. Losing that race
+        // is safe either way -- an uncompressed frame is always legal, and
+        // compress() on an ended codec returns the empty block rather than
+        // touching freed native state.
+        PerMessageDeflate pmd = perMessageDeflate.get();
+        if (pmd != null && pmd.shouldCompress(length)) {
+            byte[] deflated = pmd.compress(data, length);
+            return WsEncode(opcode, deflated, deflated.length, true);
+        }
+        return WsEncode(opcode, data, length);
     }
 
     public synchronized boolean send(Object data, boolean close) throws IOException {
@@ -355,12 +482,14 @@ public class AsyncChannel {
             }
 
             if (data instanceof String) { // null is not allowed
-                server.tryWrite(key, WsEncode(OPCODE_TEXT, ((String) data).getBytes(UTF_8)));
+                byte[] bs = ((String) data).getBytes(UTF_8);
+                server.tryWrite(key, wsData(OPCODE_TEXT, bs, bs.length));
             } else if (data instanceof byte[]) {
-                server.tryWrite(key, WsEncode(OPCODE_BINARY, (byte[]) data));
+                byte[] bs = (byte[]) data;
+                server.tryWrite(key, wsData(OPCODE_BINARY, bs, bs.length));
             } else if (data instanceof InputStream) {
                 DynamicBytes bytes = readAll((InputStream) data);
-                server.tryWrite(key, WsEncode(OPCODE_BINARY, bytes.get(), bytes.length()));
+                server.tryWrite(key, wsData(OPCODE_BINARY, bytes.get(), bytes.length()));
             } else if (data instanceof Frame.PingFrame) {
                 server.tryWrite(key, WsEncode(OPCODE_PING, ((Frame) data).data));
             } else if (data instanceof Frame.PongFrame) {

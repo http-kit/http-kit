@@ -23,6 +23,14 @@ public class WSDecoder {
 
     private final int maxSize;
 
+    /** RFC 7692 marks a compressed message by setting RSV1 on its FIRST frame. */
+    private static final int RSV1 = 0x40;
+
+    /** Null unless permessage-deflate was negotiated for this connection. */
+    private volatile PerMessageDeflate perMessageDeflate;
+    /** Whether the message currently being assembled was sent compressed. */
+    private boolean compressedMessage;
+
     private State state = State.FRAME_START;
     private DynamicBytes content; // Content accumulated across fragmented data frames
     private byte[] frameContent;
@@ -41,6 +49,12 @@ public class WSDecoder {
 
     public WSDecoder(int maxSize) {
         this.maxSize = maxSize;
+    }
+
+    /** Written from the handshake thread and from the close path, read on
+     *  the selector thread -- volatile so the null on close is actually seen. */
+    public void setPerMessageDeflate(PerMessageDeflate pmd) {
+        this.perMessageDeflate = pmd;
     }
 
     private boolean isAvailable(ByteBuffer src, int length) {
@@ -62,7 +76,11 @@ public class WSDecoder {
                     byte b = buffer.get(); // FIN, RSV, OPCODE
                     finalFlag = (b & 0x80) != 0;
 
-                    if ((b & 0x70) != 0) {
+                    // RSV1 is permessage-deflate's "this message is compressed"
+                    // bit and is legal only when the extension was negotiated.
+                    // RSV2/RSV3 remain unsupported.
+                    boolean rsv1 = (b & RSV1) != 0;
+                    if ((b & 0x30) != 0 || (rsv1 && perMessageDeflate == null)) {
                         throw new ProtocolException("unsupported websocket extension data");
                     }
 
@@ -71,15 +89,27 @@ public class WSDecoder {
                         throw new ProtocolException("unsupported websocket opcode: " + opcode);
                     }
                     if (isControlFrame(opcode)) {
+                        // RFC 7692 6.1: control frames are never compressed.
+                        if (rsv1) {
+                            throw new ProtocolException("compressed websocket control frame");
+                        }
                         if (!finalFlag) {
                             throw new ProtocolException("fragmented websocket control frame");
                         }
                     } else if (opcode == OPCODE_CONT) {
+                        // Continuations inherit the first frame's compression;
+                        // RSV1 must not be repeated on them.
+                        if (rsv1) {
+                            throw new ProtocolException(
+                                    "RSV1 set on websocket continuation frame");
+                        }
                         if (fragmentedOpCode == -1) {
                             throw new ProtocolException("unexpected websocket continuation frame");
                         }
                     } else if (fragmentedOpCode != -1) {
                         throw new ProtocolException("new data frame while fragmented message is open");
+                    } else {
+                        compressedMessage = rsv1;
                     }
                     state = State.READ_LENGTH;
                     break;
@@ -182,10 +212,14 @@ public class WSDecoder {
                                 byte[] completedContent = content.bytes();
                                 fragmentedOpCode = -1;
                                 content = null;
-                                return dataFrame(completedOpcode, completedContent);
+                                // Inflate the REASSEMBLED message, not each
+                                // fragment: the deflate stream spans the whole
+                                // message and a fragment is not independently
+                                // decodable.
+                                return dataFrame(completedOpcode, inflateIfNeeded(completedContent));
                             }
                         } else if (finalFlag) {
-                            return dataFrame(opcode, frameContent);
+                            return dataFrame(opcode, inflateIfNeeded(frameContent));
                         } else {
                             fragmentedOpCode = opcode;
                             content = new DynamicBytes(frameContent.length);
@@ -206,6 +240,18 @@ public class WSDecoder {
 
     private static boolean isControlFrame(int opcode) {
         return opcode >= OPCODE_CLOSE;
+    }
+
+    private byte[] inflateIfNeeded(byte[] data) throws ProtocolException {
+        if (!compressedMessage) return data;
+        compressedMessage = false;
+        // Read ONCE. The close path nulls this field from another thread, so
+        // re-reading it after the check could dereference null.
+        PerMessageDeflate pmd = perMessageDeflate;
+        if (pmd == null) {
+            throw new ProtocolException("permessage-deflate codec released while decoding");
+        }
+        return pmd.decompress(data);
     }
 
     private void appendFrameContent() {
