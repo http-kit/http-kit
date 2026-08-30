@@ -17,6 +17,9 @@ public class EventNames {
 
     public final String serverChannelCloseError;
 
+    /** Per-connection write queue exceeded {@code :max-queued-bytes}. */
+    public final String serverQueueOverflow;
+
     /** Prefix for HTTP status of processed requests */
     public final String serverStatusPrefix;
 
@@ -49,6 +52,7 @@ public class EventNames {
         this.serverWsDecodeError     = get(names, "serverWsDecodeError",     "httpkit.server.ws.decode.error");
         this.serverWsFrameError      = get(names, "serverWsFrameError",      "httpkit.server.ws.frame.error");
         this.serverChannelCloseError = get(names, "serverChannelCloseError", "httpkit.server.channel.close.error");
+        this.serverQueueOverflow = get(names, "serverQueueOverflow", "httpkit.server.queue.overflow");
         this.serverStatusPrefix      = get(names, "serverStatusPrefix",      "httpkit.server.status.processed.");
         this.serverStatus404         = get(names, "serverStatus404",         "httpkit.server.status.404");
         this.serverStatus413         = get(names, "serverStatus413",         "httpkit.server.status.413");

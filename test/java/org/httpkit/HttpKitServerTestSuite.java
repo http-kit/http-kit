@@ -24,6 +24,7 @@ import org.httpkit.timer.TimerServiceTest;
   HttpDecoderTest.class,
   RingResponseTest.class,
   AsyncChannelCloseTest.class,
+  ServerAttaWriteAccountingTest.class,
   HttpServerProtocolTest.class,
   TimerServiceTest.class,
   ThreadPoolTest.class

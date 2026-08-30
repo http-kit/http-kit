@@ -458,7 +458,7 @@
           (constantly
             {::ws/protocol "test"
              ::ws/listener
-             {:on-open    (fn [sock]           (log+ [:server/open]) (ws/send sock "hello"))
+             {:on-open    (fn [sock]           (log+ [:server/open]) (ws/send sock (StringBuilder. "hello")))
               :on-ping    (fn [sock bb-data]   (log+ [:server/ping (buf->str bb-data)]) (Thread/sleep 50) (ws/pong sock bb-data))
               :on-pong    (fn [_    bb-data]   (log+ [:server/pong (buf->str bb-data)]))
               :on-message (fn [_ msg]          (log+ [:server/message msg]))

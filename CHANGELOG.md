@@ -2,6 +2,53 @@ This project uses [**Break Versioning**](https://www.taoensso.com/break-versioni
 
 ---
 
+# Unreleased
+
+## New: outbound backpressure — `writable?`, `on-writable`, `queued-bytes`
+
+A channel accepts everything you `send!` it, and if the peer stops reading the
+data queues in the server. That queue was unbounded and silent: one non-reading
+client took **1364 MB of heap in 8 seconds** while `send!` returned `true` on
+all 20 000 calls. HTTP streaming and WebSocket share the write path, so both
+were affected.
+
+Queued bytes are now counted per connection, in O(1) — incremented by what is
+enqueued, decremented by `SocketChannel.write`'s return value, under the
+`synchronized (atta)` that already guards `toWrites`. Same units and shape as
+Netty's `ChannelOutboundBuffer`.
+
+- **`writable?`** — false once more than `:queue-high-water-bytes` (default
+  64 KB) is queued, true again only below `:queue-low-water-bytes` (default
+  32 KB). Two marks for hysteresis, as Netty's `WriteBufferWaterMark`.
+- **`on-writable`** — a race-free, one-shot continuation scheduled immediately
+  if already writable or called once when writability is restored, so an application is
+  told rather than having to poll. Equivalent to Netty's
+  `channelWritabilityChanged`, Node's `'drain'`, Servlet 3.1's
+  `onWritePossible`.
+- **`queued-bytes`** — the current backlog, for metrics.
+- **`:max-queued-bytes`** — a close threshold that schedules the connection for
+  closing. Concurrent producers can overshoot it before the selector closes.
+  **Off by default** (see below).
+
+**`send!` is unchanged**: `false` still means closed and nothing else. A write
+past the mark is still accepted, exactly as Netty's `write()` is.
+
+### Why the close threshold is off by default
+
+A size threshold cannot yet distinguish a stalled peer from a large response,
+because `HttpUtils.bodyBuffer` materialises a whole body into a single
+`ByteBuffer` — a 100 MB download to a perfectly healthy client arrives as one
+100 MB enqueue. Measured: with a 64 MiB threshold that download is truncated;
+with the threshold off it completes. Jetty's equivalent (`maxOutgoingFrames`) is
+likewise unlimited by default.
+
+Enable it where responses are small and incremental — WebSocket, SSE — and note
+the threshold is per connection. A bound safe to enable by default would need to
+key on *stall* rather than size, which is a follow-up.
+
+Overflow logs a warning and emits the `serverQueueOverflow` event, once per
+connection.
+
 # `v2.9.0-beta4` (2026-07-31)
 
 - **Dependency**: [on Clojars](https://clojars.org/http-kit/versions/2.9.0-beta4)

@@ -1,5 +1,7 @@
 package org.httpkit.server;
 
+import clojure.lang.IFn;
+
 import static java.nio.channels.SelectionKey.OP_ACCEPT;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
@@ -54,6 +56,7 @@ class PendingKey {
 
     public static final int OP_WRITE = -1;
     public static final int RESPONSE_COMPLETE = -2;
+    public static final int NOTIFY_WRITABLE = -3;
 }
 
 public class HttpServer implements Runnable {
@@ -89,6 +92,54 @@ public class HttpServer implements Runnable {
 
     // shared, single thread
     private final ByteBuffer buffer = ByteBuffer.allocateDirect(1024 * 64 - 1);
+
+    /**
+     * Per-connection close threshold for bytes queued for write. Exceeding it
+     * schedules the connection for close; concurrent producers can overshoot
+     * before the selector processes that close. Zero or negative (the DEFAULT)
+     * disables the threshold.
+     *
+     * <p><b>Off by default, deliberately.</b> A size threshold cannot currently
+     * distinguish a stalled peer from a large response, because
+     * {@code HttpUtils.bodyBuffer} materialises a whole body into a single
+     * ByteBuffer: a 100 MB download to a perfectly healthy client arrives at
+     * {@code tryWrite} as one 100 MB enqueue and would trip any threshold below
+     * it. Measured: with a 64 MiB threshold that download is truncated; with the
+     * threshold off it completes. Enabling this is therefore a deployment
+     * decision for a server whose responses are known to be small and
+     * incremental -- typically WebSocket or SSE.
+     *
+     * <p>{@link #queueHighWaterBytes} is the part that is safe to leave on: it
+     * only reports, and reporting cannot truncate anything.
+     *
+     * <p>See {@link ServerAtta#queuedBytes}.
+     */
+    public volatile long maxQueuedBytes = 0;
+
+    /**
+     * Per-connection HIGH water mark: above this, {@code writable?} reports
+     * false and the writable handler will fire when the queue drains again.
+     *
+     * <p>Default 64 KiB, matching Netty's {@code WriteBufferWaterMark}. It is
+     * a signal, not a limit, so it is cheap to leave on -- and it has to be
+     * small enough to fire before memory is a problem, which a multi-megabyte
+     * mark is not: at 4 MiB per connection nothing would be reported until
+     * tens of gigabytes were queued across a large connection count.
+     *
+     * <p>Zero or negative disables the signal.
+     */
+    public volatile long queueHighWaterBytes = 64L * 1024;
+
+    /**
+     * Per-connection LOW water mark: writability is restored only when the
+     * queue falls below this, not when it falls below
+     * {@link #queueHighWaterBytes}.
+     *
+     * <p>Default 32 KiB (half the high mark). The gap is the point -- see
+     * {@link ServerAtta#unwritable}. Netty rejects a configuration with
+     * high &lt; low; so does {@code run-server}.
+     */
+    public volatile long queueLowWaterBytes = 32L * 1024;
 
     private final ContextLogger<String, Throwable> errorLogger;
     private final ContextLogger<String, Throwable> warnLogger;
@@ -235,6 +286,12 @@ public class HttpServer implements Runnable {
         }
 
         ServerAtta att = (ServerAtta) key.attachment();
+        LinkedList<IFn> failedWrites = null;
+        if (att != null) {
+            failedWrites = att.discardQueued();
+        }
+        invokeWriteCallbacks(failedWrites,
+                new IOException("connection closed before asynchronous write completed"));
         if (att instanceof HttpAtta) {
             handler.clientClose(att.channel, -1);
         } else if (att != null) {
@@ -482,26 +539,36 @@ public class HttpServer implements Runnable {
     private void doWrite(SelectionKey key) {
         ServerAtta atta = (ServerAtta) key.attachment();
         SocketChannel ch = (SocketChannel) key.channel();
+        IFn writableCallback = null;
+        LinkedList<IFn> completedWrites = null;
         try {
             // the sync is per socket (per client). virtually, no contention
             // 1. keep byte data order, 2. ensure visibility
             synchronized (atta) {
                 LinkedList<ByteBuffer> toWrites = atta.toWrites;
                 int size = toWrites.size();
+                // The return value is exactly what left the queue, so the
+                // accounting stays O(1) rather than re-summing the list.
+                long written = 0;
                 if (size == 1) {
-                    ch.write(toWrites.get(0));
+                    written = ch.write(toWrites.get(0));
                     // TODO investigate why needed.
                     // ws request for write, but has no data?
                 } else if (size > 0) {
                     ByteBuffer buffers[] = new ByteBuffer[size];
                     toWrites.toArray(buffers);
-                    ch.write(buffers, 0, buffers.length);
+                    written = ch.write(buffers, 0, buffers.length);
                 }
+                atta.queuedBytes -= written;
+                completedWrites = atta.completedWrites(written);
                 Iterator<ByteBuffer> ite = toWrites.iterator();
                 while (ite.hasNext()) {
                     if (!ite.next().hasRemaining()) {
                         ite.remove();
                     }
+                }
+                if (restoredWritability(atta) && atta.channel != null) {
+                    writableCallback = atta.channel.takeWritableHandler();
                 }
                 // all done
                 if (toWrites.size() == 0) {
@@ -519,15 +586,52 @@ public class HttpServer implements Runnable {
             }
         } catch (IOException e) { // the remote forcibly closed the connection
             closeKey(key, CLOSE_AWAY);
+            return;
+        }
+        // Fired OUTSIDE the lock: application callbacks must never run while
+        // holding the per-connection monitor the write path needs. Byte
+        // ownership is completed FIFO; observation of callbacks may interleave
+        // with concurrent callers or close after the lock is released.
+        invokeWriteCallbacks(completedWrites, null);
+        invokeWriteCallback(writableCallback, null);
+    }
+
+    public boolean tryWrite(final SelectionKey key, ByteBuffer... buffers) {
+        return tryWrite(key, false, buffers);
+    }
+
+    /**
+     * @return true if the data went to the socket immediately, false if any of
+     *         it had to be queued. The common case is true: this is called on
+     *         the caller's thread and the socket buffer is usually empty, which
+     *         is why http-kit attempts the write here rather than always
+     *         deferring to the IO thread.
+     */
+    public boolean tryWrite(final SelectionKey key, boolean chunkInprogress, ByteBuffer... buffers) {
+        try {
+            return tryWrite(key, chunkInprogress, null, null, buffers);
+        } catch (IOException impossible) {
+            // The synchronous API historically reports write failure through
+            // channel close rather than throwing from send!.
+            return false;
         }
     }
 
-    public void tryWrite(final SelectionKey key, ByteBuffer... buffers) {
-        tryWrite(key, false, buffers);
+    /**
+     * Asynchronous write used by Ring's AsyncSocket. A true return means every
+     * byte reached the socket immediately and the caller should invoke
+     * {@code succeed}; false means the callbacks were retained with the queued
+     * bytes and will run on completion or close.
+     */
+    boolean tryWriteAsync(final SelectionKey key, IFn succeed, IFn fail,
+                          ByteBuffer... buffers) throws IOException {
+        return tryWrite(key, false, succeed, fail, buffers);
     }
 
-    public void tryWrite(final SelectionKey key, boolean chunkInprogress, ByteBuffer... buffers) {
+    private boolean tryWrite(final SelectionKey key, boolean chunkInprogress,
+                             IFn succeed, IFn fail, ByteBuffer... buffers) throws IOException {
         ServerAtta atta = (ServerAtta) key.attachment();
+        boolean writtenImmediately = true;
         synchronized (atta) {
             atta.chunkedResponseInprogress(chunkInprogress);
             if (atta.toWrites.isEmpty()) {
@@ -541,30 +645,135 @@ public class HttpServer implements Runnable {
                         for (ByteBuffer b : buffers) {
                             if (b.hasRemaining()) {
                                 atta.toWrites.add(b);
+                                atta.queuedBytes += b.remaining();
                             }
                         }
+                        atta.queuedWrite(remainingBytes(buffers), succeed, fail);
+                        writtenImmediately = false;
+                        updateWritabilityOnGrowth(atta);
                         pending.add(new PendingKey(key, PendingKey.OP_WRITE));
                         selector.wakeup();
+                        closeIfQueueExceeded(key, atta);
                     } else if (!atta.isKeepAlive()) {
                         pending.add(new PendingKey(key, CLOSE_NORMAL));
                         selector.wakeup();
                     }
                 } catch (IOException e) {
+                    writtenImmediately = false;
                     pending.add(new PendingKey(key, CLOSE_AWAY));
                     selector.wakeup();
+                    if (fail != null) throw e;
                 }
             } else {
                 // If has pending write, order should be maintained. (WebSocket)
                 Collections.addAll(atta.toWrites, buffers);
+                for (ByteBuffer b : buffers) {
+                    atta.queuedBytes += b.remaining();
+                }
+                atta.queuedWrite(remainingBytes(buffers), succeed, fail);
+                writtenImmediately = false;
+                updateWritabilityOnGrowth(atta);
                 pending.add(new PendingKey(key, PendingKey.OP_WRITE));
                 selector.wakeup();
+                closeIfQueueExceeded(key, atta);
             }
+        }
+        return writtenImmediately;
+    }
+
+    private static long remainingBytes(ByteBuffer[] buffers) {
+        long bytes = 0;
+        for (ByteBuffer buffer : buffers) bytes += buffer.remaining();
+        return bytes;
+    }
+
+    /** Invoke success (failure is null) or failure callbacks without allowing
+     * application code to tear down the selector loop. */
+    private void invokeWriteCallbacks(LinkedList<IFn> callbacks, Throwable failure) {
+        if (callbacks == null) return;
+        for (IFn callback : callbacks) {
+            invokeWriteCallback(callback, failure);
+        }
+    }
+
+    /** Invoke application completion code without endangering the selector. */
+    void invokeWriteCallback(IFn callback, Throwable failure) {
+        if (callback == null) return;
+        try {
+            if (failure == null) callback.invoke();
+            else callback.invoke(failure);
+        } catch (Throwable e) {
+            Telemetry.log(warnLogger, "asynchronous write callback failed", e);
+        }
+    }
+
+    /**
+     * Called with {@code atta}'s monitor held, after {@code queuedBytes} rose.
+     * Sets the unwritable flag on the low-to-high transition only.
+     */
+    private void updateWritabilityOnGrowth(ServerAtta atta) {
+        if (queueHighWaterBytes > 0 && !atta.unwritable
+                && atta.queuedBytes > queueHighWaterBytes) {
+            atta.unwritable = true;
+        }
+    }
+
+    /**
+     * Called with {@code atta}'s monitor held, after {@code queuedBytes} fell.
+     * Returns true if writability was just restored, so the caller can fire the
+     * handler OUTSIDE the lock -- once, on the transition, as Netty does.
+     */
+    private boolean restoredWritability(ServerAtta atta) {
+        if (atta.unwritable && atta.queuedBytes <= queueLowWaterBytes) {
+            atta.unwritable = false;
+            return true;
+        }
+        return false;
+    }
+
+    private void closeIfQueueExceeded(SelectionKey key, ServerAtta atta) {
+        // Latched: the condition stays true until the IO thread gets around to
+        // closing, and the application keeps sending in the meantime. Without
+        // this, one overflow produced 16 warn logs and 16 duplicate CLOSE_AWAY
+        // keys.
+        if (maxQueuedBytes > 0 && atta.queuedBytes > maxQueuedBytes
+                && !atta.overflowClosed) {
+            atta.overflowClosed = true;
+            String msg = "closing connection: " + atta.queuedBytes
+                    + " bytes queued exceeds max-queued-bytes " + maxQueuedBytes
+                    + "; the peer is not reading";
+            // A real exception, not null: DEFAULT_WARN_LOGGER prints
+            // e.getMessage() unconditionally, and Telemetry.log swallows the
+            // resulting NPE -- so passing null makes the only diagnostic this
+            // feature has silent in the default configuration.
+            Telemetry.log(warnLogger, msg, new IOException(msg));
+            Telemetry.log(eventLogger, eventNames.serverQueueOverflow);
+            pending.add(new PendingKey(key, CLOSE_AWAY));
+            selector.wakeup();
         }
     }
 
     void responseComplete(SelectionKey key) {
         pending.add(new PendingKey(key, PendingKey.RESPONSE_COMPLETE));
         selector.wakeup();
+    }
+
+    void requestWritableCallback(SelectionKey key) {
+        pending.add(new PendingKey(key, PendingKey.NOTIFY_WRITABLE));
+        selector.wakeup();
+    }
+
+    private void notifyWritable(SelectionKey key) {
+        ServerAtta atta = (ServerAtta) key.attachment();
+        IFn callback = null;
+        if (atta != null) {
+            synchronized (atta) {
+                if (key.channel().isOpen() && !atta.unwritable && atta.channel != null) {
+                    callback = atta.channel.takeWritableHandler();
+                }
+            }
+        }
+        invokeWriteCallback(callback, null);
     }
 
     void closeAfterResponse(SelectionKey key) {
@@ -597,6 +806,8 @@ public class HttpServer implements Runnable {
                         }
                     } else if (k.Op == PendingKey.RESPONSE_COMPLETE) {
                         resumeAfterResponse(k.key);
+                    } else if (k.Op == PendingKey.NOTIFY_WRITABLE) {
+                        notifyWritable(k.key);
                     } else {
                         closeKey(k.key, k.Op);
                     }
