@@ -283,7 +283,8 @@ public class HttpServer implements Runnable {
         synchronized (atta) {
             int readOp = atta.requestInProgress && canReadWhileInProgress(atta) ? OP_READ : 0;
             if (!atta.toWrites.isEmpty()) {
-                key.interestOps(OP_WRITE | readOp);
+                // WebSockets don't read while writes are queued
+                key.interestOps(OP_WRITE | (atta instanceof WsAtta ? 0 : readOp));
             } else if (atta.requestInProgress) {
                 key.interestOps(readOp);
             } else if (atta.isKeepAlive()) {
@@ -443,6 +444,15 @@ public class HttpServer implements Runnable {
                     if (!closed) {
                         tryWrite(key, WsEncode(WSDecoder.OPCODE_CLOSE, frame.data));
                     }
+                    return;
+                }
+
+                // Pause reading while handlers are behind, otherwise a client
+                // sending faster than they run could queue frames without bound.
+                if (atta.channel.unhandledBytes.get() >= AsyncChannel.MAX_UNHANDLED_BYTES) {
+                    atta.requestInProgress = true;
+                    savePendingInput(atta, input);
+                    updateInterestOps(key);
                     return;
                 }
             } while (input.hasRemaining()); // consume all

@@ -351,6 +351,33 @@
         (is (= 1000 (close-status frame)))
         (is (= "rejected" (String. body 2 (- (alength body) 2) "UTF-8")))))))
 
+(deftest test-websocket-reads-pause-while-handlers-behind ; Ref. #619
+  (let [n-msgs    1000 ; ~16MB, more than socket buffers hold
+        release_  (promise)
+        received_ (atom [])
+        server    (run-server
+                    (fn [req]
+                      (as-channel req
+                        {:on-receive (fn [_ msg] @release_ (swap! received_ conj msg))}))
+                    {:port 4353})]
+    (try
+      (with-open [^Socket socket (raw-websocket 4353 "/")]
+        (let [padding (apply str (repeat (* 16 1024) "x"))
+              msgs    (mapv #(str % padding) (range n-msgs))
+              frames  (ByteArrayOutputStream.)
+              _       (doseq [msg msgs] (.write frames ^bytes (masked-frame true 0 0x1 msg)))
+              sent_   (future (.write (.getOutputStream socket) (.toByteArray frames)) true)]
+
+          (is (= :blocked (deref sent_ 500 :blocked)) "Server stops reading while handler is blocked")
+          (deliver release_ true)
+          (is (true? (deref sent_ 10000 :blocked)))
+          (loop [n 0] ; Await handlers
+            (when (and (< (count @received_) n-msgs) (< n 1000))
+              (Thread/sleep 10)
+              (recur (inc n))))
+          (is (= msgs @received_) "All messages handled, in order")))
+      (finally (server)))))
+
 (deftest test-websocket
   (doseq [_ (range 1 4)]
     (let [client (WebSocketClient. "ws://localhost:4348/ws")]

@@ -313,6 +313,8 @@ class WSHandler implements Runnable {
         } catch (Throwable e) {
             Telemetry.log(errorLogger, "handle websocket frame " + frame, e);
             Telemetry.log(eventLogger, eventNames.serverWsFrameError);
+        } finally {
+            channel.frameHandled(frame);
         }
     }
 }
@@ -402,6 +404,7 @@ public class RingHandler implements IHandler {
         LinkingRunnable job = new LinkingRunnable(task);
         LinkingRunnable old = channel.serialTask;
         channel.serialTask = job;
+        channel.frameReceived(frame);
         try {
             if (old == null) { // No previous job
                 execs.submit(job);
@@ -413,6 +416,7 @@ public class RingHandler implements IHandler {
             }
         } catch (RejectedExecutionException e) {
             channel.serialTask = null;
+            channel.frameHandled(frame);
             channel.serverClose(1013, "Server overloaded");
             Telemetry.log(errorLogger, "increase :queue-size if this happens often", e);
             Telemetry.log(eventLogger, eventNames.serverStatus503Todo);

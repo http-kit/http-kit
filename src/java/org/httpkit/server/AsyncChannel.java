@@ -17,6 +17,7 @@ import java.nio.channels.SocketChannel;
 import java.util.Map;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.httpkit.HttpUtils.*;
@@ -51,6 +52,29 @@ public class AsyncChannel {
     // messages sent from a WebSocket client should be handled orderly by server
     // Changed from a Single Thread(IO event thread), no volatile needed
     LinkingRunnable serialTask;
+
+    // Approx memory held by received WebSocket frames not yet handled.
+    // Reading from the client is paused at the max, and resumed once
+    // handlers catch up.
+    static final long MAX_UNHANDLED_BYTES = 1024 * 1024;
+    final AtomicLong unhandledBytes = new AtomicLong();
+
+    private static long cost(Frame frame) {
+        return frame.data.length + 128L; // Payload + overhead
+    }
+
+    void frameReceived(Frame frame) {
+        unhandledBytes.addAndGet(cost(frame));
+    }
+
+    void frameHandled(Frame frame) {
+        long cost = cost(frame);
+        long now = unhandledBytes.addAndGet(-cost);
+        long resumeAt = MAX_UNHANDLED_BYTES / 2;
+        if (now < resumeAt && now + cost >= resumeAt) {
+            server.responseComplete(key); // Resume reading if paused
+        }
+    }
 
     public AsyncChannel(SelectionKey key, HttpServer server) {
         this.key = key;
