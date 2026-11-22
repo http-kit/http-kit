@@ -926,7 +926,7 @@
                   :else                   0)))))))))
 
 (defn- start-raw-response [chunks pause-ms keep-open-ms]
-  (let [server (ServerSocket. 0)
+  (let [server (ServerSocket. 0 50 (java.net.InetAddress/getByName "127.0.0.1")) ; Not wildcard, else port may be shared
         worker
         (future
           (with-open [socket (.accept server)

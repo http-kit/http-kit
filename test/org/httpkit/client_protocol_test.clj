@@ -29,7 +29,7 @@
     (.flush out)))
 
 (defn- raw-server [serve]
-  (let [server (ServerSocket. 0)
+  (let [server (ServerSocket. 0 50 (java.net.InetAddress/getByName "127.0.0.1")) ; Not wildcard, else port may be shared
         done
         (future
           (try
