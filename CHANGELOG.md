@@ -7,9 +7,7 @@ This project uses [**Break Versioning**](https://www.taoensso.com/break-versioni
 - **Dependency**: [on Clojars](https://clojars.org/http-kit/versions/2.9.0-beta5)
 - **Versioning**: [Break Versioning](https://www.taoensso.com/break-versioning)
 
-This is a significant **security and maintenance** pre-release. It's expected to
-be stable, but the changes affect core networking paths: please **test carefully
-and report any unexpected problems**, thank you! 🙏
+This is a significant **security and maintenance** pre-release. It's expected to be stable, but the changes affect core networking paths: please **test carefully and report any unexpected problems**, thank you! 🙏
 
 See linked commits below for details, and big thanks to all contributors!
 
@@ -20,13 +18,9 @@ See linked commits below for details, and big thanks to all contributors!
 ### BREAKING
 
 * \[mod] \[server] \[#615] Normalize duplicate headers \[6475a35]
-  - Duplicate request headers in Ring request maps are now joined with `,`
-    (`;` for `Cookie`) instead of newlines. Handlers that split these on
-    newlines should split on the new delimiters instead.
+  - Duplicate request headers in Ring request maps are now joined with `,` (`;` for `Cookie`) instead of newlines. Handlers that split these on newlines should split on the new delimiters instead.
 * \[mod] \[server] \[#620] Reject unassigned WebSocket close codes (@whilo) \[f773552]
-  - Closing a channel with a code in 1016-2999 now throws, and a peer that
-    starts a close with one receives 1002 instead of an echo. Both endpoints
-    should use a code in 4000-4999 instead.
+  - Closing a channel with a code in 1016-2999 now throws, and a peer that starts a close with one receives 1002 instead of an echo. Both endpoints should use a code in 4000-4999 instead.
 
 ### Fixes
 
@@ -63,10 +57,7 @@ See linked commits below for details, and big thanks to all contributors!
 - **Dependency**: [on Clojars](https://clojars.org/http-kit/versions/2.9.0-beta4)
 - **Versioning**: [Break Versioning](https://www.taoensso.com/break-versioning)
 
-This is a **security and maintenance** pre-release with extensive protocol
-hardening across the server, client, and WebSocket implementations. It's
-expected to be stable, but the changes affect core networking paths: please
-**test carefully and report any unexpected problems**, thank you! 🙏
+This is a **security and maintenance** pre-release with extensive protocol hardening across the server, client, and WebSocket implementations. It's expected to be stable, but the changes affect core networking paths: please **test carefully and report any unexpected problems**, thank you! 🙏
 
 See linked commits below for details, and big thanks to all contributors!
 
