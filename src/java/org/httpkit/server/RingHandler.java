@@ -271,7 +271,9 @@ class LinkingRunnable implements Runnable {
         // Run all jobs in this chain without consuming extra call stack
         LinkingRunnable r = this;
         while (!r.next.compareAndSet(null, r)) {
-            r = r.next.get();
+            LinkingRunnable next = r.next.get();
+            r.next.set(r); // Unlink, so that completed jobs can be GC'd
+            r = next;
             r.impl.run();
         }
     }
@@ -315,6 +317,7 @@ class WSHandler implements Runnable {
             Telemetry.log(eventLogger, eventNames.serverWsFrameError);
         } finally {
             channel.frameHandled(frame);
+            frame = null; // Idle channels hold their last job, release its frame
         }
     }
 }
