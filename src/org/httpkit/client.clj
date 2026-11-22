@@ -331,14 +331,18 @@ Value may be a delay. See also `make-client`."}
 
     With automatic unzipping:
       `:byte-array`     - bytes[]
-      `:stream`         - ByteInputStream
+      `:stream`         - java.io.InputStream, streams the body as it arrives
+                          (unless a custom `:filter` is used)
       `:text`           - String (charset based on Content-Type header)
-      `:auto`           - As `:text` or `:stream` (based on Content-Type header)
+      `:auto`           - As `:text` or buffered `:stream` (based on Content-Type header)
 
   Request options:
     :url :method :headers :timeout :connect-timeout :idle-timeout :query-params
-    :as :form-params :client :body :basic-auth :user-agent :filter :worker-pool
+    :as :form-params :multipart :client :body :basic-auth :user-agent :filter
+    :worker-pool
 
+    :multipart-mixed?   - Send `:multipart` as multipart/mixed? (default false,
+                          for multipart/form-data)
     :nested-param-style - ∈ #{:comma-separated :array :indexed nil} (default nil)"
 
   [{:keys [client timeout connect-timeout idle-timeout filter worker-pool keepalive as follow-redirects

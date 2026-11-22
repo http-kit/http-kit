@@ -126,7 +126,7 @@
        Files above this size (in MB) are mapped into memory for efficiency when served.
        Memory mapping could result to file locking. Defaults to 20 (MB).
 
-  [1] Ref. http://http-kit.org/migration.html for differences."
+  [1] Ref. https://http-kit.github.io/migration.html for differences."
 
   [handler
    & [{:keys [ip port max-body max-ws max-line
