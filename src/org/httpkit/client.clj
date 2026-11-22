@@ -29,19 +29,20 @@
     (str "Basic " (base64-encode (utf8-bytes basic-auth)))))
 
 (defn- name* [v] (if (instance? clojure.lang.Named v) (name v) v))
+(defn- lower-case [s] (.toLowerCase (str s) java.util.Locale/ROOT)) ; Locale independent
 
 (defn- remove-headers-ci [headers names]
   (when headers
     (reduce-kv
       (fn [m k v]
-        (if (contains? names (str/lower-case (str (name* k))))
+        (if (contains? names (lower-case (name* k)))
           m
           (assoc m k v)))
       {}
       headers)))
 
 (defn- assoc-header-ci [headers header-name value]
-  (assoc (or (remove-headers-ci headers #{(str/lower-case header-name)}) {})
+  (assoc (or (remove-headers-ci headers #{(lower-case header-name)}) {})
     header-name value))
 
 (defn- prepare-request-headers
@@ -69,8 +70,8 @@
 
 (defn- origin [url]
   (let [^URI uri (URI. url)]
-    [(some-> (.getScheme uri) str/lower-case)
-     (some-> (.getHost uri) str/lower-case)
+    [(some-> (.getScheme uri) lower-case)
+     (some-> (.getHost uri) lower-case)
      (HttpUtils/getPort uri)]))
 
 (defn- one-shot-body? [body]
