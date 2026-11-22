@@ -428,8 +428,6 @@ public class HttpServer implements Runnable {
                     handler.handle(atta.channel, frame);
                     atta.decoder.reset();
                 } else if (frame instanceof CloseFrame) {
-                    // A snapshot
-                    boolean closed = atta.channel.isClosed();
                     int status = ((CloseFrame) frame).getStatus();
                     String reason = ((CloseFrame) frame).getReason();
                     atta.closeStatus = status;
@@ -439,11 +437,7 @@ public class HttpServer implements Runnable {
                     atta.keepalive = false;
                     atta.decoder.reset();
 
-                    // Follow RFC6455 5.5.1
-                    // Do not send CLOSE frame again if it has been sent.
-                    if (!closed) {
-                        tryWrite(key, WsEncode(WSDecoder.OPCODE_CLOSE, frame.data));
-                    }
+                    tryWriteClose(key, WsEncode(WSDecoder.OPCODE_CLOSE, frame.data));
                     return;
                 }
 
@@ -471,7 +465,22 @@ public class HttpServer implements Runnable {
         atta.closeStatus = status;
         atta.closeReason = error.getMessage();
         byte[] payload = ByteBuffer.allocate(2).putShort((short) status).array();
-        tryWrite(key, WsEncode(WSDecoder.OPCODE_CLOSE, payload));
+        tryWriteClose(key, WsEncode(WSDecoder.OPCODE_CLOSE, payload));
+    }
+
+    // Follow RFC6455 5.5.1: send a WebSocket's Close frame only once
+    void tryWriteClose(SelectionKey key, ByteBuffer closeFrame) {
+        ServerAtta atta = (ServerAtta) key.attachment();
+        synchronized (atta) {
+            if (!atta.closeSent) {
+                atta.closeSent = true;
+                tryWrite(key, closeFrame);
+                return;
+            }
+        }
+        // Our Close frame may be written already, so nothing else would close
+        pending.add(new PendingKey(key, PendingKey.OP_WRITE));
+        selector.wakeup();
     }
 
     private void doRead(final SelectionKey key) {

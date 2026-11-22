@@ -347,7 +347,7 @@ public class AsyncChannel {
             ringHandler = closeRingHandler;
         }
         if (websocket) {
-            server.tryWrite(key, WsEncode(OPCODE_CLOSE, closePayload));
+            server.tryWriteClose(key, WsEncode(OPCODE_CLOSE, closePayload));
         } else if (request.version == HttpVersion.HTTP_1_0) {
             server.finishCloseDelimitedResponse(key);
         } else {

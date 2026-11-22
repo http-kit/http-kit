@@ -6,6 +6,7 @@ import java.util.LinkedList;
 public abstract class ServerAtta {
     final LinkedList<ByteBuffer> toWrites = new LinkedList<ByteBuffer>();
     long queuedBytes; // Bytes in toWrites, guarded by this
+    boolean closeSent; // WebSocket Close frame sent, guarded by this
 
     ByteBuffer pendingInput;
     boolean requestInProgress;

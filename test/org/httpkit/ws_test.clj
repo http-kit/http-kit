@@ -287,7 +287,15 @@
       (is (= 0x8 opcode))
       (is (= 1000 (bit-or (bit-shift-left (bit-and 0xff (aget ^bytes body 0)) 8)
                     (bit-and 0xff (aget ^bytes body 1)))))
-      (is (= "bye" (String. ^bytes body 2 (- (alength ^bytes body) 2) "UTF-8"))))))
+      (is (= "bye" (String. ^bytes body 2 (- (alength ^bytes body) 2) "UTF-8")))
+
+      (write-frames! socket [(masked-frame true 0 0x8 body)])
+      (is (= -1 (.read (.getInputStream socket))) "Server closes connection on client's reply")))
+
+  (with-open [^Socket socket (raw-websocket "/close-reason")]
+    (read-frame socket)
+    (write-frames! socket [(masked-frame true 0x40 0x1 "bad")])
+    (is (= -1 (.read (.getInputStream socket))) "Server sends only one Close frame")))
 
 (defn- server-closes-after? [frames]
   (with-open [^Socket socket (raw-websocket)]
