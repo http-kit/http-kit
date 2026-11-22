@@ -463,7 +463,10 @@
   (doseq [_ (range 0 20)]
     (let [path (str "/abc" (subs const-string 0 (+ (rand-int 4000) 8192)))
           resp @(client/get (str "http://localhost:4347" path))]
-      (is (= 414 (:status resp))))))
+      (is (= 414 (:status resp)))))
+  (is (= 431 (:status @(client/get "http://localhost:4347/"
+                         {:headers {"cookie" (subs const-string 0 9000)}})))
+    "Header line too long"))
 
 (deftest test-client-sent-one-byte-a-time
   (doseq [_ (range 0 4)]

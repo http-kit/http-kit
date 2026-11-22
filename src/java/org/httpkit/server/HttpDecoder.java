@@ -255,9 +255,8 @@ public class HttpDecoder {
         }
     }
 
-    private void readTrailers(ByteBuffer buffer)
-            throws LineTooLargeException, ProtocolException {
-        String line = readHeaderLine(buffer);
+    private void readTrailers(ByteBuffer buffer) throws ProtocolException {
+        String line = readFieldLine(buffer);
         while (line != null) {
             if (line.isEmpty()) {
                 finish();
@@ -269,7 +268,7 @@ public class HttpDecoder {
                 throw new ProtocolException("Forbidden trailer field: " + name);
             }
             HttpUtils.splitAndAddHeader(line, headers);
-            line = readHeaderLine(buffer);
+            line = readFieldLine(buffer);
         }
     }
 
@@ -280,12 +279,12 @@ public class HttpDecoder {
         readCount += toRead;
     }
 
-    private void readHeaders(ByteBuffer buffer) throws LineTooLargeException,
-            RequestTooLargeException, ProtocolException {
-        String line = readHeaderLine(buffer);
+    private void readHeaders(ByteBuffer buffer)
+            throws RequestTooLargeException, ProtocolException {
+        String line = readFieldLine(buffer);
         while (line != null && !line.isEmpty()) {
             HttpUtils.splitAndAddHeader(line, headers);
-            line = readHeaderLine(buffer);
+            line = readFieldLine(buffer);
         }
 
         if (line == null) {
@@ -357,6 +356,15 @@ public class HttpDecoder {
         content = null;
         lineReader.reset();
         request = null;
+    }
+
+    // Reads a header line other than the request line
+    private String readFieldLine(ByteBuffer buffer) throws ProtocolException {
+        try {
+            return readHeaderLine(buffer);
+        } catch (LineTooLargeException e) {
+            throw new HeadersTooLargeException("HTTP header: " + e.getMessage());
+        }
     }
 
     private String readHeaderLine(ByteBuffer buffer)
