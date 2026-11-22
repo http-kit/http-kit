@@ -390,7 +390,7 @@
             {:insecure? true :timeout 5000 :body ""
              :headers {"x-large" (apply str (repeat 20000 \x))}})))))
 
-(deftest test-misc-https-certs
+(deftest ^:skip-ci test-misc-https-certs ; Needs public sites
   ;; Check to make sure an https connection works using the default trust store.
   (is (contains? @(hkc/get "https://status.github.com/api/status.json") :status))
   (is (contains? @(hkc/get "https://google.com")      :status))
@@ -405,7 +405,7 @@
 
     "Random google.com IP address (may need updating!). Correct error is about cert path, NOT invalid hostname."))
 
-(deftest test-bad-ssl-certs
+(deftest ^:skip-ci test-bad-ssl-certs ; Needs badssl.com
   (doseq [url
           ["https://expired.badssl.com/"
            "https://wrong.host.badssl.com/"
@@ -451,17 +451,29 @@
           (sni/ssl-configurer {} engine uri)
           (let [params (.getSSLParameters engine)]
             (is (= "HTTPS" (.getEndpointIdentificationAlgorithm params)))
-            (is (nil? (.getServerNames params)))))))
+            (is (nil? (.getServerNames params)))))))))
 
-    (testing ":insecure? true works with hostname-mismatched certificates"
-      (let [resp @(hkc/get "https://wrong.host.badssl.com/" {:insecure? true})]
-        (is (contains? resp :status)
-            "Should successfully connect to hostname-mismatched cert with :insecure? true")
-        (is (nil? (:error resp))
-            "Should not have an error")))))
+(deftest test-https-hostname-verification
+  (when (utils/java-version>= 11)
+    (let [^java.security.KeyStore trust-store
+          (with-open [in (io/input-stream "test/ssl_keystore")]
+            (doto (java.security.KeyStore/getInstance "PKCS12")
+              (.load in (.toCharArray "123456"))))
+          tmf (doto (javax.net.ssl.TrustManagerFactory/getInstance
+                      (javax.net.ssl.TrustManagerFactory/getDefaultAlgorithm))
+                (.init trust-store))
+          ctx (doto (javax.net.ssl.SSLContext/getInstance "TLS")
+                (.init nil (.getTrustManagers tmf) nil))
+          resp @(hkc/get "https://localhost:9898/get"
+                  {:sslengine (.createSSLEngine ctx "localhost" 9898)})]
+      (is (re-find #"name matching localhost" (str (:error resp)))
+        "Trusted certificate for another hostname (localhost:9898) is rejected"))))
 
 (deftest test-tls-pool-isolates-security-policy
-  (let [http-client (hkc/make-client {})
+  (let [http-client ; Without hostname verification, to test only cert trust
+        (hkc/make-client
+          {:ssl-configurer
+           (partial sni/ssl-configurer {:hostname-verification? false})})
         url "https://localhost:9898/get"]
     (try
       (let [insecure @(hkc/get url {:client http-client :insecure? true})
@@ -478,7 +490,7 @@
     (is (= 404 (:status @(hkc/get "https://localhost:9898" opts))))
     (is (= 404 (:status @(hkc/get "https://localhost:9898" opts))))))
 
-(deftest test-default-sni-client
+(deftest ^:skip-ci test-default-sni-client ; Needs badssl.com
   (testing "`sni/default-client` behaves similarly to `URL.openStream()`"
     (let [sslengine (hkc/make-ssl-engine)
           https-client @sni/default-client
