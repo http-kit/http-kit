@@ -564,15 +564,21 @@
     (is (= 200 (:status @resp)))))
 
 (deftest test-server-status
-  (let [server (run-server (slow-request-handler 500) {:port 3474 :legacy-return-value? false})
-        resp_  (future (try (http/get "http://localhost:3474") (catch Exception e {:status "fail"})))]
+  (let [entered_ (promise)
+        release_ (promise)
+        server   (run-server (fn [_] (deliver entered_ true) (deref release_ 5000 nil) {:body "ok"})
+                   {:port 3474 :legacy-return-value? false})
+        resp_    (future (try (http/get "http://localhost:3474") (catch Exception e {:status "fail"})))]
 
-    (deref resp_ 100 nil) ; Ensure http/get has started
-
+    (is (deref entered_ 5000 false) "Request in flight")
     (is (= (server-status server) :running))
-    (let [f_ (future (server-stop! server {:timeout 1000}))]
-      (deref f_ 100 nil) ; Ensure stop call has started
+    (let [f_ (future (server-stop! server {:timeout 5000}))]
+      (loop [n 0] ; Await stop call start (it then blocks on held request)
+        (when (and (= (server-status server) :running) (< n 500))
+          (Thread/sleep 10)
+          (recur (inc n))))
       (is (= (server-status server) :stopping))
+      (deliver release_ true)
       (is (= (deref @f_ 5000 false) true)))
 
     (is (= (server-status server) :stopped))

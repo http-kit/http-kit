@@ -711,10 +711,10 @@ public class HttpServer implements Runnable {
         Thread cbThread = new Thread(new Runnable() {
                 public void run() {
                     try { serverThread.join(); } catch (InterruptedException e) { }
+                    status.set(Status.STOPPED); // Before callback, so awaiters see STOPPED
                     if (callback != null) {
                         try { callback.run(); } catch (Throwable t) { }
                     }
-                    status.set(Status.STOPPED);
                 }
             });
 
