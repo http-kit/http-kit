@@ -85,7 +85,15 @@
     (fn [req]
       (as-channel req
         {:on-open (fn [^AsyncChannel ch]
-                    (.serverClose ch 1000 "bye"))}))))
+                    (.serverClose ch 1000 "bye"))})))
+  (GET "/bad-close-status" []
+    (fn [req]
+      (as-channel req
+        {:on-open (fn [^AsyncChannel ch]
+                    (try
+                      (.serverClose ch 2000 "accepted")
+                      (catch IllegalArgumentException _
+                        (.serverClose ch 1000 "rejected"))))}))))
 
 (use-fixtures :once (fn [f]
                       (let [server (run-server
@@ -327,6 +335,21 @@
             [(masked-frame true 0 0x8 (byte-array [0]))]]]]
     (testing description
       (is (server-closes-after? frames)))))
+
+(deftest test-unassigned-websocket-close-statuses ; Ref. #620
+  (testing "Inbound: connection failed with 1002, not echoed"
+    (doseq [status [1016 2000 2999]]
+      (with-open [^Socket socket (raw-websocket)]
+        (write-frames! socket
+          [(masked-frame true 0 0x8
+             (byte-array [(unchecked-byte (bit-shift-right status 8)) (unchecked-byte status)]))])
+        (is (= 1002 (close-status (read-frame socket))) (str status)))))
+
+  (testing "Outbound: rejected, leaving channel usable"
+    (with-open [^Socket socket (raw-websocket "/bad-close-status")]
+      (let [{:keys [^bytes body] :as frame} (read-frame socket)]
+        (is (= 1000 (close-status frame)))
+        (is (= "rejected" (String. body 2 (- (alength body) 2) "UTF-8")))))))
 
 (deftest test-websocket
   (doseq [_ (range 1 4)]

@@ -243,10 +243,14 @@ public class WSDecoder {
         }
     }
 
+    // Statuses valid in a Close frame (either direction), Ref. RFC 6455 §7.4:
+    // 1000-2999 are reserved for the protocol, so only registered codes are
+    // valid there (incl. IANA-registered 1012-1014). 3000-4999 are for
+    // libraries and private use.
     static boolean isValidCloseStatus(int status) {
-        return status >= 1000 && status < 5000
-                && status != 1004 && status != 1005
-                && status != 1006 && status != 1015;
+        return (status >= 1000 && status <= 1003)
+            || (status >= 1007 && status <= 1014)
+            || (status >= 3000 && status <= 4999);
     }
 
     private static String decodeUtf8(byte[] data, int offset, int length)
