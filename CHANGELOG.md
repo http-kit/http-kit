@@ -2,6 +2,62 @@ This project uses [**Break Versioning**](https://www.taoensso.com/break-versioni
 
 ---
 
+# `v2.9.0-beta5` (2026-11-22)
+
+- **Dependency**: [on Clojars](https://clojars.org/http-kit/versions/2.9.0-beta5)
+- **Versioning**: [Break Versioning](https://www.taoensso.com/break-versioning)
+
+This is a significant **security and maintenance** pre-release. It's expected to
+be stable, but the changes affect core networking paths: please **test carefully
+and report any unexpected problems**, thank you! 🙏
+
+See linked commits below for details, and big thanks to all contributors!
+
+\- [Peter Taoussanis](https://www.taoensso.com)
+
+## Since `v2.9.0-beta4` (2026-07-31)
+
+### BREAKING
+
+* \[mod] \[server] \[#615] Normalize duplicate headers \[6475a35]
+  - Duplicate request headers in Ring request maps are now joined with `,`
+    (`;` for `Cookie`) instead of newlines. Handlers that split these on
+    newlines should split on the new delimiters instead.
+* \[mod] \[server] \[#620] Reject unassigned WebSocket close codes (@whilo) \[f773552]
+  - Closing a channel with a code in 1016-2999 now throws, and a peer that
+    starts a close with one receives 1002 instead of an echo. Both endpoints
+    should use a code in 4000-4999 instead.
+
+### Fixes
+
+* \[sec] \[server] \[#619] Bound queued pipelined responses \[b9a0302]
+* \[sec] \[server] \[#619] Bound unhandled WebSocket frames \[56a472a]
+* \[sec] \[client] Strip redirect headers independently of locale \[b547df2]
+* \[sec] Don't convert invalid header names to valid \[3868a5e]
+* \[fix] \[#496] \[#573] Cap bytes per socket write \[ae2085a]
+* \[fix] \[server] Don't end streaming response on empty first send \[349f983]
+* \[fix] \[server] Close socket after WebSocket close handshake \[0b747f5]
+* \[fix] \[server] Don't retain handled WebSocket frames \[3fdbf68]
+* \[fix] \[server] Don't close connections under write lock \[995aadf]
+* \[fix] \[server] Keep unwritten bytes of partial writes \[e113cce]
+* \[fix] \[client] \[#580] Fix circular error response after redirect \[76739b0]
+* \[fix] \[client] Send all of request with empty body \[824c797]
+* \[fix] \[#343] Accept keyword header names \[4f54045]
+* \[fix] \[client] \[#418] Allow response header lines up to 64KB \[973e263]
+* \[fix] \[server] \[#196] Return 431 for oversized header line \[26a0155]
+* \[fix] \[server] Return 400 for oversized chunk line \[4cd3fe1]
+* \[fix] \[server] Set stopped status before stop callback \[0e61345]
+* \[fix] \[server] `server-status`: ignore JVM locale \[4a95cc8]
+
+### New
+
+* \[new] \[server] \[#619] Add `queued-bytes` (@whilo) \[d8f28ef]
+* \[new] \[client] \[server] \[#618] Add support for HTTP QUERY method (@Ramblurr) \[7f8c701]
+* \[doc] \[#597] Note virtual thread stalls on JVM 21-23 \[9a7dee4]
+* \[doc] \[#612] \[#571] Correct client and server docstrings \[c9eb65e]
+
+---
+
 # `v2.9.0-beta4` (2026-07-31)
 
 - **Dependency**: [on Clojars](https://clojars.org/http-kit/versions/2.9.0-beta4)
