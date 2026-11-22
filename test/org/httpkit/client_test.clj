@@ -118,6 +118,7 @@
                                :status 200
                                :headers {"content-type" "text/plain"}}))
 
+  (GET "/large-header" [] (fn [_] {:headers {"x-large" (apply str (repeat 20000 \x))}}))
   (GET "/test-header" [] (fn [{:keys [headers]}] (str (get headers "test-header"))))
   (GET "/zip"         [] (fn [req] {:body "hello"}))
   (GET "/manual-gzip" []
@@ -731,6 +732,9 @@
     "Keyword header name")
   (is (:error @(hkc/get "http://localhost:4347/test-header" {:headers {"x-a\u212A" "test"}}))
     "Non-ASCII header name"))
+
+(deftest test-large-response-header ; Ref. #418
+  (is (= 20000 (count (-> @(hkc/get "http://localhost:4347/large-header") :headers :x-large)))))
 
 (defn- utf8 [^String s] (ByteBuffer/wrap (.getBytes s "UTF-8")))
 
