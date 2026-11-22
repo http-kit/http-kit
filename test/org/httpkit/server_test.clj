@@ -119,7 +119,7 @@
   (GET "/headers" [] many-headers-handler)
   (ANY "/spec" [] (fn [req] (pr-str (dissoc req :body :async-channel))))
   (GET "/string" [] (fn [req] {:status 200
-                               :headers {"Content-Type" "text/plain"}
+                               :headers {:content-type "text/plain"} ; Keyword, Ref. #343
                                :body "Hello World"}))
   (GET "/iseq" [] (fn [req] {:status 200
                              :headers {"Content-Type" "text/plain"}

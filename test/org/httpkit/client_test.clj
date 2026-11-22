@@ -710,7 +710,10 @@
                            ['("a" "b") "a,b"]]]
     (let [received (:body @(hkc/get "http://localhost:4347/test-header"
                              {:headers {"test-header" sent}}))]
-      (is (= received expected)))))
+      (is (= received expected))))
+  (is (= "test" (:body @(hkc/get "http://localhost:4347/test-header"
+                          {:headers {:test-header "test"}})))
+    "Keyword header name"))
 
 (defn- utf8 [^String s] (ByteBuffer/wrap (.getBytes s "UTF-8")))
 

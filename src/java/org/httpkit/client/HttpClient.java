@@ -535,15 +535,15 @@ public class HttpClient implements Runnable {
         }
     }
 
-    private HeaderMap requestHeaders(Map<String, Object> source) throws ProtocolException {
+    private HeaderMap requestHeaders(Map<?, ?> source) throws ProtocolException {
         HeaderMap headers = new HeaderMap();
         if (source == null) {
             return headers;
         }
 
         Set<String> singletons = new HashSet<String>();
-        for (Map.Entry<String, Object> entry : source.entrySet()) {
-            String name = HttpUtils.camelCase(entry.getKey());
+        for (Map.Entry<?, ?> entry : source.entrySet()) {
+            String name = HeaderMap.headerName(entry.getKey());
             if ("Transfer-Encoding".equals(name)) {
                 throw new ProtocolException("Chunked request bodies are not supported");
             }

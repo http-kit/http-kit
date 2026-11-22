@@ -37,7 +37,7 @@
         (if (contains? names (str/lower-case (str (name* k))))
           m
           (assoc m k v)))
-      (empty headers)
+      {}
       headers)))
 
 (defn- assoc-header-ci [headers header-name value]

@@ -1,6 +1,7 @@
 package org.httpkit;
 
 import clojure.lang.ISeq;
+import clojure.lang.Named;
 import clojure.lang.Seqable;
 
 import java.util.Arrays;
@@ -132,11 +133,16 @@ public class HeaderMap {
         this.size = 0;
     }
 
-    public static HeaderMap camelCase(Map<String, Object> map) {
+    // :content-type or "content-type" => "Content-Type"
+    public static String headerName(Object name) {
+        return HttpUtils.camelCase((name instanceof Named) ? ((Named) name).getName() : (String) name);
+    }
+
+    public static HeaderMap camelCase(Map<?, ?> map) {
         HeaderMap tmp = new HeaderMap();
         if (map != null) {
-            for (Map.Entry<String, Object> e : map.entrySet()) {
-                tmp.put(HttpUtils.camelCase(e.getKey()), e.getValue());
+            for (Map.Entry<?, ?> e : map.entrySet()) {
+                tmp.put(headerName(e.getKey()), e.getValue());
             }
         }
         return tmp;
