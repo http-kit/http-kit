@@ -26,7 +26,7 @@
 (extend-type HttpServer
   IHttpServer
   (server-port   [s] (.getPort s))
-  (server-status [s] (keyword (str/lower-case (.name (.getStatus s)))))
+  (server-status [s] (keyword (.toLowerCase (.name (.getStatus s)) java.util.Locale/ROOT)))
   (-server-stop! [s {:keys [timeout] :or {timeout 100}}]
     (let [p_ (promise)]
       (when (.stop s timeout #(deliver p_ true))
