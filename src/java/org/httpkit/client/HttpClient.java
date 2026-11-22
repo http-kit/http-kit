@@ -528,7 +528,7 @@ public class HttpClient implements Runnable {
         headers.encodeHeaders(bytes);
         ByteBuffer headBuffer = ByteBuffer.wrap(bytes.get(), 0, bytes.length());
 
-        if (bodyBuffer == null) {
+        if (bodyBuffer == null || !bodyBuffer.hasRemaining()) {
             return new ByteBuffer[]{headBuffer};
         } else {
             return new ByteBuffer[]{headBuffer, bodyBuffer};

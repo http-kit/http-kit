@@ -169,6 +169,7 @@
                  :ssl-port        9898
                  :ssl?            true
                  :sni-host-check? false
+                 :request-header-size 65536
                  :key-password    "123456"
                  :keystore        "test/ssl_keystore"})]
 
@@ -380,6 +381,13 @@
         (is (= length (-> @(hkc/get (get-url length)
                              (assoc (rand-keep-alive) :insecure? true))
                         :body count)))))))
+
+(deftest test-https-empty-body-with-large-headers
+  (is (= "0"
+        (:body
+         @(hkc/post "https://localhost:9898/content-length"
+            {:insecure? true :timeout 5000 :body ""
+             :headers {"x-large" (apply str (repeat 20000 \x))}})))))
 
 (deftest test-misc-https-certs
   ;; Check to make sure an https connection works using the default trust store.
