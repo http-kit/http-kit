@@ -537,12 +537,12 @@ public class HttpServer implements Runnable {
                     // One IO thread => One thread reading + Many thread writing
                     // Save 2 system call
                     ch.write(buffers, 0, buffers.length);
-                    if (buffers[buffers.length - 1].hasRemaining()) {
-                        for (ByteBuffer b : buffers) {
-                            if (b.hasRemaining()) {
-                                atta.toWrites.add(b);
-                            }
+                    for (ByteBuffer b : buffers) {
+                        if (b.hasRemaining()) {
+                            atta.toWrites.add(b);
                         }
+                    }
+                    if (!atta.toWrites.isEmpty()) {
                         pending.add(new PendingKey(key, PendingKey.OP_WRITE));
                         selector.wakeup();
                     } else if (!atta.isKeepAlive()) {
