@@ -381,12 +381,12 @@ Value may be a delay. See also `make-client`."}
                 (binding [*in-callback* true] (callback resp))
                 (catch Throwable t
                   (HttpUtils/printError (str method " " url "'s callback") t)
-                  {:opts opts :error t}))
+                  {:opts (dissoc opts :response) :error t}))
               resp)))
 
         handler
         (reify IResponseHandler
-          (onThrowable [this t] (deliver-resp {:opts opts :error t}))
+          (onThrowable [this t] (deliver-resp {:opts (dissoc opts :response) :error t}))
           (onSuccess [this status headers body]
             (if-let [follow-redirect? (and follow-redirects (#{301 302 303 307 308} status))]
 

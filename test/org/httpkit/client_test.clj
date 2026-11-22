@@ -67,6 +67,7 @@
                                   "&code=" code)}}))))
 
   (ANY "/redirect-nil" [] (fn [req] {:status 302 :headers nil :body ""}))
+  (ANY "/redirect-unsupported" [] (fn [req] {:status 302 :headers {"location" "ftp://127.0.0.1/"}}))
   (ANY "/redirect-with-body" []
     (fn [req]
       {:status (to-int (or (-> req :params :code) "302"))
@@ -569,6 +570,12 @@
     (testing "nil"
       (let [url "http://localhost:4347/redirect-nil"]
         (is (:error  @(hkc/get url)))))
+
+    (testing "Error after redirect isn't circular" ; Ref. #580
+      (let [resp @(hkc/get "http://localhost:4347/redirect-unsupported")]
+        (is (:error resp))
+        (is (= "ftp://127.0.0.1/" (:url (:opts resp))) "Error is from redirect target")
+        (is (not (contains? (:opts resp) :response)))))
 
     (testing "drops request bodies when switching to GET"
       (let [url "http://localhost:4347/redirect-with-body"]
