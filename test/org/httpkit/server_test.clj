@@ -151,6 +151,10 @@
   (GET "/slow" [] slow-server-handler)
   (GET "/streaming" [] streaming-handler)
   (GET "/async-just-body" [] async-just-body)
+  (GET "/streaming-empty-first" []
+    (fn [req]
+      (as-channel req
+        {:on-open (fn [ch] (send! ch "" false) (send! ch "hello"))})))
   (GET "/i-set-date" [] (fn [req] {:status 200
                                    :headers {"Date" "Tue, 7 Mar 2017 19:52:50 GMT"}
                                    :body ""}))
@@ -430,6 +434,9 @@
       (is (:headers resp))
       (is (= (:body resp) s))
       (check-on-close-called))))
+
+(deftest test-streaming-empty-first-send
+  (is (= "hello" (:body @(client/get "http://localhost:4347/streaming-empty-first")))))
 
 (deftest test-client-abort-server-receive-on-close
   (doseq [i (range 0 2)]

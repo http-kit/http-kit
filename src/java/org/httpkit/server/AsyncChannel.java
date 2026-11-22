@@ -157,8 +157,9 @@ public class AsyncChannel {
         } else {
             if (request.version == HttpVersion.HTTP_1_1) {
                 ByteBuffer[] bb = HttpEncodeChunked(status, headers, body, server.serverHeader);
-                if (bb.length == 1) {
-                    buffers = bb;
+                if (bb.length == 1 || !bb[1].hasRemaining()) {
+                    // An empty chunk would end the response
+                    buffers = new ByteBuffer[]{bb[0]};
                 } else {
                     buffers = new ByteBuffer[]{
                             bb[0], // header
