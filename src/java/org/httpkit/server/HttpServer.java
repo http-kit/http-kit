@@ -511,6 +511,7 @@ public class HttpServer implements Runnable {
         ServerAtta atta = (ServerAtta) key.attachment();
         SocketChannel ch = (SocketChannel) key.channel();
         boolean resume = false;
+        boolean close = false;
         try {
             // the sync is per socket (per client). virtually, no contention
             // 1. keep byte data order, 2. ensure visibility
@@ -547,14 +548,16 @@ public class HttpServer implements Runnable {
                             keptAlive.put(key, true);
                         }
                     } else {
-                        closeKey(key, CLOSE_NORMAL);
+                        close = true;
                     }
                 }
             }
         } catch (IOException e) { // the remote forcibly closed the connection
             closeKey(key, CLOSE_AWAY);
         }
-        if (resume) {
+        if (close) { // Outside lock, since close handlers may run
+            closeKey(key, CLOSE_NORMAL);
+        } else if (resume) {
             resumeAfterResponse(key);
         }
     }
