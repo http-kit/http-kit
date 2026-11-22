@@ -4,6 +4,7 @@ import static java.nio.channels.SelectionKey.OP_ACCEPT;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
 import static org.httpkit.HttpUtils.HttpEncode;
+import static org.httpkit.HttpUtils.cappedWrite;
 import static org.httpkit.HttpUtils.WsEncode;
 import static org.httpkit.server.Frame.CloseFrame.CLOSE_AWAY;
 import static org.httpkit.server.Frame.CloseFrame.CLOSE_NORMAL;
@@ -528,14 +529,10 @@ public class HttpServer implements Runnable {
                 LinkedList<ByteBuffer> toWrites = atta.toWrites;
                 int size = toWrites.size();
                 long written = 0;
-                if (size == 1) {
-                    written = ch.write(toWrites.get(0));
-                    // TODO investigate why needed.
-                    // ws request for write, but has no data?
-                } else if (size > 0) {
+                if (size > 0) {
                     ByteBuffer buffers[] = new ByteBuffer[size];
                     toWrites.toArray(buffers);
-                    written = ch.write(buffers, 0, buffers.length);
+                    written = cappedWrite(ch, buffers);
                 }
                 atta.queuedBytes -= written;
                 Iterator<ByteBuffer> ite = toWrites.iterator();
@@ -585,7 +582,7 @@ public class HttpServer implements Runnable {
                     // TCP buffer most of time is empty, writable(8K ~ 256k)
                     // One IO thread => One thread reading + Many thread writing
                     // Save 2 system call
-                    ch.write(buffers, 0, buffers.length);
+                    cappedWrite(ch, buffers);
                     for (ByteBuffer b : buffers) {
                         if (b.hasRemaining()) {
                             atta.toWrites.add(b);

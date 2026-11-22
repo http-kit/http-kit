@@ -9,6 +9,7 @@ import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel.MapMode;
+import java.nio.channels.SocketChannel;
 import java.nio.charset.Charset;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -129,6 +130,45 @@ public class HttpUtils {
 
     public static final String CONTINUE = "100-continue";
 
+
+    // Max bytes per socket write. The JDK writes a heap buffer by first copying
+    // all of it to a direct buffer of the same size, which it then caches per
+    // thread. So writing large buffers whole is slow, and holds on to a lot of
+    // native memory (largest write x writing threads).
+    private static final int MAX_WRITE_BYTES = 256 * 1024;
+
+    // Like `ch.write(buffers)`, but writes at most MAX_WRITE_BYTES at a time
+    public static long cappedWrite(SocketChannel ch, ByteBuffer[] buffers) throws IOException {
+        long written = 0;
+        int i = 0;
+        while (i < buffers.length) {
+            ByteBuffer b = buffers[i];
+            long wanted;
+            long n;
+            if (b.remaining() > MAX_WRITE_BYTES) { // Write part of large buffer
+                int limit = b.limit();
+                b.limit(b.position() + MAX_WRITE_BYTES);
+                try {
+                    n = ch.write(b);
+                } finally {
+                    b.limit(limit);
+                }
+                wanted = MAX_WRITE_BYTES;
+            } else { // Write as many small buffers as fit
+                int from = i;
+                wanted = 0;
+                while (i < buffers.length && wanted + buffers[i].remaining() <= MAX_WRITE_BYTES) {
+                    wanted += buffers[i++].remaining();
+                }
+                n = ch.write(buffers, from, i - from);
+            }
+            written += n;
+            if (n < wanted) {
+                break; // Socket's send buffer is full
+            }
+        }
+        return written;
+    }
 
     public static ByteBuffer bodyBuffer(Object body) throws IOException {
         if (body == null) {

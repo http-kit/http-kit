@@ -335,7 +335,7 @@ public class HttpClient implements Runnable {
                 }
             } else {
                 ByteBuffer[] buffers = req.request;
-                long written = ch.write(buffers);
+                long written = HttpUtils.cappedWrite(ch, buffers);
                 if (written > 0) {
                     req.onProgress(now);
                 }
