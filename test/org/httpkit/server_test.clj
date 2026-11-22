@@ -691,6 +691,29 @@
           "All responses arrive in order once client reads"))
       (finally (server)))))
 
+(deftest test-queued-bytes ; Ref. #619
+  (let [ch_    (promise)
+        server (run-server (fn [req] (as-channel req {:on-open #(deliver ch_ %)})) {:port 3474})]
+    (try
+      (with-open [socket (java.net.Socket. "localhost" 3474)]
+        (.write (.getOutputStream socket) (.getBytes "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n"))
+        (let [ch    (deref ch_ 5000 nil)
+              chunk (apply str (repeat (* 64 1024) "x"))]
+
+          (is (= 0 (queued-bytes ch)))
+          (dotimes [_ 400] (send! ch chunk false))
+          (is (pos? (queued-bytes ch)) "Client isn't reading, so sends queue")
+
+          (future ; Client starts reading
+            (let [in (.getInputStream socket), buf (byte-array 65536)]
+              (while (pos? (.read in buf)))))
+          (loop [n 0] ; Await client catching up
+            (when (and (pos? (queued-bytes ch)) (< n 500))
+              (Thread/sleep 10)
+              (recur (inc n))))
+          (is (= 0 (queued-bytes ch)) "Client has read everything")))
+      (finally (server)))))
+
 (defroutes custom-routes
   (GET "/" [] "hello world"))
 

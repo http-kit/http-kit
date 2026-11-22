@@ -235,6 +235,12 @@ public class HttpServer implements Runnable {
         }
 
         ServerAtta att = (ServerAtta) key.attachment();
+        if (att != null) {
+            synchronized (att) { // Nothing more can be written
+                att.toWrites.clear();
+                att.queuedBytes = 0;
+            }
+        }
         if (att instanceof HttpAtta) {
             handler.clientClose(att.channel, -1);
         } else if (att != null) {
@@ -501,15 +507,17 @@ public class HttpServer implements Runnable {
             synchronized (atta) {
                 LinkedList<ByteBuffer> toWrites = atta.toWrites;
                 int size = toWrites.size();
+                long written = 0;
                 if (size == 1) {
-                    ch.write(toWrites.get(0));
+                    written = ch.write(toWrites.get(0));
                     // TODO investigate why needed.
                     // ws request for write, but has no data?
                 } else if (size > 0) {
                     ByteBuffer buffers[] = new ByteBuffer[size];
                     toWrites.toArray(buffers);
-                    ch.write(buffers, 0, buffers.length);
+                    written = ch.write(buffers, 0, buffers.length);
                 }
+                atta.queuedBytes -= written;
                 Iterator<ByteBuffer> ite = toWrites.iterator();
                 while (ite.hasNext()) {
                     if (!ite.next().hasRemaining()) {
@@ -518,6 +526,7 @@ public class HttpServer implements Runnable {
                 }
                 // all done
                 if (toWrites.size() == 0) {
+                    atta.queuedBytes = 0;
                     if (atta.isKeepAlive()) {
                         if (atta.awaitingDrain) {
                             resume = true;
@@ -558,6 +567,7 @@ public class HttpServer implements Runnable {
                     for (ByteBuffer b : buffers) {
                         if (b.hasRemaining()) {
                             atta.toWrites.add(b);
+                            atta.queuedBytes += b.remaining();
                         }
                     }
                     if (!atta.toWrites.isEmpty()) {
@@ -574,6 +584,9 @@ public class HttpServer implements Runnable {
             } else {
                 // If has pending write, order should be maintained. (WebSocket)
                 Collections.addAll(atta.toWrites, buffers);
+                for (ByteBuffer b : buffers) {
+                    atta.queuedBytes += b.remaining();
+                }
                 pending.add(new PendingKey(key, PendingKey.OP_WRITE));
                 selector.wakeup();
             }

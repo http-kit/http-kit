@@ -385,6 +385,15 @@ public class AsyncChannel {
         return true;
     }
 
+    // Bytes sent to this channel, but not yet written to its socket
+    public long queuedBytes() {
+        ServerAtta atta = (ServerAtta) key.attachment();
+        synchronized (atta) {
+            // Once closed, connection may be serving another channel
+            return isClosed() ? 0 : atta.queuedBytes;
+        }
+    }
+
     public String toString() {
         Socket s = ((SocketChannel) key.channel()).socket();
         return s.getLocalSocketAddress() + "<->" + s.getRemoteSocketAddress();

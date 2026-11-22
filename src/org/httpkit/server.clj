@@ -342,6 +342,19 @@
                                 (.send ch (Frame$PongFrame. data) false)
                                 (callback data)))))
 
+(defn queued-bytes
+  "Returns the number of bytes sent to given channel (e.g. with `send!`) that
+  are still queued in server memory, waiting to be written to the client's
+  socket. Returns 0 for closed channels.
+
+  This queue is unbounded, so it'll keep growing for as long as you send data
+  faster than the client reads it. When pushing data to clients (WebSockets,
+  SSE, HTTP streaming, etc.), you can use this to detect slow clients and
+  then skip sends, or `close` the channel.
+
+  For Ring WebSockets, the channel is the Ring request's `:async-channel`."
+  ^long [^AsyncChannel ch] (.queuedBytes ch))
+
 (defmacro with-channel
   "DEPRECATED: this macro has potential race conditions, Ref. #318.
   Prefer `as-channel` instead."
