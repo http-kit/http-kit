@@ -198,7 +198,7 @@ public class HttpDecoder {
                     readHeaders(buffer);
                     break;
                 case READ_CHUNK_SIZE:
-                    line = lineReader.readLine(buffer);
+                    line = readChunkLine(buffer);
                     if (line != null) {
                         readRemaining = getChunkSize(line);
                         if (readRemaining == 0) {
@@ -244,9 +244,18 @@ public class HttpDecoder {
         request.setBody(content, readCount);
     }
 
+    // Reads a chunk size or chunk delimiter line
+    private String readChunkLine(ByteBuffer buffer) throws ProtocolException {
+        try {
+            return lineReader.readLine(buffer);
+        } catch (LineTooLargeException e) {
+            throw new ProtocolException("HTTP chunk: " + e.getMessage());
+        }
+    }
+
     private void readEmptyLine(ByteBuffer buffer, State nextState)
-            throws LineTooLargeException, ProtocolException {
-        String line = lineReader.readLine(buffer);
+            throws ProtocolException {
+        String line = readChunkLine(buffer);
         if (line != null) {
             if (!line.isEmpty()) {
                 throw new ProtocolException("Expected an empty line, but found " + line);
