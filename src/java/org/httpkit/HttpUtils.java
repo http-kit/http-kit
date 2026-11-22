@@ -303,11 +303,13 @@ public class HttpUtils {
         boolean upper = true;
         for (int i = 0; i < key.length(); i++) {
             char c = key.charAt(i);
-            if (upper) {
-                sb.append(Character.toUpperCase(c));
-            } else {
-                sb.append(Character.toLowerCase(c));
+            // ASCII only, so that invalid names stay invalid
+            if (upper && c >= 'a' && c <= 'z') {
+                c -= 32;
+            } else if (!upper && c >= 'A' && c <= 'Z') {
+                c += 32;
             }
+            sb.append(c);
             upper = c == '-';
         }
         return sb.toString();

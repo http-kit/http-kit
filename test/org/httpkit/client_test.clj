@@ -713,7 +713,9 @@
       (is (= received expected))))
   (is (= "test" (:body @(hkc/get "http://localhost:4347/test-header"
                           {:headers {:test-header "test"}})))
-    "Keyword header name"))
+    "Keyword header name")
+  (is (:error @(hkc/get "http://localhost:4347/test-header" {:headers {"x-a\u212A" "test"}}))
+    "Non-ASCII header name"))
 
 (defn- utf8 [^String s] (ByteBuffer/wrap (.getBytes s "UTF-8")))
 
