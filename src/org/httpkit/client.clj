@@ -157,7 +157,12 @@
 
   When on JVM 21+, uses `newVirtualThreadPerTaskExecutor` by default.
   Otherwise creates a standard `ThreadPoolExecutor` with default min and max
-  thread count auto-selected based on currently available processor count."
+  thread count auto-selected based on currently available processor count.
+
+  On JVM 21-23, all virtual threads can stall when enough of them block
+  inside a `synchronized` block, as Clojure <1.12 does when realizing lazy
+  seqs and delays (e.g. a `map` over blocking IO calls). If affected: prefer
+  Clojure 1.12+ or JVM 24+, or use `{:allow-virtual? false}`."
 
   [{:keys [queue-size n-min-threads n-max-threads prefix allow-virtual?] :as opts}]
   (utils/new-worker
