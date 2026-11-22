@@ -669,6 +669,28 @@
       (is (= "1" (:body (get @responses_ 1))))
       (is (= "2" (:body (get @responses_ 2)))))))
 
+(deftest test-pipelined-requests-await-response-drain ; Ref. #619
+  (let [n-reqs   100
+        n-calls_ (atom 0)
+        padding  (apply str (repeat (* 256 1024) "x"))
+        server   (run-server
+                   (fn [_] {:body (str (format "%05d" (swap! n-calls_ inc)) padding)})
+                   {:port 3474})]
+    (try
+      (with-open [socket (doto (java.net.Socket. "localhost" 3474) (.setSoTimeout 10000))]
+        (.write (.getOutputStream socket)
+          (.getBytes
+            (str (apply str (repeat (dec n-reqs) "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n"))
+              "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")))
+
+        (Thread/sleep 500)
+        (is (< 0 @n-calls_ n-reqs) "Client isn't reading, so later requests aren't yet handled")
+
+        (is (= (map #(format "%05d" %) (range 1 (inc n-reqs)))
+               (map second (re-seq #"\r\n\r\n(\d{5})" (slurp (.getInputStream socket) :encoding "ISO-8859-1"))))
+          "All responses arrive in order once client reads"))
+      (finally (server)))))
+
 (defroutes custom-routes
   (GET "/" [] "hello world"))
 

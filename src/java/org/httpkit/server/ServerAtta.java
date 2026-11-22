@@ -8,6 +8,7 @@ public abstract class ServerAtta {
 
     ByteBuffer pendingInput;
     boolean requestInProgress;
+    boolean awaitingDrain; // Response complete, but not yet fully written
 
     protected AsyncChannel channel;
 

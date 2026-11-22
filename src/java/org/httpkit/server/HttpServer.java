@@ -263,7 +263,8 @@ public class HttpServer implements Runnable {
     }
 
     private boolean canReadWhileInProgress(ServerAtta atta) {
-        return atta.pendingInput == null || atta.pendingInput.position() < buffer.capacity();
+        return !atta.awaitingDrain
+            && (atta.pendingInput == null || atta.pendingInput.position() < buffer.capacity());
     }
 
     private void updateInterestOps(SelectionKey key) {
@@ -298,6 +299,17 @@ public class HttpServer implements Runnable {
 
         ServerAtta atta = (ServerAtta) key.attachment();
         if (!atta.requestInProgress) {
+            return;
+        }
+
+        // HTTP: handle the next (pipelined) request only once the response is
+        // written, otherwise a client that doesn't read its responses could
+        // queue them without bound.
+        synchronized (atta) {
+            atta.awaitingDrain = atta instanceof HttpAtta && !atta.toWrites.isEmpty();
+        }
+        if (atta.awaitingDrain) {
+            updateInterestOps(key);
             return;
         }
         atta.requestInProgress = false;
@@ -482,6 +494,7 @@ public class HttpServer implements Runnable {
     private void doWrite(SelectionKey key) {
         ServerAtta atta = (ServerAtta) key.attachment();
         SocketChannel ch = (SocketChannel) key.channel();
+        boolean resume = false;
         try {
             // the sync is per socket (per client). virtually, no contention
             // 1. keep byte data order, 2. ensure visibility
@@ -506,7 +519,9 @@ public class HttpServer implements Runnable {
                 // all done
                 if (toWrites.size() == 0) {
                     if (atta.isKeepAlive()) {
-                        if (atta.requestInProgress) {
+                        if (atta.awaitingDrain) {
+                            resume = true;
+                        } else if (atta.requestInProgress) {
                             key.interestOps(canReadWhileInProgress(atta) ? OP_READ : 0);
                         } else {
                             key.interestOps(OP_READ);
@@ -519,6 +534,9 @@ public class HttpServer implements Runnable {
             }
         } catch (IOException e) { // the remote forcibly closed the connection
             closeKey(key, CLOSE_AWAY);
+        }
+        if (resume) {
+            resumeAfterResponse(key);
         }
     }
 
